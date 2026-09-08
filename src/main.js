@@ -96,16 +96,22 @@ function renderConstraints() {
       const unit = document.createElement('span');
       unit.className = 'unit';
       unit.textContent = unitLabel();
+      const swap = document.createElement('button');
+      swap.className = 'cx-swap';
+      swap.textContent = '⇄';
+      swap.title = 'Reverse direction (swap which edge anchors)';
       const del = document.createElement('button');
+      del.className = 'cx-del';
       del.textContent = '🗑';
       del.title = 'Delete dimension';
-      row.append(tag, input, unit, del);
+      row.append(tag, input, unit, swap, del);
       cxList.appendChild(row);
 
       input.addEventListener('input', () => {
         const v = parseFloat(input.value);
         if (!Number.isNaN(v)) project.setConstraintMagnitude(c.id, toMeters(v));
       });
+      swap.addEventListener('click', () => project.swapConstraint(c.id));
       del.addEventListener('click', () => project.removeConstraint(c.id));
 
       entry = { row, input, unit, tag };
@@ -140,8 +146,6 @@ sketch.onPickConstraint = (id) => {
 const propsPanel = document.getElementById('props');
 const pX = document.getElementById('p-x');
 const pY = document.getElementById('p-y');
-const pW = document.getElementById('p-w');
-const pH = document.getElementById('p-h');
 const pOp = document.getElementById('p-op');
 const pDel = document.getElementById('p-del');
 let selectedRect = null;
@@ -162,8 +166,6 @@ function updateProps() {
   };
   set(pX, b.x0);
   set(pY, b.y0);
-  set(pW, b.x1 - b.x0);
-  set(pH, b.y1 - b.y0);
   pOp.textContent = r.op === 'add' ? '➕ Add' : '➖ Subtract';
   pOp.className = `op-toggle ${r.op}`;
 }
@@ -177,8 +179,6 @@ project.onChange(updateProps);
 
 pX.addEventListener('input', () => { const v = parseFloat(pX.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.x = toMeters(v); project.touch(); } });
 pY.addEventListener('input', () => { const v = parseFloat(pY.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.y = toMeters(v); project.touch(); } });
-pW.addEventListener('input', () => { const v = parseFloat(pW.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.w = Math.max(0, toMeters(v)); project.touch(); } });
-pH.addEventListener('input', () => { const v = parseFloat(pH.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.h = Math.max(0, toMeters(v)); project.touch(); } });
 pOp.addEventListener('click', () => {
   if (!selectedRect) return;
   selectedRect.op = selectedRect.op === 'add' ? 'subtract' : 'add';

@@ -116,6 +116,17 @@ export class Project {
     this._emit();
   }
 
+  // Reverse a distance constraint's direction: swap its two edges and negate
+  // the value. Geometrically identical, but flips which edge anchors (a holds,
+  // b moves) and the displayed a→b direction.
+  swapConstraint(id) {
+    const c = this.constraints.find((c) => c.id === id);
+    if (!c) return;
+    [c.a, c.b] = [c.b, c.a];
+    c.value = -c.value;
+    this._emit();
+  }
+
   setHeight(h) {
     this.height = Math.max(0.01, h);
     this._emit();

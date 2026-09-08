@@ -8,7 +8,7 @@
 
 import { Rectangle } from '../core/model.js';
 import { makeDistance, edgeCoord, EDGE_AXIS } from '../core/constraints.js';
-import { fmt, unitLabel, toMeters, unitInfo } from '../core/units.js';
+import { fmt, unitLabel, unitInfo } from '../core/units.js';
 
 const MIN_DRAW = 0.05; // ignore tiny accidental drags (meters)
 const EDGE_PICK_PX = 8; // edge hit-test threshold (screen px)
@@ -48,8 +48,6 @@ export class Sketch2D {
     this._dimFirst = null; // first edge picked for a dimension {rect, edge}
     this._hoverEdge = null; // edge under cursor (dimension tool)
     this._dimLabelHits = []; // clickable dimension labels, rebuilt each render
-    this._sizeLabelHits = []; // clickable rectangle W/H labels, rebuilt each render
-    this._sizeInput = null; // lazily-created inline number editor
 
     this._bindEvents();
 
@@ -174,15 +172,6 @@ export class Sketch2D {
           return;
         }
       }
-      // A rectangle's own W/H label opens the inline size editor.
-      const sizeLabel = this._hitSizeLabel(px, py);
-      if (sizeLabel) {
-        // Release capture so the canvas doesn't hold pointer focus over the input.
-        try { this.canvas.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-        this._beginSizeEdit(sizeLabel);
-        return;
-      }
-
       const hit = this._hitTest(world.x, world.y);
       this._select(hit ? hit.id : null);
       if (hit) {
@@ -222,7 +211,7 @@ export class Sketch2D {
         const handle = sel && this._hitHandle(px, py, sel);
         if (handle) {
           this.canvas.style.cursor = HANDLE_CURSOR[handle];
-        } else if (this._hitDimLabel(px, py) || this._hitSizeLabel(px, py)) {
+        } else if (this._hitDimLabel(px, py)) {
           this.canvas.style.cursor = 'text';
         } else {
           const hit = this._hitTest(world.x, world.y);
@@ -378,74 +367,6 @@ export class Sketch2D {
     return null;
   }
 
-  _hitSizeLabel(px, py) {
-    // Reverse order so topmost-drawn labels win.
-    for (let i = this._sizeLabelHits.length - 1; i >= 0; i--) {
-      const h = this._sizeLabelHits[i];
-      if (px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h) return h;
-    }
-    return null;
-  }
-
-  // ---- inline size editor ----
-  _ensureSizeInput() {
-    if (this._sizeInput) return this._sizeInput;
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.step = '0.1';
-    input.min = '0';
-    input.className = 'inline-size-input';
-    input.hidden = true;
-    this.canvas.parentElement.appendChild(input);
-
-    const commit = () => {
-      if (input.hidden) return;
-      const v = parseFloat(input.value);
-      const t = input._target;
-      input.hidden = true;
-      if (t && !Number.isNaN(v)) {
-        const meters = Math.max(0, toMeters(v));
-        const r = this.project.rectangles.find((x) => x.id === t.rect);
-        if (r) {
-          if (t.dim === 'w') r.w = meters; // anchors left edge
-          else r.h = meters; // anchors bottom edge
-          this.project.touch();
-        }
-      }
-    };
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { commit(); this.canvas.focus(); }
-      else if (e.key === 'Escape') { input.hidden = true; }
-      e.stopPropagation();
-    });
-    input.addEventListener('blur', commit);
-    this._sizeInput = input;
-    return input;
-  }
-
-  _beginSizeEdit(hit) {
-    const r = this.project.rectangles.find((x) => x.id === hit.rect);
-    if (!r) return;
-    this._select(r.id);
-    const b = r.bounds;
-    const val = hit.dim === 'w' ? b.x1 - b.x0 : b.y1 - b.y0;
-    const input = this._ensureSizeInput();
-    input._target = { rect: hit.rect, dim: hit.dim };
-    input.step = String(unitInfo().snap * unitInfo().perMeter);
-    input.value = fmt(val);
-    input.style.left = `${Math.round(hit.x)}px`;
-    input.style.top = `${Math.round(hit.y - 2)}px`;
-    input.hidden = false;
-    this.render();
-    // Focus must be deferred: calling focus() inside the pointerdown handler is
-    // undone by the browser's default focus handling after the handler returns
-    // (which would immediately blur+hide the input).
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  }
-
   // ---- selection ----
   _hitTest(wx, wy) {
     const rects = this.project.rectangles;
@@ -467,7 +388,6 @@ export class Sketch2D {
 
   clearSelection() {
     this._select(null);
-    if (this._sizeInput) this._sizeInput.hidden = true;
     this.render();
   }
 
@@ -482,7 +402,6 @@ export class Sketch2D {
     ctx.fillStyle = '#1a1d23';
     ctx.fillRect(0, 0, w, h);
 
-    this._sizeLabelHits = [];
     this._drawGrid();
     this._drawAxes();
 
@@ -639,32 +558,6 @@ export class Sketch2D {
     this._dimLabelHits.push({ id: c.id, x, y, w, h });
   }
 
-  // A clickable size chip centered at (cx, cy). Registers a matching hit box.
-  _drawSizeChip(rectId, dim, text, cx, cy, selected, color) {
-    const ctx = this.ctx;
-    ctx.font = '11px system-ui';
-    const tw = ctx.measureText(text).width;
-    const chipW = tw + 10;
-    const chipH = 15;
-    const bx = cx - chipW / 2;
-    const by = cy - chipH / 2;
-
-    ctx.fillStyle = selected ? 'rgba(74,158,255,0.22)' : 'rgba(13,17,23,0.72)';
-    ctx.fillRect(bx, by, chipW, chipH);
-    ctx.strokeStyle = selected ? color : 'rgba(150,160,175,0.4)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx, by, chipW, chipH);
-
-    ctx.fillStyle = selected ? '#ffffff' : '#c9d3e0';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, cx, cy + 0.5);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    this._sizeLabelHits.push({ rect: rectId, dim, x: bx, y: by, w: chipW, h: chipH });
-  }
-
   _niceStep() {
     // Choose a grid step (m) whose on-screen spacing is ~pleasant.
     const targetPx = 70;
@@ -753,12 +646,6 @@ export class Sketch2D {
     ctx.lineWidth = selected ? 2.5 : 1.5;
     ctx.strokeRect(x, y, w, h);
 
-    // Editable size chips (click to type a new value). Both horizontal so
-    // they are easy to read and click; hit boxes match the drawn chips exactly.
-    const bw = Math.abs(b.x1 - b.x0);
-    const bh = Math.abs(b.y1 - b.y0);
-    this._drawSizeChip(rect.id, 'w', fmt(bw), x + w / 2, y - 11, selected, color);
-    this._drawSizeChip(rect.id, 'h', fmt(bh), x - 22, y + h / 2, selected, color);
 
     if (selected) {
       const pts = this._handlePoints(rect);

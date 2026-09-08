@@ -199,7 +199,6 @@ body {
 }
 .cx-row .unit { color: var(--muted); font-size: 11px; }
 .cx-row button {
-  margin-left: auto;
   background: transparent;
   border: none;
   color: var(--muted);
@@ -208,7 +207,9 @@ body {
   padding: 2px 4px;
   border-radius: 4px;
 }
-.cx-row button:hover { color: var(--subtract); background: #3a2c2c; }
+.cx-row .cx-swap { margin-left: auto; }
+.cx-row .cx-swap:hover { color: var(--accent); background: #2c3340; }
+.cx-row .cx-del:hover { color: var(--subtract); background: #3a2c2c; }
 
 /* ---- properties panel ---- */
 #props {
@@ -259,16 +260,3 @@ body {
 .op-toggle.add { color: var(--add); }
 .op-toggle.subtract { color: var(--subtract); }
 #p-del:hover { border-color: var(--subtract); color: var(--subtract); }
-
-/* ---- inline size editor (on-canvas) ---- */
-.inline-size-input {
-  position: absolute;
-  z-index: 10;
-  width: 56px;
-  background: #0d1117;
-  color: #fff;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 1px 4px;
-  font: 12px system-ui;
-}
