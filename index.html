@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>House CAD</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar">
+        <span class="brand">House&nbsp;CAD</span>
+        <div class="group" id="tool-group">
+          <button data-tool="add" class="active" title="Draw a rectangle that adds matter">➕ Add</button>
+          <button data-tool="subtract" title="Draw a rectangle that removes matter">➖ Subtract</button>
+          <button data-tool="dimension" title="Constrain the distance between two edges">📏 Dimension</button>
+          <button data-tool="select" title="Select / move / delete rectangles">🖟 Select</button>
+        </div>
+        <div class="group">
+          <label>Height <input id="height" type="number" min="0.1" step="0.1" value="2.8" /> <span class="unit-label">m</span></label>
+        </div>
+        <div class="group">
+          <label>Units
+            <select id="unit">
+              <option value="m">m</option>
+              <option value="cm">cm</option>
+              <option value="mm">mm</option>
+            </select>
+          </label>
+        </div>
+        <div class="group">
+          <button id="delete" title="Delete selected (Del)">🗑 Delete</button>
+          <button id="clear" title="Remove all rectangles">Clear</button>
+        </div>
+        <div class="group">
+          <button id="save" title="Download the project as a .json file">💾 Save</button>
+          <button id="load" title="Open a .json project file">📂 Load</button>
+          <input id="file-input" type="file" accept="application/json,.json" hidden />
+        </div>
+        <div class="group hint" id="hint">Drag on the grid to draw a rectangle.</div>
+      </header>
+      <main id="panes">
+        <section id="pane-2d">
+          <canvas id="sketch"></canvas>
+          <div class="pane-label">Plan (2D)</div>
+          <aside id="constraints">
+            <button class="cx-head" id="cx-toggle" aria-expanded="true" title="Collapse / expand">
+              <span class="cx-caret">▾</span>
+              <span class="cx-title">Dimensions</span>
+              <span class="cx-count" id="cx-count"></span>
+            </button>
+            <div id="cx-list" class="cx-list">
+              <div class="cx-empty">No dimensions yet. Use 📏 to constrain edge distances.</div>
+            </div>
+          </aside>
+          <aside id="props" hidden>
+            <div class="cx-head">Rectangle</div>
+            <div class="prop-grid">
+              <label>X</label><input id="p-x" type="number" step="0.1" /><span class="unit">m</span>
+              <label>Y</label><input id="p-y" type="number" step="0.1" /><span class="unit">m</span>
+              <label>W</label><input id="p-w" type="number" step="0.1" min="0" /><span class="unit">m</span>
+              <label>H</label><input id="p-h" type="number" step="0.1" min="0" /><span class="unit">m</span>
+            </div>
+            <div class="prop-row">
+              <button id="p-op" class="op-toggle" title="Toggle add / subtract"></button>
+              <button id="p-del" title="Delete rectangle (Del)">🗑 Delete</button>
+            </div>
+          </aside>
+        </section>
+        <div id="splitter"></div>
+        <section id="pane-3d">
+          <div id="view3d"></div>
+          <div class="pane-label">Model (3D)</div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
