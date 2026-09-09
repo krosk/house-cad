@@ -4,6 +4,10 @@ import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint } from './core/extrude.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
+import { setupMR } from './ui/mr.js';
+import { installRemoteLog } from './ui/remoteLog.js';
+
+installRemoteLog(); // dev-only: mirror console/errors to the dev server for headset debugging
 import { serializeProject, deserializeInto } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
@@ -12,6 +16,11 @@ const project = new Project();
 
 const sketch = new Sketch2D(document.getElementById('sketch'), project);
 const view = new View3D(document.getElementById('view3d'));
+
+// Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
+// immersive-ar is supported; no effect on the desktop app otherwise. MR renders
+// the flat floor plan, so it needs the current footprint on demand.
+setupMR(view, () => computeFootprint(project.rectangles));
 
 // Rebuild the 3D model whenever the plan changes.
 let firstBuild = true;

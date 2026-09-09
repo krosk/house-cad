@@ -9,3 +9,6 @@ dist/
 !.claude/skills/
 !.claude/rules/
 !.claude/handoff.md
+
+# Local Quest headset debug log (dev-only)
+quest-debug.log

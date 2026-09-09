@@ -53,3 +53,51 @@ export function extrudeFootprint(multiPolygon, height) {
   merged.computeVertexNormals();
   return merged;
 }
+
+/**
+ * Flat floor-plan fill: the footprint lying on the ground plane (no extrusion).
+ * Used by MR to show the plan on the real floor instead of the 3D massing.
+ * @param {number[][][][]} multiPolygon  output of computeFootprint()
+ * @returns {THREE.BufferGeometry | null}
+ */
+export function footprintFloorGeometry(multiPolygon) {
+  const geometries = [];
+  for (const polygon of multiPolygon) {
+    if (!polygon.length) continue;
+    const outer = ringToVec2(polygon[0]);
+    if (outer.length < 3) continue;
+    const shape = new THREE.Shape(outer);
+    for (let i = 1; i < polygon.length; i++) {
+      const hole = ringToVec2(polygon[i]);
+      if (hole.length >= 3) shape.holes.push(new THREE.Path(hole));
+    }
+    geometries.push(new THREE.ShapeGeometry(shape));
+  }
+  if (!geometries.length) return null;
+  const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries);
+  merged.rotateX(-Math.PI / 2); // lay flat: plan-Y -> world-Z, face normal -> +Y
+  return merged;
+}
+
+/**
+ * Floor-plan outline: the footprint edges as ground-plane line segments.
+ * @param {number[][][][]} multiPolygon  output of computeFootprint()
+ * @returns {THREE.BufferGeometry | null}
+ */
+export function footprintOutlineGeometry(multiPolygon) {
+  const pts = [];
+  for (const polygon of multiPolygon) {
+    for (const ring of polygon) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i];
+        const b = ring[i + 1];
+        // Match footprintFloorGeometry's rotateX(-PI/2): plan (x, y) -> world (x, 0, -y).
+        pts.push(a[0], 0, -a[1], b[0], 0, -b[1]);
+      }
+    }
+  }
+  if (!pts.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return geo;
+}

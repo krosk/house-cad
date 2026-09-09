@@ -193,6 +193,25 @@ body {
   pointer-events: none;
 }
 
+/* ---- MR (Enter AR) button — Three's ARButton, restyled to sit in the 3D pane.
+   ARButton writes inline styles, so layout-critical props need !important. ---- */
+.mr-btn {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 12px !important;
+  transform: translateX(-50%);
+  width: auto !important;
+  padding: 8px 16px !important;
+  font: inherit !important;
+  border: 1px solid var(--accent, #4ea1ff) !important;
+  border-radius: 6px !important;
+  background: rgba(20, 24, 32, 0.75) !important;
+  color: var(--accent, #4ea1ff) !important;
+  cursor: pointer;
+  z-index: 5;
+}
+
 /* ---- constraints panel ---- */
 #constraints {
   position: absolute;
