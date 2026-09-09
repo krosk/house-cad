@@ -1,106 +1,180 @@
 # House CAD — session handoff
 
-**This is the "how do I resume" doc.** Project overview also lives in `CLAUDE.md` (committed) and
-in Claude memory (`house-cad-project.md`, `serve-and-share-network-url.md`).
+**Read this first, then `CLAUDE.md`.** This is the "how do I resume" doc. Deep Phase-5 rationale
+and every XR gotcha live in Claude memory `phase5-xr-intent.md`, which auto-loads each session —
+don't duplicate it here.
 
-**Date:** 2026-09-09 (session 2)
-**Status:** Phases 1–3a live and deployed; Phase 3b (mesh export) done this session, plus touch/Quest
-input, dimension-display work, and a mobile toolbar fix — all **pushed to `origin/main`** (auto-deploys
-via Actions). Next planned piece: dimensioned floor-plan export (Phase 3b other half) or Phase 4.
+**Date:** 2026-09-09 (session 4)
+**Status:** Phase 5 **survey milestone S1 — in-headset authoring of free-space zones — implemented
+and builds clean, but UNCOMMITTED and unverified on device.** All session-4 work is in the working
+tree only. Desktop app got a layout change (toolbar→footer, 3D pane hidden).
 
 ## Where things stand in one paragraph
 
-A parametric 2.5D house CAD tool (vanilla JS + Vite + Three.js), deployed live at
-**https://krosk.github.io/house-cad/**. You draw axis-aligned add/subtract rectangles in a 2D plan,
-pin **dimension constraints** between edges (the only way to author exact size — deliberate), and see
-a live 3D extrusion resolved by a per-axis weighted least-squares solver. Save/load JSON + localStorage
-autosave work. This session added: **mesh export** (STL/OBJ/glTF), **touch + Quest 3 controller input**,
-**draggable dimension placement**, an **extension-line fix**, and a **wrapping toolbar** for phones.
-Read `CLAUDE.md` before planning any change.
+The desktop parametric 2.5D CAD tool (vanilla JS + Vite + Three.js) is deployed at
+**https://krosk.github.io/house-cad/** (from `main`; this branch is NOT merged, so it hasn't
+deployed). M0 (mixed-reality floor-plan overlay + touch registration) is committed and worked on
+device. **Session 4 built the SURVEY milestone (S1):** stand in a real room and author the plan's
+**axis-aligned free-space rectangles** in place — `DROP` a starter box at your feet, then in `EDGE`
+mode point the controller ray at one of its edges to lock it and touch the matching real wall to
+snap that edge out. Registration (`ORIGIN`+`ALIGN`) was merged into one two-step `REGISTER` action.
+Zone edges are drawn as bold per-rectangle floor strips. **The current goal is still Phase 5: an
+on-site MR survey tool** — see `phase5-xr-intent.md` before planning. **The next real feature is S2:
+tape-based exact numeric entry (a rendered in-headset numpad)** — nothing about it is built yet.
+**XR cannot be verified headlessly** — `npm run build` only proves it compiles; every MR change is
+tested by the user on the Quest.
 
-## This session's work (pushed to `origin/main`)
+## What changed in session 4
 
-- `995e6b6` **Mesh export + touch/controller-friendly input**
-  - `src/io/exportMesh.js`: wraps the live extruded geometry in a Mesh → Three's STL/OBJ/glTF
-    exporters → download. Toolbar "⬇ Export ▾" dropdown (STL/OBJ/GLB).
-  - Touch/Quest: `touch-action:none` on the canvas (the key fix — the browser was eating one-finger
-    drags as scroll); two-finger pan + pinch-zoom; a **✋ Pan tool** and on-screen **± zoom buttons**
-    for single-pointer devices (Quest controller ray); fatter hit targets for coarse pointers.
-- `8153a42` **Fix dimension extension lines to reach each shape's edge** — each dashed extension line
-  now anchors to its own edge instead of the shared max, so shorter/narrower shapes no longer get a
-  floating gap.
-- `21b543a` **Draggable dimension placement** — drag a dimension label (Select tool) to reposition it;
-  signed perpendicular **offset stored in meters** (model-space, zooms with the drawing); drag past the
-  shape flips the side; double-click resets to auto; plain click still focuses the value field. Offset
-  persists in JSON, defaults to auto for old files. Only auto dims consume stacking tiers.
-- `20df57a` **Wrap the toolbar on narrow screens** — `flex-wrap` + a `<=640px` media query so phone
-  toolbars don't overflow and get clipped by `#app { overflow:hidden }`.
+> Next agent: when you add your section here, fold anything still a live constraint into "Standing
+> decisions" or "Findings" and delete the rest.
+
+1. **MR can now author the model.** `setupMR(view, project, getFootprint)` — added `project`
+   (`main.js`) so survey modes call `project.addRectangle`/`removeRectangle`/`touch`.
+2. **Survey model = EDGE-PUSH of free space** (chosen over an earlier corner-touch version, which
+   was discarded same session): `DROP` spawns a 1.5 m `add` box at your **standing position** (no
+   floor touch — reads the headset world pos); `EDGE` is a two-step per wall — **point ray at an
+   edge → trigger LOCKS it (yellow) → touch the real wall → trigger snaps** that edge to the wall.
+   Only the touch's **perpendicular** coord is used; the opposite edge stays fixed (`setEdge`).
+3. **`ORIGIN`+`ALIGN` merged into one two-step `REGISTER`** (like EDGE): 1st touch = origin, 2nd
+   touch (a point along a wall) = yaw. Label/color flip ORIGIN(blue)→ALIGN(amber) between steps.
+   Modes are now **`FLOOR`, `REGISTER`, `DROP`, `EDGE`** and carry stable `id`s (REGISTER's label is
+   dynamic, so grip/frame-loop logic keys off `id`, not label text).
+4. **Per-rectangle UNMERGED edge outlines**, drawn as **bold flat floor strips** (not 1px GL lines):
+   `EDGE_HALF=0.02` → 4 cm wide. Rest zones purple, active zone brighter, hover magenta / locked
+   yellow (`edgeHi`, `renderOrder=10`, `depthTest:false`). The **fill stays the merged union** (one
+   uniform 0.22-opacity blob — overlaps do NOT stack/darken); only edges are per-rectangle.
+5. **Origin gizmo** (teal ring + `+X` arrow showing the ALIGN direction) rides `planPos`/`planYaw`;
+   it's the empty-state **placeholder**. Removed `placeAt`'s `children.length` guard that silently
+   **blocked registering an empty plan** — you can now survey from scratch.
+6. **`view.hideMesh` flag** (`view3d.js`): `setGeometry` rebuilds a fresh (visible) mesh on every
+   model change, which made the extruded **walls reappear in passthrough** when a survey rect was
+   added. MR sets `hideMesh=true` for the whole session; restored on exit.
+7. **Desktop layout:** toolbar moved header→**footer** (`<footer id="toolbar">`, export menu now
+   opens upward); **3D pane removed** from the layout (2D plan fills the window). The Three renderer
+   **cannot** be deleted (AR runs through it), so `#view3d` is parked **off-screen** at 640×480.
+   **START AR** button moved into the footer (`#ar-group`). Splitter element gone (`main.js` guards).
 
 ## Standing decisions
 
-- **This machine (session 2) is Linux (Steam Deck), Node v20.20.2 on PATH** — `npm install/dev/build`
-  run directly, no fnm dance. The fnm/Node-22 PATH trap below is **Windows-only** (session 1's machine).
-- **`npm run build` is the only verification** — no tests/linter/types. Clean build = imports/syntax
-  sound; it does NOT catch runtime/visual bugs. Canvas rendering and touch/controller feel need the
-  user's eyes/hands — say so when reporting.
-- **Keep the dev server running and report the Network URL** (`➜ Network:` line, e.g.
-  `http://192.168.1.154:5173/`) — the user QAs from another device on the LAN. (memory:
-  `serve-and-share-network-url`.)
-- **Sizing is constraint-first.** No on-canvas W/H chips, no inline size editor, no W/H fields in the
-  properties panel. Do NOT re-add these. Rough size = drawing + 8 handles; exact size = dimensions only.
-- **Geometry stored in meters**; `units.js` converts only display/input. Dimension `offset` is also
-  meters (model-space), consistent with this rule.
-- **Distance constraints are ordered + signed** (`value = coord(b) − coord(a)`); order sets sign, locks
-  the side, picks the anchor (`a` holds, `b` moves). `swapConstraint()` reverses it.
-- **Commit identity is `Alexis He <ahe.krosk@gmail.com>`** (personal, not work email). Repo is
-  **public**, so that email is visible on commits.
-- **Deploy is automatic** on push to `main` via `.github/workflows/deploy.yml`. Pages source must stay
-  **GitHub Actions**.
-
-### The Windows fnm trap (session 1's machine only)
-
-`$env:Path = "C:\Users\ahe\AppData\Roaming\fnm\node-versions\v22.22.2\installation;" + $env:Path`
-before any npm/node in PowerShell, or "command not found". Not relevant on the Linux machine.
+- **This machine is Linux (Steam Deck), Node v20.20.2 on PATH** — `npm install/dev/build` run
+  directly. The fnm/Node-22 dance in `CLAUDE.md` is Windows-only (a prior machine); ignore it here.
+- **`npm run build` is the only automated check** — no tests/linter/types. Clean build = imports/
+  syntax sound; it does NOT catch runtime/visual/XR bugs.
+- **Keep the dev server running and report the `https://` Network URL** — the user QAs on the Quest
+  over the LAN; WebXR needs https (self-signed; accept the cert once). (memory:
+  `serve-and-share-network-url`.) This session ran on **:5174** (`--port 5174 --strictPort`).
+- **Phase 5 = on-site MR survey tool.** Measure real walls with a **physical tape**, enter exact
+  measurements. **Tape = source of truth; Quest tracking/anchors = spatial scaffold only.** Keep the
+  **axis-aligned rectangle** model (approximate real walls square — it's "house massing"). Full
+  rationale: `phase5-xr-intent.md`.
+- **Survey interaction (session 4, on top of that intent):** author **free-space** zones by
+  edge-push (point-ray at edge, touch wall), NOT corner-touch. Registration is the two-step
+  `REGISTER`. Exact size will come from S2's numpad as **hard constraints**, overriding the pushed
+  rough size — consistent with the standing "exact size = dimension constraints only" rule.
+- **Sizing is constraint-first** on desktop — no on-canvas W/H, no inline size editor, no W/H
+  fields. Do NOT re-add.
+- **Geometry stored in meters**; `units.js` converts only display/input. Distance constraints are
+  ordered + signed (`value = coord(b) − coord(a)`); `swapConstraint()` reverses.
+- **Coordinate mapping** (needed for any MR pose math): plan `(x,y)` → planGroup-local `(x,0,−y)`;
+  `planGroup` then applies `planYaw` about UP + `planPos`. `worldToPlan`/`planToWorld` in `mr.js`
+  invert/apply this via Three's `worldToLocal`/`localToWorld` (so drift folded into `planPos` is
+  tracked automatically).
+- **Prior features still live, no action needed:** mesh export STL/OBJ/GLB (`src/io/exportMesh.js`),
+  touch + on-screen zoom, draggable dimension placement, save/load JSON + localStorage autosave.
+- **Commit identity is `Alexis He <ahe.krosk@gmail.com>`**; repo is **public**. Deploy is automatic
+  on push to `main` (`.github/workflows/deploy.yml`, Pages = GitHub Actions). `.claude/` is tracked
+  except `.env`/`.teams_request`.
 
 ## Findings / traps worth knowing
 
-- **`GLTFExporter` fails in Node** (`FileReader is not defined`) but works in the browser — `FileReader`
-  is a browser API it uses for binary output. STL/OBJ export fine headlessly; GLB verified only by the
-  browser being the target. Don't "fix" this in Node.
-- **`.claude/skills/`, `.claude/rules/`, and `.claude/handoff.md` are tracked** in git (see
-  `.gitignore`); only `.claude/.env` and `.claude/.teams_request` stay ignored. No `git add -f` needed.
-- **Pages deploy failed once** because Pages source wasn't set to "GitHub Actions"; fixed by setting it.
-- Pushing `main` auto-deploys; the user has been doing on-device QA (touch/Quest/phone) before pushing.
+- **XR reference-space mismatch (cost hours).** Three renders in `local` by default; hit/anchor
+  poses use `local-floor`. Fix (in `sessionstart`): `localSpace = await
+  requestReferenceSpace('local-floor')` then **`renderer.xr.setReferenceSpace(localSpace)`**. Any
+  pose math must use the same space Three renders with. `setReferenceSpaceType()` alone did NOT take.
+- **`View3D.setGeometry` creates a NEW visible mesh every model change** — a one-time
+  `mesh.visible=false` is lost on the next rebuild. Use the `hideMesh` flag (see change 6).
+- **The 3D renderer cannot be removed** while AR is wanted — the WebXR session presents through it.
+  It's parked off-screen instead. `View3D._resize` guards 0×0, but the constructor path doesn't, so
+  a `display:none` container would give a NaN aspect — keep it sized.
+- **`LineBasicMaterial` is always 1px in WebGL** (linewidth ignored) — hence edges are drawn as flat
+  floor strips (quads) for real thickness. If they need to be bolder still, either bump `EDGE_HALF`
+  or move to fat lines (`Line2`/`LineMaterial`, needs `resolution` set — fiddly in XR).
+- **`matrixAutoUpdate=false` + setting `.matrix` does NOT update `matrixWorld`** — drive
+  `position`/`quaternion` (default autoupdate), which the code does.
+- **`getCamera().position` stays local (≈0)** in XR — read world pos from
+  `getCamera().matrixWorld.elements` (`[12],[13],[14]` = x,y,z). DROP uses `[12]/[14]`.
+- **`depth-sensing` auto-occlusion is noisy at the floor plane** — omitted from `sessionInit`.
+- **Remote logging is how you debug on-headset.** dev-only `POST /__log` (middleware in
+  `vite.config.js`) → `quest-debug.log` (gitignored — do NOT stage it); `src/ui/remoteLog.js`
+  mirrors console/errors/values. `tail -f` it while the user tests. Quest = OculusBrowser 150.
+- **WebXR AR runs on Android Chrome (ARCore), NOT iOS Safari.** But this app's input is
+  controller-based (tracked tip touch, A/B + thumbstick mode-cycle, controller ray) — a phone has
+  none of that, so phone support would need a separate touch + `dom-overlay` + hit-test input layer.
+  Decision this session: **keep focus on Quest.**
+- **`GLTFExporter` fails in Node** (`FileReader is not defined`) but works in the browser — don't
+  "fix" it headlessly. Harmless MR warning: `Can't change size while VR device is presenting`.
+
+## Commits
+
+Substantive only (`git log` has all):
+
+- `14a22c4` **Phase 5 M0: mixed-reality floor-plan overlay on Quest 3** — the M0 milestone.
+
+**Push state:** branch `phase5-mr-overlay` is **unpushed, no upstream**, one commit ahead of `main`.
+**All session-4 work is UNCOMMITTED** in the working tree (`index.html`, `src/main.js`,
+`src/style.css`, `src/ui/mr.js`, `src/ui/view3d.js`, plus this `handoff.md`). Not on `main`, so it
+won't auto-deploy. Decide commit/push/merge with the owner.
+
+## Resuming from a clean checkout
+
+```bash
+npm install                          # once (adds @vitejs/plugin-basic-ssl)
+npm run dev -- --host --port 5174 --strictPort   # https dev server; report the https:// Network URL
+npm run build                        # the verification step — expect "✓ built in …"
+```
+
+On the Quest (Meta/Horizon browser): open the https Network URL, **accept the self-signed cert
+once**, tap **START AR** (now in the footer). Node v20 and `node_modules` already present here.
 
 ## The artifacts and what each is for
 
 | Path | Role |
 |---|---|
-| `src/core/model.js` | Project/Rectangle model + change bus; `setConstraintOffset()` (new) |
-| `src/core/constraints.js` | Per-axis weighted least-squares solver; `makeDistance` now seeds `offset:null` |
-| `src/core/geometry2d.js` | add/subtract rectangles → footprint (polygon booleans) |
-| `src/core/extrude.js` | footprint → 3D mesh (plan-Y → world-Z, extrude up +Y) |
-| `src/core/units.js` | display-unit conversion (m/cm/mm) |
-| `src/io/serialize.js` | JSON save/load; now persists dimension `offset` |
-| `src/io/exportMesh.js` | **(new)** STL/OBJ/glTF export of the live geometry |
-| `src/ui/sketch2d.js` | 2D plan editor: tools, dimensions (draggable), multi-touch, pan tool, resize |
-| `src/ui/view3d.js` | 3D viewport (Three.js, orbit — already touch-capable) |
-| `src/main.js` | wiring: toolbar, panels, save/load, export menu, zoom buttons, autosave, units |
-| `.github/workflows/deploy.yml` | build + deploy to Pages on push to main |
+| `src/ui/mr.js` | MR session: passthrough, REGISTER/FLOOR/DROP/EDGE modes, world↔plan transform, bold zone strips, origin gizmo, anchors, debug HUD |
+| `src/ui/view3d.js` | 3D viewport; XR-enabled; `onXRFrame` hook; `hideMesh` flag; grid/floor fields |
+| `src/core/extrude.js` | footprint → 3D mesh; also flat floor fill + outline geometry for MR |
+| `src/core/model.js` | Project/Rectangle model + change bus (`_emit` solves then notifies) |
+| `src/core/constraints.js` | per-axis weighted least-squares solver (S2 will write self-W/H constraints here) |
+| `index.html` / `src/style.css` | desktop layout — toolbar is a footer, 3D pane hidden, START AR in `#ar-group` |
+| `src/main.js` | wiring; `setupMR(view, project, getFootprint)`; splitter guarded |
+| `vite.config.js` | https dev server + dev-only `/__log` endpoint |
+| `phase5-xr-intent.md` (Claude memory) | deep Phase-5 rationale + XR gotchas; auto-loads |
 
 ## Next step
 
-- **Dimensioned floor-plan export** (SVG/PDF plan with dimension lines) — the other half of Phase 3.
-- **Phase 4 — rich constraints** (equal, aligned, chained). Solver already supports the linear form;
-  mostly UI + constraint types.
-- **Phase 5 — WebXR / Quest 3** room mapping (HTTPS from Pages is ready). The touch/controller input
-  this session is a stepping stone.
-- **Follow-ups if the user hits them:** overflow "⋯" menu for the toolbar on very small screens; a
-  bigger grab affordance / snap-to-nearest-edge for imprecise Quest-controller edge picking.
+- **A — S2: tape numeric entry (the point of Phase 5).** A **rendered 3D numpad** (no in-headset
+  keyboard). Agreed flow: **inline per-rectangle** — after pushing a room's edges, enter exact
+  **width then height**, written as **hard dimension constraints** (self-width = constraint between
+  the rect's own left/right edges via `project.addConstraint`; self-height between bottom/top) that
+  override the pushed rough size. This is the next real feature.
+- **B — Re-activate an older zone.** `EDGE` currently only edits the **last-dropped** rect
+  (`activeRect`). Add "point ray inside a rect → make it active" so earlier rooms can be re-edited.
+- **C — Cleanups before this branch is "done":** verify the ALIGN axis convention + the
+  world→plan sign/handedness on device (see open questions); gate/remove the debug HUD; consider an
+  in-headset "clear all"; bump/replace edge strips if not bold enough.
+- ~~Corner-touch survey (touch two opposite corners → bbox)~~ — built then **discarded this
+  session**: assumed rectangular rooms and required reaching corners. Replaced by edge-push of free
+  space (change 2), which fits the edge-as-scalar solver and non-rectangular rooms better.
+- ~~Enter-VR / dark-scene viewing~~ — superseded earlier: the user chose MR passthrough, not VR.
 
 ## Known open questions
 
-- Extrusion orientation and general visual correctness are confirmed **by the user's use**, not by any
-  automated check — no regression guard exists.
-- Touch/Quest feel (pinch-zoom, controller trigger-drag, dimension-drag) is confirmed by the user on
-  device, not by any headless test.
+- **Everything session-4 is unverified on device** — builds clean only. No XR regression guard.
+- **World→plan transform sign/handedness is untested.** Most likely bug: surveyed zones land
+  **mirrored or rotated** (the `py = −local.z` flip or a yaw mismatch). The per-action `rlog` lines
+  (`register origin/align`, `drop rect`, `edge locked/set`) + the on-tip HUD are how to diagnose.
+- **`nearestEdge` uses simple perpendicular distance** — may pick the wrong edge when you aim near a
+  corner. Watch the `edge: hov=` HUD line.
+- **Anchor drift over a multi-room house is untested** — only single-room placement exercised.
+  Printed control-point re-registration is designed (`phase5-xr-intent.md`) but not built.

@@ -38,7 +38,7 @@ body {
   gap: 8px 16px;
   padding: 8px 12px;
   background: var(--panel);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
   flex: 0 0 auto;
 }
 
@@ -107,7 +107,7 @@ body {
 #toolbar .menu { position: relative; }
 .menu-pop {
   position: absolute;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 6px); /* toolbar is a footer — open the menu upward */
   left: 0;
   z-index: 20;
   display: flex;
@@ -130,17 +130,22 @@ body {
   min-height: 0;
 }
 
-#pane-2d, #pane-3d {
+#pane-2d {
   position: relative;
-  flex: 1 1 50%;
+  flex: 1 1 100%;
   min-width: 0;
   overflow: hidden;
 }
 
-#splitter {
-  flex: 0 0 4px;
-  background: var(--line);
-  cursor: col-resize;
+/* The 3D renderer is kept alive for AR but parked off-screen (see index.html). */
+#view3d-holder {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 640px;
+  height: 480px;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 #sketch {
@@ -193,23 +198,24 @@ body {
   pointer-events: none;
 }
 
-/* ---- MR (Enter AR) button — Three's ARButton, restyled to sit in the 3D pane.
-   ARButton writes inline styles, so layout-critical props need !important. ---- */
+/* ---- MR (Enter AR) button — Three's ARButton, restyled to sit inline in the
+   footer. ARButton writes inline styles, so layout-critical props need !important. */
 .mr-btn {
-  position: absolute !important;
-  left: 50% !important;
+  position: static !important;
+  left: auto !important;
   right: auto !important;
-  bottom: 12px !important;
-  transform: translateX(-50%);
+  bottom: auto !important;
+  transform: none !important;
   width: auto !important;
-  padding: 8px 16px !important;
+  margin: 0 !important;
+  padding: 6px 12px !important;
   font: inherit !important;
+  font-size: 13px !important;
   border: 1px solid var(--accent, #4ea1ff) !important;
   border-radius: 6px !important;
   background: rgba(20, 24, 32, 0.75) !important;
   color: var(--accent, #4ea1ff) !important;
   cursor: pointer;
-  z-index: 5;
 }
 
 /* ---- constraints panel ---- */

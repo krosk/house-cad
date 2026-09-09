@@ -65,6 +65,10 @@ export class View3D {
       side: THREE.DoubleSide,
     });
     this.mesh = null;
+    // While MR is active the extruded walls must stay hidden (the flat plan is
+    // shown instead). setGeometry rebuilds the mesh on every model change, so it
+    // honors this flag rather than a one-time visibility toggle.
+    this.hideMesh = false;
 
     this._onResize = this._resize.bind(this);
     window.addEventListener('resize', this._onResize);
@@ -86,6 +90,7 @@ export class View3D {
       this.mesh = new THREE.Mesh(geometry, this.material);
       this.mesh.castShadow = true;
       this.mesh.receiveShadow = true;
+      this.mesh.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
       this.scene.add(this.mesh);
     }
   }

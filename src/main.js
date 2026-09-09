@@ -20,7 +20,7 @@ const view = new View3D(document.getElementById('view3d'));
 // Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
 // immersive-ar is supported; no effect on the desktop app otherwise. MR renders
 // the flat floor plan, so it needs the current footprint on demand.
-setupMR(view, () => computeFootprint(project.rectangles));
+setupMR(view, project, () => computeFootprint(project.rectangles));
 
 // Rebuild the 3D model whenever the plan changes.
 let firstBuild = true;
@@ -253,6 +253,7 @@ onUnitChange(() => {
 // ---- resizable splitter ----
 (() => {
   const splitter = document.getElementById('splitter');
+  if (!splitter) return; // 3D pane removed — no splitter to wire up
   const left = document.getElementById('pane-2d');
   const panes = document.getElementById('panes');
   let dragging = false;

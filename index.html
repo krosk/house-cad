@@ -7,7 +7,38 @@
   </head>
   <body>
     <div id="app">
-      <header id="toolbar">
+      <main id="panes">
+        <section id="pane-2d">
+          <canvas id="sketch"></canvas>
+          <div class="pane-label">Plan (2D)</div>
+          <div id="zoom-ctl">
+            <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+          </div>
+          <aside id="constraints">
+            <button class="cx-head" id="cx-toggle" aria-expanded="true" title="Collapse / expand">
+              <span class="cx-caret">▾</span>
+              <span class="cx-title">Dimensions</span>
+              <span class="cx-count" id="cx-count"></span>
+            </button>
+            <div id="cx-list" class="cx-list">
+              <div class="cx-empty">No dimensions yet. Use 📏 to constrain edge distances.</div>
+            </div>
+          </aside>
+          <aside id="props" hidden>
+            <div class="cx-head">Rectangle</div>
+            <div class="prop-grid">
+              <label>X</label><input id="p-x" type="number" step="0.1" /><span class="unit">m</span>
+              <label>Y</label><input id="p-y" type="number" step="0.1" /><span class="unit">m</span>
+            </div>
+            <div class="prop-row">
+              <button id="p-op" class="op-toggle" title="Toggle add / subtract"></button>
+              <button id="p-del" title="Delete rectangle (Del)">🗑 Delete</button>
+            </div>
+          </aside>
+        </section>
+      </main>
+      <footer id="toolbar">
         <span class="brand">House&nbsp;CAD</span>
         <div class="group" id="tool-group">
           <button data-tool="add" class="active" title="Draw a rectangle that adds matter">➕ Add</button>
@@ -45,44 +76,13 @@
             <button data-fmt="glb" title="Binary glTF — single file, best for sharing">glTF (.glb)</button>
           </div>
         </div>
+        <div class="group" id="ar-group"></div>
         <div class="group hint" id="hint">Drag on the grid to draw a rectangle.</div>
-      </header>
-      <main id="panes">
-        <section id="pane-2d">
-          <canvas id="sketch"></canvas>
-          <div class="pane-label">Plan (2D)</div>
-          <div id="zoom-ctl">
-            <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
-            <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-          </div>
-          <aside id="constraints">
-            <button class="cx-head" id="cx-toggle" aria-expanded="true" title="Collapse / expand">
-              <span class="cx-caret">▾</span>
-              <span class="cx-title">Dimensions</span>
-              <span class="cx-count" id="cx-count"></span>
-            </button>
-            <div id="cx-list" class="cx-list">
-              <div class="cx-empty">No dimensions yet. Use 📏 to constrain edge distances.</div>
-            </div>
-          </aside>
-          <aside id="props" hidden>
-            <div class="cx-head">Rectangle</div>
-            <div class="prop-grid">
-              <label>X</label><input id="p-x" type="number" step="0.1" /><span class="unit">m</span>
-              <label>Y</label><input id="p-y" type="number" step="0.1" /><span class="unit">m</span>
-            </div>
-            <div class="prop-row">
-              <button id="p-op" class="op-toggle" title="Toggle add / subtract"></button>
-              <button id="p-del" title="Delete rectangle (Del)">🗑 Delete</button>
-            </div>
-          </aside>
-        </section>
-        <div id="splitter"></div>
-        <section id="pane-3d">
-          <div id="view3d"></div>
-          <div class="pane-label">Model (3D)</div>
-        </section>
-      </main>
+      </footer>
+      <!-- The 3D view is hidden from the desktop layout but must stay in the DOM:
+           the WebXR/AR session renders through this Three.js renderer. Parked
+           off-screen at a real size so the renderer keeps a valid canvas/aspect. -->
+      <div id="view3d-holder" aria-hidden="true"><div id="view3d"></div></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
