@@ -14,7 +14,9 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { Rectangle } from '../core/model.js';
+import { makeDistance, makeOriginDistance, ORIGIN_ID } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
+import { toMeters, unitLabel, fmt } from '../core/units.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -104,6 +106,79 @@ export function setupMR(view, project, getFootprint) {
     return { sprite, setLines };
   }
 
+  // S2 numpad: a canvas-textured panel you aim the controller ray at to enter
+  // exact tape dimensions. Keys are hit-tested by the ray's UV on the plane (no
+  // per-key meshes). Layout: a display line (field + typed value + unit) over a
+  // 3x4 digit grid and a full-width ENTER row.
+  function makeNumpad() {
+    const W = 512, H = 640;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.30, 0.375),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+
+    const DISP_H = 140, ROWS = 5, CELL_H = (H - DISP_H) / ROWS, COLS = 3, CELL_W = W / COLS;
+    const grid = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['.', '0', 'back']];
+    const keyLabel = { back: '⌫', enter: 'ENTER' };
+
+    // Plane UV -> key id (or null). Texture flipY maps canvas-top to v=1.
+    function keyAt(u, v) {
+      const cx = u * W, cy = (1 - v) * H;
+      if (cy < DISP_H) return null;
+      const row = Math.floor((cy - DISP_H) / CELL_H);
+      if (row < 0 || row >= ROWS) return null;
+      if (row === 4) return 'enter'; // full-width ENTER
+      const col = Math.min(COLS - 1, Math.max(0, Math.floor(cx / CELL_W)));
+      return grid[row]?.[col] ?? null;
+    }
+
+    function draw(title, buffer, hoverKey) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.94)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
+      // Display line: the two references (or a prompt), then value + unit.
+      ctx.fillStyle = '#8b949e';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(title, 26, 42);
+      ctx.fillStyle = '#e6edf3';
+      ctx.font = 'bold 60px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText((buffer || '0') + ' ' + unitLabel(), W - 26, 98);
+      // Keys.
+      ctx.font = 'bold 46px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (r === 4 && c > 0) continue; // ENTER spans the row
+          const isEnter = r === 4;
+          const kid = isEnter ? 'enter' : grid[r][c];
+          const x = (isEnter ? 0 : c * CELL_W) + 6;
+          const y = DISP_H + r * CELL_H + 6;
+          const w = (isEnter ? W : CELL_W) - 12;
+          const h = CELL_H - 12;
+          const hot = hoverKey && hoverKey === kid;
+          if (kid === 'enter') ctx.fillStyle = hot ? 'rgba(52,211,153,0.95)' : 'rgba(34,110,80,0.9)';
+          else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
+          ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
+          ctx.fillStyle = '#e6edf3';
+          ctx.fillText(keyLabel[kid] ?? kid, x + w / 2, y + h / 2 + 2);
+        }
+      }
+      tex.needsUpdate = true;
+    }
+
+    return { group, mesh, keyAt, draw };
+  }
+
   // The marker sits ahead of the controller's tracked origin, along the pointing
   // ray, so it clears the physical controller body (which would occlude it) and
   // reads as a "tip." Placement uses this same offset point (see tipPosition).
@@ -146,17 +221,20 @@ export function setupMR(view, project, getFootprint) {
   reticle.visible = false;
   scene.add(reticle);
 
-  // Highlight for the survey edge you're pointing at (magenta) or have locked
-  // (yellow) in EDGE mode — a line drawn along that edge, just above the floor.
-  const edgeHiGeo = new THREE.BufferGeometry();
-  edgeHiGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(18), 3)); // 2 triangles
-  const edgeHi = new THREE.Mesh(
-    edgeHiGeo,
-    new THREE.MeshBasicMaterial({ color: 0xff5db1, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
-  );
-  edgeHi.renderOrder = 10; // always on top of the resting/active edge strips
-  edgeHi.visible = false;
-  scene.add(edgeHi);
+  // Highlights for the survey edge you're pointing at (magenta) or have locked
+  // (yellow) — a strip drawn along that edge, just above the floor. Two of them so
+  // SIZE can show both picked references (edge A and edge B) at once.
+  function makeEdgeHi() {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(18), 3)); // 2 triangles
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff5db1, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+    m.renderOrder = 10; // always on top of the resting/active edge strips
+    m.visible = false;
+    scene.add(m);
+    return m;
+  }
+  const edgeHi = makeEdgeHi();
+  const edgeHi2 = makeEdgeHi();
 
   // RECAL corner marker: a floor ring at a plan corner — previews the nearest
   // corner under your tip (cyan) before you lock it, then rides the locked corner
@@ -169,20 +247,30 @@ export function setupMR(view, project, getFootprint) {
   cornerHi.visible = false;
   scene.add(cornerHi);
 
+  // S2 numpad panel + a small cursor dot showing where the ray meets it.
+  const numpad = makeNumpad();
+  scene.add(numpad.group);
+  const numpadCursor = new THREE.Mesh(
+    new THREE.SphereGeometry(0.006, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0x60a5fa, depthTest: false, depthWrite: false }),
+  );
+  numpadCursor.renderOrder = 21;
+  numpadCursor.visible = false;
+  scene.add(numpadCursor);
+
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
   // are no zones yet, it's the placeholder that proves placement worked. It rides
   // planPos/planYaw (see applyPlanMatrix), so it's kept OUT of planGroup (which
   // buildPlan clears every rebuild).
   const originGizmo = new THREE.Group();
+  const C_ORIGIN_GIZMO = 0x2dd4bf;
+  const originRingMat = new THREE.MeshBasicMaterial({ color: C_ORIGIN_GIZMO, side: THREE.DoubleSide, depthWrite: false });
   {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.05, 0.07, 24).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x2dd4bf, side: THREE.DoubleSide, depthWrite: false }),
-    );
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.07, 24).rotateX(-Math.PI / 2), originRingMat);
     const arrowGeo = new THREE.BufferGeometry();
     arrowGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.001, 0, 0.35, 0.001, 0], 3));
-    const arrow = new THREE.Line(arrowGeo, new THREE.LineBasicMaterial({ color: 0x2dd4bf }));
+    const arrow = new THREE.Line(arrowGeo, new THREE.LineBasicMaterial({ color: C_ORIGIN_GIZMO }));
     originGizmo.add(ring, arrow); // arrow along local +X = plan +X (the ALIGN axis)
   }
   originGizmo.visible = false;
@@ -283,6 +371,19 @@ export function setupMR(view, project, getFootprint) {
   let selectedEdge = null;  // 'left'|'right'|'top'|'bottom' locked, awaiting a wall touch
   let hoverEdge = null;     // ray-previewed edge of activeRect (recomputed each frame)
 
+  // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
+  // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
+  // written as a hard constraint. edge<->edge = a size; edge<->origin = a position
+  // lock. Also edits an existing constraint between the same two references.
+  // A reference is { kind:'edge', rectId, edge } or { kind:'origin' }.
+  let dimRefA = null;       // first-picked reference (the anchor, like desktop)
+  let dimRefB = null;       // second-picked reference
+  let hoverRef = null;      // reference under the ray this frame (edge or origin)
+  let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
+  let editingId = null;     // id of the constraint being edited (if it already existed)
+  let hoverKey = null;      // numpad key under the ray this frame
+  let prevHoverKey = null;  // last drawn hover (redraw only on change)
+
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
   // (x, 0, -y), and planGroup adds planYaw + planPos; worldToLocal inverts both
   // (and tracks any drift correction folded into planPos). Undo the y-flip.
@@ -298,6 +399,9 @@ export function setupMR(view, project, getFootprint) {
   const _pw = new THREE.Vector3();
   const _drop = new THREE.Vector3(); // scratch for the DROP standing-position point
   const _cw = new THREE.Vector3();   // scratch for the RECAL corner-marker world point
+  const _cam = new THREE.Vector3();  // scratch: camera world pos (numpad placement)
+  const _camQ = new THREE.Quaternion();
+  const _fwd = new THREE.Vector3();
   function planToWorld(px, py, target = _pw) {
     planGroup.updateMatrixWorld(true);
     target.set(px, 0, -py);
@@ -335,6 +439,22 @@ export function setupMR(view, project, getFootprint) {
       bottom: Math.abs(py - b.y0), top: Math.abs(py - b.y1),
     };
     return Object.keys(d).reduce((a, k) => (d[k] < d[a] ? k : a));
+  }
+
+  // Nearest edge across ALL rects to a plan point — {rectId, edge} or null. Only
+  // considers an edge when the point is within (a margin of) that edge's span, so
+  // SIZE picks the edge you're actually next to, not a far parallel line.
+  function nearestEdgeAny(px, py) {
+    let best = null, bestD = Infinity;
+    const M = 0.2;
+    for (const r of project.rectangles) {
+      const b = r.bounds;
+      const cands = [];
+      if (py >= b.y0 - M && py <= b.y1 + M) cands.push(['left', Math.abs(px - b.x0)], ['right', Math.abs(px - b.x1)]);
+      if (px >= b.x0 - M && px <= b.x1 + M) cands.push(['bottom', Math.abs(py - b.y0)], ['top', Math.abs(py - b.y1)]);
+      for (const [edge, d] of cands) if (d < bestD) { bestD = d; best = { rectId: r.id, edge }; }
+    }
+    return best;
   }
 
   // Move one edge to a wall touch, keeping the OPPOSITE edge fixed and w/h >= 0.
@@ -395,24 +515,166 @@ export function setupMR(view, project, getFootprint) {
     placeAt(Wc.x - rx, floorY, Wc.z - rz); // sets planPos, keeps the new yaw, re-anchors at origin
   }
 
+  // --- SIZE (S2 numpad) helpers: the desktop dimension tool in AR ---
+
+  const isXEdge = (e) => e === 'left' || e === 'right';
+  let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
+
+  // A reference is a rect EDGE or the plan ORIGIN axis.
+  const refLabel = (ref) => (!ref ? '?' : ref.kind === 'origin' ? 'ORIGIN' : ref.edge.toUpperCase());
+  const refsEqual = (a, b) =>
+    !!a && !!b && a.kind === b.kind &&
+    (a.kind === 'origin' || (a.rectId === b.rectId && a.edge === b.edge));
+
+  // Two refs can be dimensioned if they lie on the same coordinate axis (and are
+  // not the same target). An edge pairs with the origin on its own axis.
+  function refsCompatible(a, b) {
+    if (a.kind === 'origin' && b.kind === 'origin') return false;
+    if (a.kind === 'edge' && b.kind === 'edge') {
+      if (refsEqual(a, b)) return false;
+      return isXEdge(a.edge) === isXEdge(b.edge);
+    }
+    return true; // edge + origin
+  }
+
+  const rectOf = (ref) => project.rectangles.find((r) => r.id === ref.rectId);
+
+  // Find an existing distance constraint between two references (either order).
+  function findConstraintForRefs(a, b) {
+    const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
+    if (origin) {
+      const e = origin === a ? b : a;
+      return project.constraints.find((k) =>
+        k.type === 'distance' && k.a.rect === ORIGIN_ID &&
+        k.b.rect === e.rectId && k.b.edge === e.edge) || null;
+    }
+    return project.constraints.find((k) =>
+      k.type === 'distance' && k.a.rect !== ORIGIN_ID && k.b.rect !== ORIGIN_ID &&
+      ((k.a.rect === a.rectId && k.a.edge === a.edge && k.b.rect === b.rectId && k.b.edge === b.edge) ||
+       (k.a.rect === b.rectId && k.a.edge === b.edge && k.b.rect === a.rectId && k.b.edge === a.edge))) || null;
+  }
+
+  // Create the constraint for a pair (a is the anchor/first pick, like desktop).
+  function makeConstraintForRefs(a, b) {
+    const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
+    let c;
+    if (origin) {
+      const e = origin === a ? b : a;
+      c = makeOriginDistance(rectOf(e), e.edge); // origin<->edge = position lock
+    } else {
+      c = makeDistance(rectOf(a), a.edge, rectOf(b), b.edge); // edge<->edge = size
+    }
+    project.addConstraint(c);
+    return c;
+  }
+
+  function resetDim() {
+    dimRefA = dimRefB = null;
+    editingId = null;
+    sizeBuffer = '';
+    bufferPristine = false;
+  }
+
+  function dimTitle() {
+    if (!dimRefA) return 'pick edge / origin';
+    if (!dimRefB) return refLabel(dimRefA) + '  <->  ?';
+    return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  (edit)' : '');
+  }
+
+  const redrawNumpad = () => numpad.draw(dimTitle(), sizeBuffer, hoverKey);
+
+  function commitEntry() {
+    if (!dimRefA || !dimRefB) return;
+    const val = parseFloat(sizeBuffer);
+    if (!Number.isFinite(val) || val <= 0) return; // keep the pair; wait for valid input
+    const meters = toMeters(val); // interpret in the current display unit
+    let c = editingId ? project.constraints.find((k) => k.id === editingId) : findConstraintForRefs(dimRefA, dimRefB);
+    if (!c) c = makeConstraintForRefs(dimRefA, dimRefB);
+    project.setConstraintMagnitude(c.id, meters); // preserves side (sign); re-solves + notifies
+    rlog('dim set', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
+    resetDim();
+    buildPlan();       // solver changed geometry; refresh the MR view
+    applyPlanMatrix();
+    redrawNumpad();
+  }
+
+  function pressKey(k) {
+    if (k === 'enter') { commitEntry(); return; }
+    if (bufferPristine && k !== 'back') sizeBuffer = ''; // typing over a prefilled edit value
+    bufferPristine = false;
+    if (k === 'back') sizeBuffer = sizeBuffer.slice(0, -1);
+    else if (k === '.') { if (!sizeBuffer.includes('.')) sizeBuffer += '.'; }
+    else if (sizeBuffer.replace('.', '').length < 6) sizeBuffer += k; // cap digit count
+    redrawNumpad();
+  }
+
+  // SIZE trigger: while both refs aren't chosen, a rect edge / the origin under the
+  // ray is picked (two picks, like clicking two edges on desktop). Once both are
+  // chosen, the ray drives the numpad and a key under it is pressed.
+  function onNumpadTouch() {
+    if (!placed || !activeRect) return;
+    if (dimRefA && dimRefB) { if (hoverKey) pressKey(hoverKey); return; }
+    if (!hoverRef) return;
+    if (!dimRefA) { dimRefA = hoverRef; rlog('dim A', { ref: refLabel(hoverRef) }); redrawNumpad(); return; }
+    if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
+    dimRefB = hoverRef;
+    const existing = findConstraintForRefs(dimRefA, dimRefB);
+    editingId = existing ? existing.id : null;
+    sizeBuffer = existing ? fmt(Math.abs(existing.value)) : ''; // prefill for editing
+    bufferPristine = !!existing;
+    rlog('dim B', { ref: refLabel(hoverRef), editing: !!existing });
+    redrawNumpad();
+  }
+
+  // Park the numpad ~0.55 m in front of the headset, upright, facing the user.
+  function placeNumpad() {
+    const e = renderer.xr.getCamera().matrixWorld.elements;
+    _cam.set(e[12], e[13], e[14]);
+    _camQ.setFromRotationMatrix(_rm.fromArray(e));
+    _fwd.set(0, 0, -1).applyQuaternion(_camQ); _fwd.y = 0;
+    if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
+    _fwd.normalize();
+    numpad.group.position.copy(_cam).addScaledVector(_fwd, 0.55);
+    numpad.group.position.y = _cam.y - 0.12; // a touch below eye level
+    numpad.group.lookAt(_cam.x, numpad.group.position.y, _cam.z); // yaw-only face
+    numpad.group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
+  }
+
+  function activateNumpad() {
+    if (!placed || !activeRect) { numpad.group.visible = false; return; }
+    resetDim();
+    placeNumpad();
+    numpad.group.visible = true;
+    redrawNumpad();
+  }
+
+  function deactivateNumpad() {
+    numpad.group.visible = false;
+    numpadCursor.visible = false;
+    edgeHi2.visible = false;
+    originRingMat.color.setHex(C_ORIGIN_GIZMO);
+    hoverKey = prevHoverKey = null;
+    hoverRef = null;
+  }
+
   // Draw the edge-highlight strip along `edge` of `rect`, in the given color —
   // same thickened-quad style as the resting edges, a touch bolder and on top.
   const _c0 = new THREE.Vector3(), _c1 = new THREE.Vector3();
   const _c2 = new THREE.Vector3(), _c3 = new THREE.Vector3();
-  function showEdge(rect, edge, colorHex) {
+  function showEdge(rect, edge, colorHex, mesh = edgeHi) {
     const [[ax, ay], [bx, by]] = edgeEndpoints(rect, edge);
     const c = stripCorners(ax, ay, bx, by, EDGE_HALF * 1.3); // slightly bolder than rest
     planToWorld(c[0][0], c[0][1], _c0);
     planToWorld(c[1][0], c[1][1], _c1);
     planToWorld(c[2][0], c[2][1], _c2);
     planToWorld(c[3][0], c[3][1], _c3);
-    const a = edgeHi.geometry.attributes.position.array;
+    const a = mesh.geometry.attributes.position.array;
     const w = (i, v) => { a[i] = v.x; a[i + 1] = v.y + 0.014; a[i + 2] = v.z; };
     w(0, _c0); w(3, _c1); w(6, _c2);   // triangle 1: c0,c1,c2
     w(9, _c0); w(12, _c2); w(15, _c3); // triangle 2: c0,c2,c3
-    edgeHi.geometry.attributes.position.needsUpdate = true;
-    edgeHi.material.color.setHex(colorHex);
-    edgeHi.visible = true;
+    mesh.geometry.attributes.position.needsUpdate = true;
+    mesh.material.color.setHex(colorHex);
+    mesh.visible = true;
   }
 
   // World point where a controller's pointing ray meets the floor plane, or null.
@@ -431,6 +693,23 @@ export function setupMR(view, project, getFootprint) {
     const t = (floorY - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
     return _rhit.copy(_ro).addScaledVector(_rd, t);
+  }
+
+  // Intersection of a controller's pointing ray with the numpad panel (with .uv),
+  // or null. Used by SIZE mode to pick the key under the ray.
+  const _raycaster = new THREE.Raycaster();
+  function rayPanelHit(inputSource) {
+    const space = inputSource?.targetRaySpace;
+    if (!space || !currentFrame) return null;
+    const pose = currentFrame.getPose(space, localSpace);
+    if (!pose) return null;
+    _rm.fromArray(pose.transform.matrix);
+    _ro.setFromMatrixPosition(_rm);
+    _rq.setFromRotationMatrix(_rm);
+    _rd.set(0, 0, -1).applyQuaternion(_rq);
+    _raycaster.set(_ro, _rd);
+    const hits = _raycaster.intersectObject(numpad.mesh, false);
+    return hits.length ? hits[0] : null;
   }
 
   const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
@@ -542,6 +821,15 @@ export function setupMR(view, project, getFootprint) {
         rlog('recal done', { yaw: +planYaw.toFixed(3) });
       },
     },
+    {
+      id: 'size', label: 'SIZE', color: 0xfbbf24,
+      // The desktop dimension tool in AR: pick two references — each a rect EDGE
+      // or the plan ORIGIN axis — then type the exact distance on the numpad.
+      // edge<->edge = a size (width/height); edge<->origin = a position lock. If a
+      // constraint already exists between the pair, its value is prefilled to edit.
+      // Written as a hard constraint (exact size = dimension constraints).
+      onTouch: onNumpadTouch,
+    },
   ];
   let currentMode = 0;
 
@@ -560,6 +848,8 @@ export function setupMR(view, project, getFootprint) {
     recalCorner = null;
     const m = modes[currentMode];
     applyModeVisual(m.label, m.color);
+    if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
+    else deactivateNumpad();
   }
 
   function placeAt(x, y, z) {
@@ -609,8 +899,15 @@ export function setupMR(view, project, getFootprint) {
     selectedEdge = null;
     hoverEdge = null;
     edgeHi.visible = false;
+    edgeHi2.visible = false;
     cornerHi.visible = false;
     originGizmo.visible = false;
+    originRingMat.color.setHex(C_ORIGIN_GIZMO);
+    resetDim();
+    hoverRef = null;
+    hoverKey = prevHoverKey = null;
+    numpad.group.visible = false;
+    numpadCursor.visible = false;
     setMode(0);
 
     localSpace = await session.requestReferenceSpace('local-floor');
@@ -625,8 +922,12 @@ export function setupMR(view, project, getFootprint) {
     anchor = null;
     reticle.visible = false;
     edgeHi.visible = false;
+    edgeHi2.visible = false;
     cornerHi.visible = false;
     originGizmo.visible = false;
+    originRingMat.color.setHex(C_ORIGIN_GIZMO);
+    numpad.group.visible = false;
+    numpadCursor.visible = false;
     scene.remove(planGroup);
 
     view.hideMesh = false; // desktop shows the extruded walls again
@@ -678,6 +979,11 @@ export function setupMR(view, project, getFootprint) {
   //  - otherwise: un-place the plan so you can register it again.
   function onReset() {
     const mode = modes[currentMode];
+    if (mode.id === 'size') { // undo the last dimension pick, step by step
+      if (dimRefB || editingId) { dimRefB = null; editingId = null; sizeBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
+      if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
+      return;
+    }
     if (mode.id === 'drop' || mode.id === 'edge') {
       if (selectedEdge) { // a locked edge is pending -> just cancel it
         selectedEdge = null;
@@ -755,7 +1061,7 @@ export function setupMR(view, project, getFootprint) {
     currentFrame = frame;
     pollModeCycle(frame);
     const lines = [
-      `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}`,
+      `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
       `edge:   sel=${selectedEdge ?? '-'} hov=${hoverEdge ?? '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
@@ -818,6 +1124,51 @@ export function setupMR(view, project, getFootprint) {
           cornerHi.visible = true;
         }
       }
+    } else if (modeId === 'size') {
+      // SIZE: pick two references (edge or origin) then type on the numpad. While
+      // the pair isn't complete, aim at the floor to pick refs; once complete, the
+      // ray drives the numpad. Locked refs (amber) and the hover ref (yellow) are
+      // drawn — edges as strips, the origin by tinting its gizmo ring.
+      reticle.visible = false;
+      hoverKey = null;
+      hoverRef = null;
+      numpadCursor.visible = false;
+      edgeHi.visible = false;
+      edgeHi2.visible = false;
+      originRingMat.color.setHex(C_ORIGIN_GIZMO);
+      if (dimRefA && dimRefB) {
+        // Numpad phase: raycast the panel for the key under the ray.
+        let panelHit = null;
+        for (const src of frame.session.inputSources) { panelHit = rayPanelHit(src); if (panelHit) break; }
+        if (numpad.group.visible && panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      } else {
+        // Reference-pick phase: ray the floor; the origin (near the gizmo) or the
+        // nearest edge across all rects is the candidate.
+        let hit = null;
+        for (const src of frame.session.inputSources) { hit = rayFloorHit(src); if (hit) break; }
+        if (hit) {
+          const { px, py } = worldToPlan(hit);
+          if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
+          else { const e = nearestEdgeAny(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+          reticle.visible = true;
+          reticle.position.set(hit.x, floorY + 0.002, hit.z);
+        }
+      }
+      // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
+      let ei = 0;
+      const slots = [edgeHi, edgeHi2];
+      const showRef = (ref, color) => {
+        if (!ref) return;
+        if (ref.kind === 'origin') originRingMat.color.setHex(color);
+        else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
+      };
+      showRef(dimRefA, 0xfbbf24);
+      showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
+      if (hoverKey !== prevHoverKey) { redrawNumpad(); prevHoverKey = hoverKey; }
     } else {
       // DROP: no floor target (drops at the standing position).
       reticle.visible = false;

@@ -42,6 +42,10 @@ export function edgeCoord(rect, edge) {
 let _cid = 0;
 export const nextConstraintId = () => `c${++_cid}`;
 
+// Sentinel "rectangle" id for the plan ORIGIN. An edge reference with this id is
+// the origin line on its axis, fixed at coordinate 0 (a constant, not a variable).
+export const ORIGIN_ID = '__origin__';
+
 // Advance the constraint-id counter past any loaded ids after a project load.
 export function syncConstraintIdCounter(ids) {
   for (const id of ids) {
@@ -68,6 +72,26 @@ export function makeDistance(rectA, edgeA, rectB, edgeB) {
     b: { rect: rectB.id, edge: edgeB },
     value,
     offset: null, // signed perpendicular placement (m); null = auto-stack
+    conflict: false,
+  };
+}
+
+/**
+ * Distance from the plan ORIGIN (coordinate 0 on the edge's axis) to a rect edge
+ * — i.e. an absolute position lock in plan space. Stored like a distance
+ * constraint with the origin as endpoint a (fixed at 0), so value = the signed
+ * edge coordinate; editing the magnitude keeps the side (via setConstraintMagnitude).
+ */
+export function makeOriginDistance(rect, edge) {
+  const axis = EDGE_AXIS[edge];
+  return {
+    id: nextConstraintId(),
+    type: 'distance',
+    axis,
+    a: { rect: ORIGIN_ID, edge: axis }, // origin line, fixed at 0 on this axis
+    b: { rect: rect.id, edge },
+    value: edgeCoord(rect, edge),
+    offset: null,
     conflict: false,
   };
 }
@@ -170,10 +194,20 @@ export function solve(project) {
     // Hard constraint terms.
     const rowsForResidual = [];
     for (const c of axisConstraints) {
-      const ia = index.get(`${c.a.rect}:${c.a.edge}`);
-      const ib = index.get(`${c.b.rect}:${c.b.edge}`);
-      if (ia == null || ib == null) { c.conflict = false; continue; }
-      const terms = [[ib, 1], [ia, -1]]; // coord(b) - coord(a) = value
+      const aOrigin = c.a.rect === ORIGIN_ID;
+      const bOrigin = c.b.rect === ORIGIN_ID;
+      const ia = aOrigin ? null : index.get(`${c.a.rect}:${c.a.edge}`);
+      const ib = bOrigin ? null : index.get(`${c.b.rect}:${c.b.edge}`);
+      // Every NON-origin endpoint must resolve to a variable; a two-origin
+      // constraint is meaningless.
+      if ((!aOrigin && ia == null) || (!bOrigin && ib == null) || (aOrigin && bOrigin)) {
+        c.conflict = false; continue;
+      }
+      // coord(b) - coord(a) = value; an origin endpoint contributes a fixed 0
+      // (it just drops out of the left-hand side).
+      const terms = [];
+      if (!bOrigin) terms.push([ib, 1]);
+      if (!aOrigin) terms.push([ia, -1]);
       addRow(M, rhs, terms, c.value, W_HARD);
       rowsForResidual.push({ c, terms });
     }
