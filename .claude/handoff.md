@@ -42,12 +42,13 @@ before planning any change; it has the architecture and the critical Node-via-fn
   passes but `actions/deploy-pages@v4` fails. Fixed by setting the source; now works.
 - **Claude cannot click through the UI** — changes are verified by build only. Visual QA has been the
   user's; the app is confirmed working by them (draw, constrain, 3D, save/load, units, deploy).
-- The **handoff skill** and this doc live under `.claude/` which is **gitignored** → local-only, not
-  pushed.
+- `.claude/skills/`, `.claude/rules/`, and `.claude/handoff.md` are **tracked** in git; only
+  `.claude/.env` and `.claude/.teams_request` stay ignored (see `.gitignore`).
 
 ## Commits
 
-Both pushed to `origin/main` (clean working tree, no upstream divergence):
+Substantive (feature) commits, pushed to `origin/main`; doc/config-only commits omitted
+(`git log` has them):
 
 - `3cf49de` Constraint-first sizing, dimension swap, and CLAUDE.md
 - `c3f7bdc` House CAD: parametric 2.5D house modeling tool
