@@ -1,148 +1,165 @@
 ---
 name: handoff
-description: Bring handoff.md up to date at the end of a session and print the prompt for the successor session. Use when wrapping up work, when asked to "write the handoff", or before a session restart. Enforces the file's own rules -- outstanding work only, newest first, no perishable facts -- and ends by printing the paste-able successor prompt.
-allowed-tools: Bash(git *) Bash(npm *) Bash(grep *) Read Edit Write
-argument-hint: (none) | check | print
+description: Write or update a handoff document so a new session can reconstruct context efficiently, prune it of everything that no longer earns its place, and emit a copy-pasteable prompt for the next session. Use when ending a session, switching context, or when an effort spans multiple sessions.
 ---
 
-## Task
+Produce a handoff a *fresh* session can act on: a document that reconstructs context efficiently,
+and a short prompt that points at it.
 
-If `$ARGUMENTS` is `check`, run the **Audit flow** and change nothing.
-If `$ARGUMENTS` is `print`, skip to **Print the successor prompt**.
-Otherwise run the **Update flow**, then print.
+The document is the deliverable. The prompt is a pointer plus the few things that would be
+dangerous or wasteful to discover late.
 
-`handoff.md` (at `.claude/handoff.md`) is the only file in the repo whose job is
-what is NOT done. Every edit either adds an outstanding item, closes one, or
-corrects something that has gone stale. If an edit does none of those, it belongs
-somewhere else -- CLAUDE.md for durable architecture, a commit message for
-finished work.
+`$ARGUMENTS` may name the target document. If absent, find or create it (step 2).
 
 ---
 
-## What the file is for
+## The rule that governs everything here
 
-Three rules, stated in the file itself and broken most often by good intentions:
+**A handoff doc is read once, by someone with no memory, who will act on it.** Every stale line
+costs more than a missing one — a fresh agent cannot tell which lines are current. So:
 
-- **Newest section first.**
-- **A section with nothing OUTSTANDING in it belongs in CLAUDE.md, not here.**
-  Move the durable part, then delete the section.
-- **Finished work is recorded in commit messages and CLAUDE.md.** Never restate
-  it here, and never re-derive it from here.
-
-The failure this file exists to prevent is a successor acting on something that
-was true when it was written. That makes accuracy about the MACHINE more
-important than completeness about the WORK.
+- **Verify from the repo, not from conversation memory.** You will misremember. Run `git log`,
+  `git status`, `git diff`; read the file. This is not optional — a wrong "this regressed" claim
+  sends the next session to fix something that was deliberate.
+- Label claims **Proven** or **Hypothesis** (per `CLAUDE.md` if the project defines it). Never let
+  a hypothesis read as settled.
+- **Accurate and sparse beats comprehensive and stale.**
 
 ---
 
-## Update flow
+## Steps
 
-### 1. Establish what changed
+### 1. Establish what is actually true
 
-```
-git log --oneline <last-handoff-commit>..HEAD
+Do this before writing anything.
+
+```bash
+git branch --show-current
+git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1   # upstream? sometimes none
+git log @{u}..HEAD --oneline 2>/dev/null || git log --oneline -20   # commits not yet pushed
 git status --short
 ```
 
-Read the commit messages rather than the diffs. They are the record of finished
-work, which is exactly what must NOT be copied into the handoff -- what you are
-looking for is the residue each commit left behind: a question it raised, a
-ruling it now depends on, a thing it deliberately did not do.
+For every uncommitted tracked file: **look at the diff and work out whether it is yours.**
+Pre-existing local modifications that predate the effort must be reported as such, not as
+regressions to fix. If a prior commit deliberately left something dirty, say so and say why.
 
-If any non-markdown file changed this session, run `npm run build` and confirm it
-is clean. That is the whole verification gate here -- there is no test suite,
-linter, or type checker -- so a green build means imports/syntax are sound and
-nothing more; runtime, canvas-rendering, and touch/controller behaviour are still
-unverified until the user exercises them.
+If the repo has a large untracked working tree (build output, data, scratch scripts), filter it —
+`git status --short | grep -v '^??'` — and report only tracked changes plus untracked files the
+effort actually created.
 
-### 2. Close what closed
+### 2. Find or create the document
 
-For every item in the file, decide: still outstanding, or done?
+Look for an existing handoff or plan doc before creating one — updating beats proliferating.
+A multi-session effort often wants two files:
 
-- **Done** -- delete it. Do not leave it with a "CLOSED" marker and a paragraph
-  of history; that is what the commit message is for. The one exception is when
-  the closing itself carries a constraint the next session must respect (for
-  example a ruling that holds only while some other decision holds) -- keep that
-  sentence, drop the rest.
-- **Closed elsewhere** -- when a ruling lands, grep the whole repo for the claim
-  it answers, not just the file you are editing. A note that says "still open"
-  about something already decided costs a second decision on a settled question.
-- **Renumber** any list you shortened, so item 1 is item 1.
+| File | Role |
+|---|---|
+| `<effort>-handoff.md` | "How do I resume" — the doc this skill maintains |
+| `<effort>-plan.md` | Phase history, findings, detailed plan |
 
-### 3. Correct what went stale
+Keep the split if it exists. Cross-link them; do not duplicate content between them. Put them
+wherever the project keeps working docs (e.g. a `docs/` or `.claude/` directory).
 
-Hunt these specifically. They are the edits nobody thinks to make:
+### 3. Write the document
 
-- **Perishable facts stated as durable ones.** Never record a pid, "the dev
-  server is currently running", or a port's state. Record how to CHECK it and how
-  to RESTART it (`npm run dev`, then the printed Network URL). A pid has a
-  half-life of hours; this file is read for days.
-- **Diagnostics that do not diagnose.** If a check was tried this session and
-  turned out to prove nothing, say so by name. A plausible-looking wrong test is
-  worse than no test, because the next session will trust it. Retracting one is a
-  normal edit here, not an embarrassment.
-- **Inference presented as fact.** If something was concluded rather than
-  observed, mark it: "I am assuming X because Y". The handoff is where this is
-  most costly to skip.
+Use this structure. Drop sections that do not apply; do not invent content to fill them.
 
-### 4. Write the new section
+```markdown
+# <Effort> — session handoff
 
-Replace the existing `## Start here (YYYY-MM-DD)` section with the current date
-and what a successor needs before acting; never accumulate multiple Start here
-sections. Keep the remaining sections grouped by WHO can close the item: the
-user's device/visual QA judgements (touch, Quest, phone, extrusion correctness),
-agent-owned engineering, and tooling/deploy. Put each new item under its real
-owner; an item filed under the wrong owner waits forever.
+**Read this first, then <detailed-plan>.** This file is the "how do I resume" doc.
 
-Prose, not bullets, wherever the reason matters more than the fact. This file is
-read start to finish by whoever picks the project up, and a list of assertions
-does not survive that reading as well as sentences that say why.
+**Date:** <YYYY-MM-DD> (session N)
+**Status:** <one line: what state the work is in>
 
-### 5. Check the invariants before committing
+## Where things stand in one paragraph
+<What exists, what works, what is proven. Then the CURRENT GOAL, stated plainly —
+especially if it changed. Point at the section to read before planning work.>
 
-- No pids, no "currently running", no port states asserted as fact.
-- No section without an outstanding item in it.
-- Every date absolute, never "yesterday" or "last session".
-- The session-start prompt at the top still matches how the project actually
-  works -- if a recovery path (build, deploy, or run) changed this session, it
-  changed there too.
+## What changed in session N
+> Next agent: when you add your own section here, fold anything still a live constraint
+> into "Standing decisions" or "Findings" and delete the rest.
+<Numbered, short. Findings, not narrative.>
 
-Commit the handoff with author `Alexis He <ahe.krosk@gmail.com>`. `.claude/` is
-gitignored, so stage with `git add -f .claude/handoff.md`. A markdown-only commit
-needs no build; if any non-markdown file rides along, build first.
+## Standing decisions
+<Facts from earlier sessions still in force. This is where prior sessions' changelogs
+go to be compressed. Each entry: the decision and why it holds.>
+
+## Findings / traps worth knowing
+<Things that cost real time to discover. Non-obvious behaviour, replicated defects,
+constraints that look wrong but are deliberate.>
+
+## Commits
+<Substantive commits only. Say that doc-only commits are omitted. Record push state,
+whether the branch has an upstream, and any branch needing owner sign-off before merge.>
+
+## Resuming from a clean checkout
+<Exact commands: install, build, run, the fast test/check and its expected result.
+Note what is already present on this machine so it is not rebuilt needlessly.>
+
+## The artifacts and what each is for
+| Path | Role |
+<One row per file the next session will touch. Role, not description.>
+
+## Next step
+<Ranked options, A/B/C. For each: what it is and why it is or is not next.
+Strike through superseded options AND GIVE THE REASON — otherwise the next
+session re-derives them.>
+
+## Known open questions
+<What is unverified, unexercised, or uncertain. Be explicit that these are gaps.>
+```
+
+If the effort touches a second repo, record its branch, its base ref, and whether its owners have
+signed off — that is easy to lose and expensive to rediscover.
+
+### 4. Prune — the part most often skipped
+
+Read the whole document as if you had never seen it. Remove:
+
+| Remove | Because |
+|---|---|
+| Sentences true for one session, phrased as standing facts | e.g. "no changes were needed this session" reads as permanent |
+| Per-session changelogs older than the current one | Fold live constraints into Standing decisions; delete the narrative |
+| The same point stated in 2–3 places | Keep one canonical statement; others become pointers |
+| Doc-only / trivial commits in the commits table | Noise in an orientation table; `git log` has them |
+| Structure an agent can read from the code | Directory listings, obvious call sequences |
+| Anything likely wrong within a sprint | Volatile detail belongs in code, not docs |
+
+**Do not delete a superseded goal — strike it through and give the reason.** Deleting it means the
+next session re-derives it and wastes the same time. This is the single highest-value pruning rule.
+
+### 5. Emit the next-session prompt
+
+Print it in a fenced block, ready to copy. Keep it short — the document carries the detail. Include
+only:
+
+1. **Read order**, with a note not to preload large or binary context (data files, big generated
+   sources).
+2. **Branch**, and any constraint on it (no upstream, never work on the default branch directly,
+   needs sign-off).
+3. **Goal**, including what is explicitly *not* the goal if that changed.
+4. **First task**, concrete enough to start on.
+5. **Traps** — put anything actively dangerous (destructive git operation, a file that must not be
+   staged, an unsafe call) FIRST. A fresh agent reaches for the plausible-looking thing.
+6. **Setup**, pointing at the document's resume section, noting what already exists locally.
+
+If the work is genuinely simple, "read `<doc>` and continue" is a complete prompt. Do not pad it.
+
+### 6. Offer to commit
+
+Prefer committing by **explicit path** over `git add -A` when the working tree contains generated
+files, data, or scratch that should not be staged. Follow the project's branch and commit-message
+conventions (per `CLAUDE.md` if defined). Report anything left uncommitted and whose it is.
 
 ---
 
-## Audit flow
+## Constraints
 
-Same checks, no edits. Report, in this order: sections with nothing outstanding
-left in them, perishable facts stated as durable, items whose owner looks wrong,
-and any note contradicted by a ruling elsewhere in the repo. Do not fix them --
-`check` exists so the author can see the drift before deciding what to do about
-it.
-
----
-
-## Print the successor prompt
-
-End every run by printing a fenced block the author can paste into the next
-session. It is two parts and no more:
-
-```
-Read .claude/handoff.md, starting with the session-start prompt at the top, and
-follow it. <One or two sentences of current intent: what we are starting, and any
-decision that must be settled before code exists.>
-```
-
-The standing half -- how to verify state, the constraints a session breaks by
-accident -- lives at the top of `handoff.md` and is not repeated in the paste.
-The paste carries intent only.
-
-**If the successor prompt wants to be longer than about three lines, that is a
-defect in `handoff.md`, not a reason for a longer prompt.** Put the extra state
-in the file and shorten the paste. A prompt that carries state is a prompt that
-has to be rewritten by hand every session, which is how it ends up wrong.
-
-Do not include in the paste: anything about a running process, an attached tool,
-or an open editor. All of it can be false by the time it is read, and the file's
-verification steps already cover it.
+- Never state a repo fact you have not just verified in this session.
+- Never write a per-session changelog without also compressing the previous one.
+- Never delete a superseded decision silently.
+- Never pad the next-session prompt to look thorough; it competes for attention with the document.
+- The document is for a reader with no memory of the conversation. Anything that only makes sense
+  to someone who was here does not belong in it.

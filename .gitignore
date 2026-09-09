@@ -3,5 +3,9 @@ dist/
 *.local
 .DS_Store
 
-# Claude Code local session data — not part of the app
-.claude/
+# Claude Code: keep local session data (.env, .teams_request) out, but track
+# shared config (skills, rules, the handoff doc).
+.claude/*
+!.claude/skills/
+!.claude/rules/
+!.claude/handoff.md

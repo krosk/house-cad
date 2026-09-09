@@ -5,8 +5,8 @@ in Claude memory (`house-cad-project.md`, `serve-and-share-network-url.md`).
 
 **Date:** 2026-09-09 (session 2)
 **Status:** Phases 1–3a live and deployed; Phase 3b (mesh export) done this session, plus touch/Quest
-input, dimension-display work, and a mobile toolbar fix. **4 commits sit on `main` UNPUSHED** — pushing
-auto-deploys them. Next planned piece: dimensioned floor-plan export (Phase 3b other half) or Phase 4.
+input, dimension-display work, and a mobile toolbar fix — all **pushed to `origin/main`** (auto-deploys
+via Actions). Next planned piece: dimensioned floor-plan export (Phase 3b other half) or Phase 4.
 
 ## Where things stand in one paragraph
 
@@ -18,7 +18,7 @@ autosave work. This session added: **mesh export** (STL/OBJ/glTF), **touch + Que
 **draggable dimension placement**, an **extension-line fix**, and a **wrapping toolbar** for phones.
 Read `CLAUDE.md` before planning any change.
 
-## This session's work (all committed to `main`, NOT pushed)
+## This session's work (pushed to `origin/main`)
 
 - `995e6b6` **Mesh export + touch/controller-friendly input**
   - `src/io/exportMesh.js`: wraps the live extruded geometry in a Mesh → Three's STL/OBJ/glTF
@@ -67,9 +67,10 @@ before any npm/node in PowerShell, or "command not found". Not relevant on the L
 - **`GLTFExporter` fails in Node** (`FileReader is not defined`) but works in the browser — `FileReader`
   is a browser API it uses for binary output. STL/OBJ export fine headlessly; GLB verified only by the
   browser being the target. Don't "fix" this in Node.
-- **`.claude/` is gitignored** → this doc and any handoff/quest-connect skills are local-only, not pushed.
-- Pushing `main` auto-deploys; the user has been doing on-device QA (touch/Quest/phone) **before**
-  pushing, so don't push without asking.
+- **`.claude/skills/`, `.claude/rules/`, and `.claude/handoff.md` are tracked** in git (see
+  `.gitignore`); only `.claude/.env` and `.claude/.teams_request` stay ignored. No `git add -f` needed.
+- **Pages deploy failed once** because Pages source wasn't set to "GitHub Actions"; fixed by setting it.
+- Pushing `main` auto-deploys; the user has been doing on-device QA (touch/Quest/phone) before pushing.
 
 ## The artifacts and what each is for
 
@@ -89,7 +90,6 @@ before any npm/node in PowerShell, or "command not found". Not relevant on the L
 
 ## Next step
 
-- **Push** the 4 pending commits once device QA is done (auto-deploys).
 - **Dimensioned floor-plan export** (SVG/PDF plan with dimension lines) — the other half of Phase 3.
 - **Phase 4 — rich constraints** (equal, aligned, chained). Solver already supports the linear form;
   mostly UI + constraint types.
