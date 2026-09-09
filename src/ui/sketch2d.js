@@ -576,20 +576,23 @@ export class Sketch2D {
 
       const OFFSET = 26; // px from geometry to dimension line
       const TIER = 20; // px between stacked dimensions
+      const EXT_OVER = 5; // px the extension line runs past the dimension line
       const arrow = 5;
 
       if (c.axis === 'x') {
         const xa = la.coord;
         const xb = lb.coord;
-        const topY = Math.max(la.p1.y, lb.p1.y); // world y (bounds y1)
+        // Each edge's own top (world y1); the dim line clears the taller of them.
+        const topYa = la.p1.y;
+        const topYb = lb.p1.y;
         const tier = xTier++;
-        const sy = this.toScreen(0, topY).y - OFFSET - tier * TIER;
+        const sy = this.toScreen(0, Math.max(topYa, topYb)).y - OFFSET - tier * TIER;
         const sxa = this.toScreen(xa, 0).x;
         const sxb = this.toScreen(xb, 0).x;
-        // Extension lines.
+        // Extension lines: from each edge's actual top up past the dim line.
         ctx.setLineDash([3, 3]);
-        this._seg(sxa, this.toScreen(0, topY).y, sxa, sy);
-        this._seg(sxb, this.toScreen(0, topY).y, sxb, sy);
+        this._seg(sxa, this.toScreen(0, topYa).y, sxa, sy - EXT_OVER);
+        this._seg(sxb, this.toScreen(0, topYb).y, sxb, sy - EXT_OVER);
         ctx.setLineDash([]);
         // Dimension line + arrows.
         this._seg(sxa, sy, sxb, sy);
@@ -599,14 +602,17 @@ export class Sketch2D {
       } else {
         const ya = la.coord;
         const yb = lb.coord;
-        const rightX = Math.max(la.p1.x, lb.p1.x); // world x (bounds x1)
+        // Each edge's own right side (world x1); the dim line clears the wider.
+        const rightXa = la.p1.x;
+        const rightXb = lb.p1.x;
         const tier = yTier++;
-        const sx = this.toScreen(rightX, 0).x + OFFSET + tier * TIER;
+        const sx = this.toScreen(Math.max(rightXa, rightXb), 0).x + OFFSET + tier * TIER;
         const sya = this.toScreen(0, ya).y;
         const syb = this.toScreen(0, yb).y;
+        // Extension lines: from each edge's actual right side out past the dim line.
         ctx.setLineDash([3, 3]);
-        this._seg(this.toScreen(rightX, 0).x, sya, sx, sya);
-        this._seg(this.toScreen(rightX, 0).x, syb, sx, syb);
+        this._seg(this.toScreen(rightXa, 0).x, sya, sx + EXT_OVER, sya);
+        this._seg(this.toScreen(rightXb, 0).x, syb, sx + EXT_OVER, syb);
         ctx.setLineDash([]);
         this._seg(sx, sya, sx, syb);
         this._arrowV(sx, sya, Math.sign(syb - sya) * arrow);
