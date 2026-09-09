@@ -18,6 +18,7 @@ export function serializeProject(project) {
     constraints: project.constraints.map((c) => ({
       id: c.id, type: c.type, axis: c.axis,
       a: { ...c.a }, b: { ...c.b }, value: c.value,
+      offset: c.offset ?? null,
     })),
   };
 }
@@ -51,6 +52,7 @@ export function deserializeInto(project, data) {
     a: { ...c.a },
     b: { ...c.b },
     value: c.value,
+    offset: typeof c.offset === 'number' ? c.offset : null,
     conflict: false,
   }));
   project.height = typeof data.height === 'number' ? data.height : 2.8;

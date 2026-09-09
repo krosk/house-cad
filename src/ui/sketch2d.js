@@ -117,6 +117,7 @@ export class Sketch2D {
     c.addEventListener('pointercancel', (e) => this._onUp(e));
     c.addEventListener('pointerleave', (e) => this._onUp(e));
     c.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
+    c.addEventListener('dblclick', (e) => this._onDblClick(e));
     c.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('keydown', (e) => {
@@ -180,11 +181,12 @@ export class Sketch2D {
     }
 
     if (this.tool === 'select') {
-      // A dimension-constraint label takes priority over rectangle selection.
+      // A dimension label takes priority over rectangle selection. Grabbing it
+      // starts a reposition drag; a click without movement focuses its field.
       const label = this._hitDimLabel(px, py);
       if (label) {
-        this.onPickConstraint?.(label.id);
-        this.render();
+        const c = this.project.constraints.find((k) => k.id === label.id);
+        this._drag = { mode: 'dimOffset', c, moved: false, downX: px, downY: py };
         return;
       }
       // Resize handles of the already-selected rectangle take priority.
@@ -246,7 +248,7 @@ export class Sketch2D {
         if (handle) {
           this.canvas.style.cursor = HANDLE_CURSOR[handle];
         } else if (this._hitDimLabel(px, py)) {
-          this.canvas.style.cursor = 'text';
+          this.canvas.style.cursor = 'move';
         } else {
           const hit = this._hitTest(world.x, world.y);
           this.canvas.style.cursor = hit ? 'move' : 'default';
@@ -289,6 +291,22 @@ export class Sketch2D {
       r.y = Math.min(y0, y1);
       r.h = Math.abs(y1 - y0);
       this.project.touch();
+    } else if (this._drag.mode === 'dimOffset') {
+      const d = this._drag;
+      // A small dead-zone keeps a plain click from nudging the placement.
+      if (!d.moved && Math.hypot(px - d.downX, py - d.downY) < 4) return;
+      d.moved = true;
+      this.canvas.style.cursor = 'grabbing';
+      const c = d.c;
+      if (!c) return;
+      const la = this._edgeLineWorld(c.a);
+      const lb = this._edgeLineWorld(c.b);
+      if (!la || !lb) return;
+      // Perpendicular distance from the same anchor the renderer uses.
+      c.offset = c.axis === 'x'
+        ? world.y - Math.max(la.p1.y, lb.p1.y)
+        : world.x - Math.max(la.p1.x, lb.p1.x);
+      this.project.touch();
     }
   }
 
@@ -326,9 +344,21 @@ export class Sketch2D {
     } else if (this._drag.mode === 'move' || this._drag.mode === 'resize') {
       this._drag.rect._dragging = false;
       this.project.touch(); // final settle without drag priority
+    } else if (this._drag.mode === 'dimOffset') {
+      // No movement → treat as a click: focus the dimension's value field.
+      if (!this._drag.moved) this.onPickConstraint?.(this._drag.c?.id);
+      this.canvas.style.cursor = 'move';
     }
     this._drag = null;
     this.render();
+  }
+
+  // Double-click a dimension label to return it to automatic placement.
+  _onDblClick(e) {
+    if (this.tool !== 'select') return;
+    const { px, py } = this._localXY(e);
+    const label = this._hitDimLabel(px, py);
+    if (label) this.project.setConstraintOffset(label.id, null);
   }
 
   _onWheel(e) {
@@ -466,8 +496,10 @@ export class Sketch2D {
   }
 
   _hitDimLabel(px, py) {
+    const pad = this._coarse ? 8 : 2; // easier to grab, esp. on touch
     for (const h of this._dimLabelHits) {
-      if (px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h) return h;
+      if (px >= h.x - pad && px <= h.x + h.w + pad
+        && py >= h.y - pad && py <= h.y + h.h + pad) return h;
     }
     return null;
   }
@@ -580,39 +612,57 @@ export class Sketch2D {
       const arrow = 5;
 
       if (c.axis === 'x') {
-        const xa = la.coord;
-        const xb = lb.coord;
-        // Each edge's own top (world y1); the dim line clears the taller of them.
-        const topYa = la.p1.y;
-        const topYb = lb.p1.y;
-        const tier = xTier++;
-        const sy = this.toScreen(0, Math.max(topYa, topYb)).y - OFFSET - tier * TIER;
-        const sxa = this.toScreen(xa, 0).x;
-        const sxb = this.toScreen(xb, 0).x;
-        // Extension lines: from each edge's actual top up past the dim line.
+        const sxa = this.toScreen(la.coord, 0).x;
+        const sxb = this.toScreen(lb.coord, 0).x;
+        // Dimension line screen-y: auto = stacked above the taller shape;
+        // pinned = a signed model-space offset from that top (drag to place).
+        let sy;
+        if (c.offset == null) {
+          const topY = Math.max(la.p1.y, lb.p1.y);
+          sy = this.toScreen(0, topY).y - OFFSET - xTier++ * TIER;
+        } else {
+          const topY = Math.max(la.p1.y, lb.p1.y);
+          sy = this.toScreen(0, topY + c.offset).y;
+        }
+        // Each extension line springs from the edge end nearer the dim line, so
+        // it always touches the shape whether the dim sits above or below.
+        const conn = (l) => {
+          const top = this.toScreen(0, l.p1.y).y;
+          const bot = this.toScreen(0, l.p0.y).y;
+          return Math.abs(sy - top) <= Math.abs(sy - bot) ? top : bot;
+        };
+        const cya = conn(la);
+        const cyb = conn(lb);
         ctx.setLineDash([3, 3]);
-        this._seg(sxa, this.toScreen(0, topYa).y, sxa, sy - EXT_OVER);
-        this._seg(sxb, this.toScreen(0, topYb).y, sxb, sy - EXT_OVER);
+        this._seg(sxa, cya, sxa, sy + Math.sign(sy - cya) * EXT_OVER);
+        this._seg(sxb, cyb, sxb, sy + Math.sign(sy - cyb) * EXT_OVER);
         ctx.setLineDash([]);
-        // Dimension line + arrows.
         this._seg(sxa, sy, sxb, sy);
         this._arrowH(sxa, sy, Math.sign(sxb - sxa) * arrow);
         this._arrowH(sxb, sy, Math.sign(sxa - sxb) * arrow);
-        this._dimLabel(c, (sxa + sxb) / 2, sy - 4);
+        const above = sy <= Math.min(cya, cyb);
+        this._dimLabel(c, (sxa + sxb) / 2, above ? sy - 4 : sy + 16);
       } else {
-        const ya = la.coord;
-        const yb = lb.coord;
-        // Each edge's own right side (world x1); the dim line clears the wider.
-        const rightXa = la.p1.x;
-        const rightXb = lb.p1.x;
-        const tier = yTier++;
-        const sx = this.toScreen(Math.max(rightXa, rightXb), 0).x + OFFSET + tier * TIER;
-        const sya = this.toScreen(0, ya).y;
-        const syb = this.toScreen(0, yb).y;
-        // Extension lines: from each edge's actual right side out past the dim line.
+        const sya = this.toScreen(0, la.coord).y;
+        const syb = this.toScreen(0, lb.coord).y;
+        let sx;
+        if (c.offset == null) {
+          const rightX = Math.max(la.p1.x, lb.p1.x);
+          sx = this.toScreen(rightX, 0).x + OFFSET + yTier++ * TIER;
+        } else {
+          const rightX = Math.max(la.p1.x, lb.p1.x);
+          sx = this.toScreen(rightX + c.offset, 0).x;
+        }
+        const conn = (l) => {
+          const right = this.toScreen(l.p1.x, 0).x;
+          const left = this.toScreen(l.p0.x, 0).x;
+          return Math.abs(sx - right) <= Math.abs(sx - left) ? right : left;
+        };
+        const cxa = conn(la);
+        const cxb = conn(lb);
         ctx.setLineDash([3, 3]);
-        this._seg(this.toScreen(rightXa, 0).x, sya, sx + EXT_OVER, sya);
-        this._seg(this.toScreen(rightXb, 0).x, syb, sx + EXT_OVER, syb);
+        this._seg(cxa, sya, sx + Math.sign(sx - cxa) * EXT_OVER, sya);
+        this._seg(cxb, syb, sx + Math.sign(sx - cxb) * EXT_OVER, syb);
         ctx.setLineDash([]);
         this._seg(sx, sya, sx, syb);
         this._arrowV(sx, sya, Math.sign(syb - sya) * arrow);

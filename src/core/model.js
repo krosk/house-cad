@@ -127,6 +127,15 @@ export class Project {
     this._emit();
   }
 
+  // Pin a dimension's perpendicular placement (signed meters), or pass null to
+  // return it to automatic stacking. Purely presentational — not solved.
+  setConstraintOffset(id, offset) {
+    const c = this.constraints.find((c) => c.id === id);
+    if (!c) return;
+    c.offset = offset;
+    this._emit();
+  }
+
   setHeight(h) {
     this.height = Math.max(0.01, h);
     this._emit();

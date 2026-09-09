@@ -67,6 +67,7 @@ export function makeDistance(rectA, edgeA, rectB, edgeB) {
     a: { rect: rectA.id, edge: edgeA },
     b: { rect: rectB.id, edge: edgeB },
     value,
+    offset: null, // signed perpendicular placement (m); null = auto-stack
     conflict: false,
   };
 }

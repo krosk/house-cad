@@ -35,7 +35,7 @@ const HINTS = {
   add: 'Drag on the grid to draw a rectangle that ADDS matter.',
   subtract: 'Drag to draw a rectangle that REMOVES matter (cut-out).',
   dimension: 'Click one edge, then another (same axis) to lock the distance.',
-  select: 'Click a rectangle to select; drag to move; Del to delete.',
+  select: 'Drag rectangles to move, dimension labels to reposition (double-click a label to auto-place). Del to delete.',
   pan: 'Drag anywhere to pan. Pinch or use +/− to zoom.',
 };
 function setTool(tool) {
