@@ -34,7 +34,8 @@ body {
 #toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   padding: 8px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -88,6 +89,18 @@ body {
   border-radius: 6px;
   padding: 4px 6px;
   cursor: pointer;
+}
+
+/* Phones: let the hint drop to its own full-width line instead of squeezing
+   the button groups, and tighten spacing. */
+@media (max-width: 640px) {
+  #toolbar { gap: 6px 10px; }
+  #toolbar .brand { flex-basis: 100%; }
+  #toolbar .hint {
+    margin-left: 0;
+    flex-basis: 100%;
+    order: 1; /* push below the button rows */
+  }
 }
 
 /* ---- export dropdown ---- */
