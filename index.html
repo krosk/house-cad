@@ -14,6 +14,7 @@
           <button data-tool="subtract" title="Draw a rectangle that removes matter">➖ Subtract</button>
           <button data-tool="dimension" title="Constrain the distance between two edges">📏 Dimension</button>
           <button data-tool="select" title="Select / move / delete rectangles">🖟 Select</button>
+          <button data-tool="pan" title="Pan the view (drag anywhere)">✋ Pan</button>
         </div>
         <div class="group">
           <label>Height <input id="height" type="number" min="0.1" step="0.1" value="2.8" /> <span class="unit-label">m</span></label>
@@ -36,12 +37,24 @@
           <button id="load" title="Open a .json project file">📂 Load</button>
           <input id="file-input" type="file" accept="application/json,.json" hidden />
         </div>
+        <div class="group menu" id="export-menu">
+          <button id="export-btn" title="Export the 3D model as a mesh">⬇ Export ▾</button>
+          <div class="menu-pop" id="export-pop" hidden>
+            <button data-fmt="stl" title="Binary STL — for 3D printing">STL (.stl)</button>
+            <button data-fmt="obj" title="Wavefront OBJ — plain text">OBJ (.obj)</button>
+            <button data-fmt="glb" title="Binary glTF — single file, best for sharing">glTF (.glb)</button>
+          </div>
+        </div>
         <div class="group hint" id="hint">Drag on the grid to draw a rectangle.</div>
       </header>
       <main id="panes">
         <section id="pane-2d">
           <canvas id="sketch"></canvas>
           <div class="pane-label">Plan (2D)</div>
+          <div id="zoom-ctl">
+            <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+          </div>
           <aside id="constraints">
             <button class="cx-head" id="cx-toggle" aria-expanded="true" title="Collapse / expand">
               <span class="cx-caret">▾</span>

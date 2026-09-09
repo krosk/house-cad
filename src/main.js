@@ -5,6 +5,7 @@ import { extrudeFootprint } from './core/extrude.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { serializeProject, deserializeInto } from './io/serialize.js';
+import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
@@ -14,9 +15,11 @@ const view = new View3D(document.getElementById('view3d'));
 
 // Rebuild the 3D model whenever the plan changes.
 let firstBuild = true;
+let currentGeometry = null; // the live extruded mesh, kept for export
 function rebuild() {
   const footprint = computeFootprint(project.rectangles);
   const geometry = extrudeFootprint(footprint, project.height);
+  currentGeometry = geometry;
   view.setGeometry(geometry);
   if (firstBuild && geometry) {
     view.frameModel();
@@ -33,6 +36,7 @@ const HINTS = {
   subtract: 'Drag to draw a rectangle that REMOVES matter (cut-out).',
   dimension: 'Click one edge, then another (same axis) to lock the distance.',
   select: 'Click a rectangle to select; drag to move; Del to delete.',
+  pan: 'Drag anywhere to pan. Pinch or use +/− to zoom.',
 };
 function setTool(tool) {
   sketch.setTool(tool);
@@ -51,6 +55,10 @@ sketch.onStatus = (msg) => {
     hint.textContent = HINTS[sketch.tool];
   }, 2500);
 };
+
+// ---- on-screen zoom buttons (touch / Quest controller) ----
+document.getElementById('zoom-in').addEventListener('click', () => sketch.zoomBy(1.2));
+document.getElementById('zoom-out').addEventListener('click', () => sketch.zoomBy(1 / 1.2));
 
 // ---- constraints panel (live list of dimensions) ----
 const cxList = document.getElementById('cx-list');
@@ -288,6 +296,43 @@ fileInput.addEventListener('change', async () => {
     fileInput.value = ''; // allow re-loading the same file
   }
 });
+
+// ---- mesh export (STL / OBJ / glTF) ----
+(() => {
+  const btn = document.getElementById('export-btn');
+  const pop = document.getElementById('export-pop');
+  const close = () => { pop.hidden = true; };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.hidden = !pop.hidden;
+  });
+  pop.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', close); // click-outside dismisses
+
+  const EXPORTERS = {
+    stl: () => exportSTL(currentGeometry, 'house.stl'),
+    obj: () => exportOBJ(currentGeometry, 'house.obj'),
+    glb: () => exportGLTF(currentGeometry, 'house.glb'),
+  };
+
+  pop.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', async () => {
+      close();
+      if (!currentGeometry) {
+        sketch.onStatus?.('Nothing to export — the model is empty.');
+        return;
+      }
+      const fmt = b.dataset.fmt;
+      try {
+        await EXPORTERS[fmt]();
+        sketch.onStatus?.(`Exported house.${fmt}`);
+      } catch (err) {
+        alert(`Export failed:\n${err.message}`);
+      }
+    });
+  });
+})();
 
 // ---- autosave to localStorage (survives page reload) ----
 const LS_KEY = 'house-cad:autosave:v1';

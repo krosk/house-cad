@@ -45,6 +45,10 @@ export class Sketch2D {
     this._drag = null; // active pointer interaction
     this._spaceDown = false;
 
+    this._pointers = new Map(); // pointerId -> {px,py}; drives multi-touch
+    this._gesture = null; // {mid,dist} while two-finger pan/pinch is active
+    this._coarse = false; // last pointer was touch/pen → use fatter hit targets
+
     this._dimFirst = null; // first edge picked for a dimension {rect, edge}
     this._hoverEdge = null; // edge under cursor (dimension tool)
     this._dimLabelHits = []; // clickable dimension labels, rebuilt each render
@@ -62,9 +66,14 @@ export class Sketch2D {
     this.tool = tool;
     this._dimFirst = null;
     this._hoverEdge = null;
-    this.canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    const CURSOR = { select: 'default', pan: 'grab' };
+    this.canvas.style.cursor = CURSOR[tool] ?? 'crosshair';
     this.render();
   }
+
+  // Coarse pointers (finger / controller ray) get larger hit targets.
+  get _edgePickPx() { return this._coarse ? EDGE_PICK_PX * 2 : EDGE_PICK_PX; }
+  get _handlePx() { return this._coarse ? HANDLE_PX * 2 : HANDLE_PX; }
 
   // ---- coordinate transforms ----
   toWorld(px, py) {
@@ -105,6 +114,7 @@ export class Sketch2D {
     c.addEventListener('pointerdown', (e) => this._onDown(e));
     c.addEventListener('pointermove', (e) => this._onMove(e));
     c.addEventListener('pointerup', (e) => this._onUp(e));
+    c.addEventListener('pointercancel', (e) => this._onUp(e));
     c.addEventListener('pointerleave', (e) => this._onUp(e));
     c.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -131,9 +141,25 @@ export class Sketch2D {
   _onDown(e) {
     this.canvas.setPointerCapture(e.pointerId);
     const { px, py } = this._localXY(e);
-    const panning = e.button === 1 || this._spaceDown || e.button === 2;
+    this._coarse = e.pointerType !== 'mouse';
+    this._pointers.set(e.pointerId, { px, py });
+
+    // A second finger turns the interaction into a two-finger pan + pinch-zoom.
+    // Abort whatever the first finger started so it leaves no stray draft.
+    if (this._pointers.size >= 2) {
+      this._abortPointerAction();
+      const pts = [...this._pointers.values()];
+      this._gesture = { mid: this._centroid(pts), dist: this._spread(pts) };
+      this.render();
+      return;
+    }
+
+    // Pan via: the Pan tool (touch / controller), middle/right mouse, or Space.
+    const panning = this.tool === 'pan' || e.button === 1 || e.button === 2
+      || this._spaceDown;
 
     if (panning) {
+      this.canvas.style.cursor = 'grabbing';
       this._drag = { mode: 'pan', px, py, ox: this.originX, oy: this.originY };
       return;
     }
@@ -199,6 +225,14 @@ export class Sketch2D {
 
   _onMove(e) {
     const { px, py } = this._localXY(e);
+    if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, { px, py });
+
+    // Two-finger pan + pinch-zoom takes over while active.
+    if (this._gesture && this._pointers.size >= 2) {
+      this._updateGesture();
+      return;
+    }
+
     const world = this.toWorld(px, py);
     this._cursor = world;
 
@@ -259,7 +293,20 @@ export class Sketch2D {
   }
 
   _onUp(e) {
+    this._pointers.delete(e.pointerId);
+
+    // Winding down a multi-touch gesture.
+    if (this._gesture) {
+      if (this._pointers.size < 2) this._gesture = null;
+      // Don't let a leftover finger start a fresh action; wait for a new touch.
+      return;
+    }
+
+    if (this.tool === 'pan' && !this._drag) this.canvas.style.cursor = 'grab';
     if (!this._drag) return;
+    if (this._drag.mode === 'pan' && this.tool === 'pan') {
+      this.canvas.style.cursor = 'grab';
+    }
     if (this._drag.mode === 'draw') {
       const d = this.draft;
       const w = Math.abs(d.x1 - d.x0);
@@ -297,11 +344,68 @@ export class Sketch2D {
     this.render();
   }
 
+  // ---- multi-touch (two-finger pan + pinch-zoom) ----
+  _centroid(pts) {
+    let x = 0, y = 0;
+    for (const p of pts) { x += p.px; y += p.py; }
+    const n = pts.length || 1;
+    return { x: x / n, y: y / n };
+  }
+  _spread(pts) {
+    if (pts.length < 2) return 0;
+    return Math.hypot(pts[0].px - pts[1].px, pts[0].py - pts[1].py);
+  }
+
+  _updateGesture() {
+    const pts = [...this._pointers.values()];
+    const mid = this._centroid(pts);
+    const dist = this._spread(pts);
+
+    // Pan by how far the two-finger midpoint moved.
+    this.originX += mid.x - this._gesture.mid.x;
+    this.originY += mid.y - this._gesture.mid.y;
+
+    // Pinch-zoom about the midpoint, keeping that world point pinned.
+    if (this._gesture.dist > 0 && dist > 0) {
+      const before = this.toWorld(mid.x, mid.y);
+      this.scale = Math.min(400, Math.max(4, this.scale * (dist / this._gesture.dist)));
+      const after = this.toWorld(mid.x, mid.y);
+      this.originX += (after.x - before.x) * this.scale;
+      this.originY -= (after.y - before.y) * this.scale;
+    }
+
+    this._gesture.mid = mid;
+    this._gesture.dist = dist;
+    this.render();
+  }
+
+  // Discard an in-flight single-pointer action (used when a 2nd finger lands).
+  _abortPointerAction() {
+    if (this._drag && (this._drag.mode === 'move' || this._drag.mode === 'resize')) {
+      this._drag.rect._dragging = false;
+      this.project.touch();
+    }
+    this._drag = null;
+    this.draft = null;
+  }
+
+  // Zoom about the viewport center by a factor (on-screen +/- buttons).
+  zoomBy(factor) {
+    const cx = this._cssW / 2;
+    const cy = this._cssH / 2;
+    const before = this.toWorld(cx, cy);
+    this.scale = Math.min(400, Math.max(4, this.scale * factor));
+    const after = this.toWorld(cx, cy);
+    this.originX += (after.x - before.x) * this.scale;
+    this.originY -= (after.y - before.y) * this.scale;
+    this.render();
+  }
+
   // ---- edge picking (dimension tool) ----
   // Returns {rect, edge, axis} for the nearest rectangle edge within threshold.
   _hitEdge(px, py) {
     let best = null;
-    let bestDist = EDGE_PICK_PX;
+    let bestDist = this._edgePickPx;
     for (const r of this.project.rectangles) {
       const b = r.bounds;
       const c0 = this.toScreen(b.x0, b.y0);
@@ -352,10 +456,11 @@ export class Sketch2D {
   }
 
   _hitHandle(px, py, rect) {
+    const t = this._handlePx;
     const pts = this._handlePoints(rect);
     for (const [name, [wx, wy]] of Object.entries(pts)) {
       const s = this.toScreen(wx, wy);
-      if (Math.abs(px - s.x) <= HANDLE_PX && Math.abs(py - s.y) <= HANDLE_PX) return name;
+      if (Math.abs(px - s.x) <= t && Math.abs(py - s.y) <= t) return name;
     }
     return null;
   }
@@ -648,14 +753,15 @@ export class Sketch2D {
 
 
     if (selected) {
+      const hs = this._coarse ? 6 : 3.5; // half-size; fatter for touch
       const pts = this._handlePoints(rect);
       for (const [wx, wy] of Object.values(pts)) {
         const s = this.toScreen(wx, wy);
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
-        ctx.fillRect(s.x - 3.5, s.y - 3.5, 7, 7);
-        ctx.strokeRect(s.x - 3.5, s.y - 3.5, 7, 7);
+        ctx.fillRect(s.x - hs, s.y - hs, hs * 2, hs * 2);
+        ctx.strokeRect(s.x - hs, s.y - hs, hs * 2, hs * 2);
       }
     }
   }
