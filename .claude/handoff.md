@@ -5,16 +5,17 @@ and every XR gotcha live in Claude memory `phase5-xr-intent.md`, which auto-load
 don't duplicate it here.
 
 **Date:** 2026-09-09 (session 4)
-**Status:** Phase 5 **survey milestone S1 — in-headset authoring of free-space zones — implemented
-and builds clean, but UNCOMMITTED and unverified on device.** All session-4 work is in the working
-tree only. Desktop app got a layout change (toolbar→footer, 3D pane hidden).
+**Status:** Phase 5 **survey milestone S1 — in-headset authoring of free-space zones — committed,
+pushed, and merged to `main` (so it DEPLOYED to Pages), but still UNVERIFIED on device.** A desktop
+layout change (toolbar→footer, 3D pane hidden) is now live too. Working tree is clean.
 
 ## Where things stand in one paragraph
 
 The desktop parametric 2.5D CAD tool (vanilla JS + Vite + Three.js) is deployed at
-**https://krosk.github.io/house-cad/** (from `main`; this branch is NOT merged, so it hasn't
-deployed). M0 (mixed-reality floor-plan overlay + touch registration) is committed and worked on
-device. **Session 4 built the SURVEY milestone (S1):** stand in a real room and author the plan's
+**https://krosk.github.io/house-cad/** (from `main`). **Session 4's S1 work is now on `main` and
+deployed** — the owner approved the direct push this session. M0 (mixed-reality floor-plan overlay +
+touch registration) worked on device; S1 is live but **not yet tried on the Quest**.
+**Session 4 built the SURVEY milestone (S1):** stand in a real room and author the plan's
 **axis-aligned free-space rectangles** in place — `DROP` a starter box at your feet, then in `EDGE`
 mode point the controller ray at one of its edges to lock it and touch the matching real wall to
 snap that edge out. Registration (`ORIGIN`+`ALIGN`) was merged into one two-step `REGISTER` action.
@@ -119,12 +120,18 @@ tested by the user on the Quest.
 
 Substantive only (`git log` has all):
 
+- `27653b6` **Phase 5 S2: in-headset SIZE mode — the desktop dimension tool in AR** (+ origin-distance core).
+- `4dc55c6` **Phase 5: RECAL mode — drift correction by re-zeroing against a known corner**.
+- `1749424` **Phase 5 S1: in-headset survey — edge-push free-space zones**.
 - `14a22c4` **Phase 5 M0: mixed-reality floor-plan overlay on Quest 3** — the M0 milestone.
 
-**Push state:** branch `phase5-mr-overlay` is **unpushed, no upstream**, one commit ahead of `main`.
-**All session-4 work is UNCOMMITTED** in the working tree (`index.html`, `src/main.js`,
-`src/style.css`, `src/ui/mr.js`, `src/ui/view3d.js`, plus this `handoff.md`). Not on `main`, so it
-won't auto-deploy. Decide commit/push/merge with the owner.
+**WORKFLOW RULE CHANGED (session 5):** commit and push **directly on `main`** — do NOT create
+feature branches (memory: `commit-directly-on-main`; overrides the old branch-and-merge rule and the
+base "branch first" default). **`main` still auto-deploys to Pages on push**, so every push
+publishes — surface that, and only push when the user asks. The old `phase5-mr-overlay` branch was
+fast-forwarded into `main` and is now defunct.
+The commits carry `Co-Authored-By: Claude` / `Claude-Session` trailers (M0 did not — owner is aware,
+declined to strip them).
 
 ## Resuming from a clean checkout
 
@@ -170,7 +177,8 @@ once**, tap **START AR** (now in the footer). Node v20 and `node_modules` alread
 
 ## Known open questions
 
-- **Everything session-4 is unverified on device** — builds clean only. No XR regression guard.
+- **Everything session-4 is unverified on device** — it's committed and DEPLOYED but never tried on
+  the Quest; only the headless build passed. No XR regression guard exists.
 - **World→plan transform sign/handedness is untested.** Most likely bug: surveyed zones land
   **mirrored or rotated** (the `py = −local.z` flip or a yaw mismatch). The per-action `rlog` lines
   (`register origin/align`, `drop rect`, `edge locked/set`) + the on-tip HUD are how to diagnose.
