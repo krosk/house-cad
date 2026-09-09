@@ -158,6 +158,17 @@ export function setupMR(view, project, getFootprint) {
   edgeHi.visible = false;
   scene.add(edgeHi);
 
+  // RECAL corner marker: a floor ring at a plan corner — previews the nearest
+  // corner under your tip (cyan) before you lock it, then rides the locked corner
+  // (purple) while you touch the edge direction.
+  const cornerHi = new THREE.Mesh(
+    new THREE.RingGeometry(0.035, 0.06, 24).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+  );
+  cornerHi.renderOrder = 11; // above the edge highlight
+  cornerHi.visible = false;
+  scene.add(cornerHi);
+
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
   // are no zones yet, it's the placeholder that proves placement worked. It rides
@@ -260,6 +271,9 @@ export function setupMR(view, project, getFootprint) {
   let planYaw = 0;                     // plan rotation about vertical, set by ALIGN step
   let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
   let awaitingAlign = false;           // REGISTER two-step: origin done, awaiting the align touch
+  let awaitingRecalDir = false;        // RECAL two-step: corner locked, awaiting the edge-direction touch
+  let recalCorner = null;              // {cx, cy} plan corner being re-referenced by RECAL
+  const recalWc = new THREE.Vector3(); // world position of the touched real corner (RECAL step 1)
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -283,6 +297,7 @@ export function setupMR(view, project, getFootprint) {
   // Plan (x, y) -> world, the inverse mapping (used to draw edge highlights).
   const _pw = new THREE.Vector3();
   const _drop = new THREE.Vector3(); // scratch for the DROP standing-position point
+  const _cw = new THREE.Vector3();   // scratch for the RECAL corner-marker world point
   function planToWorld(px, py, target = _pw) {
     planGroup.updateMatrixWorld(true);
     target.set(px, 0, -py);
@@ -336,6 +351,50 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
+  // Nearest plan-space corner of ANY surveyed rectangle to a plan point — RECAL's
+  // reference-point pick (so you can re-zero off any known corner, not just origin).
+  function nearestPlanCorner(px, py) {
+    let best = null, bestD = Infinity;
+    for (const r of project.rectangles) {
+      const b = r.bounds;
+      for (const [cx, cy] of [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]]) {
+        const d = Math.hypot(px - cx, py - cy);
+        if (d < bestD) { bestD = d; best = { cx, cy }; }
+      }
+    }
+    return best;
+  }
+
+  // Re-zero the whole plan against a KNOWN plan corner to correct drift. Given the
+  // corner's real-world position (Wc) and a world direction along one of its real
+  // edges (wdx,wdz), solve the rigid floor transform (planYaw + planPos) so both
+  // the corner and the edge direction land on the touches. All rectangles, stored
+  // in plan space, follow rigidly, so rotational AND positional drift are fixed.
+  // Same Ry(yaw)·(x,0,-y)+planPos convention as applyPlanMatrix/REGISTER, so it's
+  // self-consistent regardless of the (untested) global world->plan handedness.
+  function recalibrate(corner, Wc, wdx, wdz) {
+    const wlen = Math.hypot(wdx, wdz);
+    const wx = wdx / wlen, wz = wdz / wlen;
+    // Pick the plan axis whose CURRENT world direction best matches the touch, so
+    // recal makes the small intended rotation (not a 90° flip to another edge).
+    const c0 = Math.cos(planYaw), s0 = Math.sin(planYaw);
+    let Pdx = 1, Pdy = 0, best = -Infinity;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ex = dx * c0 - dy * s0;   // Ry(yaw)·(dx,0,-dy), horizontal x
+      const ez = -dx * s0 - dy * c0;  // ... horizontal z
+      const dot = ex * wx + ez * wz;
+      if (dot > best) { best = dot; Pdx = dx; Pdy = dy; }
+    }
+    // yaw so plan dir (Pdx,Pdy) maps to world (wx,wz).
+    const yaw1 = Math.atan2(-wz, wx) - Math.atan2(Pdy, Pdx);
+    planYaw = yaw1;
+    // planPos so the plan corner maps to the touched world corner.
+    const c1 = Math.cos(yaw1), s1 = Math.sin(yaw1);
+    const rx = corner.cx * c1 - corner.cy * s1;   // Ry(yaw1)·(cx,0,-cy), horizontal
+    const rz = -corner.cx * s1 - corner.cy * c1;
+    placeAt(Wc.x - rx, floorY, Wc.z - rz); // sets planPos, keeps the new yaw, re-anchors at origin
+  }
+
   // Draw the edge-highlight strip along `edge` of `rect`, in the given color —
   // same thickened-quad style as the resting edges, a touch bolder and on top.
   const _c0 = new THREE.Vector3(), _c1 = new THREE.Vector3();
@@ -375,6 +434,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
+  const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
 
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
@@ -453,6 +513,35 @@ export function setupMR(view, project, getFootprint) {
         applyPlanMatrix();
       },
     },
+    {
+      id: 'recal', label: 'RECAL', color: C_RECAL,
+      // Correct drift: re-zero the plan against a KNOWN corner. Two touches (like
+      // REGISTER, but referencing any surveyed corner, not just plan-origin):
+      // 1st = the real corner; 2nd = a point along one of its real edges. Both
+      // rotational and positional drift are corrected; the whole plan follows.
+      onTouch: (pos) => {
+        if (!placed) return;
+        if (!awaitingRecalDir) {
+          const { px, py } = worldToPlan(pos);
+          const corner = nearestPlanCorner(px, py);
+          if (!corner) return; // no surveyed corners to reference yet
+          recalCorner = corner;
+          recalWc.copy(pos);
+          awaitingRecalDir = true;
+          applyModeVisual('RECAL DIR', C_RECAL_DIR); // cue step 2
+          rlog('recal corner', { cx: +corner.cx.toFixed(3), cy: +corner.cy.toFixed(3) });
+          return;
+        }
+        const wdx = pos.x - recalWc.x, wdz = pos.z - recalWc.z;
+        if (Math.hypot(wdx, wdz) < 0.05) return; // too close to define a direction
+        recalibrate(recalCorner, recalWc, wdx, wdz);
+        awaitingRecalDir = false;
+        recalCorner = null;
+        buildPlan();       // geometry unchanged, but reassert against the new transform
+        applyModeVisual('RECAL', C_RECAL); // ready to re-recal next time
+        rlog('recal done', { yaw: +planYaw.toFixed(3) });
+      },
+    },
   ];
   let currentMode = 0;
 
@@ -467,6 +556,8 @@ export function setupMR(view, project, getFootprint) {
   function setMode(i) {
     currentMode = (i + modes.length) % modes.length;
     awaitingAlign = false; // leaving/entering a mode resets the REGISTER two-step
+    awaitingRecalDir = false; // ... and the RECAL two-step
+    recalCorner = null;
     const m = modes[currentMode];
     applyModeVisual(m.label, m.color);
   }
@@ -518,6 +609,7 @@ export function setupMR(view, project, getFootprint) {
     selectedEdge = null;
     hoverEdge = null;
     edgeHi.visible = false;
+    cornerHi.visible = false;
     originGizmo.visible = false;
     setMode(0);
 
@@ -533,6 +625,7 @@ export function setupMR(view, project, getFootprint) {
     anchor = null;
     reticle.visible = false;
     edgeHi.visible = false;
+    cornerHi.visible = false;
     originGizmo.visible = false;
     scene.remove(planGroup);
 
@@ -609,6 +702,13 @@ export function setupMR(view, project, getFootprint) {
       rlog('register align cancelled');
       return;
     }
+    if (mode.id === 'recal' && awaitingRecalDir) { // cancel the pending direction step
+      awaitingRecalDir = false;
+      recalCorner = null;
+      applyModeVisual('RECAL', C_RECAL);
+      rlog('recal dir cancelled');
+      return;
+    }
     if (!placed) return;
     placed = false;
     anchor = null; // forget the old anchor; a fresh one is made on next place
@@ -655,10 +755,10 @@ export function setupMR(view, project, getFootprint) {
     currentFrame = frame;
     pollModeCycle(frame);
     const lines = [
-      `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}`,
+      `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
-      `edge:   sel=${selectedEdge ?? '-'} hov=${hoverEdge ?? '-'}`,
+      `edge:   sel=${selectedEdge ?? '-'} hov=${hoverEdge ?? '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
       `floorY:   ${f2(floorY)}`,
       `plan.y:   ${f2(planPos.y)}`,
       `cam.y:    ${f2(camWorldY())}`,
@@ -666,6 +766,7 @@ export function setupMR(view, project, getFootprint) {
     for (const d of debugs) d.setLines(lines);
     // Floor preview + edge highlight, depending on the current mode.
     hoverEdge = null;
+    cornerHi.visible = false;
     const modeId = modes[currentMode].id;
     if (modeId === 'edge' && activeRect) {
       // EDGE mode: ray a floor point, pick the nearest edge, ring the aim point.
@@ -686,21 +787,37 @@ export function setupMR(view, project, getFootprint) {
       if (selectedEdge) showEdge(activeRect, selectedEdge, 0xffe14d);
       else if (hoverEdge) showEdge(activeRect, hoverEdge, 0xff5db1);
       else edgeHi.visible = false;
-    } else if (modeId === 'floor' || modeId === 'register') {
+    } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
       // Tip-touch modes: a ring under whichever controller tip is tracked, so you
-      // see where FLOOR/ORIGIN/ALIGN will land (both REGISTER steps included).
-      let shown = false;
+      // see where FLOOR/ORIGIN/ALIGN/RECAL will land (both two-step gestures incl.).
+      let tipPos = null;
       for (const src of frame.session.inputSources) {
-        const pos = tipPosition(src);
-        if (pos) {
-          reticle.visible = true;
-          reticle.position.set(pos.x, floorY + 0.002, pos.z);
-          shown = true;
-          break;
+        tipPos = tipPosition(src);
+        if (tipPos) break;
+      }
+      if (tipPos) {
+        reticle.visible = true;
+        reticle.position.set(tipPos.x, floorY + 0.002, tipPos.z);
+      } else {
+        reticle.visible = false;
+      }
+      edgeHi.visible = false;
+      // RECAL: mark the corner. While locking (step 1), preview the nearest plan
+      // corner under the tip (cyan); once locked (step 2), ride the locked corner
+      // (purple) so you see what you're aligning as you touch the edge direction.
+      if (modeId === 'recal') {
+        let c = recalCorner;
+        if (!awaitingRecalDir) {
+          if (tipPos) { const { px, py } = worldToPlan(tipPos); c = nearestPlanCorner(px, py); }
+          else c = null;
+        }
+        if (c) {
+          planToWorld(c.cx, c.cy, _cw);
+          cornerHi.position.set(_cw.x, floorY + 0.008, _cw.z);
+          cornerHi.material.color.setHex(awaitingRecalDir ? C_RECAL_DIR : C_RECAL);
+          cornerHi.visible = true;
         }
       }
-      if (!shown) reticle.visible = false;
-      edgeHi.visible = false;
     } else {
       // DROP: no floor target (drops at the standing position).
       reticle.visible = false;
