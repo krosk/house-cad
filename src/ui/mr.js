@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { Rectangle } from '../core/model.js';
-import { makeDistance, makeOriginDistance, ORIGIN_ID } from '../core/constraints.js';
+import { makeDistance, makeOriginDistance, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { toMeters, unitLabel, fmt } from '../core/units.js';
 import { rlog } from './remoteLog.js';
@@ -192,6 +192,7 @@ export function setupMR(view, project, getFootprint) {
   const controllers = [];
   const labels = [];
   const debugs = [];
+  const readouts = []; // per-controller dimension-value pill (shown on ray hover)
   for (const i of [0, 1]) {
     const c = renderer.xr.getController(i); // target-ray space: -Z is the pointing dir
     const tip = new THREE.Mesh(tipGeom, tipMat);
@@ -201,8 +202,17 @@ export function setupMR(view, project, getFootprint) {
     label.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.05, TIP_OFFSET.z);
     c.add(label.sprite);
     labels.push(label);
+    // A larger pill above the mode label that shows the value of whichever
+    // constraint the ray is pointing at — a legible "close-up" of small in-world
+    // dimension text. Hidden until the ray hovers a dimension.
+    const readout = makeLabel();
+    readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.10, TIP_OFFSET.z);
+    readout.sprite.scale.set(0.2, 0.05, 1);
+    readout.sprite.visible = false;
+    c.add(readout.sprite);
+    readouts.push(readout);
     const dbg = makeDebug(); // debug HUD above each tip so it's always in view
-    dbg.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.16, TIP_OFFSET.z);
+    dbg.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.20, TIP_OFFSET.z);
     c.add(dbg.sprite);
     debugs.push(dbg);
     c.addEventListener('select', onSelect);   // trigger: run current mode
@@ -294,6 +304,10 @@ export function setupMR(view, project, getFootprint) {
   const EDGE_HALF = 0.02; // strip half-width -> 4 cm bold edge
   const restMat = new THREE.MeshBasicMaterial({ color: 0x9b6dff, side: THREE.DoubleSide, depthWrite: false });   // resting zone edges
   const activeMat = new THREE.MeshBasicMaterial({ color: 0xd8b4fe, side: THREE.DoubleSide, depthWrite: false }); // active zone edges
+  // Dimension (constraint) annotations: thin blue floor strips for the dim/extension
+  // lines, red when the constraint conflicts. Value shown on a billboarded label.
+  const dimMat = new THREE.MeshBasicMaterial({ color: 0x79c0ff, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+  const dimConflictMat = new THREE.MeshBasicMaterial({ color: 0xff5c5c, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
 
   // Plan-space corners [c0,c1,c2,c3] of a thickened axis-aligned segment A->B.
   function stripCorners(ax, ay, bx, by, t) {
@@ -327,11 +341,111 @@ export function setupMR(view, project, getFootprint) {
     return geo;
   }
 
+  // Endpoints + coordinate of an edge in plan coords (mirror of sketch2d's
+  // _edgeLineWorld). null for the origin ref, so origin-distance constraints are
+  // skipped here — same as the desktop, which draws no line for __origin__.
+  function edgeLine(ref) {
+    if (!ref || ref.rect === ORIGIN_ID) return null;
+    const r = project.rectangles.find((x) => x.id === (ref.rect.id ?? ref.rect));
+    if (!r) return null;
+    const b = r.bounds;
+    const coord = edgeCoord(r, ref.edge);
+    switch (ref.edge) {
+      case 'left': return { p0: { x: b.x0, y: b.y0 }, p1: { x: b.x0, y: b.y1 }, coord };
+      case 'right': return { p0: { x: b.x1, y: b.y0 }, p1: { x: b.x1, y: b.y1 }, coord };
+      case 'bottom': return { p0: { x: b.x0, y: b.y0 }, p1: { x: b.x1, y: b.y0 }, coord };
+      case 'top': return { p0: { x: b.x0, y: b.y1 }, p1: { x: b.x1, y: b.y1 }, coord };
+      default: return null;
+    }
+  }
+
+  const DIM_OFFSET = 0.2;   // m, dim line sits this far outside the geometry
+  const DIM_TIER = 0.14;    // m, stack successive dims on an axis to reduce overlap
+  const DIM_EXT_OVER = 0.04; // m, extension line runs a little past the dim line
+  const DIM_T = 0.008;      // m, strip half-width (thinner than survey edges)
+
+  // Dimension value labels currently in the plan, for ray-hover pick (their value
+  // is echoed big on the controller). Rebuilt with the plan each edit.
+  let dimSprites = [];
+
+  // A billboarded value label (canvas pill, always faces the user) at a plan point.
+  function makeDimLabel(text, color, px, py) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 18, 24, 0.82)';
+    ctx.beginPath(); ctx.roundRect(6, 14, 244, 36, 10); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 33);
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    sprite.scale.set(0.16, 0.04, 1);
+    sprite.position.set(px, 0.04, -py); // plan (x,y) -> local (x,0,-y), lifted 4 cm
+    sprite.userData.dimText = text;     // the value, echoed on the controller on hover
+    return sprite;
+  }
+
+  // Draw every distance constraint of the active floor into planGroup: a dim line
+  // between the two edges (offset outward), extension lines, and the value label.
+  function buildDimensions() {
+    const segs = [];        // {ax,ay,bx,by,conflict} strips to build
+    dimSprites = [];        // value labels, for hover pick
+    let xTier = 0, yTier = 0;
+    for (const c of (project.constraints || [])) {
+      if (c.type !== 'distance') continue;
+      const la = edgeLine(c.a), lb = edgeLine(c.b);
+      if (!la || !lb) continue; // skip origin-referenced (no line, per desktop)
+      const conflict = !!c.conflict;
+      const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
+      const color = conflict ? '#ff5c5c' : '#79c0ff';
+      if (c.axis === 'x') {
+        const xa = la.coord, xb = lb.coord;
+        const yBase = Math.max(la.p1.y, lb.p1.y);
+        const yLine = yBase + DIM_OFFSET + (xTier++) * DIM_TIER;
+        segs.push({ ax: xa, ay: yLine, bx: xb, by: yLine, conflict });            // dim line
+        segs.push({ ax: xa, ay: la.p1.y, bx: xa, by: yLine + DIM_EXT_OVER, conflict }); // ext a
+        segs.push({ ax: xb, ay: lb.p1.y, bx: xb, by: yLine + DIM_EXT_OVER, conflict }); // ext b
+        dimSprites.push(makeDimLabel(text, color, (xa + xb) / 2, yLine));
+      } else {
+        const ya = la.coord, yb = lb.coord;
+        const xBase = Math.max(la.p1.x, lb.p1.x);
+        const xLine = xBase + DIM_OFFSET + (yTier++) * DIM_TIER;
+        segs.push({ ax: xLine, ay: ya, bx: xLine, by: yb, conflict });            // dim line
+        segs.push({ ax: la.p1.x, ay: ya, bx: xLine + DIM_EXT_OVER, by: ya, conflict }); // ext a
+        segs.push({ ax: lb.p1.x, ay: yb, bx: xLine + DIM_EXT_OVER, by: yb, conflict }); // ext b
+        dimSprites.push(makeDimLabel(text, color, xLine, (ya + yb) / 2));
+      }
+    }
+    // Build strips in two batches so conflict lines share a material with the rest.
+    for (const conflict of [false, true]) {
+      const arr = [];
+      const tri = (p) => arr.push(p[0], 0, -p[1]);
+      for (const s of segs) {
+        if (s.conflict !== conflict) continue;
+        const cc = stripCorners(s.ax, s.ay, s.bx, s.by, DIM_T);
+        tri(cc[0]); tri(cc[1]); tri(cc[2]);
+        tri(cc[0]); tri(cc[2]); tri(cc[3]);
+      }
+      if (!arr.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+      const m = new THREE.Mesh(geo, conflict ? dimConflictMat : dimMat);
+      m.position.y = 0.008; // above the edge strips
+      m.renderOrder = 12;
+      planGroup.add(m);
+    }
+    for (const s of dimSprites) planGroup.add(s);
+  }
+
   function buildPlan() {
-    // Clear any previous geometry.
+    // Clear any previous geometry. Dispose sprite textures/materials too (dim
+    // labels create a CanvasTexture each rebuild) so they don't leak.
     for (const child of [...planGroup.children]) {
       planGroup.remove(child);
       child.geometry?.dispose();
+      if (child.isSprite) { child.material.map?.dispose(); child.material.dispose(); }
     }
     const footprint = getFootprint?.() ?? [];
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = total free space
@@ -351,6 +465,7 @@ export function setupMR(view, project, getFootprint) {
         planGroup.add(o);
       }
     }
+    buildDimensions(); // constraint dimension lines + value labels
     return planGroup.children.length > 0;
   }
 
@@ -708,6 +823,32 @@ export function setupMR(view, project, getFootprint) {
     const t = (overlayY() - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
     return _rhit.copy(_ro).addScaledVector(_rd, t);
+  }
+
+  // The dimension value whose label the controller's ray is aimed at, or null.
+  // Angular pick (nearest label within a small cone) so it works at any distance
+  // even when the in-world text is too small to hit precisely — that's the point.
+  const _dp = new THREE.Vector3(), _dv = new THREE.Vector3();
+  const DIM_HOVER_COS = Math.cos(5 * Math.PI / 180); // ~5° cone
+  function pickDimLabel(inputSource) {
+    if (!dimSprites.length) return null;
+    const space = inputSource?.targetRaySpace;
+    if (!space || !currentFrame) return null;
+    const pose = currentFrame.getPose(space, localSpace);
+    if (!pose) return null;
+    _rm.fromArray(pose.transform.matrix);
+    _ro.setFromMatrixPosition(_rm);
+    _rq.setFromRotationMatrix(_rm);
+    _rd.set(0, 0, -1).applyQuaternion(_rq).normalize(); // pointing ray
+    let best = null, bestCos = DIM_HOVER_COS;
+    for (const s of dimSprites) {
+      s.getWorldPosition(_dp);
+      _dv.copy(_dp).sub(_ro);
+      if (_dv.dot(_rd) <= 0) continue; // behind the controller
+      const cos = _dv.normalize().dot(_rd);
+      if (cos > bestCos) { bestCos = cos; best = s; }
+    }
+    return best?.userData.dimText ?? null;
   }
 
   // Intersection of a controller's pointing ray with the numpad panel (with .uv),
@@ -1170,6 +1311,14 @@ export function setupMR(view, project, getFootprint) {
     // markers are hidden so the two don't clutter or read as both being live.
     const activeCtl = pickSource(frame);
     for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
+    // Echo the pointed-at constraint's value big on the active controller so
+    // small in-world dimension text can be read up close.
+    const hovDim = pickDimLabel(activeCtl);
+    controllers.forEach((c, i) => {
+      const on = c.userData.inputSource === activeCtl && !!hovDim;
+      readouts[i].sprite.visible = on;
+      if (on) readouts[i].setText(hovDim, 0x79c0ff);
+    });
     const lines = [
       ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
       `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
