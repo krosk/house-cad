@@ -1,7 +1,7 @@
 import './style.css';
 import { Project, Rectangle } from './core/model.js';
 import { computeFootprint } from './core/geometry2d.js';
-import { extrudeFootprint } from './core/extrude.js';
+import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { setupMR } from './ui/mr.js';
@@ -22,15 +22,18 @@ const view = new View3D(document.getElementById('view3d'));
 // the flat floor plan, so it needs the current footprint on demand.
 setupMR(view, project, () => computeFootprint(project.rectangles));
 
-// Rebuild the 3D model whenever the plan changes.
+// Rebuild the 3D model whenever the plan changes. Each floor extrudes
+// independently and stacks at its elevation; export merges the whole stack.
 let firstBuild = true;
-let currentGeometry = null; // the live extruded mesh, kept for export
+let currentGeometry = null; // merged mesh of all floors, kept for export
 function rebuild() {
-  const footprint = computeFootprint(project.rectangles);
-  const geometry = extrudeFootprint(footprint, project.height);
-  currentGeometry = geometry;
-  view.setGeometry(geometry);
-  if (firstBuild && geometry) {
+  const floorGeos = project.floors.map((f) => ({
+    geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
+    elevation: f.elevation,
+  }));
+  view.setGeometry(floorGeos);
+  currentGeometry = mergeFloorGeometries(floorGeos);
+  if (firstBuild && floorGeos.some((g) => g.geometry)) {
     view.frameModel();
     firstBuild = false;
   }
@@ -214,9 +217,82 @@ function setHeightInput() {
 }
 project.onChange(setHeightInput);
 
+// ---- floor switcher (storeys) ----
+// Each floor is an independent plan sharing the same origin corner; editing
+// acts on the active floor. Rows list the highest storey first.
+const fcList = document.getElementById('fc-list');
+function renderFloors() {
+  fcList.innerHTML = '';
+  const floors = project.floors;
+  for (let i = floors.length - 1; i >= 0; i--) {
+    const f = floors[i];
+    const row = document.createElement('div');
+    row.className = 'fc-row' + (f.id === project.activeFloorId ? ' active' : '');
+    row.title = 'Click to edit this floor · double-click the name to rename';
+
+    const name = document.createElement('span');
+    name.className = 'fc-name';
+    name.textContent = f.name;
+
+    const elev = document.createElement('span');
+    elev.className = 'fc-elev';
+    elev.textContent = `${fmt(f.elevation)} ${unitLabel()}`;
+
+    const ground = document.createElement('button');
+    ground.className = 'fc-ground' + (f.id === project.groundFloorId ? ' on' : '');
+    ground.textContent = '⌂';
+    ground.title = f.id === project.groundFloorId
+      ? 'Ground floor (elevation datum)' : 'Set as ground floor';
+
+    const del = document.createElement('button');
+    del.className = 'fc-del';
+    del.textContent = '✕';
+    del.title = 'Remove floor';
+    if (floors.length <= 1) del.style.visibility = 'hidden';
+
+    row.append(name, elev, ground, del);
+    fcList.appendChild(row);
+
+    row.addEventListener('click', () => {
+      if (f.id !== project.activeFloorId) {
+        project.setActiveFloor(f.id);
+        sketch.clearSelection();
+      }
+    });
+    name.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const nn = prompt('Floor name', f.name);
+      if (nn != null && nn.trim()) project.renameFloor(f.id, nn.trim());
+    });
+    ground.addEventListener('click', (e) => {
+      e.stopPropagation();
+      project.setGroundFloor(f.id);
+    });
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (floors.length <= 1) return;
+      const n = f.rectangles.length;
+      if (n && !confirm(`Remove floor "${f.name}" and its ${n} rectangle(s)?`)) return;
+      project.removeFloor(f.id);
+    });
+  }
+}
+project.onChange(renderFloors);
+renderFloors();
+
+document.getElementById('fc-add-above').addEventListener('click', () => {
+  project.addFloor({ above: true, name: 'Floor' });
+  sketch.clearSelection();
+});
+document.getElementById('fc-add-below').addEventListener('click', () => {
+  project.addFloor({ above: false, name: 'Basement' });
+  sketch.clearSelection();
+});
+
 document.getElementById('delete').addEventListener('click', () => sketch.deleteSelected());
 document.getElementById('clear').addEventListener('click', () => {
-  if (project.rectangles.length && confirm('Remove all rectangles?')) project.clear();
+  if (project.rectangles.length
+    && confirm(`Remove all rectangles on "${project.activeFloor.name}"?`)) project.clear();
 });
 
 // ---- collapsible dimensions panel ----
@@ -369,7 +445,7 @@ function seedDemo() {
     const saved = localStorage.getItem(LS_KEY);
     if (saved) {
       deserializeInto(project, JSON.parse(saved));
-      restored = project.rectangles.length > 0;
+      restored = project.floors.some((f) => f.rectangles.length > 0);
     }
   } catch { restored = false; }
   if (!restored) seedDemo();

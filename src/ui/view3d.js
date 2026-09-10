@@ -64,10 +64,13 @@ export class View3D {
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
-    this.mesh = null;
+    // The house is a stack of one mesh per floor, each offset in Y by its
+    // elevation. Kept in a group so multi-floor models frame/hide as a unit.
+    this.house = new THREE.Group();
+    this.scene.add(this.house);
     // While MR is active the extruded walls must stay hidden (the flat plan is
-    // shown instead). setGeometry rebuilds the mesh on every model change, so it
-    // honors this flag rather than a one-time visibility toggle.
+    // shown instead). setGeometry rebuilds on every model change, so it honors
+    // this flag rather than a one-time visibility toggle.
     this.hideMesh = false;
 
     this._onResize = this._resize.bind(this);
@@ -80,24 +83,31 @@ export class View3D {
     this.renderer.setAnimationLoop(this._animate);
   }
 
-  setGeometry(geometry) {
-    if (this.mesh) {
-      this.scene.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh = null;
+  // Accepts an array of { geometry, elevation } (one per floor) or a single
+  // BufferGeometry (treated as one floor at elevation 0). Rebuilds the stacked
+  // house group on every model change.
+  setGeometry(floors) {
+    for (const m of this.house.children) m.geometry.dispose();
+    this.house.clear();
+
+    const list = Array.isArray(floors)
+      ? floors
+      : (floors ? [{ geometry: floors, elevation: 0 }] : []);
+
+    for (const { geometry, elevation } of list) {
+      if (!geometry) continue;
+      const mesh = new THREE.Mesh(geometry, this.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.position.y = elevation || 0;
+      this.house.add(mesh);
     }
-    if (geometry) {
-      this.mesh = new THREE.Mesh(geometry, this.material);
-      this.mesh.castShadow = true;
-      this.mesh.receiveShadow = true;
-      this.mesh.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
-      this.scene.add(this.mesh);
-    }
+    this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
   }
 
   frameModel() {
-    if (!this.mesh) return;
-    const box = new THREE.Box3().setFromObject(this.mesh);
+    if (!this.house.children.length) return;
+    const box = new THREE.Box3().setFromObject(this.house);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
     this.controls.target.copy(center);

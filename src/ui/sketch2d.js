@@ -541,6 +541,7 @@ export class Sketch2D {
 
     this._drawGrid();
     this._drawAxes();
+    this._drawGhost();
 
     for (const rect of this.project.rectangles) {
       this._drawRect(rect, rect.id === this.selectedId);
@@ -768,6 +769,41 @@ export class Sketch2D {
     ctx.textAlign = 'right';
     ctx.fillText(`grid ${fmt(major)} ${unitLabel()}`, w - 8, h - 8);
     ctx.textAlign = 'left';
+  }
+
+  // The floor to show as a faint underlay for alignment: the one directly
+  // below the active floor (build up), falling back to the one above.
+  _ghostFloor() {
+    const p = this.project;
+    if (!p.floors) return null;
+    const i = p.floors.findIndex((f) => f.id === p.activeFloorId);
+    if (i < 0) return null;
+    return p.floors[i - 1] || p.floors[i + 1] || null;
+  }
+
+  _drawGhost() {
+    const gf = this._ghostFloor();
+    if (!gf || !gf.rectangles.length) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    for (const rect of gf.rectangles) {
+      const b = rect.bounds;
+      const p0 = this.toScreen(b.x0, b.y1);
+      const p1 = this.toScreen(b.x1, b.y0);
+      ctx.strokeStyle = rect.op === 'add'
+        ? 'rgba(120,140,170,0.38)' : 'rgba(255,107,107,0.30)';
+      ctx.strokeRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
+    }
+    ctx.setLineDash([]);
+    // Name the underlay so it's clear which storey it is.
+    ctx.fillStyle = 'rgba(154,163,178,0.7)';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(`underlay: ${gf.name}`, this._cssW / 2, 16);
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
 
   _drawAxes() {

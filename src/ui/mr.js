@@ -408,12 +408,23 @@ export function setupMR(view, project, getFootprint) {
     return planGroup.localToWorld(target);
   }
 
-  // Rebuild the plan's transform from its origin (planPos) and yaw (planYaw).
-  // Drive position/quaternion (not .matrix) so Three keeps matrixWorld in sync.
+  // Active floor's derived base elevation (m) off the ground datum. Register-once
+  // establishes the ground origin; each storey's overlay lifts by this so it
+  // renders at its real height above that origin (see Project._recomputeElevations).
+  const activeElevation = () => project.activeFloor?.elevation ?? 0;
+  // World Y of the active floor's overlay plane = registered ground level +
+  // elevation. EDGE/SIZE ray hits and reticles use this so you edit at the floor
+  // you're standing on, not the ground. A pure Y lift, so worldToPlan (which
+  // reads x/z only) is unaffected — plan coords stay correct on every storey.
+  const overlayY = () => planPos.y + activeElevation();
+
+  // Rebuild the plan's transform from its origin (planPos), yaw (planYaw), and the
+  // active floor's elevation lift. Drive position/quaternion (not .matrix) so
+  // Three keeps matrixWorld in sync.
   function applyPlanMatrix() {
-    planGroup.position.copy(planPos);
+    planGroup.position.set(planPos.x, overlayY(), planPos.z);
     planGroup.quaternion.setFromAxisAngle(UP, planYaw);
-    originGizmo.position.copy(planPos); // gizmo rides the same origin + yaw
+    originGizmo.position.copy(planGroup.position); // gizmo rides the lifted origin + yaw
     originGizmo.quaternion.copy(planGroup.quaternion);
   }
 
@@ -690,7 +701,7 @@ export function setupMR(view, project, getFootprint) {
     _rq.setFromRotationMatrix(_rm);
     _rd.set(0, 0, -1).applyQuaternion(_rq); // pointing ray = controller -Z
     if (Math.abs(_rd.y) < 1e-4) return null; // parallel to the floor
-    const t = (floorY - _ro.y) / _rd.y;
+    const t = (overlayY() - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
     return _rhit.copy(_ro).addScaledVector(_rd, t);
   }
@@ -721,8 +732,13 @@ export function setupMR(view, project, getFootprint) {
   const modes = [
     {
       id: 'floor', label: 'FLOOR', color: 0x51d88a,
-      // Calibrate the floor height from a touch on the real floor; re-level if placed.
+      // Calibrate the GROUND base level (the datum every storey's overlay lifts
+      // off). A touch on an upper floor is at that floor's height, which would
+      // double-count against its elevation — so only re-level on the ground floor.
       onTouch: (pos) => {
+        if (placed && project.activeFloorId !== project.groundFloorId) {
+          rlog('floor: switch to ground floor to re-level'); return;
+        }
         floorY = pos.y;
         if (placed) placeAt(planPos.x, floorY, planPos.z);
       },
@@ -852,6 +868,33 @@ export function setupMR(view, project, getFootprint) {
     else deactivateNumpad();
   }
 
+  // Point the survey edit-state at the active floor: EDGE edits its last rect,
+  // and grip-undo pops from its own rects. Keeps `surveyed` scoped to the active
+  // floor so removeRectangle (which acts on the active floor) always resolves.
+  function refreshFloorEditState() {
+    surveyed.length = 0;
+    for (const r of project.rectangles) surveyed.push(r.id); // active floor, creation order
+    activeRect = project.rectangles[project.rectangles.length - 1] || null;
+    selectedEdge = null;
+    resetDim();
+  }
+
+  // Switch the active storey up (+1) / down (-1) in the stack. Register-once
+  // means the frame is shared; only the overlay's elevation changes. No wrap —
+  // you can't step past the top or bottom floor.
+  function switchFloor(delta) {
+    const floors = project.floors;
+    const i = floors.findIndex((f) => f.id === project.activeFloorId);
+    const j = i + delta;
+    if (j < 0 || j >= floors.length) return;
+    project.setActiveFloor(floors[j].id);
+    refreshFloorEditState();
+    buildPlan();
+    applyPlanMatrix(); // overlay lifts to the new floor's elevation
+    const f = project.activeFloor;
+    rlog('floor switch', { name: f.name, elev: +f.elevation.toFixed(3) });
+  }
+
   function placeAt(x, y, z) {
     planPos.set(x, y, z);
     planGroup.visible = true; // may have no zones yet — the origin gizmo is the placeholder
@@ -878,12 +921,12 @@ export function setupMR(view, project, getFootprint) {
     saved.gridVisible = view.grid?.visible;
     saved.floorVisible = view.floor?.visible;
     saved.controls = view.controls.enabled;
-    saved.meshVisible = view.mesh?.visible;
+    saved.meshVisible = view.house?.visible;
 
     scene.background = null; // reveal passthrough
     if (view.grid) view.grid.visible = false;
     if (view.floor) view.floor.visible = false;
-    if (view.mesh) view.mesh.visible = false; // hide the extruded walls
+    if (view.house) view.house.visible = false; // hide the extruded walls
     view.hideMesh = true; // keep them hidden even as survey edits rebuild the mesh
     view.controls.enabled = false;
 
@@ -894,9 +937,7 @@ export function setupMR(view, project, getFootprint) {
     anchor = null;
     planYaw = 0;
     floorY = 0;
-    surveyed.length = 0;
-    activeRect = null;
-    selectedEdge = null;
+    refreshFloorEditState(); // seed EDGE target + undo stack from the active floor
     hoverEdge = null;
     edgeHi.visible = false;
     edgeHi2.visible = false;
@@ -934,7 +975,7 @@ export function setupMR(view, project, getFootprint) {
     scene.background = saved.background ?? null;
     if (view.grid) view.grid.visible = saved.gridVisible ?? true;
     if (view.floor) view.floor.visible = saved.floorVisible ?? true;
-    if (view.mesh) view.mesh.visible = saved.meshVisible ?? true;
+    if (view.house) view.house.visible = saved.meshVisible ?? true;
     view.controls.enabled = saved.controls ?? true;
     view._resize(); // XR left the framebuffer at headset size
   });
@@ -1024,13 +1065,14 @@ export function setupMR(view, project, getFootprint) {
     applyModeVisual(mode.label, mode.color);
   }
 
-  // Edge-detection state for the mode-cycle inputs.
-  const btn = { next: false, prev: false, stick: false };
+  // Edge-detection state for the mode-cycle / floor-switch inputs.
+  const btn = { next: false, prev: false, stick: false, stickY: false };
 
   function pollModeCycle(frame) {
     // xr-standard mapping: buttons[4]=A/X (lower), buttons[5]=B/Y (upper),
-    // axes[2]=thumbstick x. Accept either controller.
-    let next = false, prev = false, stickX = 0;
+    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (change floor).
+    // Accept either controller.
+    let next = false, prev = false, stickX = 0, stickY = 0;
     for (const src of frame.session.inputSources) {
       const gp = src.gamepad;
       if (!gp) continue;
@@ -1038,21 +1080,37 @@ export function setupMR(view, project, getFootprint) {
       if (gp.buttons[4]?.pressed) prev = true; // lower face button -> previous
       const x = gp.axes[2] ?? 0;
       if (Math.abs(x) > Math.abs(stickX)) stickX = x;
+      const y = gp.axes[3] ?? 0;
+      if (Math.abs(y) > Math.abs(stickY)) stickY = y;
     }
     if (next && !btn.next) setMode(currentMode + 1);
     if (prev && !btn.prev) setMode(currentMode - 1);
     btn.next = next;
     btn.prev = prev;
-    // Thumbstick flick with a dead zone, one step per flick.
-    if (!btn.stick && Math.abs(stickX) > 0.7) {
+    // Thumbstick flick, dead-zoned, one step per flick. The dominant axis wins so
+    // a diagonal doesn't cycle a mode AND change floor at once.
+    if (!btn.stick && Math.abs(stickX) > 0.7 && Math.abs(stickX) >= Math.abs(stickY)) {
       setMode(currentMode + (stickX > 0 ? 1 : -1));
       btn.stick = true;
     } else if (Math.abs(stickX) < 0.3) {
       btn.stick = false;
     }
+    // Stick up (negative Y) = floor above; down = floor below.
+    if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
+      switchFloor(stickY < 0 ? 1 : -1);
+      btn.stickY = true;
+    } else if (Math.abs(stickY) < 0.3) {
+      btn.stickY = false;
+    }
   }
 
   const f2 = (n) => (Number.isFinite(n) ? n.toFixed(3) : '—');
+  // Active floor as "Name i/N" for the HUD.
+  const floorLabel = () => {
+    const fl = project.floors;
+    const i = fl.findIndex((f) => f.id === project.activeFloorId);
+    return `${project.activeFloor?.name ?? '-'} ${i + 1}/${fl.length}`;
+  };
   const _wp = new THREE.Vector3();
   // XR camera world height (matrixWorld, not .position which stays local/0).
   const camWorldY = () => renderer.xr.getCamera().matrixWorld.elements[13];
@@ -1063,6 +1121,7 @@ export function setupMR(view, project, getFootprint) {
     const lines = [
       `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
+      `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
       `edge:   sel=${selectedEdge ?? '-'} hov=${hoverEdge ?? '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
       `floorY:   ${f2(floorY)}`,
@@ -1085,7 +1144,7 @@ export function setupMR(view, project, getFootprint) {
         const { px, py } = worldToPlan(hit);
         hoverEdge = nearestEdge(activeRect, px, py);
         reticle.visible = true;
-        reticle.position.set(hit.x, floorY + 0.002, hit.z);
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
       } else {
         reticle.visible = false;
       }
@@ -1119,7 +1178,7 @@ export function setupMR(view, project, getFootprint) {
         }
         if (c) {
           planToWorld(c.cx, c.cy, _cw);
-          cornerHi.position.set(_cw.x, floorY + 0.008, _cw.z);
+          cornerHi.position.set(_cw.x, overlayY() + 0.008, _cw.z);
           cornerHi.material.color.setHex(awaitingRecalDir ? C_RECAL_DIR : C_RECAL);
           cornerHi.visible = true;
         }
@@ -1155,7 +1214,7 @@ export function setupMR(view, project, getFootprint) {
           if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
           else { const e = nearestEdgeAny(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
           reticle.visible = true;
-          reticle.position.set(hit.x, floorY + 0.002, hit.z);
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).

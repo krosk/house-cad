@@ -144,13 +144,14 @@ function addRow(M, rhs, terms, target, w) {
 }
 
 /**
- * Solve all constraints and write resolved coordinates back into the project's
- * rectangles. Safe to call on every change. No-op when there are no
- * constraints (geometry is then whatever the user drew/dragged).
+ * Solve all constraints of one floor (or any {rectangles, constraints} scope)
+ * and write resolved coordinates back into its rectangles. Safe to call on
+ * every change. No-op when there are no constraints (geometry is then whatever
+ * the user drew/dragged). Project._emit() calls this once per floor.
  */
-export function solve(project) {
-  const constraints = project.constraints;
-  const rects = project.rectangles;
+export function solve(floor) {
+  const constraints = floor.constraints;
+  const rects = floor.rectangles;
   if (!constraints.length || !rects.length) {
     for (const c of constraints) c.conflict = false;
     return;

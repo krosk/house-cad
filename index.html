@@ -11,6 +11,14 @@
         <section id="pane-2d">
           <canvas id="sketch"></canvas>
           <div class="pane-label">Plan (2D)</div>
+          <aside id="floor-ctl">
+            <div class="fc-head">
+              <span class="fc-title">Floors</span>
+              <button id="fc-add-above" title="Add a floor above the active one">＋▲</button>
+              <button id="fc-add-below" title="Add a floor below the active one">＋▼</button>
+            </div>
+            <div id="fc-list" class="fc-list"></div>
+          </aside>
           <div id="zoom-ctl">
             <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
             <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>

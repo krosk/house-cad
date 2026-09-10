@@ -55,6 +55,25 @@ export function extrudeFootprint(multiPolygon, height) {
 }
 
 /**
+ * Merge a stack of per-floor extrusions into one geometry for mesh export,
+ * translating each up by its elevation. Clones the inputs so the live display
+ * meshes (positioned via mesh.position.y) are untouched.
+ * @param {{geometry: THREE.BufferGeometry|null, elevation: number}[]} floors
+ * @returns {THREE.BufferGeometry | null}
+ */
+export function mergeFloorGeometries(floors) {
+  const geos = [];
+  for (const { geometry, elevation } of floors) {
+    if (!geometry) continue;
+    const g = geometry.clone();
+    if (elevation) g.translate(0, elevation, 0);
+    geos.push(g);
+  }
+  if (!geos.length) return null;
+  return geos.length === 1 ? geos[0] : mergeGeometries(geos);
+}
+
+/**
  * Flat floor-plan fill: the footprint lying on the ground plane (no extrusion).
  * Used by MR to show the plan on the real floor instead of the 3D massing.
  * @param {number[][][][]} multiPolygon  output of computeFootprint()

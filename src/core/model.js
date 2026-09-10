@@ -23,6 +23,16 @@ export function syncRectIdCounter(ids) {
   }
 }
 
+let _fid = 0;
+const nextFloorId = () => `f${++_fid}`;
+
+export function syncFloorIdCounter(ids) {
+  for (const id of ids) {
+    const m = /^f(\d+)$/.exec(id);
+    if (m) _fid = Math.max(_fid, Number(m[1]));
+  }
+}
+
 export class Rectangle {
   constructor({ x, y, w, h, op = 'add', id = nextId() }) {
     this.id = id;
@@ -50,23 +60,115 @@ export class Rectangle {
   }
 }
 
+// A storey: an independent plan (its own rectangles + constraints) with its own
+// wall height. All floors share the SAME plan origin (0,0) — the surveyed corner
+// — so corners stack by construction and 2D underlays line up for free.
+// `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
+// datum, not authored; Project._recomputeElevations() keeps it current.
+export class Floor {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], height = 2.8, elevation = 0 } = {}) {
+    this.id = id;
+    this.name = name;
+    this.rectangles = rectangles;
+    this.constraints = constraints;
+    this.height = height; // storey height, meters
+    this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
+  }
+}
+
 export class Project {
   constructor() {
-    this.rectangles = [];
-    this.constraints = [];
-    this.height = 2.8; // wall height, meters
+    const ground = new Floor({ name: 'Ground' });
+    this.floors = [ground]; // ordered bottom → top
+    this.activeFloorId = ground.id;
+    this.groundFloorId = ground.id; // elevation datum (0) + MR registration floor
     this._listeners = new Set();
   }
+
+  // --- floor access -------------------------------------------------------
+  get activeFloor() {
+    return this.floors.find((f) => f.id === this.activeFloorId) || this.floors[0];
+  }
+
+  // Facade: the editing surface (sketch2d, solver, serialize, MR) works on the
+  // ACTIVE floor via these, so nothing downstream needs to know about floors.
+  get rectangles() { return this.activeFloor.rectangles; }
+  set rectangles(v) { this.activeFloor.rectangles = v; }
+  get constraints() { return this.activeFloor.constraints; }
+  set constraints(v) { this.activeFloor.constraints = v; }
+  get height() { return this.activeFloor.height; }
+  set height(v) { this.activeFloor.height = v; }
 
   onChange(fn) {
     this._listeners.add(fn);
     return () => this._listeners.delete(fn);
   }
 
-  // Resolve constraints, then notify listeners so they see solved geometry.
+  // Re-derive each floor's base elevation by stacking heights off the ground
+  // datum: ground = 0, floors above accumulate, floors below go negative.
+  _recomputeElevations() {
+    let gi = this.floors.findIndex((f) => f.id === this.groundFloorId);
+    if (gi < 0) gi = 0;
+    this.floors[gi].elevation = 0;
+    for (let i = gi + 1; i < this.floors.length; i++) {
+      this.floors[i].elevation = this.floors[i - 1].elevation + this.floors[i - 1].height;
+    }
+    for (let i = gi - 1; i >= 0; i--) {
+      this.floors[i].elevation = this.floors[i + 1].elevation - this.floors[i].height;
+    }
+  }
+
+  // Recompute elevations, resolve every floor's constraints, then notify
+  // listeners so they see fully-solved, stacked geometry.
   _emit() {
-    solve(this);
+    this._recomputeElevations();
+    for (const f of this.floors) solve(f);
     for (const fn of this._listeners) fn(this);
+  }
+
+  // --- floor management ---------------------------------------------------
+  setActiveFloor(id) {
+    if (this.floors.some((f) => f.id === id)) {
+      this.activeFloorId = id;
+      this._emit();
+    }
+  }
+
+  setGroundFloor(id) {
+    if (this.floors.some((f) => f.id === id)) {
+      this.groundFloorId = id;
+      this._emit();
+    }
+  }
+
+  renameFloor(id, name) {
+    const f = this.floors.find((f) => f.id === id);
+    if (f) { f.name = name; this._emit(); }
+  }
+
+  // Insert a new empty floor adjacent to `refId` (default: active floor),
+  // inheriting its storey height. Becomes the active floor.
+  addFloor({ refId = this.activeFloorId, above = true, name } = {}) {
+    const ri = Math.max(0, this.floors.findIndex((f) => f.id === refId));
+    const ref = this.floors[ri];
+    const floor = new Floor({ name: name || 'Floor', height: ref ? ref.height : 2.8 });
+    this.floors.splice(above ? ri + 1 : ri, 0, floor);
+    this.activeFloorId = floor.id;
+    this._emit();
+    return floor;
+  }
+
+  // Remove a floor (never the last one). If it was ground or active, reassign.
+  removeFloor(id) {
+    if (this.floors.length <= 1) return;
+    const i = this.floors.findIndex((f) => f.id === id);
+    if (i < 0) return;
+    this.floors.splice(i, 1);
+    if (this.activeFloorId === id) {
+      this.activeFloorId = this.floors[Math.min(i, this.floors.length - 1)].id;
+    }
+    if (this.groundFloorId === id) this.groundFloorId = this.floors[0].id;
+    this._emit();
   }
 
   addRectangle(rect) {

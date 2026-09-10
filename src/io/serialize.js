@@ -1,51 +1,77 @@
 // Serialize / deserialize a Project to plain JSON. This is the persistent,
-// parametric definition of the house: rectangles + constraints + height. The
-// downstream footprint/extrusion is always recomputed, never stored.
+// parametric definition of the house: floors (each = rectangles + constraints +
+// height) plus which floor is ground/active. The downstream footprint/extrusion
+// and each floor's derived elevation are always recomputed, never stored.
 
-import { Rectangle, syncRectIdCounter } from '../core/model.js';
+import { Floor, Rectangle, syncRectIdCounter, syncFloorIdCounter } from '../core/model.js';
 import { syncConstraintIdCounter } from '../core/constraints.js';
 
-export const FILE_VERSION = 1;
+export const FILE_VERSION = 2;
+
+function serializeRect(r) {
+  return { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op };
+}
+function serializeConstraint(c) {
+  return {
+    id: c.id, type: c.type, axis: c.axis,
+    a: { ...c.a }, b: { ...c.b }, value: c.value,
+    offset: c.offset ?? null,
+  };
+}
 
 export function serializeProject(project) {
   return {
     app: 'house-cad',
     version: FILE_VERSION,
-    height: project.height,
-    rectangles: project.rectangles.map((r) => ({
-      id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op,
-    })),
-    constraints: project.constraints.map((c) => ({
-      id: c.id, type: c.type, axis: c.axis,
-      a: { ...c.a }, b: { ...c.b }, value: c.value,
-      offset: c.offset ?? null,
+    activeFloorId: project.activeFloorId,
+    groundFloorId: project.groundFloorId,
+    floors: project.floors.map((f) => ({
+      id: f.id,
+      name: f.name,
+      height: f.height,
+      rectangles: f.rectangles.map(serializeRect),
+      constraints: f.constraints.map(serializeConstraint),
     })),
   };
+}
+
+// Normalize either shape (v2 floors[], or legacy v1 top-level rectangles) into a
+// list of plain floor descriptors. Returns null if the data is unusable.
+function floorDescriptors(data) {
+  if (Array.isArray(data.floors)) return data.floors;
+  if (Array.isArray(data.rectangles)) {
+    // Legacy v1: one implicit Ground floor.
+    return [{
+      name: 'Ground',
+      height: data.height,
+      rectangles: data.rectangles,
+      constraints: data.constraints || [],
+    }];
+  }
+  return null;
 }
 
 // Basic shape validation so a bad/foreign file fails loudly, not silently.
 export function validateProjectData(data) {
   if (!data || typeof data !== 'object') return 'Not a JSON object.';
   if (data.app && data.app !== 'house-cad') return `Unknown file (app="${data.app}").`;
-  if (!Array.isArray(data.rectangles)) return 'Missing "rectangles" array.';
-  for (const r of data.rectangles) {
-    if (['x', 'y', 'w', 'h'].some((k) => typeof r[k] !== 'number')) {
-      return 'A rectangle is missing numeric x/y/w/h.';
+  const floors = floorDescriptors(data);
+  if (!floors) return 'Missing "floors" (or legacy "rectangles") array.';
+  if (!floors.length) return 'File has no floors.';
+  for (const f of floors) {
+    if (!Array.isArray(f.rectangles)) return 'A floor is missing its "rectangles" array.';
+    for (const r of f.rectangles) {
+      if (['x', 'y', 'w', 'h'].some((k) => typeof r[k] !== 'number')) {
+        return 'A rectangle is missing numeric x/y/w/h.';
+      }
     }
+    if (f.constraints && !Array.isArray(f.constraints)) return '"constraints" must be an array.';
   }
-  if (data.constraints && !Array.isArray(data.constraints)) return '"constraints" must be an array.';
   return null; // ok
 }
 
-// Replace the project's contents from parsed JSON data. Emits one change.
-export function deserializeInto(project, data) {
-  const err = validateProjectData(data);
-  if (err) throw new Error(err);
-
-  project.rectangles = data.rectangles.map(
-    (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add' }),
-  );
-  project.constraints = (data.constraints || []).map((c) => ({
+function makeConstraint(c) {
+  return {
     id: c.id,
     type: c.type || 'distance',
     axis: c.axis,
@@ -54,12 +80,35 @@ export function deserializeInto(project, data) {
     value: c.value,
     offset: typeof c.offset === 'number' ? c.offset : null,
     conflict: false,
+  };
+}
+
+// Replace the project's contents from parsed JSON data. Emits one change.
+export function deserializeInto(project, data) {
+  const err = validateProjectData(data);
+  if (err) throw new Error(err);
+
+  const descriptors = floorDescriptors(data);
+  const floors = descriptors.map((f) => new Floor({
+    id: f.id, // undefined for legacy → Floor mints one
+    name: f.name || 'Floor',
+    height: typeof f.height === 'number' ? f.height : 2.8,
+    rectangles: (f.rectangles || []).map(
+      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add' }),
+    ),
+    constraints: (f.constraints || []).map(makeConstraint),
   }));
-  project.height = typeof data.height === 'number' ? data.height : 2.8;
+
+  project.floors = floors;
+  project.groundFloorId = floors.some((f) => f.id === data.groundFloorId)
+    ? data.groundFloorId : floors[0].id;
+  project.activeFloorId = floors.some((f) => f.id === data.activeFloorId)
+    ? data.activeFloorId : floors[0].id;
 
   // Ensure future auto-generated ids don't collide with loaded ones.
-  syncRectIdCounter(project.rectangles.map((r) => r.id));
-  syncConstraintIdCounter(project.constraints.map((c) => c.id));
+  syncFloorIdCounter(floors.map((f) => f.id));
+  syncRectIdCounter(floors.flatMap((f) => f.rectangles.map((r) => r.id)));
+  syncConstraintIdCounter(floors.flatMap((f) => f.constraints.map((c) => c.id)));
 
   project._emit();
 }

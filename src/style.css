@@ -198,6 +198,79 @@ body {
   pointer-events: none;
 }
 
+/* ---- floor switcher (storeys) ---- */
+#floor-ctl {
+  position: absolute;
+  top: 34px;
+  left: 10px;
+  width: 168px;
+  max-height: calc(100% - 48px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(4px);
+  z-index: 5;
+}
+.fc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.fc-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-right: auto;
+}
+.fc-head button {
+  background: #30353f;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.fc-head button:hover { border-color: var(--accent); }
+.fc-list { display: flex; flex-direction: column; padding: 4px; gap: 2px; overflow-y: auto; }
+/* Rows render top floor first (highest storey on top), matching the stack. */
+.fc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.fc-row:hover { background: #2c313b; }
+.fc-row.active { background: var(--accent); border-color: var(--accent); color: #0b1220; }
+.fc-row.active .fc-elev { color: #0b1220; }
+.fc-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.fc-elev { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fc-row button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.fc-row.active button { color: #0b1220; }
+.fc-ground.on { color: #ffd166; opacity: 1; }
+.fc-ground { opacity: 0.5; }
+.fc-ground:hover { color: #ffd166; opacity: 1; }
+.fc-del:hover { color: var(--subtract); opacity: 1; }
+
 /* ---- MR (Enter AR) button — Three's ARButton, restyled to sit inline in the
    footer. ARButton writes inline styles, so layout-critical props need !important. */
 .mr-btn {
