@@ -451,4 +451,51 @@ function seedDemo() {
   if (!restored) seedDemo();
 })();
 
+// ---- PWA install button ----
+// The Quest Browser (and desktop Chromium) fire `beforeinstallprompt` when the
+// app meets the install criteria, but the Quest Browser exposes no obvious
+// "Install" menu item — so we surface our own toolbar button. If the event
+// never fires, the browser can't install directly (use Bubblewrap instead) and
+// the button simply stays hidden. It's also hidden when already installed.
+(function setupInstall() {
+  const group = document.getElementById('install-group');
+  const btn = document.getElementById('install-btn');
+  if (!group || !btn) return;
+  let deferred = null; // the stashed beforeinstallprompt event
+
+  // Already running as an installed app? Never show the button.
+  const installed = window.matchMedia?.('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (installed) return;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();      // stop the browser's own mini-infobar
+    deferred = e;            // keep it to trigger from our button
+    group.hidden = false;    // now we KNOW the app is installable
+  });
+
+  // On-screen status, since the headset has no visible console. Reports exactly
+  // what prompt()/userChoice does so we can tell if the Quest Browser actually
+  // implements the install dialog.
+  const hint = document.getElementById('hint');
+  const say = (msg) => { if (hint) hint.textContent = `install: ${msg}`; };
+
+  btn.addEventListener('click', async () => {
+    if (!deferred) { say('no deferred prompt (event not held)'); return; }
+    say('calling prompt()…');
+    try {
+      const p = deferred.prompt();          // may return a promise or undefined
+      say('prompt() called, awaiting choice…');
+      const choice = await (deferred.userChoice ?? p);
+      say(`choice: ${choice?.outcome ?? JSON.stringify(choice) ?? 'unknown'}`);
+      if (choice?.outcome === 'accepted') group.hidden = true;
+    } catch (err) {
+      say(`prompt() error: ${err?.name ?? ''} ${err?.message ?? err}`);
+    }
+    deferred = null; // beforeinstallprompt is single-use; browser re-fires if still installable
+  });
+
+  window.addEventListener('appinstalled', () => { group.hidden = true; });
+})();
+
 console.log('House CAD ready.');
