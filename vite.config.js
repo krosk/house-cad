@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'node:fs';
 
 // Dev-only: a POST /__log endpoint so the app running in the Quest browser can
@@ -32,12 +33,46 @@ export default defineConfig(({ command }) => ({
   // the repo name. Dev server stays at '/'.
   base: command === 'build' ? './' : '/',
 
-  // basic-ssl serves the dev server over https with a self-signed cert. WebXR
+  // DEV (serve): basic-ssl serves https with a self-signed cert. WebXR
   // (immersive-ar on the Quest) requires a secure context, and the Quest reaches
   // the dev server by LAN IP — which is only "secure" over https. The Quest
   // browser will warn about the self-signed cert once; accept it to proceed.
-  // questLogger adds the /__log endpoint. Neither is applied to `build`.
-  plugins: command === 'serve' ? [basicSsl(), questLogger()] : [],
+  // questLogger adds the /__log endpoint.
+  //
+  // BUILD: VitePWA turns the deployed site into an INSTALLABLE, OFFLINE PWA — the
+  // only path that keeps WebXR AR on Quest (a WebView/TWA APK can't enter
+  // immersive-ar). Workbox precaches the whole build so, once installed from the
+  // https Pages URL, it runs with no network. The PWA is intentionally NOT in dev
+  // (a service worker would fight HMR and the self-signed-cert flow).
+  plugins: command === 'serve'
+    ? [basicSsl(), questLogger()]
+    : [VitePWA({
+        registerType: 'autoUpdate',
+        // Relative paths so it stays portable under the GitHub Pages subpath
+        // (same reason base is './'). start_url/scope resolve to the app root.
+        includeAssets: ['favicon-32.png', 'apple-touch-icon.png', 'icon.svg'],
+        manifest: {
+          name: 'House CAD',
+          short_name: 'House CAD',
+          description: 'Parametric 2.5D CAD for house massing, with on-site MR survey on Quest 3.',
+          theme_color: '#0f1218',
+          background_color: '#0f1218',
+          display: 'standalone',
+          orientation: 'any',
+          icons: [
+            { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+            { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+          // The three.js chunk exceeds Workbox's 2 MiB default — raise the cap so
+          // it's precached (otherwise the app wouldn't be fully offline).
+          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        },
+        devOptions: { enabled: false },
+      })],
 
   // host: true exposes the dev server on the LAN so you can open it in the Quest
   // 3 browser at the printed Network URL (now https://).

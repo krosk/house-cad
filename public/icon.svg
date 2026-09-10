@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0f1218"/>
+  <!-- house roof -->
+  <path d="M256 96 L400 216 L112 216 Z" fill="none" stroke="#4ea1ff" stroke-width="20" stroke-linejoin="round"/>
+  <!-- plan: outer footprint -->
+  <rect x="140" y="240" width="232" height="160" rx="8" fill="none" stroke="#4ea1ff" stroke-width="20"/>
+  <!-- plan: an interior subtract/room + a dimension tick -->
+  <rect x="176" y="276" width="96" height="88" rx="4" fill="none" stroke="#9b6dff" stroke-width="14"/>
+  <line x1="300" y1="276" x2="300" y2="364" stroke="#79c0ff" stroke-width="12" stroke-linecap="round"/>
+  <line x1="288" y1="276" x2="312" y2="276" stroke="#79c0ff" stroke-width="12" stroke-linecap="round"/>
+  <line x1="288" y1="364" x2="312" y2="364" stroke="#79c0ff" stroke-width="12" stroke-linecap="round"/>
+</svg>
