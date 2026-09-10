@@ -327,8 +327,12 @@ export function setupMR(view, project, getFootprint) {
   // they read bold at 1:1. Materials are MeshBasic; DoubleSide so they show from
   // any angle. depthWrite off so stacked strips/fill don't z-fight.
   const EDGE_HALF = 0.02; // strip half-width -> 4 cm bold edge
-  const restMat = new THREE.MeshBasicMaterial({ color: 0x9b6dff, side: THREE.DoubleSide, depthWrite: false });   // resting zone edges
-  const activeMat = new THREE.MeshBasicMaterial({ color: 0xd8b4fe, side: THREE.DoubleSide, depthWrite: false }); // active zone edges
+  const restMat = new THREE.MeshBasicMaterial({ color: 0x9b6dff, side: THREE.DoubleSide, depthWrite: false });   // resting ROOM (add) edges
+  const activeMat = new THREE.MeshBasicMaterial({ color: 0xd8b4fe, side: THREE.DoubleSide, depthWrite: false }); // active ROOM (add) edges
+  // WALL (subtract) zones get a red hue so "wall" reads distinctly from "roomspace"
+  // (add), matching the desktop add=blue / subtract=red convention.
+  const restSubMat = new THREE.MeshBasicMaterial({ color: 0xff6b6b, side: THREE.DoubleSide, depthWrite: false });   // resting WALL (subtract) edges
+  const activeSubMat = new THREE.MeshBasicMaterial({ color: 0xffb4b4, side: THREE.DoubleSide, depthWrite: false }); // active WALL (subtract) edges
   // Dimension (constraint) annotations: thin blue floor strips for the dim/extension
   // lines, red when the constraint conflicts. Value shown on a billboarded label.
   const dimMat = new THREE.MeshBasicMaterial({ color: 0x79c0ff, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
@@ -475,20 +479,21 @@ export function setupMR(view, project, getFootprint) {
     const footprint = getFootprint?.() ?? [];
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = total free space
     if (fillGeo) planGroup.add(new THREE.Mesh(fillGeo, fillMat));
-    // Per-rectangle edge strips: non-active zones purple, active zone brighter/on top.
-    const restGeo = rectStripGeo(project.rectangles.filter((r) => r !== activeRect));
-    if (restGeo) {
-      const o = new THREE.Mesh(restGeo, restMat);
-      o.position.y = 0.004; // lift above the fill
+    // Per-rectangle edge strips. Non-active zones sit lower; the active zone is
+    // brighter and on top. ROOM (add) zones are purple, WALL (subtract) zones red —
+    // so you can tell roomspace from wall at a glance.
+    const pushStrips = (rects, mat, y) => {
+      const geo = rectStripGeo(rects);
+      if (!geo) return;
+      const o = new THREE.Mesh(geo, mat);
+      o.position.y = y; // lift above the fill
       planGroup.add(o);
-    }
+    };
+    const others = project.rectangles.filter((r) => r !== activeRect);
+    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004);
+    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004);
     if (activeRect) {
-      const activeGeo = rectStripGeo([activeRect]);
-      if (activeGeo) {
-        const o = new THREE.Mesh(activeGeo, activeMat);
-        o.position.y = 0.006;
-        planGroup.add(o);
-      }
+      pushStrips([activeRect], activeRect.op === 'subtract' ? activeSubMat : activeMat, 0.006);
     }
     buildDimensions(); // constraint dimension lines + value labels
     return planGroup.children.length > 0;
@@ -896,9 +901,29 @@ export function setupMR(view, project, getFootprint) {
   const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
   const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
 
+  // Drop a throwaway starter rectangle (ROOM = add / WALL = subtract) at the user's
+  // standing position — no floor touch needed, since the box is throwaway and its
+  // edges get pushed to the real walls in EDGE mode. It becomes the active rect.
+  function dropRect(op) {
+    if (!placed) return; // need a registered frame (ORIGIN) to define plan space
+    const e = renderer.xr.getCamera().matrixWorld.elements; // headset world pos
+    _drop.set(e[12], floorY, e[14]);
+    const { px, py } = worldToPlan(_drop);
+    const half = 0.75; // 1.5 m starter box — size is throwaway, edges get pushed
+    const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op });
+    project.addRectangle(rect);
+    surveyed.push(rect.id);
+    activeRect = rect;
+    selectedEdge = null;
+    buildPlan();       // re-read footprint (now includes the new rect); keeps transform
+    applyPlanMatrix(); // buildPlan swaps geometry only; reassert position/yaw
+    rlog('drop rect', { id: rect.id, op, px: +px.toFixed(3), py: +py.toFixed(3) });
+  }
+
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
-  // visible. FLOOR + REGISTER set up the frame; DROP/EDGE are the survey loop.
+  // visible. FLOOR + REGISTER set up the frame; ROOM/WALL drop zones and EDGE snaps
+  // their edges to the real walls.
   const modes = [
     {
       id: 'floor', label: 'FLOOR', color: 0x51d88a,
@@ -938,25 +963,17 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'drop', label: 'DROP', color: 0x2dd4bf,
-      // Drop a default free-space rectangle at your standing position — no floor
-      // touch needed, since the box is throwaway and its edges get pushed to the
-      // walls in EDGE mode. It becomes the active rectangle.
-      onTouch: () => {
-        if (!placed) return; // need a registered frame (ORIGIN) to define plan space
-        const e = renderer.xr.getCamera().matrixWorld.elements; // headset world pos
-        _drop.set(e[12], floorY, e[14]);
-        const { px, py } = worldToPlan(_drop);
-        const half = 0.75; // 1.5 m starter box — size is throwaway, edges get pushed
-        const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op: 'add' });
-        project.addRectangle(rect);
-        surveyed.push(rect.id);
-        activeRect = rect;
-        selectedEdge = null;
-        buildPlan();       // re-read footprint (now includes the new rect); keeps transform
-        applyPlanMatrix(); // buildPlan swaps geometry only; reassert position/yaw
-        rlog('drop rect', { id: rect.id, px: +px.toFixed(3), py: +py.toFixed(3) });
-      },
+      id: 'drop', label: 'ROOM', color: 0x2dd4bf,
+      // Drop a ROOMSPACE (add) rectangle at your standing position. It becomes the
+      // active rectangle; push its edges to the walls in EDGE.
+      onTouch: () => dropRect('add'),
+    },
+    {
+      id: 'wall', label: 'WALL', color: 0xff6b6b,
+      // Drop a WALL (subtract) rectangle — solid, no roomspace — the same way. It
+      // carves a hole in the footprint fill; push its edges to the real wall faces
+      // in EDGE. add = roomspace, subtract = wall.
+      onTouch: () => dropRect('subtract'),
     },
     {
       id: 'edge', label: 'EDGE', color: 0xff5db1,
@@ -1188,7 +1205,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip button: context-sensitive undo.
-  //  - DROP/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
+  //  - ROOM/WALL/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
   //  - REGISTER mid-gesture: cancel the pending align step (keep the origin).
   //  - otherwise: un-place the plan so you can register it again.
   function onReset(event) {
@@ -1199,7 +1216,7 @@ export function setupMR(view, project, getFootprint) {
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
     }
-    if (mode.id === 'drop' || mode.id === 'edge') {
+    if (mode.id === 'drop' || mode.id === 'wall' || mode.id === 'edge') {
       if (selectedEdge) { // a locked edge is pending -> just cancel it
         selectedEdge = null;
         rlog('edge lock cancelled');
@@ -1446,7 +1463,7 @@ export function setupMR(view, project, getFootprint) {
       showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
       if (hoverKey !== prevHoverKey) { redrawNumpad(); prevHoverKey = hoverKey; }
     } else {
-      // DROP: no floor target (drops at the standing position).
+      // ROOM/WALL: no floor target (drops at the standing position).
       reticle.visible = false;
       edgeHi.visible = false;
     }
