@@ -279,6 +279,51 @@ export function setupMR(view, project, getFootprint) {
   const edgeHi = makeEdgeHi();
   const edgeHi2 = makeEdgeHi();
 
+  // Whole-zone outline highlight for EDIT mode (the room/wall under your ray). All
+  // four edges in one buffer (4 edges * 2 triangles * 3 verts = 24 verts / 72 floats).
+  const rectHi = new THREE.Mesh(
+    new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(72), 3)),
+    new THREE.MeshBasicMaterial({ color: 0x51d88a, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+  );
+  rectHi.renderOrder = 11;
+  rectHi.visible = false;
+  scene.add(rectHi);
+
+  // Zebra fill for the SELECTED zone in EDIT mode: a seamless 45° diagonal stripe
+  // texture over the whole rectangle, so the active selection reads instantly and
+  // distinctly from the op-colored outline. Tiles at a constant world size (repeat
+  // is set per-frame from the zone's dimensions), so stripes stay the same width
+  // whatever the zone's size.
+  const ZEBRA_PERIOD = 0.6; // m of plan covered by one texture tile (4 stripe pairs)
+  function makeZebraTexture() {
+    const N = 64, P = 16; // tile px, stripe period px (P divides N -> seamless)
+    const canvas = document.createElement('canvas');
+    canvas.width = N; canvas.height = N;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(N, N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const on = ((x + y) % P) < P / 2; // 45° bands, exactly periodic in x and y
+        const i = (y * N + x) * 4;
+        img.data[i] = 0xff; img.data[i + 1] = 0xe1; img.data[i + 2] = 0x4d; // yellow
+        img.data[i + 3] = on ? 200 : 0;                                     // stripe / gap
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+  const zebra = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), // lie flat, matching plan (x,y)->(x,0,-y)
+    new THREE.MeshBasicMaterial({ map: makeZebraTexture(), transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+  );
+  zebra.renderOrder = 10; // under the outline (11), over the fill
+  zebra.visible = false;
+  scene.add(zebra);
+  const _zp = new THREE.Vector3(); // scratch: selected-zone center in world
+
   // RECAL corner marker: a floor ring at a plan corner — previews the nearest
   // corner under your tip (cyan) before you lock it, then rides the locked corner
   // (purple) while you touch the edge direction.
@@ -524,6 +569,8 @@ export function setupMR(view, project, getFootprint) {
   let activeRect = null;    // the rectangle whose edges EDGE mode edits (last dropped)
   let selectedEdge = null;  // {rectId, edge} locked, awaiting a wall touch
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
+  let selectedRect = null;  // EDIT mode: the persistently-selected zone (survives aim)
+  let hoverStack = [];      // EDIT mode: zones under the ray this frame, topmost-first
 
   // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
   // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
@@ -642,6 +689,15 @@ export function setupMR(view, project, getFootprint) {
       }
     }
     return best;
+  }
+
+  // All zones containing a plan point, TOPMOST (last-created) first — EDIT mode's
+  // overlap stack, which the trigger cycles down through.
+  function rectsAtPoint(px, py) {
+    const out = [];
+    const rects = project.rectangles;
+    for (let i = rects.length - 1; i >= 0; i--) if (rects[i].contains(px, py)) out.push(rects[i]);
+    return out;
   }
 
   // Move one edge to a wall touch, keeping the OPPOSITE edge fixed and w/h >= 0.
@@ -864,6 +920,44 @@ export function setupMR(view, project, getFootprint) {
     mesh.visible = true;
   }
 
+  // Outline a whole rectangle (all four edges) into rectHi, in the given color —
+  // EDIT mode's "this is the zone under your ray" highlight.
+  function showRectOutline(rect, colorHex) {
+    const b = rect.bounds;
+    const edges = [
+      [b.x0, b.y0, b.x1, b.y0], [b.x1, b.y0, b.x1, b.y1], // bottom, right
+      [b.x1, b.y1, b.x0, b.y1], [b.x0, b.y1, b.x0, b.y0], // top, left
+    ];
+    const a = rectHi.geometry.attributes.position.array;
+    let o = 0;
+    const put = (v) => { a[o++] = v.x; a[o++] = v.y + 0.014; a[o++] = v.z; };
+    for (const [ax, ay, bx, by] of edges) {
+      const c = stripCorners(ax, ay, bx, by, EDGE_HI_HALF);
+      planToWorld(c[0][0], c[0][1], _c0); planToWorld(c[1][0], c[1][1], _c1);
+      planToWorld(c[2][0], c[2][1], _c2); planToWorld(c[3][0], c[3][1], _c3);
+      put(_c0); put(_c1); put(_c2);
+      put(_c0); put(_c2); put(_c3);
+    }
+    rectHi.geometry.attributes.position.needsUpdate = true;
+    rectHi.material.color.setHex(colorHex);
+    rectHi.visible = true;
+  }
+
+  // Lay the zebra stripe fill over a whole rectangle: flat on its floor, yaw-aligned
+  // with the plan, sized to the zone, with the texture repeat set so stripe width is
+  // constant in the real world regardless of zone size.
+  function showZebra(rect) {
+    const b = rect.bounds;
+    const w = b.x1 - b.x0, h = b.y1 - b.y0;
+    if (w <= 0 || h <= 0) { zebra.visible = false; return; }
+    planToWorld((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, _zp);
+    zebra.position.set(_zp.x, overlayY() + 0.012, _zp.z); // above the fill + outline base
+    zebra.quaternion.copy(planGroup.quaternion);          // plan yaw (stays flat)
+    zebra.scale.set(w, 1, h);
+    zebra.material.map.repeat.set(w / ZEBRA_PERIOD, h / ZEBRA_PERIOD);
+    zebra.visible = true;
+  }
+
   // World point where a controller's pointing ray meets the floor plane, or null.
   const _ro = new THREE.Vector3(), _rd = new THREE.Vector3();
   const _rhit = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rm = new THREE.Matrix4();
@@ -947,6 +1041,17 @@ export function setupMR(view, project, getFootprint) {
     rlog('drop rect', { id: rect.id, op, px: +px.toFixed(3), py: +py.toFixed(3) });
   }
 
+  // EDIT mode: flip the selected zone room<->wall (add<->subtract). Bound to the
+  // upper face button (B/Y) while in EDIT — see pollModeCycle.
+  function swapSelected() {
+    if (!selectedRect) return;
+    selectedRect.op = selectedRect.op === 'subtract' ? 'add' : 'subtract';
+    project.touch();
+    buildPlan();
+    applyPlanMatrix();
+    rlog('edit swap', { id: selectedRect.id, op: selectedRect.op });
+  }
+
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
   // visible. FLOOR + REGISTER set up the frame; ROOM/WALL drop zones and EDGE snaps
@@ -1027,6 +1132,20 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'edit', label: 'EDIT', color: 0xa78bfa,
+      // Select a zone to edit. TRIGGER picks the zone under your ray; pressing again
+      // cycles DOWN through overlapping zones (wraps), so any buried zone is
+      // reachable. The selection persists + is zebra-highlighted. Then GRIP deletes
+      // it (see onReset), or the upper face button B/Y swaps it room<->wall (see
+      // swapSelected / pollModeCycle).
+      onTouch: () => {
+        if (!placed || !hoverStack.length) return;
+        const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
+        selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
+        rlog('edit select', { id: selectedRect.id, op: selectedRect.op, stack: hoverStack.length });
+      },
+    },
+    {
       id: 'recal', label: 'RECAL', color: C_RECAL,
       // Correct drift: re-zero the plan against a KNOWN corner. Two touches (like
       // REGISTER, but referencing any surveyed corner, not just plan-origin):
@@ -1080,6 +1199,9 @@ export function setupMR(view, project, getFootprint) {
     awaitingAlign = false; // leaving/entering a mode resets the REGISTER two-step
     awaitingRecalDir = false; // ... and the RECAL two-step
     recalCorner = null;
+    selectedRect = null; // clear the EDIT selection when changing modes
+    rectHi.visible = false;
+    zebra.visible = false;
     const m = modes[currentMode];
     applyModeVisual(m.label, m.color);
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
@@ -1094,6 +1216,7 @@ export function setupMR(view, project, getFootprint) {
     for (const r of project.rectangles) surveyed.push(r.id); // active floor, creation order
     activeRect = project.rectangles[project.rectangles.length - 1] || null;
     selectedEdge = null;
+    selectedRect = null; // EDIT selection is per-floor; drop it on a floor switch
     resetDim();
   }
 
@@ -1185,6 +1308,9 @@ export function setupMR(view, project, getFootprint) {
     edgeHi.visible = false;
     edgeHi2.visible = false;
     cornerHi.visible = false;
+    rectHi.visible = false;
+    zebra.visible = false;
+    selectedRect = null;
     originGizmo.visible = false;
     originRingMat.color.setHex(C_ORIGIN_GIZMO);
     numpad.group.visible = false;
@@ -1236,6 +1362,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip button: context-sensitive undo.
+  //  - EDIT: delete the selected zone.
   //  - ROOM/WALL/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
   //  - REGISTER mid-gesture: cancel the pending align step (keep the origin).
   //  - otherwise: un-place the plan so you can register it again.
@@ -1245,6 +1372,21 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'size') { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; sizeBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
+      return;
+    }
+    if (mode.id === 'edit') { // grip deletes the selected zone
+      if (!selectedRect) return;
+      const id = selectedRect.id;
+      project.removeRectangle(id);
+      const si = surveyed.indexOf(id);
+      if (si >= 0) surveyed.splice(si, 1);
+      if (activeRect && activeRect.id === id) {
+        activeRect = project.rectangles[project.rectangles.length - 1] || null;
+      }
+      selectedRect = null;
+      buildPlan();
+      applyPlanMatrix();
+      rlog('edit delete', { id });
       return;
     }
     if (mode.id === 'drop' || mode.id === 'wall' || mode.id === 'edge') {
@@ -1345,7 +1487,12 @@ export function setupMR(view, project, getFootprint) {
       exitHoldStart = 0;
       exitProgress = 0;
     }
-    if (next && !btn.next) setMode(currentMode + 1);
+    // Upper face button (B/Y) normally cycles to the next mode, but in EDIT it
+    // swaps the selected zone room<->wall (thumbstick-x still cycles modes there).
+    if (next && !btn.next) {
+      if (modes[currentMode].id === 'edit') swapSelected();
+      else setMode(currentMode + 1);
+    }
     if (prev && !btn.prev) setMode(currentMode - 1);
     btn.next = next;
     btn.prev = prev;
@@ -1400,6 +1547,9 @@ export function setupMR(view, project, getFootprint) {
       `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
       `edge:   sel=${selectedEdge ? selectedEdge.edge : '-'} hov=${hoverEdge ? hoverEdge.edge : '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
+      ...(modes[currentMode].id === 'edit' ? [selectedRect
+        ? `edit:   SEL ${selectedRect.op === 'subtract' ? 'WALL' : 'ROOM'} #${selectedRect.id}  B=swap grip=del`
+        : `edit:   trig=pick${hoverStack.length ? ' (' + hoverStack.length + ')' : ''}`] : []),
       `floorY:   ${f2(floorY)}`,
       `plan.y:   ${f2(planPos.y)}`,
       `cam.y:    ${f2(camWorldY())}`,
@@ -1408,6 +1558,9 @@ export function setupMR(view, project, getFootprint) {
     // Floor preview + edge highlight, depending on the current mode.
     hoverEdge = null;
     cornerHi.visible = false;
+    rectHi.visible = false;
+    zebra.visible = false;
+    hoverStack = [];
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
@@ -1502,6 +1655,26 @@ export function setupMR(view, project, getFootprint) {
       showRef(dimRefA, 0xfbbf24);
       showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
       if (hoverKey !== prevHoverKey) { redrawNumpad(); prevHoverKey = hoverKey; }
+    } else if (modeId === 'edit') {
+      // EDIT: ray the floor, gather the overlap stack under the reticle. The
+      // persistent selection (if any) is zebra-filled + outlined in its op color;
+      // otherwise preview the topmost zone under the reticle in yellow outline.
+      const hit = rayFloorHit(pickSource(frame));
+      if (hit) {
+        const { px, py } = worldToPlan(hit);
+        hoverStack = rectsAtPoint(px, py);
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+      } else {
+        reticle.visible = false;
+      }
+      if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
+      if (selectedRect) {
+        showRectOutline(selectedRect, selectedRect.op === 'subtract' ? 0xff6b6b : 0x51d88a);
+        showZebra(selectedRect);
+      } else if (hoverStack.length) {
+        showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
+      }
     } else {
       // ROOM/WALL: no floor target (drops at the standing position).
       reticle.visible = false;
