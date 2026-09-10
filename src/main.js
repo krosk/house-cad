@@ -462,40 +462,48 @@ function seedDemo() {
   const btn = document.getElementById('install-btn');
   if (!group || !btn) return;
   let deferred = null; // the stashed beforeinstallprompt event
+  let fires = 0;       // how many times beforeinstallprompt fired
 
   // Already running as an installed app? Never show the button.
   const installed = window.matchMedia?.('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
   if (installed) return;
 
+  // Sticky on-screen status (the headset has no visible console). Each line is
+  // numbered and APPENDED, so nothing flashes past — we see the whole sequence.
+  const hint = document.getElementById('hint');
+  const log = [];
+  const say = (msg) => { log.push(`${log.length + 1}. ${msg}`); if (hint) hint.textContent = log.slice(-4).join('  |  '); };
+
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();      // stop the browser's own mini-infobar
     deferred = e;            // keep it to trigger from our button
     group.hidden = false;    // now we KNOW the app is installable
+    say(`beforeinstallprompt #${++fires} held`);
   });
-
-  // On-screen status, since the headset has no visible console. Reports exactly
-  // what prompt()/userChoice does so we can tell if the Quest Browser actually
-  // implements the install dialog.
-  const hint = document.getElementById('hint');
-  const say = (msg) => { if (hint) hint.textContent = `install: ${msg}`; };
 
   btn.addEventListener('click', async () => {
-    if (!deferred) { say('no deferred prompt (event not held)'); return; }
-    say('calling prompt()…');
+    if (!deferred) { say(`click: no held event (fired ${fires}x so far)`); return; }
+    const e = deferred;
+    say('click: calling prompt()');
+    let p;
     try {
-      const p = deferred.prompt();          // may return a promise or undefined
-      say('prompt() called, awaiting choice…');
-      const choice = await (deferred.userChoice ?? p);
-      say(`choice: ${choice?.outcome ?? JSON.stringify(choice) ?? 'unknown'}`);
-      if (choice?.outcome === 'accepted') group.hidden = true;
+      p = e.prompt();                 // may throw synchronously, or return a promise
     } catch (err) {
-      say(`prompt() error: ${err?.name ?? ''} ${err?.message ?? err}`);
+      say(`prompt() threw: ${err?.name || ''} ${err?.message || err}`);
+      return;                         // keep deferred so we can retry
     }
-    deferred = null; // beforeinstallprompt is single-use; browser re-fires if still installable
+    say('prompt() returned, awaiting userChoice');
+    try {
+      const choice = await (e.userChoice ?? p);
+      say(`userChoice: ${choice?.outcome ?? JSON.stringify(choice) ?? 'undefined'}`);
+      if (choice?.outcome === 'accepted') { group.hidden = true; deferred = null; }
+    } catch (err) {
+      say(`userChoice error: ${err?.name || ''} ${err?.message || err}`);
+    }
   });
 
-  window.addEventListener('appinstalled', () => { group.hidden = true; });
+  window.addEventListener('appinstalled', () => { group.hidden = true; say('appinstalled fired'); });
 })();
 
 console.log('House CAD ready.');
