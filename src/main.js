@@ -462,28 +462,37 @@ function seedDemo() {
   const btn = document.getElementById('install-btn');
   if (!group || !btn) return;
   let deferred = null; // the stashed beforeinstallprompt event
-  let fires = 0;       // how many times beforeinstallprompt fired
+  let fires = 0;       // how many times beforeinstallprompt has fired
 
   // Already running as an installed app? Never show the button.
   const installed = window.matchMedia?.('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
   if (installed) return;
 
-  // Sticky on-screen status (the headset has no visible console). Each line is
-  // numbered and APPENDED, so nothing flashes past — we see the whole sequence.
+  // Sticky on-screen status (the headset has no visible console). Numbered,
+  // appended, showing the last few — so nothing flashes past. Prefixed with the
+  // build stamp so we can tell a stale cached build from a fresh one.
   const hint = document.getElementById('hint');
+  const build = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
   const log = [];
-  const say = (msg) => { log.push(`${log.length + 1}. ${msg}`); if (hint) hint.textContent = log.slice(-4).join('  |  '); };
+  const say = (msg) => { log.push(`${log.length + 1}. ${msg}`); if (hint) hint.textContent = `[b:${build}] ${log.slice(-4).join('  |  ')}`; };
+
+  // Show the button regardless, so its visibility no longer implies the event
+  // fired. Status tells us whether the browser has actually offered install.
+  group.hidden = false;
+  say('waiting for beforeinstallprompt…');
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();      // stop the browser's own mini-infobar
     deferred = e;            // keep it to trigger from our button
-    group.hidden = false;    // now we KNOW the app is installable
-    say(`beforeinstallprompt #${++fires} held`);
+    say(`beforeinstallprompt #${++fires} held — installable`);
   });
 
   btn.addEventListener('click', async () => {
-    if (!deferred) { say(`click: no held event (fired ${fires}x so far)`); return; }
+    if (!deferred) {
+      say(`click: browser never offered install (fired ${fires}x) — likely no in-browser install here`);
+      return;
+    }
     const e = deferred;
     say('click: calling prompt()');
     let p;
@@ -506,4 +515,4 @@ function seedDemo() {
   window.addEventListener('appinstalled', () => { group.hidden = true; say('appinstalled fired'); });
 })();
 
-console.log('House CAD ready.');
+console.log('House CAD ready. build', typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev');

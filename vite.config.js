@@ -33,6 +33,11 @@ export default defineConfig(({ command }) => ({
   // the repo name. Dev server stays at '/'.
   base: command === 'build' ? './' : '/',
 
+  // A build stamp shown in the UI, so while debugging the PWA/service-worker
+  // cache we can confirm which build the headset actually loaded (vs. a stale
+  // cached one). Minute precision is plenty to tell builds apart.
+  define: { __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
+
   // DEV (serve): basic-ssl serves https with a self-signed cert. WebXR
   // (immersive-ar on the Quest) requires a secure context, and the Quest reaches
   // the dev server by LAN IP — which is only "secure" over https. The Quest
