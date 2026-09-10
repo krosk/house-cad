@@ -330,7 +330,8 @@ export function setupMR(view, project, getFootprint) {
   // Edges are drawn as thin FLOOR STRIPS (flat quads) rather than 1px GL lines, so
   // they read bold at 1:1. Materials are MeshBasic; DoubleSide so they show from
   // any angle. depthWrite off so stacked strips/fill don't z-fight.
-  const EDGE_HALF = 0.02; // strip half-width -> 4 cm bold edge
+  const EDGE_HALF = 0.005;   // strip half-width -> 1 cm resting edge
+  const EDGE_HI_HALF = 0.01; // half-width for hover/lock highlights -> 2 cm, bolder than rest
   const restMat = new THREE.MeshBasicMaterial({ color: 0x9b6dff, side: THREE.DoubleSide, depthWrite: false });   // resting ROOM (add) edges
   const activeMat = new THREE.MeshBasicMaterial({ color: 0xd8b4fe, side: THREE.DoubleSide, depthWrite: false }); // active ROOM (add) edges
   // WALL (subtract) zones get a red hue so "wall" reads distinctly from "roomspace"
@@ -521,8 +522,8 @@ export function setupMR(view, project, getFootprint) {
   // pointing at an edge (ray) then touching the matching real wall.
   const surveyed = [];      // Rectangle ids this session, in creation order (for undo)
   let activeRect = null;    // the rectangle whose edges EDGE mode edits (last dropped)
-  let selectedEdge = null;  // 'left'|'right'|'top'|'bottom' locked, awaiting a wall touch
-  let hoverEdge = null;     // ray-previewed edge of activeRect (recomputed each frame)
+  let selectedEdge = null;  // {rectId, edge} locked, awaiting a wall touch
+  let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
 
   // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
   // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
@@ -594,17 +595,6 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // Which edge of `rect` is nearest a plan point — smallest perpendicular gap to
-  // the four edge lines. Robust enough when you point near the intended edge.
-  function nearestEdge(rect, px, py) {
-    const b = rect.bounds;
-    const d = {
-      left: Math.abs(px - b.x0), right: Math.abs(px - b.x1),
-      bottom: Math.abs(py - b.y0), top: Math.abs(py - b.y1),
-    };
-    return Object.keys(d).reduce((a, k) => (d[k] < d[a] ? k : a));
-  }
-
   // Nearest edge across ALL rects to a plan point — {rectId, edge} or null. Only
   // considers an edge when the point is within (a margin of) that edge's span, so
   // SIZE picks the edge you're actually next to, not a far parallel line.
@@ -617,6 +607,39 @@ export function setupMR(view, project, getFootprint) {
       if (py >= b.y0 - M && py <= b.y1 + M) cands.push(['left', Math.abs(px - b.x0)], ['right', Math.abs(px - b.x1)]);
       if (px >= b.x0 - M && px <= b.x1 + M) cands.push(['bottom', Math.abs(py - b.y0)], ['top', Math.abs(py - b.y1)]);
       for (const [edge, d] of cands) if (d < bestD) { bestD = d; best = { rectId: r.id, edge }; }
+    }
+    return best;
+  }
+
+  // Perpendicular distance from a plan point to an axis-aligned edge SEGMENT (not
+  // its infinite line): clamps to the segment ends so a point off the end of an
+  // edge isn't counted as "on" it.
+  function ptSegDist(px, py, ax, ay, bx, by) {
+    const vx = bx - ax, vy = by - ay;
+    const L2 = vx * vx + vy * vy;
+    let t = L2 > 0 ? ((px - ax) * vx + (py - ay) * vy) / L2 : 0;
+    t = Math.min(1, Math.max(0, t));
+    return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+  }
+
+  // The edge the beam is actually pointing AT: the edge SEGMENT closest to the
+  // aimed floor point (px,py), across ALL zones, within EDGE_PICK_M. Unlike
+  // nearestEdgeAny (perpendicular distance to a possibly-far parallel line), this
+  // uses true segment distance + a cap, so open floor picks nothing and the edge
+  // under your reticle wins. Returns {rectId, edge} | null.
+  const EDGE_PICK_M = 0.4; // m; how close the reticle must be to an edge to pick it
+  function edgeAtPoint(px, py) {
+    let best = null, bestD = EDGE_PICK_M;
+    for (const r of project.rectangles) {
+      const b = r.bounds;
+      const segs = [
+        ['left', b.x0, b.y0, b.x0, b.y1], ['right', b.x1, b.y0, b.x1, b.y1],
+        ['bottom', b.x0, b.y0, b.x1, b.y0], ['top', b.x0, b.y1, b.x1, b.y1],
+      ];
+      for (const [edge, ax, ay, bx, by] of segs) {
+        const d = ptSegDist(px, py, ax, ay, bx, by);
+        if (d < bestD) { bestD = d; best = { rectId: r.id, edge }; }
+      }
     }
     return best;
   }
@@ -827,7 +850,7 @@ export function setupMR(view, project, getFootprint) {
   const _c2 = new THREE.Vector3(), _c3 = new THREE.Vector3();
   function showEdge(rect, edge, colorHex, mesh = edgeHi) {
     const [[ax, ay], [bx, by]] = edgeEndpoints(rect, edge);
-    const c = stripCorners(ax, ay, bx, by, EDGE_HALF * 1.3); // slightly bolder than rest
+    const c = stripCorners(ax, ay, bx, by, EDGE_HI_HALF); // bolder than the resting edges
     planToWorld(c[0][0], c[0][1], _c0);
     planToWorld(c[1][0], c[1][1], _c1);
     planToWorld(c[2][0], c[2][1], _c2);
@@ -981,18 +1004,22 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'edge', label: 'EDGE', color: 0xff5db1,
-      // Two presses per wall: 1st (aiming at an edge) LOCKS that edge; 2nd (tip
-      // touching the real wall) snaps the locked edge to the wall. The ray picks
-      // the edge; the touch supplies only the perpendicular coordinate.
+      // Two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS that edge;
+      // 2nd (tip touching the real wall) snaps the locked edge to the wall. The ray
+      // picks the edge across all zones; the touch supplies only the perpendicular
+      // coordinate.
       onTouch: (pos) => {
-        if (!placed || !activeRect) return;
+        if (!placed) return;
         if (!selectedEdge) {
-          if (hoverEdge) { selectedEdge = hoverEdge; rlog('edge locked', { edge: selectedEdge }); }
+          if (hoverEdge) { selectedEdge = hoverEdge; rlog('edge locked', { edge: hoverEdge.edge, rect: hoverEdge.rectId }); }
           return;
         }
-        const { px, py } = worldToPlan(pos);
-        setEdge(activeRect, selectedEdge, px, py);
-        rlog('edge set', { edge: selectedEdge, px: +px.toFixed(3), py: +py.toFixed(3) });
+        const rect = project.rectangles.find((r) => r.id === selectedEdge.rectId);
+        if (rect) {
+          const { px, py } = worldToPlan(pos);
+          setEdge(rect, selectedEdge.edge, px, py);
+          rlog('edge set', { edge: selectedEdge.edge, px: +px.toFixed(3), py: +py.toFixed(3) });
+        }
         selectedEdge = null;
         project.touch();   // rectangle mutated in place -> re-solve + notify
         buildPlan();
@@ -1372,7 +1399,7 @@ export function setupMR(view, project, getFootprint) {
       `placed: ${placed}   anchor: ${!!anchor}`,
       `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
-      `edge:   sel=${selectedEdge ?? '-'} hov=${hoverEdge ?? '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
+      `edge:   sel=${selectedEdge ? selectedEdge.edge : '-'} hov=${hoverEdge ? hoverEdge.edge : '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
       `floorY:   ${f2(floorY)}`,
       `plan.y:   ${f2(planPos.y)}`,
       `cam.y:    ${f2(camWorldY())}`,
@@ -1382,21 +1409,29 @@ export function setupMR(view, project, getFootprint) {
     hoverEdge = null;
     cornerHi.visible = false;
     const modeId = modes[currentMode].id;
-    if (modeId === 'edge' && activeRect) {
-      // EDGE mode: ray a floor point, pick the nearest edge, ring the aim point.
+    if (modeId === 'edge') {
+      // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
+      // ALL zones, ring the aim point. edgeAtPoint uses true segment distance + a
+      // cap, so the highlight tracks the edge under your reticle (open floor = none).
       const hit = rayFloorHit(pickSource(frame));
       if (hit) {
         const { px, py } = worldToPlan(hit);
-        hoverEdge = nearestEdge(activeRect, px, py);
+        hoverEdge = edgeAtPoint(px, py); // {rectId, edge} | null
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
       } else {
+        hoverEdge = null;
         reticle.visible = false;
       }
       // Locked edge shows yellow; otherwise preview the ray-picked edge in magenta.
-      if (selectedEdge) showEdge(activeRect, selectedEdge, 0xffe14d);
-      else if (hoverEdge) showEdge(activeRect, hoverEdge, 0xff5db1);
-      else edgeHi.visible = false;
+      const shown = selectedEdge || hoverEdge;
+      if (shown) {
+        const r = project.rectangles.find((x) => x.id === shown.rectId);
+        if (r) showEdge(r, shown.edge, selectedEdge ? 0xffe14d : 0xff5db1);
+        else edgeHi.visible = false;
+      } else {
+        edgeHi.visible = false;
+      }
     } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
       // Tip-touch modes: a ring under whichever controller tip is tracked, so you
       // see where FLOOR/ORIGIN/ALIGN/RECAL will land (both two-step gestures incl.).
