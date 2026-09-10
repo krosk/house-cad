@@ -58,22 +58,27 @@ export function setupMR(view, project, getFootprint) {
   // web app has no ?ar, so it keeps the manual START AR button. console.* is
   // mirrored to `adb logcat` (chromium) for on-device debugging of the APK.
   if (new URLSearchParams(location.search).has('ar')) {
-    const autoStartAR = async () => {
+    // Try requestSession DIRECTLY (no isSessionSupported gate — it returns false
+    // in the 2D APK and may be unreliable in the immersive shell, and bailing
+    // leaves the splash up forever). Retry a few times for XR-device readiness.
+    // Record status to document.title so it's inspectable even without a console.
+    const setStatus = (s) => { try { document.title = `AR: ${s}`; } catch { /* noop */ } };
+    const autoStartAR = async (attempt = 0) => {
+      setStatus(`try ${attempt}`);
+      console.info('[auto-AR] attempt', attempt); rlog('auto-AR attempt', { attempt });
       try {
-        if (!navigator.xr || !(await navigator.xr.isSessionSupported('immersive-ar'))) {
-          console.warn('[auto-AR] immersive-ar not supported'); rlog('auto-AR: unsupported');
-          return;
-        }
-        console.info('[auto-AR] requesting session…'); rlog('auto-AR: requesting');
         const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
         await renderer.xr.setSession(session);
-        console.info('[auto-AR] session started'); rlog('auto-AR: started');
+        setStatus('started'); console.info('[auto-AR] session started'); rlog('auto-AR: started');
       } catch (e) {
-        console.error('[auto-AR] failed:', e?.name, e?.message || e);
-        rlog('auto-AR failed', { name: e?.name, msg: String(e?.message || e) });
+        const msg = `${e?.name || ''} ${e?.message || e}`;
+        console.error('[auto-AR] failed:', msg); rlog('auto-AR failed', { attempt, msg });
+        setStatus(`fail#${attempt} ${msg}`);
+        if (attempt < 6) setTimeout(() => autoStartAR(attempt + 1), 700);
       }
     };
-    autoStartAR();
+    if (navigator.xr) autoStartAR();
+    else setStatus('no navigator.xr');
   }
 
   // A small floating text label (canvas texture) that rides a controller tip and
