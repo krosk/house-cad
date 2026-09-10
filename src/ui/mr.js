@@ -213,6 +213,12 @@ export function setupMR(view, project, getFootprint) {
   // reads as a "tip." Placement uses this same offset point (see tipPosition).
   const TIP_OFFSET = new THREE.Vector3(0, 0, -0.04); // 4 cm forward along -Z
 
+  // Render order for controller-mounted UI (mode label, readout pill, debug HUD).
+  // All overlays use depthTest:false, so paint order is purely renderOrder; this
+  // must sit above every world-space overlay (edges/rectHi/zebra ≤12, numpad ≤21)
+  // so the controller panels are never hidden by a floor fill like the zebra.
+  const HUD_ORDER = 100;
+
   // Controllers, each with a small sphere "tip" you touch to the real floor, plus
   // a mode label. Placement uses the controller's tracked position (cm-accurate)
   // rather than a depth raycast, so the floor is defined by physically touching it.
@@ -229,6 +235,7 @@ export function setupMR(view, project, getFootprint) {
     c.add(tip);
     const label = makeLabel();
     label.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.05, TIP_OFFSET.z);
+    label.sprite.renderOrder = HUD_ORDER; // controller UI paints over every world overlay (zebra etc.)
     c.add(label.sprite);
     labels.push(label);
     // A larger pill above the mode label that shows the value of whichever
@@ -238,10 +245,12 @@ export function setupMR(view, project, getFootprint) {
     readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.10, TIP_OFFSET.z);
     readout.sprite.scale.set(0.2, 0.05, 1);
     readout.sprite.visible = false;
+    readout.sprite.renderOrder = HUD_ORDER;
     c.add(readout.sprite);
     readouts.push(readout);
     const dbg = makeDebug(); // debug HUD above each tip so it's always in view
     dbg.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.20, TIP_OFFSET.z);
+    dbg.sprite.renderOrder = HUD_ORDER;
     c.add(dbg.sprite);
     debugs.push(dbg);
     c.addEventListener('select', onSelect);   // trigger: run current mode
@@ -257,8 +266,9 @@ export function setupMR(view, project, getFootprint) {
 
   // A ring that lies on the floor under the active controller tip, previewing
   // where a touch will land. Recolors with the current mode.
+  const RETICLE_OUTER = 0.08; // m; also the EDGE-pick radius (edge must fall in the ring)
   const reticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.06, 0.08, 32).rotateX(-Math.PI / 2),
+    new THREE.RingGeometry(0.06, RETICLE_OUTER, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 }),
   );
   reticle.visible = false;
@@ -295,6 +305,9 @@ export function setupMR(view, project, getFootprint) {
   // is set per-frame from the zone's dimensions), so stripes stay the same width
   // whatever the zone's size.
   const ZEBRA_PERIOD = 0.6; // m of plan covered by one texture tile (4 stripe pairs)
+  // Zebra tints (white texture is multiplied by these): blue for ROOM (add),
+  // red for WALL (subtract) — matches the desktop add=blue / subtract=red convention.
+  const ZEBRA_ADD = 0x60a5fa, ZEBRA_SUB = 0xff6b6b;
   function makeZebraTexture() {
     const N = 64, P = 16; // tile px, stripe period px (P divides N -> seamless)
     const canvas = document.createElement('canvas');
@@ -303,10 +316,11 @@ export function setupMR(view, project, getFootprint) {
     const img = ctx.createImageData(N, N);
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
-        const on = ((x + y) % P) < P / 2; // 45° bands, exactly periodic in x and y
+        const on = ((x + y) % P) < P * 0.375; // thin 45° bands, exactly periodic in x and y
         const i = (y * N + x) * 4;
-        img.data[i] = 0xff; img.data[i + 1] = 0xe1; img.data[i + 2] = 0x4d; // yellow
-        img.data[i + 3] = on ? 200 : 0;                                     // stripe / gap
+        // White so the material color tints it; low alpha keeps the fill discreet.
+        img.data[i] = 0xff; img.data[i + 1] = 0xff; img.data[i + 2] = 0xff;
+        img.data[i + 3] = on ? 90 : 0; // faint stripe / transparent gap
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -674,7 +688,9 @@ export function setupMR(view, project, getFootprint) {
   // nearestEdgeAny (perpendicular distance to a possibly-far parallel line), this
   // uses true segment distance + a cap, so open floor picks nothing and the edge
   // under your reticle wins. Returns {rectId, edge} | null.
-  const EDGE_PICK_M = 0.4; // m; how close the reticle must be to an edge to pick it
+  // Cap = the reticle's outer radius, so an edge is pickable ONLY when it actually
+  // falls inside the ring you're aiming — not merely "somewhere near."
+  const EDGE_PICK_M = RETICLE_OUTER; // m; edge must lie within the reticle ring to pick
   function edgeAtPoint(px, py) {
     let best = null, bestD = EDGE_PICK_M;
     for (const r of project.rectangles) {
@@ -782,6 +798,13 @@ export function setupMR(view, project, getFootprint) {
 
   const rectOf = (ref) => project.rectangles.find((r) => r.id === ref.rectId);
 
+  // Current plan coordinate of a reference (origin axis = 0, else the edge coord).
+  const refCoord = (ref) => (ref.kind === 'origin' ? 0 : edgeCoord(rectOf(ref), ref.edge));
+  // The distance a pair currently spans, in the display unit — used to prefill the
+  // numpad with the value you're already at, so entering size edits from the real
+  // measurement rather than from a blank field.
+  const currentSpan = (a, b) => Math.abs(refCoord(b) - refCoord(a));
+
   // Find an existing distance constraint between two references (either order).
   function findConstraintForRefs(a, b) {
     const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
@@ -863,8 +886,10 @@ export function setupMR(view, project, getFootprint) {
     dimRefB = hoverRef;
     const existing = findConstraintForRefs(dimRefA, dimRefB);
     editingId = existing ? existing.id : null;
-    sizeBuffer = existing ? fmt(Math.abs(existing.value)) : ''; // prefill for editing
-    bufferPristine = !!existing;
+    // Prefill with the constrained value if one exists, else the current measured
+    // span. Either way the field opens on the real value; the first keypress replaces it.
+    sizeBuffer = fmt(existing ? Math.abs(existing.value) : currentSpan(dimRefA, dimRefB));
+    bufferPristine = true;
     rlog('dim B', { ref: refLabel(hoverRef), editing: !!existing });
     redrawNumpad();
   }
@@ -955,6 +980,7 @@ export function setupMR(view, project, getFootprint) {
     zebra.quaternion.copy(planGroup.quaternion);          // plan yaw (stays flat)
     zebra.scale.set(w, 1, h);
     zebra.material.map.repeat.set(w / ZEBRA_PERIOD, h / ZEBRA_PERIOD);
+    zebra.material.color.setHex(rect.op === 'subtract' ? ZEBRA_SUB : ZEBRA_ADD); // blue add / red wall
     zebra.visible = true;
   }
 
