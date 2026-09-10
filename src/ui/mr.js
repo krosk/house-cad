@@ -207,6 +207,10 @@ export function setupMR(view, project, getFootprint) {
     debugs.push(dbg);
     c.addEventListener('select', onSelect);   // trigger: run current mode
     c.addEventListener('squeeze', onReset);   // grip: undo placement
+    // Remember which XRInputSource drives this controller object so we can show
+    // its tip/label only while it's the active hand.
+    c.addEventListener('connected', (e) => { c.userData.inputSource = e.data; });
+    c.addEventListener('disconnected', () => { c.userData.inputSource = null; });
     scene.add(c);
     controllers.push(c);
   }
@@ -960,6 +964,8 @@ export function setupMR(view, project, getFootprint) {
 
   renderer.xr.addEventListener('sessionend', () => {
     view.onXRFrame = null;
+    exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
+    activeSource = null; // next session re-latches on first use
     anchor = null;
     reticle.visible = false;
     edgeHi.visible = false;
@@ -995,6 +1001,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function onSelect(event) {
+    activeSource = event.data; // trigger claims control for this controller
     const pos = tipPosition(event.data);
     if (!pos) return;
     lastTouch.copy(pos); // for the debug HUD
@@ -1018,7 +1025,8 @@ export function setupMR(view, project, getFootprint) {
   //  - DROP/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
   //  - REGISTER mid-gesture: cancel the pending align step (keep the origin).
   //  - otherwise: un-place the plan so you can register it again.
-  function onReset() {
+  function onReset(event) {
+    if (event?.data) activeSource = event.data; // grip claims control too
     const mode = modes[currentMode];
     if (mode.id === 'size') { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; sizeBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
@@ -1067,21 +1075,61 @@ export function setupMR(view, project, getFootprint) {
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
   const btn = { next: false, prev: false, stick: false, stickY: false };
+  // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
+  // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
+  // (not a tap) so it can't collide with stick flicks or be hit by accident.
+  const EXIT_HOLD_MS = 1200;
+  let exitHoldStart = 0; // performance-time when the hold began (0 = not held)
+  let exitProgress = 0;  // 0..1, for the HUD countdown
+  let exiting = false;   // guard so session.end() fires once
 
-  function pollModeCycle(frame) {
-    // xr-standard mapping: buttons[4]=A/X (lower), buttons[5]=B/Y (upper),
+  // The controller the user is currently driving with. Two controllers reading
+  // the same actions fight each other (e.g. both sticks summed), so ALL input —
+  // buttons, sticks, the exit hold, and every ray/tip pick — reads from ONLY
+  // this one. It flips to whichever controller last showed activity.
+  let activeSource = null;
+  // Any button pressed or a real stick deflection counts as "using" a controller.
+  function isActing(gp) {
+    return gp.buttons.some((b) => b?.pressed) ||
+      Math.abs(gp.axes[2] ?? 0) > 0.5 || Math.abs(gp.axes[3] ?? 0) > 0.5;
+  }
+  // The source to read this frame: the active one if still present, else the
+  // first tracked source (so reticles preview before the user has acted).
+  function pickSource(frame) {
+    const list = [...frame.session.inputSources];
+    if (activeSource && list.includes(activeSource)) return activeSource;
+    return list.find((s) => s.gamepad) ?? list[0] ?? null;
+  }
+
+  function pollModeCycle(frame, time) {
+    // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
+    // buttons[4]=A/X (lower), buttons[5]=B/Y (upper),
     // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (change floor).
-    // Accept either controller.
-    let next = false, prev = false, stickX = 0, stickY = 0;
+    // Latch onto whichever controller is being used, then read ONLY that one.
     for (const src of frame.session.inputSources) {
-      const gp = src.gamepad;
-      if (!gp) continue;
-      if (gp.buttons[5]?.pressed) next = true; // upper face button -> next
-      if (gp.buttons[4]?.pressed) prev = true; // lower face button -> previous
-      const x = gp.axes[2] ?? 0;
-      if (Math.abs(x) > Math.abs(stickX)) stickX = x;
-      const y = gp.axes[3] ?? 0;
-      if (Math.abs(y) > Math.abs(stickY)) stickY = y;
+      if (src.gamepad && isActing(src.gamepad)) activeSource = src;
+    }
+    let next = false, prev = false, stickX = 0, stickY = 0, stickDown = false;
+    const gp = pickSource(frame)?.gamepad;
+    if (gp) {
+      next = !!gp.buttons[5]?.pressed;     // upper face button -> next
+      prev = !!gp.buttons[4]?.pressed;     // lower face button -> previous
+      stickDown = !!gp.buttons[3]?.pressed; // thumbstick click (hold to exit)
+      stickX = gp.axes[2] ?? 0;
+      stickY = gp.axes[3] ?? 0;
+    }
+    // Hold-to-exit: accumulate hold time; end the session past the threshold.
+    if (stickDown && !exiting) {
+      if (!exitHoldStart) exitHoldStart = time;
+      exitProgress = Math.min(1, (time - exitHoldStart) / EXIT_HOLD_MS);
+      if (exitProgress >= 1) {
+        exiting = true;
+        rlog('exit AR (thumbstick hold)');
+        frame.session.end().catch(() => {});
+      }
+    } else {
+      exitHoldStart = 0;
+      exitProgress = 0;
     }
     if (next && !btn.next) setMode(currentMode + 1);
     if (prev && !btn.prev) setMode(currentMode - 1);
@@ -1117,8 +1165,13 @@ export function setupMR(view, project, getFootprint) {
 
   function onXRFrame(time, frame) {
     currentFrame = frame;
-    pollModeCycle(frame);
+    pollModeCycle(frame, time);
+    // Show the tip/label/HUD on ONLY the active controller — the other hand's
+    // markers are hidden so the two don't clutter or read as both being live.
+    const activeCtl = pickSource(frame);
+    for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
     const lines = [
+      ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
       `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
       `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
@@ -1135,11 +1188,7 @@ export function setupMR(view, project, getFootprint) {
     const modeId = modes[currentMode].id;
     if (modeId === 'edge' && activeRect) {
       // EDGE mode: ray a floor point, pick the nearest edge, ring the aim point.
-      let hit = null;
-      for (const src of frame.session.inputSources) {
-        hit = rayFloorHit(src);
-        if (hit) break;
-      }
+      const hit = rayFloorHit(pickSource(frame));
       if (hit) {
         const { px, py } = worldToPlan(hit);
         hoverEdge = nearestEdge(activeRect, px, py);
@@ -1155,11 +1204,7 @@ export function setupMR(view, project, getFootprint) {
     } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
       // Tip-touch modes: a ring under whichever controller tip is tracked, so you
       // see where FLOOR/ORIGIN/ALIGN/RECAL will land (both two-step gestures incl.).
-      let tipPos = null;
-      for (const src of frame.session.inputSources) {
-        tipPos = tipPosition(src);
-        if (tipPos) break;
-      }
+      const tipPos = tipPosition(pickSource(frame));
       if (tipPos) {
         reticle.visible = true;
         reticle.position.set(tipPos.x, floorY + 0.002, tipPos.z);
@@ -1197,8 +1242,7 @@ export function setupMR(view, project, getFootprint) {
       originRingMat.color.setHex(C_ORIGIN_GIZMO);
       if (dimRefA && dimRefB) {
         // Numpad phase: raycast the panel for the key under the ray.
-        let panelHit = null;
-        for (const src of frame.session.inputSources) { panelHit = rayPanelHit(src); if (panelHit) break; }
+        const panelHit = rayPanelHit(pickSource(frame));
         if (numpad.group.visible && panelHit) {
           hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
           numpadCursor.position.copy(panelHit.point);
@@ -1207,8 +1251,7 @@ export function setupMR(view, project, getFootprint) {
       } else {
         // Reference-pick phase: ray the floor; the origin (near the gizmo) or the
         // nearest edge across all rects is the candidate.
-        let hit = null;
-        for (const src of frame.session.inputSources) { hit = rayFloorHit(src); if (hit) break; }
+        const hit = rayFloorHit(pickSource(frame));
         if (hit) {
           const { px, py } = worldToPlan(hit);
           if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
