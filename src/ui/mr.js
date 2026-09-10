@@ -397,6 +397,7 @@ export function setupMR(view, project, getFootprint) {
   // (add), matching the desktop add=blue / subtract=red convention.
   const restSubMat = new THREE.MeshBasicMaterial({ color: 0xff6b6b, side: THREE.DoubleSide, depthWrite: false });   // resting WALL (subtract) edges
   const activeSubMat = new THREE.MeshBasicMaterial({ color: 0xffb4b4, side: THREE.DoubleSide, depthWrite: false }); // active WALL (subtract) edges
+  const lockedMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false });    // WHITE: an edge whose axis is fully pinned (position+size)
   // Dimension (constraint) annotations: thin blue floor strips for the dim/extension
   // lines, red when the constraint conflicts. Value shown on a billboarded label.
   const dimMat = new THREE.MeshBasicMaterial({ color: 0x79c0ff, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
@@ -413,16 +414,17 @@ export function setupMR(view, project, getFootprint) {
   // Two-triangle strip geometry for the 4 edges of each rectangle, in planGroup-
   // local coords (plan (x,y) -> (x,0,-y)). Drawn UNMERGED so every zone's own
   // edges stay visible for editing, even where zones overlap.
-  function rectStripGeo(rects, t = EDGE_HALF) {
+  function rectStripGeo(rects, t = EDGE_HALF, wantEdge = null) {
     const arr = [];
     const tri = (c) => arr.push(c[0], 0, -c[1]);
     for (const r of rects) {
       const b = r.bounds;
       const edges = [
-        [b.x0, b.y0, b.x1, b.y0], [b.x1, b.y0, b.x1, b.y1], // bottom, right
-        [b.x1, b.y1, b.x0, b.y1], [b.x0, b.y1, b.x0, b.y0], // top, left
+        ['bottom', b.x0, b.y0, b.x1, b.y0], ['right', b.x1, b.y0, b.x1, b.y1],
+        ['top', b.x1, b.y1, b.x0, b.y1], ['left', b.x0, b.y1, b.x0, b.y0],
       ];
-      for (const [ax, ay, bx, by] of edges) {
+      for (const [name, ax, ay, bx, by] of edges) {
+        if (wantEdge && !wantEdge(r, name)) continue;
         const c = stripCorners(ax, ay, bx, by, t);
         tri(c[0]); tri(c[1]); tri(c[2]);
         tri(c[0]); tri(c[2]); tri(c[3]);
@@ -532,6 +534,37 @@ export function setupMR(view, project, getFootprint) {
     for (const s of dimSprites) planGroup.add(s);
   }
 
+  // Edges whose axis is FULLY pinned — both edges on that axis connect to the plan
+  // ORIGIN through the constraint graph (so position is tied to the datum AND the
+  // size between them is fixed). Returned as a Set of `${rectId}:${edge}`; these
+  // render white. Computed per axis via union-find over edge-coordinate nodes.
+  function lockedEdges() {
+    const parent = new Map();
+    const find = (k) => {
+      if (!parent.has(k)) parent.set(k, k);
+      let root = k;
+      while (parent.get(root) !== root) root = parent.get(root);
+      while (parent.get(k) !== root) { const nx = parent.get(k); parent.set(k, root); k = nx; }
+      return root;
+    };
+    const union = (a, b) => { parent.set(find(a), find(b)); };
+    const axisOf = (edge) => (edge === 'left' || edge === 'right' ? 'x' : 'y');
+    for (const c of project.constraints) {
+      if (c.type !== 'distance') continue;
+      const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
+      const ax = axisOf(aOrigin ? c.b.edge : c.a.edge); // axis from the non-origin endpoint
+      union(aOrigin ? `O:${ax}` : `${c.a.rect}:${c.a.edge}`,
+            bOrigin ? `O:${ax}` : `${c.b.rect}:${c.b.edge}`);
+    }
+    const white = new Set();
+    const pinned = (rid, e, ax) => parent.has(`${rid}:${e}`) && find(`${rid}:${e}`) === find(`O:${ax}`);
+    for (const r of project.rectangles) {
+      if (pinned(r.id, 'left', 'x') && pinned(r.id, 'right', 'x')) { white.add(`${r.id}:left`); white.add(`${r.id}:right`); }
+      if (pinned(r.id, 'bottom', 'y') && pinned(r.id, 'top', 'y')) { white.add(`${r.id}:bottom`); white.add(`${r.id}:top`); }
+    }
+    return white;
+  }
+
   function buildPlan() {
     // Clear any previous geometry. Dispose sprite textures/materials too (dim
     // labels create a CanvasTexture each rebuild) so they don't leak.
@@ -546,18 +579,24 @@ export function setupMR(view, project, getFootprint) {
     // Per-rectangle edge strips. Non-active zones sit lower; the active zone is
     // brighter and on top. ROOM (add) zones are purple, WALL (subtract) zones red —
     // so you can tell roomspace from wall at a glance.
-    const pushStrips = (rects, mat, y) => {
-      const geo = rectStripGeo(rects);
+    const pushStrips = (rects, mat, y, wantEdge) => {
+      const geo = rectStripGeo(rects, EDGE_HALF, wantEdge);
       if (!geo) return;
       const o = new THREE.Mesh(geo, mat);
       o.position.y = y; // lift above the fill
       planGroup.add(o);
     };
+    // Fully-pinned (position+size) edges render WHITE; the rest keep their op color.
+    const locked = lockedEdges();
+    const isLocked = (r, e) => locked.has(`${r.id}:${e}`);
+    const notLocked = (r, e) => !isLocked(r, e);
     const others = project.rectangles.filter((r) => r !== activeRect);
-    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004);
-    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004);
+    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004, notLocked);
+    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004, notLocked);
+    pushStrips(others, lockedMat, 0.005, isLocked); // white locked edges, just above resting
     if (activeRect) {
-      pushStrips([activeRect], activeRect.op === 'subtract' ? activeSubMat : activeMat, 0.006);
+      pushStrips([activeRect], activeRect.op === 'subtract' ? activeSubMat : activeMat, 0.006, notLocked);
+      pushStrips([activeRect], lockedMat, 0.007, isLocked); // white locked edges of the active zone
     }
     buildDimensions(); // constraint dimension lines + value labels
     return planGroup.children.length > 0;
@@ -569,9 +608,9 @@ export function setupMR(view, project, getFootprint) {
   let placed = false;
   const saved = {};
   const planPos = new THREE.Vector3(); // last placed reference point (world)
-  let planYaw = 0;                     // plan rotation about vertical, set by ALIGN step
+  let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
   let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
-  let awaitingAlign = false;           // REGISTER two-step: origin done, awaiting the align touch
+  let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
   let awaitingRecalDir = false;        // RECAL two-step: corner locked, awaiting the edge-direction touch
   let recalCorner = null;              // {cx, cy} plan corner being re-referenced by RECAL
   const recalWc = new THREE.Vector3(); // world position of the touched real corner (RECAL step 1)
@@ -596,6 +635,7 @@ export function setupMR(view, project, getFootprint) {
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
   let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
+  let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
   let hoverKey = null;      // numpad key under the ray this frame
   let prevHoverKey = null;  // last drawn hover (redraw only on change)
 
@@ -656,22 +696,6 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // Nearest edge across ALL rects to a plan point — {rectId, edge} or null. Only
-  // considers an edge when the point is within (a margin of) that edge's span, so
-  // SIZE picks the edge you're actually next to, not a far parallel line.
-  function nearestEdgeAny(px, py) {
-    let best = null, bestD = Infinity;
-    const M = 0.2;
-    for (const r of project.rectangles) {
-      const b = r.bounds;
-      const cands = [];
-      if (py >= b.y0 - M && py <= b.y1 + M) cands.push(['left', Math.abs(px - b.x0)], ['right', Math.abs(px - b.x1)]);
-      if (px >= b.x0 - M && px <= b.x1 + M) cands.push(['bottom', Math.abs(py - b.y0)], ['top', Math.abs(py - b.y1)]);
-      for (const [edge, d] of cands) if (d < bestD) { bestD = d; best = { rectId: r.id, edge }; }
-    }
-    return best;
-  }
-
   // Perpendicular distance from a plan point to an axis-aligned edge SEGMENT (not
   // its infinite line): clamps to the segment ends so a point off the end of an
   // edge isn't counted as "on" it.
@@ -684,10 +708,9 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // The edge the beam is actually pointing AT: the edge SEGMENT closest to the
-  // aimed floor point (px,py), across ALL zones, within EDGE_PICK_M. Unlike
-  // nearestEdgeAny (perpendicular distance to a possibly-far parallel line), this
-  // uses true segment distance + a cap, so open floor picks nothing and the edge
-  // under your reticle wins. Returns {rectId, edge} | null.
+  // aimed floor point (px,py), across ALL zones, within EDGE_PICK_M. Uses true
+  // segment distance + a cap, so open floor picks nothing and the edge under your
+  // reticle wins. Shared by EDGE and SIZE ref-picking. Returns {rectId, edge} | null.
   // Cap = the reticle's outer radius, so an edge is pickable ONLY when it actually
   // falls inside the ring you're aiming — not merely "somewhere near."
   const EDGE_PICK_M = RETICLE_OUTER; // m; edge must lie within the reticle ring to pick
@@ -839,6 +862,7 @@ export function setupMR(view, project, getFootprint) {
     editingId = null;
     sizeBuffer = '';
     bufferPristine = false;
+    dimConflict = false;
   }
 
   function dimTitle() {
@@ -847,16 +871,32 @@ export function setupMR(view, project, getFootprint) {
     return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  (edit)' : '');
   }
 
-  const redrawNumpad = () => numpad.draw(dimTitle(), sizeBuffer, hoverKey);
+  const redrawNumpad = () => numpad.draw(dimTitle() + (dimConflict ? '  !CONFLICT' : ''), sizeBuffer, hoverKey);
+
+  const conflictCount = () => project.constraints.reduce((n, k) => n + (k.conflict ? 1 : 0), 0);
 
   function commitEntry() {
     if (!dimRefA || !dimRefB) return;
     const val = parseFloat(sizeBuffer);
-    if (!Number.isFinite(val) || val <= 0) return; // keep the pair; wait for valid input
+    // 0 m is valid: an edge<->origin lock puts the edge on the origin axis, and an
+    // edge<->edge 0 makes two zones adjacent (shared wall). Only reject negatives/NaN.
+    if (!Number.isFinite(val) || val < 0) return; // wait for valid input
     const meters = toMeters(val); // interpret in the current display unit
-    let c = editingId ? project.constraints.find((k) => k.id === editingId) : findConstraintForRefs(dimRefA, dimRefB);
-    if (!c) c = makeConstraintForRefs(dimRefA, dimRefB);
+    const existing = editingId ? project.constraints.find((k) => k.id === editingId) : findConstraintForRefs(dimRefA, dimRefB);
+    const prevValue = existing ? existing.value : null;
+    const c = existing ?? makeConstraintForRefs(dimRefA, dimRefB);
+    const before = conflictCount();
     project.setConstraintMagnitude(c.id, meters); // preserves side (sign); re-solves + notifies
+    if (conflictCount() > before) {
+      // This size can't hold alongside the existing constraints. Refuse it: undo so
+      // the model stays consistent, and keep the pair on-screen for a retry.
+      if (existing) project.setConstraintMagnitude(c.id, Math.abs(prevValue)); // restore old value
+      else project.removeConstraint(c.id);                                     // drop the just-made one
+      dimConflict = true;
+      redrawNumpad();
+      rlog('dim refused (conflict)', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
+      return;
+    }
     rlog('dim set', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
     resetDim();
     buildPlan();       // solver changed geometry; refresh the MR view
@@ -866,6 +906,7 @@ export function setupMR(view, project, getFootprint) {
 
   function pressKey(k) {
     if (k === 'enter') { commitEntry(); return; }
+    dimConflict = false; // any edit clears the refusal warning
     if (bufferPristine && k !== 'back') sizeBuffer = ''; // typing over a prefilled edit value
     bufferPristine = false;
     if (k === 'back') sizeBuffer = sizeBuffer.slice(0, -1);
@@ -1078,6 +1119,20 @@ export function setupMR(view, project, getFootprint) {
     rlog('edit swap', { id: selectedRect.id, op: selectedRect.op });
   }
 
+  // SIZE mode: reverse the picked dimension's direction (like desktop swapConstraint) —
+  // flips which edge anchors (a holds, b moves) and the A->B order. Bound to B/Y while
+  // in SIZE with both refs chosen. No-op for an origin lock (the origin datum can't move).
+  function swapDim() {
+    if (!dimRefA || !dimRefB) return;
+    if (dimRefA.kind === 'origin' || dimRefB.kind === 'origin') { rlog('dim swap n/a (origin)'); return; }
+    [dimRefA, dimRefB] = [dimRefB, dimRefA]; // reverse the pair for the next commit
+    const c = editingId ? project.constraints.find((k) => k.id === editingId)
+                        : findConstraintForRefs(dimRefA, dimRefB);
+    if (c) { project.swapConstraint(c.id); buildPlan(); applyPlanMatrix(); } // flip live + re-solve
+    redrawNumpad(); // title now reads B <-> A
+    rlog('dim swap', { a: refLabel(dimRefA), b: refLabel(dimRefB) });
+  }
+
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
   // visible. FLOOR + REGISTER set up the frame; ROOM/WALL drop zones and EDGE snaps
@@ -1097,27 +1152,34 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      // REGISTER: a two-step place+orient (like EDGE). 1st touch sets the origin;
-      // 2nd touch (a point along a real wall from the origin) sets the yaw so the
-      // plan's +X points down that wall. The tip label/color flips ORIGIN->ALIGN
-      // between the steps so the current step is always visible.
+      // REGISTER: a 3-point gesture that DERIVES the origin corner, so the corner
+      // itself never has to be reachable (it's often blocked by furniture/walls).
+      // Touch two points P1,P2 along one real wall (this sets +X down that wall),
+      // then a third point P3 on the perpendicular wall. The origin is the corner
+      // where the two walls meet = P3 projected onto the P1->P2 wall line. The tip
+      // label steps WALL 1 -> WALL 2 -> PERP so the current step is always visible.
       id: 'register', label: 'ORIGIN', color: C_ORIGIN,
       onTouch: (pos) => {
-        if (!awaitingAlign) {
-          placeAt(pos.x, floorY, pos.z); // step 1: origin (gizmo appears)
-          awaitingAlign = true;
-          applyModeVisual('ALIGN', C_ALIGN); // cue step 2
-          rlog('register origin', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
-          return;
+        registerPts.push({ x: pos.x, z: pos.z });
+        const n = registerPts.length;
+        if (n === 1) { applyModeVisual('WALL 2', C_ALIGN); rlog('register p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return; }
+        if (n === 2) {
+          const [p1, p2] = registerPts;
+          if (Math.hypot(p2.x - p1.x, p2.z - p1.z) < 0.05) { registerPts.pop(); return; } // too close to define the wall
+          applyModeVisual('PERP', C_ALIGN); rlog('register p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return;
         }
-        const dx = pos.x - planPos.x;
-        const dz = pos.z - planPos.z;
-        if (Math.hypot(dx, dz) < 0.05) return; // too close to define a direction
-        planYaw = Math.atan2(-dz, dx); // step 2: orient +X toward the wall touch
-        applyPlanMatrix();
-        awaitingAlign = false;
-        applyModeVisual('ORIGIN', C_ORIGIN); // ready to re-register next time
-        rlog('register align', { yaw: +planYaw.toFixed(3) });
+        // 3rd touch: derive the corner (projection of P3 onto the P1->P2 wall line) + yaw.
+        const [p1, p2, p3] = registerPts;
+        registerPts = [];
+        const dx = p2.x - p1.x, dz = p2.z - p1.z;
+        const len = Math.hypot(dx, dz);
+        const ux = dx / len, uz = dz / len;                         // unit wall direction
+        const proj = (p3.x - p1.x) * ux + (p3.z - p1.z) * uz;       // P3 -> nearest point on the wall line
+        const cx = p1.x + proj * ux, cz = p1.z + proj * uz;         // the (possibly unreachable) corner
+        planYaw = Math.atan2(-dz, dx);                              // orient +X along the P1->P2 wall
+        placeAt(cx, floorY, cz);                                    // origin at the derived corner; applies yaw + re-anchors
+        applyModeVisual('ORIGIN', C_ORIGIN);                        // ready to re-register next time
+        rlog('register corner', { cx: +cx.toFixed(3), cz: +cz.toFixed(3), yaw: +planYaw.toFixed(3) });
       },
     },
     {
@@ -1222,7 +1284,7 @@ export function setupMR(view, project, getFootprint) {
 
   function setMode(i) {
     currentMode = (i + modes.length) % modes.length;
-    awaitingAlign = false; // leaving/entering a mode resets the REGISTER two-step
+    registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     awaitingRecalDir = false; // ... and the RECAL two-step
     recalCorner = null;
     selectedRect = null; // clear the EDIT selection when changing modes
@@ -1433,10 +1495,11 @@ export function setupMR(view, project, getFootprint) {
       }
       return;
     }
-    if (mode.id === 'register' && awaitingAlign) { // cancel the pending align step
-      awaitingAlign = false;
-      applyModeVisual('ORIGIN', C_ORIGIN);
-      rlog('register align cancelled');
+    if (mode.id === 'register' && registerPts.length) { // undo the last REGISTER point
+      registerPts.pop();
+      const n = registerPts.length;
+      applyModeVisual(n === 0 ? 'ORIGIN' : n === 1 ? 'WALL 2' : 'PERP', n === 0 ? C_ORIGIN : C_ALIGN);
+      rlog('register undo', { remaining: n });
       return;
     }
     if (mode.id === 'recal' && awaitingRecalDir) { // cancel the pending direction step
@@ -1451,7 +1514,7 @@ export function setupMR(view, project, getFootprint) {
     anchor = null; // forget the old anchor; a fresh one is made on next place
     planGroup.visible = false;
     originGizmo.visible = false;
-    awaitingAlign = false;
+    registerPts = [];
     applyModeVisual(mode.label, mode.color);
   }
 
@@ -1513,10 +1576,12 @@ export function setupMR(view, project, getFootprint) {
       exitHoldStart = 0;
       exitProgress = 0;
     }
-    // Upper face button (B/Y) normally cycles to the next mode, but in EDIT it
-    // swaps the selected zone room<->wall (thumbstick-x still cycles modes there).
+    // Upper face button (B/Y) normally cycles to the next mode, but it's overridden
+    // in EDIT (swap the selected zone room<->wall) and in SIZE with a pair chosen
+    // (reverse the dimension's direction). Thumbstick-x still cycles modes there.
     if (next && !btn.next) {
       if (modes[currentMode].id === 'edit') swapSelected();
+      else if (modes[currentMode].id === 'size' && dimRefA && dimRefB) swapDim();
       else setMode(currentMode + 1);
     }
     if (prev && !btn.prev) setMode(currentMode - 1);
@@ -1568,7 +1633,7 @@ export function setupMR(view, project, getFootprint) {
     const lines = [
       `build:  ${BUILD_ID}`,
       ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
-      `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
+      `mode:   ${modes[currentMode].label}${modes[currentMode].id === 'register' && registerPts.length ? ' >P' + (registerPts.length + 1) : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
       `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
       `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
@@ -1576,6 +1641,8 @@ export function setupMR(view, project, getFootprint) {
       ...(modes[currentMode].id === 'edit' ? [selectedRect
         ? `edit:   SEL ${selectedRect.op === 'subtract' ? 'WALL' : 'ROOM'} #${selectedRect.id}  B=swap grip=del`
         : `edit:   trig=pick${hoverStack.length ? ' (' + hoverStack.length + ')' : ''}`] : []),
+      ...(modes[currentMode].id === 'size' && dimRefA && dimRefB && dimRefA.kind !== 'origin' && dimRefB.kind !== 'origin'
+        ? [`size:   ${refLabel(dimRefA)}->${refLabel(dimRefB)}  B=swap dir`] : []),
       `floorY:   ${f2(floorY)}`,
       `plan.y:   ${f2(planPos.y)}`,
       `cam.y:    ${f2(camWorldY())}`,
@@ -1660,12 +1727,13 @@ export function setupMR(view, project, getFootprint) {
         }
       } else {
         // Reference-pick phase: ray the floor; the origin (near the gizmo) or the
-        // nearest edge across all rects is the candidate.
+        // edge under the reticle is the candidate. Same rule as EDGE mode: edgeAtPoint
+        // caps at the reticle radius, so an edge is pickable only when it falls in the ring.
         const hit = rayFloorHit(pickSource(frame));
         if (hit) {
           const { px, py } = worldToPlan(hit);
           if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
-          else { const e = nearestEdgeAny(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+          else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
           reticle.visible = true;
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         }
