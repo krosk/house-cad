@@ -52,6 +52,30 @@ export function setupMR(view, project, getFootprint) {
   button.classList.add('mr-btn');
   (document.getElementById('ar-group') || document.body).appendChild(button);
 
+  // Packaged Quest APK (immersive app mode) launches with ?ar=1 and shows only a
+  // splash until the page starts an immersive session — so auto-enter AR on load.
+  // Launching the app icon provides the user-activation WebXR needs. The desktop
+  // web app has no ?ar, so it keeps the manual START AR button. console.* is
+  // mirrored to `adb logcat` (chromium) for on-device debugging of the APK.
+  if (new URLSearchParams(location.search).has('ar')) {
+    const autoStartAR = async () => {
+      try {
+        if (!navigator.xr || !(await navigator.xr.isSessionSupported('immersive-ar'))) {
+          console.warn('[auto-AR] immersive-ar not supported'); rlog('auto-AR: unsupported');
+          return;
+        }
+        console.info('[auto-AR] requesting session…'); rlog('auto-AR: requesting');
+        const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        await renderer.xr.setSession(session);
+        console.info('[auto-AR] session started'); rlog('auto-AR: started');
+      } catch (e) {
+        console.error('[auto-AR] failed:', e?.name, e?.message || e);
+        rlog('auto-AR failed', { name: e?.name, msg: String(e?.message || e) });
+      }
+    };
+    autoStartAR();
+  }
+
   // A small floating text label (canvas texture) that rides a controller tip and
   // always shows the current mode — so a shared touch gesture can't be misfired.
   function makeLabel() {
