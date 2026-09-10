@@ -1,194 +1,185 @@
 # House CAD — session handoff
 
 **Read this first, then `CLAUDE.md`.** This is the "how do I resume" doc. Deep Phase-5 rationale
-and every XR gotcha live in Claude memory `phase5-xr-intent.md`, which auto-loads each session —
-don't duplicate it here.
+and every XR gotcha live in Claude memory `phase5-xr-intent.md` + `multi-floor-design.md`, which
+auto-load each session — don't duplicate them here.
 
-**Date:** 2026-09-10 (session 6)
-**Status:** **Multi-floor / storeys committed (`a38f31a`, local — NOT pushed), build-clean, but
-UNVERIFIED** — desktop not yet eyeballed in a browser, MR not tried on the Quest. `main` is 2 commits
-ahead of `origin/main` (`a38f31a` feature + `a1a8ef2` session-5 docs); nothing pushed this session.
+**Date:** 2026-09-10 (session 7)
+**Status:** **Quest APK path is WORKING** — the app installs as an immersive, offline, sideloaded
+Quest 3 APK and **launches into AR (proven on device).** Everything is **committed and pushed**
+(`main` = `origin/main`, tree clean). **Still owed: on-device FUNCTIONAL QA** — entering AR is
+proven, but the survey flow and multi-floor have NOT been exercised on the Quest.
 
 ## Where things stand in one paragraph
 
 The desktop parametric 2.5D CAD tool (vanilla JS + Vite + Three.js) is deployed at
-**https://krosk.github.io/house-cad/**. This session added **multi-floor storeys**: `Project` now
-holds an ordered `floors[]`, each an independent plan (rectangles + constraints + its own height),
-sharing the same plan origin (the surveyed corner) so storeys stack by construction. A **facade**
-(`project.rectangles/constraints/height` → the active floor) kept every existing consumer working
-unchanged. Desktop gains a **floor switcher + ghost underlay + stacked 3D**; MR gains a **thumbstick-↕
-floor switch** with the overlay lifted to each floor's elevation. **The current goal is still Phase 5
-— an on-site MR survey tool** (read `phase5-xr-intent.md` before planning), now multi-storey.
-**Nothing multi-floor has been run yet** (only `npm run build` passed), AND the pre-existing on-device
-QA debt (S1/RECAL/S2 never tried on Quest) is still open — so the immediate need is **verification**,
-not more features. XR cannot be verified headlessly.
+**https://krosk.github.io/house-cad/** and is now also an **installable PWA** packaged into a
+**sideloaded Quest 3 APK** (`com.krosk.housecad`, Bubblewrap/TWA, immersive mode). Tapping the app
+icon launches straight into passthrough AR — the survey overlay. **The current goal is still Phase 5:
+an on-site MR survey tool** (read `phase5-xr-intent.md` before planning), now multi-storey and
+installable. **What's proven:** the APK installs, verifies its origin, and enters AR; the PWA serves
+correctly; multi-floor + the session-7 AR features build clean and are deployed. **What's NOT proven:**
+the actual survey workflow on device (REGISTER→DROP→EDGE→SIZE→RECAL), multi-floor behaviour (desktop
+eyeball + MR), and the session-7 AR features (single-controller, in-world exit, dimensions overlay)
+have not been functionally QA'd on the Quest — only that AR launches. So the immediate need is
+**on-device functional verification**, not more features.
 
-## What changed in session 6
-
-> Next agent: when you add your section here, fold anything still a live constraint into "Standing
+## What changed in session 7
+> Next agent: when you add your section, fold anything still a live constraint into "Standing
 > decisions" or "Findings" and delete the rest.
 
-1. **Multi-floor data model** (`model.js`, `constraints.js`). New `Floor {id,name,rectangles,
-   constraints,height,elevation}`; `Project` holds `floors[]` + `activeFloorId` + `groundFloorId`.
-   Facade getters/setters make `project.rectangles/constraints/height` point at the **active** floor,
-   so sketch2d/mr/serialize/solver needed no rewrite. `_emit()` recomputes elevations (stack heights
-   off the ground datum: ground=0, up accumulates, basement negative), then solves **each** floor.
-   `solve()` now takes a floor (any `{rectangles,constraints}`). New floor API: `addFloor/removeFloor/
-   setActiveFloor/setGroundFloor/renameFloor`.
-2. **Persistence v2 + migration** (`serialize.js`). Writes `floors[]` (+ active/ground ids); loads
-   both v2 and **legacy v1** (top-level `rectangles` → one "Ground" floor). Old localStorage autosaves
-   migrate transparently. Export merges the whole stack.
-3. **Desktop UI** (`index.html`, `style.css`, `main.js`, `sketch2d.js`, `view3d.js`). Floor switcher
-   `#floor-ctl` (top-left): highest storey first, click to switch, **＋▲/＋▼** add above/below, **⌂**
-   set ground datum, **✕** remove, dbl-click name to rename. **Ghost underlay**: the adjacent floor
-   (below, else above) drawn as faint dashed outlines (labeled `underlay: <name>`). **3D stacking**:
-   `view3d` swapped its single `mesh` for a `house` **Group** of one mesh per floor at `position.y =
-   elevation`; `setGeometry` now takes `[{geometry, elevation}]`.
-4. **MR per-floor** (`mr.js`). Overlay lifts by the active floor's elevation (`overlayY() = planPos.y
-   + activeElevation()`, a pure Y-lift so worldToPlan is unaffected). **Thumbstick ↕** switches floor
-   (up=above, down=below), **↔** still cycles modes, dominant-axis guard prevents diagonal cross-talk.
-   EDGE/SIZE ray hits use `overlayY()` so you edit at the floor you stand on. `FLOOR` re-leveling is
-   guarded to the ground floor (an upper-floor touch would double-count its elevation). `surveyed`/
-   `activeRect` re-scoped to the active floor on switch (`refreshFloorEditState`). HUD shows `floor:`.
+1. **MR input → single active controller + in-world exit** (`mr.js`, commit `fc11499`). All input
+   (mode cycle, floor switch, rays, tips) now reads only the controller that last showed activity
+   (`activeSource`/`pickSource`); the idle controller's tip/label/HUD are hidden. **Hold the
+   thumbstick (buttons[3]) ~1.2 s to exit AR** (DOM "EXIT AR" isn't visible in-headset).
+2. **Constraint dimensions drawn in AR + controller readout** (`mr.js`, `9b68199`). Each active-floor
+   distance constraint renders as a dim line + billboarded value label (origin-refs skipped, matching
+   desktop). Pointing the active controller at a dimension echoes its value big on a controller pill
+   (angular pick, ~5° cone).
+3. **Installable offline PWA** (`vite.config.js`, `public/`, `8f3cf3d`). `vite-plugin-pwa`
+   (build-only) emits manifest + service worker, precaches the build. Icons generated from
+   `public/icon.svg`. **Confirmed: Quest Browser does NOT do in-browser install** (`beforeinstallprompt`
+   never fires) — so a real app requires packaging (below). The in-browser Install button was added
+   for diagnosis then removed (`18bf322`).
+4. **Quest APK via Bubblewrap — WORKING** (`ec8d5cf`, `b656ee8`; runbook `packaging/quest-apk.md`).
+   Packaged **immersive** mode; APK start URL is `/house-cad/?ar=1`; the web app auto-enters AR on
+   `?ar=1` by calling `requestSession('immersive-ar')` **directly** (NOT gated on `isSessionSupported`,
+   which is false/unreliable in the immersive shell and would hang on the splash). Sideloaded via adb;
+   launches into AR on device.
 
 ## Standing decisions
 
-- **This machine is Linux (Steam Deck), Node v20.20.2 on PATH** — `npm install/dev/build` run
-  directly. The fnm/Node-22 block in `CLAUDE.md` Commands is Windows-only (a prior machine); ignore.
-- **Git: commit and push directly on `main`, no feature branches** (`CLAUDE.md` → Git workflow).
-  **`main` auto-deploys to Pages on push**, so every push publishes — only push when asked.
+- **This machine is a Steam Deck (SteamOS), Node v20 via nvm.** No system `java`/`adb` — Bubblewrap
+  brought its own under `~/.bubblewrap/` (adb: `~/.bubblewrap/android_sdk/platform-tools/adb`,
+  keytool: `~/.bubblewrap/jdk/jdk-17.0.11+9/bin/keytool`). The fnm/Node-22 block in `CLAUDE.md`
+  Commands is Windows-only (a prior machine); ignore.
+- **Git: commit and push directly on `main`, no feature branches.** `main` auto-deploys to Pages on
+  push, so **every push publishes** — only push when asked. (`packaging/` docs aren't in the built
+  site, so doc pushes don't change the live app.)
 - **`npm run build` is the only automated check** — no tests/linter/types. Clean build = imports/
   syntax sound; it does NOT catch runtime/visual/XR bugs.
-- **Keep the dev server running; report the `https://` Network URL** — the user QAs on the Quest over
-  LAN; WebXR needs https (self-signed; accept once). This session: `https://192.168.1.154:5174/`
-  (`npm run dev -- --host --port 5174 --strictPort`). (memory: `serve-and-share-network-url`.)
-- **Phase 5 = on-site MR survey tool.** Physical **tape = source of truth**; Quest tracking/anchors =
-  spatial scaffold only. Keep the **axis-aligned rectangle** model. Full rationale + XR gotchas:
-  `phase5-xr-intent.md`.
-- **Multi-floor design (session 6, settled with the owner):** floors are **independent plans** (not
-  copy-from-below, not one shared footprint); **per-floor height**; all floors share the **same plan
-  origin corner** (differ only in elevation). **MR = register once on the ground**, each floor carries
-  its **own elevation** (derived from stacked heights), **RECAL** fixes drift. **NO per-room anchors,
-  NO Quest room scan / plane detection** (owner ruled out — `phase5-xr-intent.md`). API facts (don't
-  re-research): WebXR `unbounded` reference space is **unsupported on Quest** (so `local-floor` + RECAL
-  is the only whole-house path); persistent anchors cap at **8/site** (moot given no anchoring plan).
-- **Survey modes (6, stable `id`s):** FLOOR → REGISTER (2-step origin+yaw) → DROP → EDGE (2-step
-  lock+snap) → RECAL (corner+edge re-zero) → SIZE (two-ref numpad). Modes are DATA in `modes`;
-  grip/frame-loop key off `id`. Grip = context undo. Thumbstick ↔ cycles modes, ↕ changes floor.
-- **Exact size = dimension constraints only** (desktop AND SIZE). No on-canvas W/H, no inline size
-  editor, no W/H field. SIZE writes hard constraints overriding EDGE's rough pushed size.
-- **Geometry in meters**; `units.js` converts only display/input. Distance constraints ordered+signed
-  (`value = coord(b)−coord(a)`); `swapConstraint()` reverses; `setConstraintMagnitude()` keeps sign.
-- **Coordinate mapping:** plan `(x,y)` → planGroup-local `(x,0,−y)`; planGroup applies `planYaw` about
-  UP + `planPos`. `worldToPlan`/`planToWorld` invert/apply via Three's `worldToLocal`/`localToWorld`.
-  Extrusion base sits at world y=0, so a floor mesh/overlay at elevation `e` is just `position.y = e`.
-- **Desktop layout:** toolbar is `<footer id="toolbar">` (export menu opens upward); 3D pane removed
-  (2D fills window) but the Three renderer is kept, parked off-screen at 640×480 because AR presents
-  through it. START AR in `#ar-group`. `setupMR(view, project, getFootprint)`.
-- **Prior features still live:** mesh export STL/OBJ/GLB, touch + on-screen zoom, draggable dimension
-  placement, save/load JSON + localStorage autosave.
-- **Commit identity `Alexis He <ahe.krosk@gmail.com>`**; repo public. Commits carry `Co-Authored-By:
-  Claude` / `Claude-Session` trailers. `origin/phase5-mr-overlay` still exists on the remote — defunct,
-  safe to delete.
+- **Quest distribution = SIDELOAD APK, immersive mode** (owner ruled out the Meta Horizon Store).
+  Full reproducible runbook: **`packaging/quest-apk.md`** (read it before touching packaging). Key
+  invariants: package `com.krosk.housecad`, immersive `horizonOSAppMode`, start URL `/house-cad/?ar=1`,
+  same signing key forever. Signing passwords kept in `~/.bw_pw` (chmod 600) for non-interactive
+  rebuilds (`set -a; . ~/.bw_pw; set +a; bubblewrap build`).
+- **Digital Asset Links MUST be at the origin root** `https://krosk.github.io/.well-known/assetlinks.json`
+  (an immersive PWA won't launch unverified). Served by a **separate user-site repo `krosk.github.io`**
+  (local clone `~/krosk.github.io`, remote `git@github.com:krosk/krosk.github.io.git`) with a
+  `.nojekyll` file (Jekyll otherwise strips the dot-folder). Contains the signing SHA-256
+  `F7:99:55:CB:…:5A`.
+- **The APK is a thin shell that loads the LIVE site.** So a web change needs only a Pages deploy +
+  `adb shell pm clear com.krosk.housecad` (refresh the SW cache); rebuild the APK only when
+  `twa-manifest.json` changes (mode/startUrl/icons/version).
+- **Phase 5 = on-site MR survey tool.** Physical tape = source of truth; Quest tracking/anchors =
+  scaffold only. Keep the axis-aligned rectangle model. Rationale + XR gotchas: `phase5-xr-intent.md`.
+- **Multi-floor (settled session 6):** floors are **independent plans** (not copy-from-below); per-floor
+  height; all floors share the **same plan origin corner** (differ only in elevation). MR = register
+  once on the ground; each floor carries its own elevation (from stacked heights); RECAL fixes drift.
+  **NO per-room anchors, NO Quest room scan / plane detection** (so USE_SCENE permission declined in
+  the APK). `Project.floors[]` + `activeFloorId`/`groundFloorId`; a facade makes
+  `project.rectangles/constraints/height` point at the active floor so most consumers were untouched.
+- **Survey modes (6, stable `id`s):** FLOOR → REGISTER → DROP → EDGE → RECAL → SIZE. Modes are DATA in
+  `modes`. Thumbstick ↔ cycles modes, ↕ changes floor, grip = context undo, thumbstick-hold = exit AR.
+- **Exact size = dimension constraints only** (desktop AND in-headset SIZE). No on-canvas W/H, no inline
+  size editor. **Geometry in meters**; `units.js` converts only display/input. Distance constraints
+  ordered+signed (`value = coord(b)−coord(a)`).
+- **Coordinate mapping:** plan `(x,y)` → planGroup-local `(x,0,−y)`; planGroup applies `planYaw` +
+  `planPos`. Overlay lift per floor is a pure Y translation (`overlayY()`), so plan coords stay correct
+  on every storey.
 
 ## Findings / traps worth knowing
 
-- **The facade is why multi-floor was cheap.** `project.rectangles/constraints/height` are getters
-  onto the active floor — DON'T reintroduce raw fields. Editing always targets the active floor; the
-  solver runs per floor in `_emit()`.
-- **MR overlay-lift is a pure Y translation.** `worldToPlan` reads only x/z, so plan coords stay
-  correct on every storey; `planToWorld` returns points at the overlay plane. Ray planes/reticles for
-  EDGE/SIZE use `overlayY()`; tip-mode reticles (FLOOR/REGISTER/RECAL) still use bare `floorY` (ground
-  registration flow). **Upper-floor overlay height is only as right as the desktop-entered storey
-  heights** — there is NO in-MR floor-height capture yet.
-- **Floors are created on desktop only.** MR's thumbstick-↕ switches among EXISTING floors; it can't
-  add one. Set up storeys + heights on desktop before an MR multi-floor test.
-- **XR reference-space mismatch (cost hours).** In `sessionstart`: `localSpace = await
-  requestReferenceSpace('local-floor')` then **`renderer.xr.setReferenceSpace(localSpace)`**. Any pose
-  math must use the same space Three renders with. `setReferenceSpaceType()` alone did NOT take.
-- **Drift correction is limited.** Single origin anchor, POSITION only → corrects translation, not
-  rotation; error grows with distance. **RECAL** is the manual fix (exact at the recal corner). No
-  per-room anchors (deliberately — see Standing decisions).
-- **Desktop does NOT render origin-referenced dimensions.** `sketch2d._edgeLineWorld` returns null for
-  `__origin__` and `_drawDimensions` skips it — edge↔origin constraints solve/lock but draw no line.
-- **`View3D.setGeometry` rebuilds meshes every model change** — a one-time `visible=false` is lost.
-  Use the `hideMesh` flag (MR sets it). MR references `view.house` (the floor group), not `view.mesh`.
-- **`LineBasicMaterial` is always 1px in WebGL** — edges/highlights are flat floor strips (quads,
-  `EDGE_HALF=0.02`). Two highlight meshes so SIZE shows both refs.
-- **`matrixAutoUpdate=false` + setting `.matrix` does NOT update `matrixWorld`** — drive
-  `position`/`quaternion` (default autoupdate), which the code does.
-- **`getCamera().position` stays local (≈0)** in XR — read world pos from `matrixWorld.elements`
-  (`[12],[13],[14]`).
-- **Remote logging debugs on-headset.** dev-only `POST /__log` (vite middleware) → `quest-debug.log`
-  (**gitignored — do NOT stage it**); `src/ui/remoteLog.js` mirrors console. `tail -f` while testing.
-- **`GLTFExporter` fails in Node** (works in browser) — don't "fix" headlessly. Harmless MR warning:
-  `Can't change size while VR device is presenting`. depth-sensing omitted (noisy floor occlusion).
-- **WebXR AR is Quest/Android (ARCore), not iOS.** Controller input wouldn't map to a phone — focus
-  stays on Quest.
+- **The facade is why multi-floor was cheap.** `project.rectangles/constraints/height` are getters onto
+  the active floor — don't reintroduce raw fields. Solver runs per floor in `_emit()`.
+- **Quest APK, hard-won (all in `packaging/quest-apk.md`):** in-browser PWA install doesn't exist on
+  Quest; 2D-mode APK can't enter `immersive-ar`; immersive-mode shows only a splash until the page
+  starts a session; gating auto-AR on `isSessionSupported` hangs it; `assetlinks.json` must be
+  origin-root + `.nojekyll`; get the fingerprint from the SIGNED APK (`keytool -printcert -jarfile`,
+  no keystore password); a release TWA gives no web console (logcat has no `console.*`; `chrome://
+  inspect` needs the Oculus Browser's Remote Web Inspector enabled); the SW can serve a stale build in
+  the APK after redeploy → `pm clear`; one headset can show multiple adb transports → `adb -s <serial>`.
+- **XR reference-space mismatch (cost hours, still in force).** In `sessionstart`: request
+  `local-floor` AND `renderer.xr.setReferenceSpace(localSpace)`; `setReferenceSpaceType()` alone did NOT
+  take. Read world cam pos from `matrixWorld.elements` ([12],[13],[14]); `getCamera().position` stays ~0.
+- **Desktop does NOT render origin-referenced dimensions** (edge↔`__origin__`); they solve/lock but draw
+  no line. Same in the AR overlay (skipped for parity).
+- **`View3D.setGeometry` rebuilds meshes every change** — MR uses the `hideMesh` flag and references
+  `view.house` (the floor Group), not `view.mesh`. `LineBasicMaterial` is always 1px → edges/dims are
+  flat floor-strip quads.
+- **Remote logging (`rlog` → dev-only `POST /__log` → `quest-debug.log`, gitignored — never stage it)**
+  only works on the dev server, NOT on Pages/the APK. On the APK, `console.*` isn't visible either.
+- **WebXR AR is Quest/Android only** (not iOS). `GLTFExporter` fails in Node (works in browser) — don't
+  "fix" headlessly.
 
 ## Commits
 
-Substantive only (doc-only omitted; `git log` has all). `main` upstream `origin/main`;
-`main` is ahead of `origin/main` by the two commits below — **nothing pushed this session**.
+Substantive only (doc-only omitted; `git log` has all). `main` = `origin/main` — **everything pushed.**
 
-- `a38f31a` **Phase 5: multi-floor storeys** (model, 2D, 3D, serialize, MR) — session 6, unpushed.
-- `a1a8ef2` Docs refresh (session 5) — unpushed.
-- `27653b6` Phase 5 S2: in-headset SIZE mode (+ origin-distance core).
-- `4dc55c6` Phase 5: RECAL mode — drift correction by re-zeroing against a known corner.
-- `1749424` Phase 5 S1: in-headset survey — edge-push free-space zones.
-- `14a22c4` Phase 5 M0: mixed-reality floor-plan overlay on Quest 3.
+- `b656ee8` robust auto-AR (drop `isSessionSupported` gate, retry) — the fix that made AR launch.
+- `ec8d5cf` auto-enter AR on `?ar=1` (Quest immersive APK).
+- `8f3cf3d` installable offline PWA (vite-plugin-pwa + manifest + icons).
+- `9b68199` constraint dimensions in AR + controller readout.
+- `fc11499` single active controller + in-world AR exit.
+- `a38f31a` (session 6) multi-floor storeys (model, 2D, 3D, serialize, MR).
+- (Intermediate PWA-diagnostic commits `cdbccad`/`2171c63`/`cef38e2` were the in-browser-install probe,
+  since removed in `18bf322` — ignore.)
 
 ## Resuming from a clean checkout
 
 ```bash
-npm install                          # once
-npm run dev -- --host --port 5174 --strictPort   # https dev server; report the https:// Network URL
-npm run build                        # the only automated check — expect "✓ built in …"
+npm install                                            # once
+npm run dev -- --host --port 5174 --strictPort         # https dev server; report the https:// Network URL
+npm run build                                          # the only automated check — expect "✓ built in …"
 ```
 
-On the Quest (Meta/Horizon browser): open the https Network URL, accept the self-signed cert once,
-tap **START AR**. Node v20 and `node_modules` already present here. The dev server is typically left
-running between sessions (check `:5174` before starting a new one).
+Node v20 + `node_modules` present. Dev server often left running on `:5174` (check before starting).
+Quest APK: the Bubblewrap project (`~/house-cad-apk`), the assetlinks repo (`~/krosk.github.io`),
+`~/.bw_pw`, and Bubblewrap's JDK/SDK all already exist on this machine — see `packaging/quest-apk.md`
+to rebuild/reinstall (don't re-init from scratch).
 
 ## The artifacts and what each is for
 
 | Path | Role |
 |---|---|
-| `src/core/model.js` | `Floor` + `Project` (floors[], activeFloorId, groundFloorId); facade to active floor; `_recomputeElevations`; `_emit` solves each floor; floor CRUD |
-| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)`; `makeDistance`, `makeOriginDistance`/`ORIGIN_ID` |
+| `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_recomputeElevations`; `_emit` solves each floor |
+| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)`; `makeDistance`, `makeOriginDistance`/`ORIGIN_ID`; `edgeCoord` |
 | `src/io/serialize.js` | v2 floors[] + v1→one-Ground migration |
-| `src/core/extrude.js` | footprint → 3D mesh; `mergeFloorGeometries` (stack for export); flat floor fill/outline for MR |
-| `src/ui/view3d.js` | 3D viewport; `house` Group (one mesh/floor at elevation); `setGeometry([{geometry,elevation}])`; `hideMesh` |
-| `src/ui/sketch2d.js` | 2D editor; `_drawGhost` underlay of the adjacent floor |
-| `src/ui/mr.js` | MR session; modes; `overlayY()` floor-elevation lift; thumbstick-↕ `switchFloor`; `refreshFloorEditState`; numpad; anchors; HUD |
-| `src/main.js` | wiring; per-floor rebuild + stacked export; `#floor-ctl` switcher; `setupMR` |
-| `index.html` / `src/style.css` | desktop layout + `#floor-ctl` |
-| `vite.config.js` | https dev server + dev-only `/__log` endpoint |
-| `phase5-xr-intent.md` (Claude memory) | deep Phase-5 rationale + XR gotchas + multi-floor/anchor decisions; auto-loads |
+| `src/ui/mr.js` | MR session; modes; single active controller + thumbstick-hold exit; dimension overlay + readout; `overlayY()` per-floor lift; **`?ar=1` auto-enter-AR**; numpad; anchors; HUD |
+| `src/ui/sketch2d.js` / `view3d.js` | 2D editor (ghost underlay) / 3D `house` Group (one mesh per floor at elevation) |
+| `src/main.js` | wiring; `#floor-ctl` switcher; per-floor rebuild + stacked export; `setupMR` |
+| `vite.config.js` | https dev + `/__log`; **vite-plugin-pwa (build-only)** |
+| `public/` | PWA icons + `icon.svg` |
+| `packaging/quest-apk.md` | **Complete reproduce-from-scratch Quest APK runbook** (read before packaging work) |
+| `packaging/assetlinks.template.json` | Digital Asset Links template (fingerprint filled from the signed APK) |
+| `~/house-cad-apk/` (not in repo) | Bubblewrap project: `twa-manifest.json`, `android.keystore`, `app-release-signed.apk` |
+| `~/krosk.github.io/` (separate repo) | serves `/.well-known/assetlinks.json` + `.nojekyll` |
+| `phase5-xr-intent.md`, `multi-floor-design.md` (Claude memory) | deep rationale; auto-load |
 
 ## Next step
 
-- **A — VERIFY, don't build (do this first).** Two verifications are stacked and both are cheap-ish:
-  (1) **Desktop eyeball** in a browser (HMR is live): add a floor above, draw offset, confirm the
-  ghost underlay lines up and the 3D shows stacked storeys; add a basement; toggle ⌂ and watch
-  elevations; save/reload. (2) **On-device QA on the Quest** — still owed from before AND now includes
-  multi-floor: walk REGISTER→DROP→EDGE→SIZE→RECAL on the ground, then **thumbstick-↕ to another floor**
-  and confirm the overlay lifts to the right height and edits target that floor. No new features until
-  felt.
-- **B — Push** (`a38f31a` + `a1a8ef2`) once the feature is at least desktop-verified. Owner asks
-  first; **pushing publishes to Pages**. Never stage `quest-debug.log`.
-- **C — Follow-ups surfaced this session:** in-MR floor creation + in-MR storey-height capture (today
-  floors/heights are desktop-only); point-ray to re-activate an older zone (EDGE/DROP/RECAL still key
-  off `activeRect`); verify world→plan handedness + ALIGN convention on device; gate/remove debug HUD.
-- ~~Per-room anchors~~ — **dropped (session 6):** owner ruled out anchors-per-room and Quest room scan;
-  drift is RECAL + tape only. (`phase5-xr-intent.md`.)
+- **A — ON-DEVICE FUNCTIONAL QA (do this first; owed since session 5).** AR *launches* on the APK, but
+  nothing functional has been exercised. Set up storeys + heights on DESKTOP first (MR can't create
+  floors), then on the Quest walk **REGISTER→DROP→EDGE→SIZE→RECAL** on the ground, thumbstick-↕ to
+  another floor and confirm the overlay lifts + edits target that floor, check the **dimension overlay +
+  controller readout**, single-active-controller behaviour, and **thumbstick-hold exit**. No web console
+  on the APK — for web-side debugging use the plain Quest Browser (`?ar=1` URL) or enable the Oculus
+  Browser Remote Web Inspector.
+- **B — Resolve model transfer to the Quest app.** The immersive APK has **no 2D editor**, so a plan
+  authored on desktop must reach it. Verify whether the installed app shares localStorage with the Quest
+  Browser at the same origin, else wire JSON export/import (or in-AR floor setup). Currently a Hypothesis.
+- **C — Desktop multi-floor eyeball** (still owed from session 6): add a floor, draw offset, confirm the
+  ghost underlay lines up + 3D stacks + save/reload; add a basement; toggle ⌂.
+- ~~Meta Horizon Store distribution~~ — **out of scope** (owner: sideload only).
+- ~~In-browser PWA install button~~ — **removed**; Quest Browser can't install PWAs (`beforeinstallprompt`
+  never fires), so it was dead weight.
 
 ## Known open questions
 
-- **Everything multi-floor is unverified** — desktop not eyeballed, MR not on device; only `npm run
-  build` passed. No runtime/XR regression guard exists.
-- **On-device QA of S1/RECAL/S2 was never done** (carried from session 5) — world→plan sign/handedness,
-  `nearestEdge` near corners, numpad ray-pick feel all still unconfirmed on the Quest.
-- **Upper-floor overlay height depends on desktop-entered storey heights** — no in-MR capture, so a
-  wrong height floats the overlay off the real floor (RECAL fixes horizontal drift, not this).
-- **Anchor drift over a multi-room / multi-floor house is untested** — only single-room exercised.
+- **Nothing on the Quest is functionally verified beyond "AR launches."** Survey flow, multi-floor
+  switching/elevation, dimension overlay/readout, single-controller, exit gesture — all unexercised on
+  device. No runtime/XR regression guard exists.
+- **Upper-floor overlay height depends on desktop-entered storey heights** — no in-MR capture; a wrong
+  height floats the overlay off the real floor (RECAL fixes horizontal drift, not this).
+- **Model transfer desktop→Quest APK** unverified (see Next step B).
+- **Anchor drift over a multi-room / multi-floor house** untested — only single-room exercised.
