@@ -2,6 +2,19 @@ import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
+
+// A build stamp shown on the in-headset HUD: git short-hash + UTC build time.
+// It lets you confirm on-device that a fresh deploy actually loaded (vs. a stale
+// service-worker cache) — the stamp changes only when the site is rebuilt.
+function buildId() {
+  let hash = 'nogit';
+  try { hash = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* not a git checkout */ }
+  const t = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const stamp = `${p(t.getUTCMonth() + 1)}${p(t.getUTCDate())}-${p(t.getUTCHours())}${p(t.getUTCMinutes())}`;
+  return `${hash} ${stamp}Z`;
+}
 
 // Dev-only: a POST /__log endpoint so the app running in the Quest browser can
 // mirror its console/errors/debug values back to a file on this machine
@@ -32,6 +45,11 @@ export default defineConfig(({ command }) => ({
   // project-site subpath (https://<user>.github.io/<repo>/) without hard-coding
   // the repo name. Dev server stays at '/'.
   base: command === 'build' ? './' : '/',
+
+  // Inject the build stamp as a compile-time constant (see mr.js HUD).
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId()),
+  },
 
   // DEV (serve): basic-ssl serves https with a self-signed cert. WebXR
   // (immersive-ar on the Quest) requires a secure context, and the Quest reaches

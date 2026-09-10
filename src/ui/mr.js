@@ -21,6 +21,10 @@ import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
 
+// Build stamp (git hash + UTC time), injected by Vite `define`. Shown on the HUD so
+// you can confirm on-device that a fresh deploy loaded, not a stale SW cache.
+const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
+
 /**
  * @param {View3D} view
  * @param {Project} project  the live model — SURVEY mode authors rectangles into it
@@ -109,17 +113,17 @@ export function setupMR(view, project, getFootprint) {
   function makeDebug() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
-    canvas.height = 256;
+    canvas.height = 320; // taller so the extra build-stamp line fits without clipping
     const ctx = canvas.getContext('2d');
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-    sprite.scale.set(0.24, 0.12, 1);
+    sprite.scale.set(0.24, 0.15, 1); // match the 512x320 aspect
     sprite.position.set(0, 0.14, -0.04);
     const setLines = (lines) => {
-      ctx.clearRect(0, 0, 512, 256);
+      ctx.clearRect(0, 0, 512, 320);
       ctx.fillStyle = 'rgba(15, 18, 24, 0.82)';
       ctx.beginPath();
-      ctx.roundRect(6, 6, 500, 244, 14);
+      ctx.roundRect(6, 6, 500, 308, 14);
       ctx.fill();
       ctx.fillStyle = '#e6edf3';
       ctx.font = '28px monospace';
@@ -1362,6 +1366,7 @@ export function setupMR(view, project, getFootprint) {
       if (on) readouts[i].setText(hovDim, 0x79c0ff);
     });
     const lines = [
+      `build:  ${BUILD_ID}`,
       ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
       `mode:   ${modes[currentMode].label}${awaitingAlign ? ' >ALIGN' : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
       `placed: ${placed}   anchor: ${!!anchor}`,
