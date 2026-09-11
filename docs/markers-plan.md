@@ -4,9 +4,12 @@
 architecture).** This is the design + resume doc for adding **vertical elements** to the survey
 tool. Nothing here is built yet — this captures the decided design so a fresh session can start.
 
-**Date:** 2026-09-11 (design session, pre-implementation)
-**Status:** DESIGN AGREED, NOT STARTED. No code written. Owner wants vertical elements now that
-AR is the primary surface (memory `phase5-xr-intent`).
+**Date:** 2026-09-11 (design session; updated through session 13)
+**Status:** OUTLET SHIPPED. Category-1 markers (outlets) are built end-to-end (s12) and since split
+into disjoint plan/outlet editing + dimensioning domains with projected floor icons (s13). Remaining
+per this doc: switch/ethernet/light + type picker, then wires; openings (category 2) still deferred.
+See `.claude/handoff.md` → Next step B/C and `docs/ar-survey.md` for the current build. The design
+rationale below still governs; treat "we build first / not started" phrasing as historical.
 
 ## Goal in one paragraph
 
