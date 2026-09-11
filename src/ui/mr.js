@@ -17,6 +17,7 @@ import { Rectangle } from '../core/model.js';
 import { makeDistance, makeOriginDistance, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { toMeters, unitLabel, fmt } from '../core/units.js';
+import { serializeProject, deserializeInto } from '../io/serialize.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -212,6 +213,78 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, keyAt, draw };
   }
 
+  // SAVE/LOAD slot menu: same ray-aimed canvas panel as the numpad, but the cells
+  // are persistence slots (2 cols x 3 rows = 6). A filled slot shows when it was
+  // saved and how many rectangles it holds; empty slots read "empty". One panel is
+  // reused by both modes — draw() recolors/retitles for SAVE (green) vs LOAD (blue).
+  const SLOT_COLS = 2, SLOT_ROWS = 3, SLOT_COUNT = SLOT_COLS * SLOT_ROWS;
+  function makeSlotMenu() {
+    const W = 512, H = 640;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.30, 0.375),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+
+    const TITLE_H = 96, CELL_H = (H - TITLE_H) / SLOT_ROWS, CELL_W = W / SLOT_COLS;
+
+    // Plane UV -> slot index (or null). Texture flipY maps canvas-top to v=1.
+    function slotAt(u, v) {
+      const cx = u * W, cy = (1 - v) * H;
+      if (cy < TITLE_H) return null;
+      const row = Math.floor((cy - TITLE_H) / CELL_H);
+      const col = Math.floor(cx / CELL_W);
+      if (row < 0 || row >= SLOT_ROWS || col < 0 || col >= SLOT_COLS) return null;
+      return row * SLOT_COLS + col;
+    }
+
+    // metaFor(i) -> {rects, when} | null ; accent is the mode's color as '#rrggbb'.
+    function draw(title, accent, hoverSlot, metaFor) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.94)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.font = 'bold 40px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(title, 26, TITLE_H / 2);
+      for (let i = 0; i < SLOT_COUNT; i++) {
+        const row = Math.floor(i / SLOT_COLS), col = i % SLOT_COLS;
+        const x = col * CELL_W + 8, y = TITLE_H + row * CELL_H + 8;
+        const w = CELL_W - 16, h = CELL_H - 16;
+        const meta = metaFor(i);
+        const hot = hoverSlot === i;
+        ctx.fillStyle = hot ? accent : (meta ? 'rgba(48,54,61,0.95)' : 'rgba(33,38,45,0.8)');
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 16); ctx.fill();
+        ctx.fillStyle = hot ? '#0d1117' : '#8b949e';
+        ctx.font = 'bold 26px sans-serif';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(`SLOT ${i + 1}`, x + 18, y + 14);
+        if (meta) {
+          ctx.fillStyle = hot ? '#0d1117' : '#e6edf3';
+          ctx.font = 'bold 32px sans-serif';
+          ctx.fillText(`${meta.rects} rect${meta.rects === 1 ? '' : 's'}`, x + 18, y + h - 78);
+          ctx.fillStyle = hot ? '#0d1117' : '#79c0ff';
+          ctx.font = '24px sans-serif';
+          ctx.fillText(meta.when, x + 18, y + h - 40);
+        } else {
+          ctx.fillStyle = hot ? '#0d1117' : '#484f58';
+          ctx.font = 'italic 30px sans-serif';
+          ctx.fillText('empty', x + 18, y + h - 56);
+        }
+      }
+      tex.needsUpdate = true;
+    }
+
+    return { group, mesh, slotAt, draw };
+  }
+
   // The marker sits ahead of the controller's tracked origin, along the pointing
   // ray, so it clears the physical controller body (which would occlude it) and
   // reads as a "tip." Placement uses this same offset point (see tipPosition).
@@ -365,6 +438,10 @@ export function setupMR(view, project, getFootprint) {
   numpadCursor.renderOrder = 21;
   numpadCursor.visible = false;
   scene.add(numpadCursor);
+
+  // SAVE/LOAD slot menu panel (shares numpadCursor as its ray-hit dot).
+  const slotMenu = makeSlotMenu();
+  scene.add(slotMenu.group);
 
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
@@ -692,6 +769,9 @@ export function setupMR(view, project, getFootprint) {
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
   let hoverKey = null;      // numpad key under the ray this frame
   let prevHoverKey = null;  // last drawn hover (redraw only on change)
+  let hoverSlot = null;     // SAVE/LOAD slot under the ray this frame (0-based)
+  let prevHoverSlot = null; // last drawn slot hover
+  let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
 
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
   // (x, 0, -y), and planGroup adds planYaw + planPos; worldToLocal inverts both
@@ -1051,18 +1131,19 @@ export function setupMR(view, project, getFootprint) {
     showNumpad(); // pair complete -> enter the numpad/edit phase
   }
 
-  // Park the numpad ~0.55 m in front of the headset, upright, facing the user.
-  function placeNumpad() {
+  // Park a ray-aimed panel ~0.55 m in front of the headset, upright, facing the
+  // user (yaw-only). Shared by the SIZE numpad and the SAVE/LOAD slot menu.
+  function placePanel(group) {
     const e = renderer.xr.getCamera().matrixWorld.elements;
     _cam.set(e[12], e[13], e[14]);
     _camQ.setFromRotationMatrix(_rm.fromArray(e));
     _fwd.set(0, 0, -1).applyQuaternion(_camQ); _fwd.y = 0;
     if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
     _fwd.normalize();
-    numpad.group.position.copy(_cam).addScaledVector(_fwd, 0.55);
-    numpad.group.position.y = _cam.y - 0.12; // a touch below eye level
-    numpad.group.lookAt(_cam.x, numpad.group.position.y, _cam.z); // yaw-only face
-    numpad.group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
+    group.position.copy(_cam).addScaledVector(_fwd, 0.55);
+    group.position.y = _cam.y - 0.12; // a touch below eye level
+    group.lookAt(_cam.x, group.position.y, _cam.z); // yaw-only face
+    group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
   }
 
   // Enter SIZE in the ref-pick phase; the pad itself appears only once a pair/constraint
@@ -1074,7 +1155,7 @@ export function setupMR(view, project, getFootprint) {
   // Park the pad in front of the user and show it — called when a pair is completed or
   // an existing constraint is selected (i.e. entering the numpad/edit phase).
   function showNumpad() {
-    placeNumpad();
+    placePanel(numpad.group);
     numpad.group.visible = true;
     redrawNumpad();
   }
@@ -1086,6 +1167,87 @@ export function setupMR(view, project, getFootprint) {
     originRingMat.color.setHex(C_ORIGIN_GIZMO);
     hoverKey = prevHoverKey = null;
     hoverRef = null;
+  }
+
+  // ---- SAVE / LOAD: persist the whole project to localStorage slots ----
+  // The slot unit is the entire multi-floor project (what serializeProject emits),
+  // since deserializeInto replaces everything — saving one floor would be a trap.
+  const slotKey = (i) => `house-cad:slot:${i}`;
+
+  // Parsed slot payload {savedAt, data} | null (bad/absent/foreign JSON -> null).
+  function readSlot(i) {
+    try {
+      const raw = localStorage.getItem(slotKey(i));
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      return o && o.data && Array.isArray(o.data.floors) ? o : null;
+    } catch { return null; }
+  }
+
+  // Slot summary for the menu cell: rectangle count (all floors) + a short local
+  // date/time. null for an empty slot.
+  function slotMeta(i) {
+    const o = readSlot(i);
+    if (!o) return null;
+    const rects = o.data.floors.reduce((n, f) => n + (f.rectangles?.length || 0), 0);
+    const d = new Date(o.savedAt);
+    const when = Number.isFinite(d.getTime())
+      ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '?';
+    return { rects, when };
+  }
+
+  const slotTitle = () => slotFlash || (modes[currentMode].id === 'save' ? 'SAVE — pick slot' : 'LOAD — pick slot');
+  const slotAccent = () => (modes[currentMode].id === 'save' ? '#51d88a' : '#4ea1ff');
+  const redrawSlotMenu = () => slotMenu.draw(slotTitle(), slotAccent(), hoverSlot, slotMeta);
+
+  function showSlotMenu() {
+    placePanel(slotMenu.group);
+    slotFlash = null;
+    hoverSlot = prevHoverSlot = null;
+    slotMenu.group.visible = true;
+    redrawSlotMenu();
+  }
+
+  function deactivateSlotMenu() {
+    slotMenu.group.visible = false;
+    numpadCursor.visible = false;
+    hoverSlot = prevHoverSlot = null;
+    slotFlash = null;
+  }
+
+  // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes/overwrites the
+  // slot; LOAD replaces the whole project from a filled slot (empty = no-op) and
+  // rebuilds the MR view (the registered frame/anchor is untouched — the loaded plan
+  // drops into wherever you already registered).
+  function onSlotTouch() {
+    if (hoverSlot == null) return;
+    const i = hoverSlot;
+    if (modes[currentMode].id === 'save') {
+      try {
+        localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
+        slotFlash = `SAVED → ${i + 1}`;
+        rlog('slot save', { slot: i });
+      } catch (e) {
+        slotFlash = 'SAVE FAILED';
+        rlog('slot save FAIL', String(e));
+      }
+    } else {
+      const o = readSlot(i);
+      if (!o) { slotFlash = `SLOT ${i + 1} empty`; redrawSlotMenu(); return; }
+      try {
+        deserializeInto(project, o.data); // emits a change (re-solves every floor)
+        refreshFloorEditState();          // re-seed EDGE target + undo stack from the loaded active floor
+        buildPlan();                      // mr.js rebuilds manually (no onChange subscription)
+        applyPlanMatrix();
+        slotFlash = `LOADED ${i + 1}`;
+        rlog('slot load', { slot: i });
+      } catch (e) {
+        slotFlash = 'LOAD FAILED';
+        rlog('slot load FAIL', String(e));
+      }
+    }
+    redrawSlotMenu();
   }
 
   // Draw the edge-highlight strip along `edge` of `rect`, in the given color —
@@ -1203,10 +1365,10 @@ export function setupMR(view, project, getFootprint) {
     return best; // the hovered dim sprite (userData: dimText, cId, refA, refB) or null
   }
 
-  // Intersection of a controller's pointing ray with the numpad panel (with .uv),
-  // or null. Used by SIZE mode to pick the key under the ray.
+  // Intersection of a controller's pointing ray with a canvas panel (with .uv), or
+  // null. Used by SIZE (numpad) and SAVE/LOAD (slot menu) to pick the cell under the ray.
   const _raycaster = new THREE.Raycaster();
-  function rayPanelHit(inputSource) {
+  function rayPanelHit(inputSource, mesh = numpad.mesh) {
     const space = inputSource?.targetRaySpace;
     if (!space || !currentFrame) return null;
     const pose = currentFrame.getPose(space, localSpace);
@@ -1216,7 +1378,7 @@ export function setupMR(view, project, getFootprint) {
     _rq.setFromRotationMatrix(_rm);
     _rd.set(0, 0, -1).applyQuaternion(_rq);
     _raycaster.set(_ro, _rd);
-    const hits = _raycaster.intersectObject(numpad.mesh, false);
+    const hits = _raycaster.intersectObject(mesh, false);
     return hits.length ? hits[0] : null;
   }
 
@@ -1423,6 +1585,18 @@ export function setupMR(view, project, getFootprint) {
       // Written as a hard constraint (exact size = dimension constraints).
       onTouch: onNumpadTouch,
     },
+    {
+      id: 'save', label: 'SAVE', color: 0x51d88a,
+      // Aim the ray at a slot on the menu and trigger to write the whole project
+      // there (overwrites a filled slot). Slots show their save time + rect count.
+      onTouch: onSlotTouch,
+    },
+    {
+      id: 'load', label: 'LOAD', color: 0x4ea1ff,
+      // Aim at a filled slot and trigger to replace the project with it; the loaded
+      // plan drops into the frame you already registered. Empty slots are a no-op.
+      onTouch: onSlotTouch,
+    },
   ];
   let currentMode = 0;
 
@@ -1446,6 +1620,8 @@ export function setupMR(view, project, getFootprint) {
     applyModeVisual(m.label, m.color);
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
     else deactivateNumpad();
+    if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
+    else deactivateSlotMenu();
   }
 
   // Point the survey edit-state at the active floor: EDGE edits its last rect,
@@ -1927,6 +2103,24 @@ export function setupMR(view, project, getFootprint) {
         showZebra(selectedRect);
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
+      }
+    } else if (modeId === 'save' || modeId === 'load') {
+      // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverSlot = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(pickSource(frame), slotMenu.mesh);
+      if (slotMenu.group.visible && panelHit) {
+        hoverSlot = slotMenu.slotAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      // Moving to a different slot clears a lingering "SAVED/LOADED" flash.
+      if (hoverSlot !== prevHoverSlot) {
+        if (hoverSlot !== null) slotFlash = null;
+        redrawSlotMenu();
+        prevHoverSlot = hoverSlot;
       }
     } else {
       // ROOM/WALL: no floor target (drops at the standing position).
