@@ -222,12 +222,17 @@ export function solve(floor) {
       c.conflict = Math.abs(lhs - c.value) > CONFLICT_TOL;
     }
 
-    // Write results back: reconstruct x/w (or y/h) per rectangle.
+    // Write results back: reconstruct x/w (or y/h) per rectangle. The two edge
+    // variables are solved positionally and CAN cross (e.g. a constraint pushes an
+    // edge past its unconstrained opposite), which would yield a negative w/h. We
+    // normalize to keep the documented w>=0, h>=0 invariant: bounds-based edge
+    // identity (used by every picker/highlight) then always agrees with edgeCoord
+    // (raw), so picking an edge never resolves to its opposite.
     for (const r of rects) {
       const lo = x[index.get(`${r.id}:${edges[0]}`)];
       const hi = x[index.get(`${r.id}:${edges[1]}`)];
-      if (axis === 'x') { r.x = lo; r.w = hi - lo; }
-      else { r.y = lo; r.h = hi - lo; }
+      if (axis === 'x') { r.x = Math.min(lo, hi); r.w = Math.abs(hi - lo); }
+      else { r.y = Math.min(lo, hi); r.h = Math.abs(hi - lo); }
     }
   }
 }
