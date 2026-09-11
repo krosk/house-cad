@@ -1616,11 +1616,13 @@ export function setupMR(view, project, getFootprint) {
     gripDrag = null;
   }
 
-  // Grip button: context-sensitive undo.
+  // Grip button: context-sensitive, but it only ever DELETES geometry in EDIT — every
+  // other mode does a non-destructive cancel of an in-progress gesture (or nothing), so
+  // grip can't wipe a room/dimension/registration by accident.
   //  - EDIT: delete the selected zone.
-  //  - ROOM/WALL/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
-  //  - REGISTER mid-gesture: cancel the pending align step (keep the origin).
-  //  - otherwise: un-place the plan so you can register it again.
+  //  - SIZE: cancel the last dimension pick, step by step.
+  //  - EDGE: cancel a pending locked edge.
+  //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
     if (event?.data) activeSource = event.data; // grip claims control too
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
@@ -1630,7 +1632,7 @@ export function setupMR(view, project, getFootprint) {
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
     }
-    if (mode.id === 'edit') { // grip deletes the selected zone
+    if (mode.id === 'edit') { // grip deletes the selected zone (the ONLY grip delete)
       if (!selectedRect) return;
       const id = selectedRect.id;
       project.removeRectangle(id);
@@ -1645,25 +1647,12 @@ export function setupMR(view, project, getFootprint) {
       rlog('edit delete', { id });
       return;
     }
-    if (mode.id === 'drop' || mode.id === 'wall' || mode.id === 'edge') {
-      if (selectedEdge) { // a locked edge is pending -> just cancel it
-        selectedEdge = null;
-        rlog('edge lock cancelled');
-        return;
-      }
-      const id = surveyed.pop(); // undo the last surveyed room
-      if (id) {
-        project.removeRectangle(id);
-        // Fall back to the previous surveyed rect as active (or none).
-        const prev = surveyed[surveyed.length - 1];
-        activeRect = prev ? project.rectangles.find((r) => r.id === prev) ?? null : null;
-        buildPlan();
-        applyPlanMatrix();
-        rlog('survey undo', { id });
-      }
+    if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
+      selectedEdge = null;
+      rlog('edge lock cancelled');
       return;
     }
-    if (mode.id === 'register' && registerPts.length) { // undo the last REGISTER point
+    if (mode.id === 'register' && registerPts.length) { // back out the last REGISTER point
       registerPts.pop();
       const n = registerPts.length;
       applyModeVisual(n === 0 ? 'ORIGIN' : n === 1 ? 'WALL 2' : 'PERP', n === 0 ? C_ORIGIN : C_ALIGN);
@@ -1677,13 +1666,7 @@ export function setupMR(view, project, getFootprint) {
       rlog('recal dir cancelled');
       return;
     }
-    if (!placed) return;
-    placed = false;
-    anchor = null; // forget the old anchor; a fresh one is made on next place
-    planGroup.visible = false;
-    originGizmo.visible = false;
-    registerPts = [];
-    applyModeVisual(mode.label, mode.color);
+    // No destructive fallback: rooms are removed only via EDIT; re-register via REGISTER.
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
