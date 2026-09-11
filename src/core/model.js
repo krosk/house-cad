@@ -9,7 +9,7 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { solve } from './constraints.js';
+import { solve, solveMarkers } from './constraints.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -20,6 +20,17 @@ export function syncRectIdCounter(ids) {
   for (const id of ids) {
     const m = /^r(\d+)$/.exec(id);
     if (m) _id = Math.max(_id, Number(m[1]));
+  }
+}
+
+let _mid = 0;
+export const nextMarkerId = () => `m${++_mid}`;
+
+// Advance the marker-id counter past any loaded ids after a project load.
+export function syncMarkerIdCounter(ids) {
+  for (const id of ids) {
+    const m = /^m(\d+)$/.exec(id);
+    if (m) _mid = Math.max(_mid, Number(m[1]));
   }
 }
 
@@ -66,11 +77,16 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], height = 2.8, elevation = 0 } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
     this.constraints = constraints;
+    // Wall-anchored survey annotations (outlets/switches/lights/wires). A parallel
+    // lane: {id, type, x, y, z} in plan meters + height above the floor. NOT part of
+    // the footprint/extrude pipeline. X/Y can be pinned by marker distance constraints
+    // (resolved one-way in solveMarkers); z is inherent, edited by hand.
+    this.markers = markers;
     this.height = height; // storey height, meters
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
   }
@@ -96,6 +112,8 @@ export class Project {
   set rectangles(v) { this.activeFloor.rectangles = v; }
   get constraints() { return this.activeFloor.constraints; }
   set constraints(v) { this.activeFloor.constraints = v; }
+  get markers() { return this.activeFloor.markers; }
+  set markers(v) { this.activeFloor.markers = v; }
   get height() { return this.activeFloor.height; }
   set height(v) { this.activeFloor.height = v; }
 
@@ -119,10 +137,12 @@ export class Project {
   }
 
   // Recompute elevations, resolve every floor's constraints, then notify
-  // listeners so they see fully-solved, stacked geometry.
+  // listeners so they see fully-solved, stacked geometry. Markers are resolved
+  // in a one-way pass AFTER the rectangle solve (they read resolved wall edges
+  // but never move them — see solveMarkers).
   _emit() {
     this._recomputeElevations();
-    for (const f of this.floors) solve(f);
+    for (const f of this.floors) { solve(f); solveMarkers(f); }
     for (const fn of this._listeners) fn(this);
   }
 
@@ -192,6 +212,39 @@ export class Project {
   clear() {
     this.rectangles = [];
     this.constraints = [];
+    this.markers = [];
+    this._emit();
+  }
+
+  // --- markers (wall-anchored survey annotations) -------------------------
+  // Add a marker (plain object {type, x, y, z}) to the active floor, minting an
+  // id if none was supplied. z is its inherent height above the floor.
+  addMarker(marker) {
+    if (!marker.id) marker.id = nextMarkerId();
+    if (!marker._locked) marker._locked = { x: false, y: false };
+    this.markers.push(marker);
+    this._emit();
+    return marker;
+  }
+
+  removeMarker(id) {
+    const i = this.markers.findIndex((m) => m.id === id);
+    if (i >= 0) {
+      this.markers.splice(i, 1);
+      // Drop any constraints that pinned the removed marker.
+      this.constraints = this.constraints.filter(
+        (c) => c.a.marker !== id && c.b.marker !== id,
+      );
+      this._emit();
+    }
+  }
+
+  // Set a marker's inherent height above the floor (meters). Edited by hand in
+  // EDIT; z is never a constraint axis.
+  setMarkerHeight(id, z) {
+    const m = this.markers.find((m) => m.id === id);
+    if (!m) return;
+    m.z = z;
     this._emit();
   }
 

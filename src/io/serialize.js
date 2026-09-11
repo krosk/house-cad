@@ -3,7 +3,7 @@
 // height) plus which floor is ground/active. The downstream footprint/extrusion
 // and each floor's derived elevation are always recomputed, never stored.
 
-import { Floor, Rectangle, syncRectIdCounter, syncFloorIdCounter } from '../core/model.js';
+import { Floor, Rectangle, syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter } from '../core/model.js';
 import { syncConstraintIdCounter } from '../core/constraints.js';
 
 export const FILE_VERSION = 2;
@@ -18,6 +18,9 @@ function serializeConstraint(c) {
     offset: c.offset ?? null,
   };
 }
+function serializeMarker(m) {
+  return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
+}
 
 export function serializeProject(project) {
   return {
@@ -31,6 +34,7 @@ export function serializeProject(project) {
       height: f.height,
       rectangles: f.rectangles.map(serializeRect),
       constraints: f.constraints.map(serializeConstraint),
+      markers: f.markers.map(serializeMarker),
     })),
   };
 }
@@ -66,6 +70,7 @@ export function validateProjectData(data) {
       }
     }
     if (f.constraints && !Array.isArray(f.constraints)) return '"constraints" must be an array.';
+    if (f.markers && !Array.isArray(f.markers)) return '"markers" must be an array.';
   }
   return null; // ok
 }
@@ -97,6 +102,10 @@ export function deserializeInto(project, data) {
       (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add' }),
     ),
     constraints: (f.constraints || []).map(makeConstraint),
+    markers: (f.markers || []).map((m) => ({
+      id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
+      _locked: { x: false, y: false },
+    })),
   }));
 
   project.floors = floors;
@@ -109,6 +118,7 @@ export function deserializeInto(project, data) {
   syncFloorIdCounter(floors.map((f) => f.id));
   syncRectIdCounter(floors.flatMap((f) => f.rectangles.map((r) => r.id)));
   syncConstraintIdCounter(floors.flatMap((f) => f.constraints.map((c) => c.id)));
+  syncMarkerIdCounter(floors.flatMap((f) => f.markers.map((m) => m.id)));
 
   project._emit();
 }

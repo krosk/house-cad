@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { Rectangle } from '../core/model.js';
-import { makeDistance, makeOriginDistance, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
+import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
@@ -403,12 +403,11 @@ export function setupMR(view, project, getFootprint) {
   // so the controller panels are never hidden by a floor fill like the zebra.
   const HUD_ORDER = 100;
 
-  // Vertical offsets (m, above the controller) of the stacked controller panels,
+  // Vertical offsets (m, above the tip) of the stacked controller panels,
   // bottom -> top: mode label, hover readout, instructions (help), info (debug).
-  // The panels are re-seated straight up in WORLD space each frame (see onXRFrame)
-  // so they read upright regardless of how the controller is tilted; these are the
-  // heights of that world-vertical stack. Help below debug: instructions read
-  // nearest the hand, the info HUD on top.
+  // The panels are children of the controller, so they ride its tilt (the sprites
+  // themselves still billboard). Help below debug: instructions read nearest the
+  // hand, the info HUD on top.
   const PANEL_Y = { label: 0.05, readout: 0.11, help: 0.26, debug: 0.46 };
 
   // Controllers, each with a small sphere "tip" you touch to the real floor, plus
@@ -427,7 +426,7 @@ export function setupMR(view, project, getFootprint) {
     tip.position.copy(TIP_OFFSET);
     c.add(tip);
     const label = makeLabel();
-    label.sprite.position.set(0, PANEL_Y.label, 0);
+    label.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.label, TIP_OFFSET.z);
     label.sprite.renderOrder = HUD_ORDER; // controller UI paints over every world overlay (zebra etc.)
     c.add(label.sprite);
     labels.push(label);
@@ -435,7 +434,7 @@ export function setupMR(view, project, getFootprint) {
     // constraint the ray is pointing at — a legible "close-up" of small in-world
     // dimension text. Hidden until the ray hovers a dimension.
     const readout = makeLabel();
-    readout.sprite.position.set(0, PANEL_Y.readout, 0);
+    readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.readout, TIP_OFFSET.z);
     readout.sprite.scale.set(0.2, 0.05, 1);
     readout.sprite.visible = false;
     readout.sprite.renderOrder = HUD_ORDER;
@@ -443,12 +442,12 @@ export function setupMR(view, project, getFootprint) {
     readouts.push(readout);
     // Instructions (help) box sits BELOW the info (debug) HUD; info reads on top.
     const help = makeHelp(); // mode instructions
-    help.sprite.position.set(0, PANEL_Y.help, 0);
+    help.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.help, TIP_OFFSET.z);
     help.sprite.renderOrder = HUD_ORDER;
     c.add(help.sprite);
     helps.push(help);
     const dbg = makeDebug(); // debug HUD (info panel), above the instructions box
-    dbg.sprite.position.set(0, PANEL_Y.debug, 0);
+    dbg.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.debug, TIP_OFFSET.z);
     dbg.sprite.renderOrder = HUD_ORDER;
     c.add(dbg.sprite);
     debugs.push(dbg);
@@ -626,6 +625,13 @@ export function setupMR(view, project, getFootprint) {
   // The placed plan lives in this group; its position/rotation follow the anchor.
   const planGroup = new THREE.Group();
   planGroup.visible = false;
+
+  // Marker glyphs (wall-anchored annotations) live in their own group under planGroup
+  // so they ride the plan's yaw + per-floor elevation for free. buildPlan clears the
+  // rest of planGroup every rebuild but SKIPS this group; buildMarkers repopulates it.
+  const markerGroup = new THREE.Group();
+  planGroup.add(markerGroup);
+  const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
 
   const fillMat = new THREE.MeshBasicMaterial({
     color: ACCENT, transparent: true, opacity: 0.22,
@@ -885,6 +891,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
+      if (child === markerGroup) continue; // markers are rebuilt separately (buildMarkers)
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -915,7 +922,47 @@ export function setupMR(view, project, getFootprint) {
       pushStrips([activeRect], lockedMat, 0.007, isLocked); // white locked edges of the active zone
     }
     if (withDims) buildDimensions(); // constraint dimension lines + value labels
+    if (withDims) buildMarkers();    // wall-anchored annotation glyphs (own group, not cleared above)
     return planGroup.children.length > 0;
+  }
+
+  // A marker glyph: an outlet icon on a translucent disc, tinted WHITE once the marker
+  // is fully pinned (both X and Y constrained), else the marker's type color. Drawn on
+  // a canvas so the tint can change (an emoji couldn't go white-when-locked).
+  function makeMarkerSprite(marker) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const color = marker._full ? '#ffffff' : '#ff9f43';
+    ctx.fillStyle = 'rgba(15,18,24,0.82)';
+    ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 7; ctx.strokeStyle = color; ctx.stroke();
+    // Outlet glyph: two vertical slots + a ground hole.
+    ctx.fillStyle = color;
+    ctx.fillRect(47, 38, 11, 36);
+    ctx.fillRect(70, 38, 11, 36);
+    ctx.beginPath(); ctx.arc(64, 92, 7, 0, Math.PI * 2); ctx.fill();
+    const tex = new THREE.CanvasTexture(canvas);
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+    spr.scale.set(0.09, 0.09, 1);
+    spr.renderOrder = 32; // above floor overlays/highlights (badges are 30)
+    return spr;
+  }
+
+  // Rebuild the marker glyphs into markerGroup (planGroup-local), placing each at
+  // (x, z, -y): plan (x,y) maps to local (x,0,-y) and z lifts it above the floor
+  // overlay (local y=0 = world overlayY()), so it sits at its real height.
+  function buildMarkers() {
+    for (const child of [...markerGroup.children]) {
+      markerGroup.remove(child);
+      child.material?.map?.dispose();
+      child.material?.dispose();
+    }
+    for (const m of project.markers) {
+      const spr = makeMarkerSprite(m);
+      spr.position.set(m.x, m.z, -m.y);
+      markerGroup.add(spr);
+    }
   }
 
   let localSpace = null;
@@ -942,6 +989,10 @@ export function setupMR(view, project, getFootprint) {
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
   let selectedRect = null;  // EDIT mode: the persistently-selected zone (survives aim)
   let hoverStack = [];      // EDIT mode: zones under the ray this frame, topmost-first
+  let selectedMarker = null; // EDIT mode: the marker being height-edited (suspends zone select)
+  let hoverMarker = null;    // EDIT mode: the marker under the reticle this frame
+  let markerBuffer = '';     // EDIT height pad: typed digits (prefilled with the marker's z)
+  let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
 
   // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
   // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
@@ -1059,6 +1110,17 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // The marker nearest the aimed floor point (px,py), within the reticle radius —
+  // reticle-gated like edgeAtPoint. Used by SIZE (pin its X/Y) and EDIT (edit height).
+  function markerAtPoint(px, py) {
+    let best = null, bestD = EDGE_PICK_M;
+    for (const m of project.markers) {
+      const d = Math.hypot(px - m.x, py - m.y);
+      if (d < bestD) { bestD = d; best = m; }
+    }
+    return best;
+  }
+
   // All zones containing a plan point, TOPMOST (last-created) first — EDIT mode's
   // overlap stack, which the trigger cycles down through.
   function rectsAtPoint(px, py) {
@@ -1162,15 +1224,25 @@ export function setupMR(view, project, getFootprint) {
   const isXEdge = (e) => e === 'left' || e === 'right';
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
 
-  // A reference is a rect EDGE or the plan ORIGIN axis.
-  const refLabel = (ref) => (!ref ? '?' : ref.kind === 'origin' ? t('ref.origin') : t(`edge.${ref.edge}`));
+  // A reference is a rect EDGE, the plan ORIGIN axis, or a MARKER (pinned to a wall).
+  const markerOf = (ref) => project.markers.find((m) => m.id === ref.markerId);
+  const refLabel = (ref) => (!ref ? '?'
+    : ref.kind === 'origin' ? t('ref.origin')
+    : ref.kind === 'marker' ? t(`marker.${markerOf(ref)?.type ?? 'outlet'}`)
+    : t(`edge.${ref.edge}`));
   const refsEqual = (a, b) =>
     !!a && !!b && a.kind === b.kind &&
-    (a.kind === 'origin' || (a.rectId === b.rectId && a.edge === b.edge));
+    (a.kind === 'origin' ? true
+      : a.kind === 'marker' ? a.markerId === b.markerId
+      : (a.rectId === b.rectId && a.edge === b.edge));
 
-  // Two refs can be dimensioned if they lie on the same coordinate axis (and are
-  // not the same target). An edge pairs with the origin on its own axis.
+  // Two refs can be dimensioned if they lie on the same coordinate axis (and are not
+  // the same target). An edge pairs with the origin on its own axis. A MARKER pin must
+  // pair with a rect EDGE (the edge supplies the axis) — marker+marker / marker+origin
+  // have no axis source and are disallowed.
   function refsCompatible(a, b) {
+    const am = a.kind === 'marker', bm = b.kind === 'marker';
+    if (am || bm) return (am && b.kind === 'edge') || (bm && a.kind === 'edge');
     if (a.kind === 'origin' && b.kind === 'origin') return false;
     if (a.kind === 'edge' && b.kind === 'edge') {
       if (refsEqual(a, b)) return false;
@@ -1181,15 +1253,31 @@ export function setupMR(view, project, getFootprint) {
 
   const rectOf = (ref) => project.rectangles.find((r) => r.id === ref.rectId);
 
-  // Current plan coordinate of a reference (origin axis = 0, else the edge coord).
-  const refCoord = (ref) => (ref.kind === 'origin' ? 0 : edgeCoord(rectOf(ref), ref.edge));
+  // The axis a pair is dimensioned on = the axis of whichever ref is an edge.
+  const pairAxis = (a, b) => {
+    const e = a.kind === 'edge' ? a : (b.kind === 'edge' ? b : null);
+    return e ? (isXEdge(e.edge) ? 'x' : 'y') : 'x';
+  };
+  // A reference's plan coordinate on the given axis (origin = 0, marker = its x/y).
+  const coordOnAxis = (ref, axis) =>
+    ref.kind === 'origin' ? 0
+      : ref.kind === 'marker' ? (markerOf(ref)?.[axis] ?? 0)
+      : edgeCoord(rectOf(ref), ref.edge);
   // The distance a pair currently spans, in the display unit — used to prefill the
   // numpad with the value you're already at, so entering size edits from the real
   // measurement rather than from a blank field.
-  const currentSpan = (a, b) => Math.abs(refCoord(b) - refCoord(a));
+  const currentSpan = (a, b) => { const ax = pairAxis(a, b); return Math.abs(coordOnAxis(b, ax) - coordOnAxis(a, ax)); };
 
   // Find an existing distance constraint between two references (either order).
   function findConstraintForRefs(a, b) {
+    const markerRef = a.kind === 'marker' ? a : (b.kind === 'marker' ? b : null);
+    if (markerRef) {
+      const e = markerRef === a ? b : a; // the edge endpoint
+      return project.constraints.find((k) =>
+        (k.a.marker === markerRef.markerId || k.b.marker === markerRef.markerId) &&
+        ((k.a.rect === e.rectId && k.a.edge === e.edge) || (k.b.rect === e.rectId && k.b.edge === e.edge)),
+      ) || null;
+    }
     const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
     if (origin) {
       const e = origin === a ? b : a;
@@ -1205,6 +1293,20 @@ export function setupMR(view, project, getFootprint) {
 
   // Create the constraint for a pair (a is the anchor/first pick, like desktop).
   function makeConstraintForRefs(a, b) {
+    const markerRef = a.kind === 'marker' ? a : (b.kind === 'marker' ? b : null);
+    if (markerRef) {
+      const e = markerRef === a ? b : a; // the wall edge (anchor)
+      const m = markerOf(markerRef);
+      const axis = isXEdge(e.edge) ? 'x' : 'y';
+      // At most one pin per (marker, axis): drop any existing same-axis pin first so
+      // picking a different wall RE-ANCHORS cleanly instead of stacking pins.
+      for (const k of [...project.constraints]) {
+        if ((k.a.marker === m.id || k.b.marker === m.id) && k.axis === axis) project.removeConstraint(k.id);
+      }
+      const mc = makeMarkerDistance(m, rectOf(e), e.edge);
+      project.addConstraint(mc);
+      return mc;
+    }
     const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
     let c;
     if (origin) {
@@ -1395,6 +1497,56 @@ export function setupMR(view, project, getFootprint) {
   // LEVEL trigger: drive the numpad key under the ray.
   function onLevelTouch() {
     if (hoverKey) pressLevelKey(hoverKey);
+  }
+
+  // ---- EDIT marker height: a marker's inherent height above the floor, typed by hand
+  // on the SIZE numpad (reused, like LEVEL). SWAP is inert; DEL deletes the marker. X/Y
+  // are pinned separately in SIZE — height is never a constraint axis.
+  const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${t('marker.height')}`;
+  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey);
+
+  function refreshMarkerPad() {
+    markerBuffer = selectedMarker ? fmt(selectedMarker.z) : '';
+    markerPristine = true;
+    redrawMarkerPad();
+  }
+
+  function activateMarkerPad() {
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    refreshMarkerPad();
+  }
+
+  function commitMarkerHeight() {
+    if (!selectedMarker) return;
+    const val = parseFloat(markerBuffer);
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
+    project.setMarkerHeight(selectedMarker.id, toMeters(val));
+    rlog('marker height', { id: selectedMarker.id, m: +toMeters(val).toFixed(3) });
+    buildPlan(); applyPlanMatrix(); // z changed -> the glyph re-seats at the new height
+    refreshMarkerPad();
+  }
+
+  function deleteSelectedMarker() {
+    if (!selectedMarker) return;
+    const id = selectedMarker.id;
+    project.removeMarker(id); // also drops its X/Y pins
+    selectedMarker = null;
+    deactivateNumpad();
+    buildPlan(); applyPlanMatrix();
+    rlog('marker delete', { id });
+  }
+
+  function pressMarkerKey(k) {
+    if (k === 'enter') { commitMarkerHeight(); return; }
+    if (k === 'swap') return; // no role when entering a height
+    if (k === 'del') { deleteSelectedMarker(); return; }
+    if (markerPristine && k !== 'back') markerBuffer = '';
+    markerPristine = false;
+    if (k === 'back') markerBuffer = markerBuffer.slice(0, -1);
+    else if (k === '.') { if (!markerBuffer.includes('.')) markerBuffer += '.'; }
+    else if (markerBuffer.replace('.', '').length < 6) markerBuffer += k;
+    redrawMarkerPad();
   }
 
   // Cycle the active storey Basement -> Ground -> Upper -> (wrap) — the dedicated
@@ -1866,10 +2018,37 @@ export function setupMR(view, project, getFootprint) {
       // it (see onReset), or the upper face button B/Y swaps it room<->wall (see
       // swapSelected / pollModeCycle).
       onTouch: () => {
-        if (!placed || !hoverStack.length) return;
+        if (!placed) return;
+        // Height pad is up and the ray is on it -> drive the pad.
+        if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
+        // A marker under the reticle takes priority: select it + open the height pad.
+        if (hoverMarker) {
+          selectedMarker = hoverMarker;
+          selectedRect = null; // marker editing suspends zone selection (B/Y swap no-ops)
+          activateMarkerPad();
+          rlog('marker select', { id: selectedMarker.id });
+          return;
+        }
+        // Otherwise it's zone selection — leave marker-height mode first.
+        if (selectedMarker) { selectedMarker = null; deactivateNumpad(); }
+        if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
         rlog('edit select', { id: selectedRect.id, op: selectedRect.op, stack: hoverStack.length });
+      },
+    },
+    {
+      id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
+      // Drop an OUTLET marker at the tip. x/y come from the tip's plan position; z = the
+      // tip's height above the active floor (a first guess). Edit the height in EDIT; pin
+      // x/y to the walls in SIZE. Markers are annotations — NOT part of the massing.
+      onTouch: (pos) => {
+        if (!placed) return;
+        const { px, py } = worldToPlan(pos);
+        const z = Math.max(0, pos.y - overlayY());
+        const m = project.addMarker({ type: 'outlet', x: px, y: py, z });
+        buildPlan(); applyPlanMatrix();
+        rlog('marker drop', { id: m.id, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });
       },
     },
     {
@@ -1970,6 +2149,7 @@ export function setupMR(view, project, getFootprint) {
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
     selectedRect = null; // clear the EDIT selection when changing modes
+    selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     rectHi.visible = false;
     zebra.visible = false;
@@ -2006,6 +2186,7 @@ export function setupMR(view, project, getFootprint) {
     activeRect = project.rectangles[project.rectangles.length - 1] || null;
     selectedEdge = null;
     selectedRect = null; // EDIT selection is per-floor; drop it on a floor switch
+    selectedMarker = null; // ...and any marker being height-edited
     resetDim();
   }
 
@@ -2213,6 +2394,7 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (mode.id === 'edit') { // grip deletes the selected zone (the ONLY grip delete)
+      if (selectedMarker) { deleteSelectedMarker(); return; } // ...or the selected marker
       if (!selectedRect) return;
       const id = selectedRect.id;
       project.removeRectangle(id);
@@ -2365,7 +2547,6 @@ export function setupMR(view, project, getFootprint) {
     return `${project.activeFloor?.name ?? '-'} ${i + 1}/${fl.length}`;
   };
   const _wp = new THREE.Vector3();
-  const _panelUp = new THREE.Vector3(), _panelInvQ = new THREE.Quaternion(); // scratch: world-vertical panel re-seat
   // XR camera world height (matrixWorld, not .position which stays local/0).
   const camWorldY = () => renderer.xr.getCamera().matrixWorld.elements[13];
 
@@ -2376,18 +2557,6 @@ export function setupMR(view, project, getFootprint) {
     // markers are hidden so the two don't clutter or read as both being live.
     const activeCtl = pickSource(frame);
     for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
-    // Re-seat the controller panels straight up in WORLD space, so the stack reads
-    // upright no matter how the hand is tilted (the sprites already billboard; only
-    // their offset rode the controller's rotation). Each panel's local offset is the
-    // world-up vector de-rotated by the controller's orientation.
-    controllers.forEach((c, i) => {
-      if (!c.visible) return;
-      _panelInvQ.copy(c.quaternion).invert();
-      labels[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.label, 0).applyQuaternion(_panelInvQ));
-      readouts[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.readout, 0).applyQuaternion(_panelInvQ));
-      helps[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.help, 0).applyQuaternion(_panelInvQ));
-      debugs[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.debug, 0).applyQuaternion(_panelInvQ));
-    });
     // Echo the pointed-at constraint's value big on the active controller so
     // small in-world dimension text can be read up close.
     const hovSprite = pickDimLabel(activeCtl);
@@ -2545,8 +2714,12 @@ export function setupMR(view, project, getFootprint) {
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A dim panel is hovered only when the RETICLE is over it (before the first ref).
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
-          if (!hoverDim) { // a hovered dim panel takes over the pick; otherwise pick a floor edge/origin
-            if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
+          if (!hoverDim) { // a hovered dim panel takes over the pick; otherwise pick a floor marker/edge/origin
+            // A marker pin needs marker + edge: prefer a marker unless ref A is already a
+            // marker (then the second pick must be the wall edge).
+            const mk = (dimRefA && dimRefA.kind === 'marker') ? null : markerAtPoint(px, py);
+            if (mk) hoverRef = { kind: 'marker', markerId: mk.id };
+            else if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
             else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
           }
         }
@@ -2558,6 +2731,7 @@ export function setupMR(view, project, getFootprint) {
       const showRef = (ref, color) => {
         if (!ref) return;
         if (ref.kind === 'origin') originRingMat.color.setHex(color);
+        else if (ref.kind === 'marker') { /* the marker glyph is its own highlight */ }
         else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
       };
       if (hoverDim) {
@@ -2583,18 +2757,33 @@ export function setupMR(view, project, getFootprint) {
       }
       if (hoverKey !== prevHoverKey) { redrawLevelPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'edit') {
-      // EDIT: ray the floor, gather the overlap stack under the reticle. The
-      // persistent selection (if any) is zebra-filled + outlined in its op color;
-      // otherwise preview the topmost zone under the reticle in yellow outline.
+      // EDIT: ray the floor, gather the overlap stack under the reticle. A marker under
+      // the reticle takes priority (select it to edit its height). The persistent zone
+      // selection (if any) is zebra-filled + outlined; else preview the topmost zone.
+      hoverKey = null;
+      hoverMarker = null;
+      numpadCursor.visible = false;
+      // While a marker is selected, its height pad is up — raycast it for the key.
+      if (selectedMarker && numpad.group.visible) {
+        const panelHit = rayPanelHit(pickSource(frame));
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
       const hit = rayFloorHit(pickSource(frame));
       if (hit) {
         const { px, py } = worldToPlan(hit);
-        hoverStack = rectsAtPoint(px, py);
+        hoverMarker = markerAtPoint(px, py);
+        hoverStack = hoverMarker ? [] : rectsAtPoint(px, py); // a marker under the reticle wins
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
       } else {
         reticle.visible = false;
+        hoverStack = [];
       }
+      if (selectedMarker && !project.markers.includes(selectedMarker)) { selectedMarker = null; deactivateNumpad(); }
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
       if (selectedRect) {
         showRectOutline(selectedRect, selectedRect.op === 'subtract' ? 0xff6b6b : 0x51d88a);
@@ -2602,6 +2791,7 @@ export function setupMR(view, project, getFootprint) {
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
       }
+      if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.
       reticle.visible = false;

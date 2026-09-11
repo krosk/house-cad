@@ -23,6 +23,7 @@ const STRINGS = {
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF',    zh: '编辑' },
+  'mode.marker':   { en: 'OUTLET', fr: 'PRISE',    zh: '插座' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.size':     { en: 'SIZE',   fr: 'COTE',     zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
@@ -61,9 +62,14 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Aim at a zone and trigger to select it (trigger again cycles buried zones). Grip deletes; B/Y swaps room/wall.',
-    fr: 'Visez une zone et gâchette pour la sélectionner (à nouveau : zones dessous). Poignée : supprime ; B/Y : pièce/mur.',
-    zh: '瞄准一个区域并扣动扳机选择（再次扣动循环下层区域）。握把删除；B/Y 切换房间/墙。',
+    en: 'Aim at a zone and trigger to select it (trigger again cycles buried zones). Grip deletes; B/Y swaps room/wall. Aim at a marker to edit its height; grip deletes it.',
+    fr: 'Visez une zone et gâchette pour la sélectionner (à nouveau : zones dessous). Poignée : supprime ; B/Y : pièce/mur. Visez une prise pour régler sa hauteur ; poignée : supprime.',
+    zh: '瞄准一个区域并扣动扳机选择（再次扣动循环下层区域）。握把删除；B/Y 切换房间/墙。瞄准一个标记可调整其高度；握把删除它。',
+  },
+  'help.marker': {
+    en: 'Trigger to drop an outlet at the tip; its height starts at the tip’s height above the floor. Pin X/Y to the walls in SIZE, edit the height in EDIT.',
+    fr: 'Gâchette pour poser une prise à la pointe ; sa hauteur initiale = hauteur de la pointe au-dessus du sol. Fixez X/Y aux murs dans COTE, réglez la hauteur dans MODIF.',
+    zh: '扣动扳机在笔尖处放置一个插座；初始高度为笔尖离地高度。在“尺寸”中把 X/Y 固定到墙面，在“编辑”中调整高度。',
   },
   'help.recal': {
     en: 'Fix drift. Aim so the reticle hugs wall 1 and trigger to pick a known corner, then touch 2 points on wall 1 and 1 on wall 2.',
@@ -71,9 +77,9 @@ const STRINGS = {
     zh: '修正漂移。瞄准使准星贴住墙1并扣动扳机选择一个已知墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
   },
   'help.size': {
-    en: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side.',
-    fr: 'Choisissez deux références — un bord ou l’origine du plan — puis tapez la distance exacte sur le pavé. B/Y inverse le côté.',
-    zh: '选取两个参照——矩形的边或平面原点——然后在数字键盘上输入精确距离。B/Y 翻转方向。',
+    en: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side. To pin a marker: pick it, then a wall edge (0 = on the wall).',
+    fr: 'Choisissez deux références — un bord ou l’origine du plan — puis tapez la distance exacte sur le pavé. B/Y inverse le côté. Pour fixer une prise : choisissez-la, puis un bord de mur (0 = sur le mur).',
+    zh: '选取两个参照——矩形的边或平面原点——然后在数字键盘上输入精确距离。B/Y 翻转方向。固定标记：先选标记，再选墙边（0 = 贴在墙上）。',
   },
   'help.save': {
     en: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
@@ -130,6 +136,10 @@ const STRINGS = {
 
   // --- LANG menu title --------------------------------------------------------
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },
+
+  // --- markers (wall-anchored annotations) ------------------------------------
+  'marker.outlet': { en: 'outlet', fr: 'prise',   zh: '插座' },
+  'marker.height': { en: 'height', fr: 'hauteur', zh: '高度' },
 };
 
 let current = 'en';

@@ -96,6 +96,46 @@ export function makeOriginDistance(rect, edge) {
   };
 }
 
+// ---- marker pins (wall-anchored annotations) ----
+// A marker endpoint is { marker: <id> } (no edge). A marker distance pins the
+// marker's X or Y to a rect edge (or the origin) — same signed shape as a normal
+// distance, so the numpad/flip logic transfers. These are resolved ONE-WAY in
+// solveMarkers (the marker follows; it never moves the wall), and are excluded
+// from the rectangle solve().
+
+export function isMarkerConstraint(c) {
+  return !!(c.a?.marker || c.b?.marker);
+}
+
+/** Pin marker X or Y to a rect edge. value = marker coord − edge coord (0 = on the wall). */
+export function makeMarkerDistance(marker, refRect, refEdge) {
+  const axis = EDGE_AXIS[refEdge];
+  return {
+    id: nextConstraintId(),
+    type: 'distance',
+    axis,
+    a: { rect: refRect.id, edge: refEdge }, // anchor (the real wall edge)
+    b: { marker: marker.id },               // dependent (follows)
+    value: marker[axis] - edgeCoord(refRect, refEdge),
+    offset: null,
+    conflict: false,
+  };
+}
+
+/** Pin marker X or Y to the plan origin (coordinate 0 on that axis). */
+export function makeMarkerOriginDistance(marker, axis) {
+  return {
+    id: nextConstraintId(),
+    type: 'distance',
+    axis,
+    a: { rect: ORIGIN_ID, edge: axis }, // origin line, fixed at 0
+    b: { marker: marker.id },
+    value: marker[axis],
+    offset: null,
+    conflict: false,
+  };
+}
+
 // ---- dense linear solver (Gaussian elimination, partial pivoting) ----
 // Solves M x = rhs for small symmetric positive-definite M.
 function solveLinear(M, rhs) {
@@ -178,8 +218,10 @@ export function solve(floor) {
       }
     }
 
-    // Anchor boost: the first edge (a) of each distance dimension holds.
-    const axisConstraints = constraints.filter((c) => c.axis === axis);
+    // Anchor boost: the first edge (a) of each distance dimension holds. Marker
+    // pins are excluded — they reference a marker endpoint that is not a rect
+    // variable, are resolved one-way in solveMarkers, and must never tug a wall.
+    const axisConstraints = constraints.filter((c) => c.axis === axis && !isMarkerConstraint(c));
     for (const c of axisConstraints) {
       const ia = index.get(`${c.a.rect}:${c.a.edge}`);
       if (ia != null && vars[ia].weight === W_STAY) vars[ia].weight = W_ANCHOR;
@@ -235,4 +277,45 @@ export function solve(floor) {
       else { r.y = Math.min(lo, hi); r.h = Math.abs(hi - lo); }
     }
   }
+}
+
+/**
+ * Resolve a floor's marker pins, ONE-WAY, after solve() has settled the rects.
+ * Each marker distance constraint pins the marker's X or Y to a (now-resolved)
+ * rect edge or the plan origin; the marker follows, the wall never moves. A
+ * marker with no pin on an axis keeps its current (captured/edited) coordinate.
+ * Tags each marker `_locked = {x,y}` and `_full` (both pinned → the glyph reads
+ * as fully placed). z is never touched — it is inherent, edited by hand.
+ */
+export function solveMarkers(floor) {
+  const markers = floor.markers || [];
+  if (!markers.length) return;
+  const rectById = new Map(floor.rectangles.map((r) => [r.id, r]));
+  const byId = new Map(markers.map((m) => [m.id, m]));
+
+  for (const m of markers) m._locked = { x: false, y: false };
+
+  for (const c of floor.constraints) {
+    if (!isMarkerConstraint(c)) continue;
+    c.conflict = false; // one-way pins are always satisfiable
+    // Identify the marker endpoint (dependent) and the reference endpoint.
+    const markerIsB = !!c.b.marker;
+    const markerEnd = markerIsB ? c.b : c.a;
+    const refEnd = markerIsB ? c.a : c.b;
+    const m = byId.get(markerEnd.marker);
+    if (!m) continue;
+    // Resolve the reference coordinate on this axis from settled geometry.
+    let refCoord;
+    if (refEnd.rect === ORIGIN_ID) refCoord = 0;
+    else {
+      const rr = rectById.get(refEnd.rect);
+      if (!rr) continue; // dangling ref (rect deleted) — leave the marker free
+      refCoord = edgeCoord(rr, refEnd.edge);
+    }
+    // value = coord(b) − coord(a). Solve for the marker's coordinate.
+    m[c.axis] = markerIsB ? refCoord + c.value : refCoord - c.value;
+    m._locked[c.axis] = true;
+  }
+
+  for (const m of markers) m._full = m._locked.x && m._locked.y;
 }
