@@ -25,7 +25,7 @@ const STRINGS = {
   'mode.edit':     { en: 'PLAN',   fr: 'PLAN',     zh: '平面' },
   'mode.marker':   { en: 'OUTLET', fr: 'PRISE',    zh: '插座' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
-  'mode.size':     { en: 'SIZE',   fr: 'COTE',     zh: '尺寸' },
+  'mode.dims':     { en: 'DIMS',   fr: 'COTE',     zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
@@ -67,19 +67,19 @@ const STRINGS = {
     zh: '仅编辑平面。瞄准区域并扣动扳机选择；再次扣动可循环下层区域。握把删除；B/Y切换房间/墙。',
   },
   'help.marker': {
-    en: 'Edit outlets only. Aim and trigger to edit height; grip-drag moves one, grip away deletes the selection. Trigger empty space to place at the tip. SIZE pins X/Y.',
-    fr: 'Modifiez seulement les prises. Visez + gâchette : hauteur ; poignée-glisser : déplacer ; poignée ailleurs : supprimer. Gâchette dans le vide : poser à la pointe. COTE fixe X/Y.',
-    zh: '仅编辑插座。瞄准并扣动扳机可编辑高度；按住握把拖动，移开后按握把删除所选项。对空处扣动扳机可在笔尖放置。“尺寸”固定X/Y。',
+    en: 'Edit outlets only. Aim and trigger to edit height; grip-drag moves one, grip away deletes the selection. Trigger empty space to place at the tip. A floor icon marks X/Y.',
+    fr: 'Modifiez seulement les prises. Visez + gâchette : hauteur ; poignée-glisser : déplacer ; poignée ailleurs : supprimer. Gâchette dans le vide : poser à la pointe. Une icône au sol marque X/Y.',
+    zh: '仅编辑插座。瞄准并扣动扳机可编辑高度；按住握把拖动，移开后按握把删除所选项。对空处扣动扳机可在笔尖放置；地面图标标记X/Y。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
     fr: 'Corrige la dérive. Visez avec le réticule jusqu’à surligner le mur 1, gâchette pour choisir son coin, puis 2 points sur le mur 1 et 1 sur le mur 2.',
     zh: '修正漂移。用指针准星瞄准至墙1高亮，扣动扳机选择墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
   },
-  'help.size': {
-    en: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side. To pin a marker: pick it, then a wall edge (0 = on the wall).',
-    fr: 'Choisissez deux références — un bord ou l’origine du plan — puis tapez la distance exacte sur le pavé. B/Y inverse le côté. Pour fixer une prise : choisissez-la, puis un bord de mur (0 = sur le mur).',
-    zh: '选取两个参照——矩形的边或平面原点——然后在数字键盘上输入精确距离。B/Y 翻转方向。固定标记：先选标记，再选墙边（0 = 贴在墙上）。',
+  'help.dims': {
+    en: 'Pick two floor references, then type the distance. For an outlet, pick a plan edge and its floor icon (either order; 0 = on wall). The linked wall outlet highlights too.',
+    fr: 'Choisissez deux références au sol, puis tapez la distance. Pour une prise : bord du plan + icône au sol (ordre libre ; 0 = au mur). La prise liée est aussi surlignée.',
+    zh: '选择两个地面参照，再输入距离。固定插座时选择平面边和地面图标（顺序不限；0 = 贴墙），对应的墙上插座也会高亮。',
   },
   'help.save': {
     en: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
@@ -109,7 +109,7 @@ const STRINGS = {
   'key.del':   { en: '🗑 DEL',  fr: '🗑 SUPPR',  zh: '🗑 删除' },
   'key.flip':  { en: '⇄ FLIP',  fr: '⇄ INVERSER', zh: '⇄ 翻转' },
 
-  // --- SIZE dimension title ---------------------------------------------------
+  // --- DIMS dimension title ---------------------------------------------------
   'dim.pick':     { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },
   'dim.edit':     { en: '(edit)', fr: '(modif.)', zh: '（编辑）' },
   'dim.conflict': { en: '!CONFLICT', fr: '!CONFLIT', zh: '！冲突' },

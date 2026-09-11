@@ -13,13 +13,13 @@ editor (`ar-2d-parity` memory).
 ## Modes (13, stable `id`s), cycled by A/B / thumbstick-x
 
 `FLOOR` → `LEVEL` → `REGISTER`(id `register`, label ORIGIN) → `ROOM`(id `drop`) → `WALL` →
-`EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) → `RECAL` → `SIZE` → `SAVE` → `LOAD` → `LANG`.
+`EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) → `RECAL` → `DIMS` → `SAVE` → `LOAD` → `LANG`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
 Per-frame mode visuals/highlights are the big if/else chain keyed on `modeId` near the end of
 the animation loop. `setMode` resets in-progress gestures and activates/deactivates the numpad
-(SIZE + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
+(DIMS + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
 (= FLOOR at session start); everything else is keyed by `id` or `currentMode ± 1`.
 
 - **FLOOR** — calibrate the ground base level `floorY` by touching the real ground. Guarded to
@@ -37,12 +37,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   through overlapping zones), grip deletes it, and B/Y swaps it room↔wall. Outlet glyphs are inert.
 - **OUTLET** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
   pointing directly at an outlet and triggering opens its height pad; grip-drag moves it in 3D;
-  grip away deletes the selected outlet. Plan zones are inert.
+  grip away deletes the selected outlet. Every outlet also has a flat projected floor icon showing
+  its plan X/Y. Plan zones are inert.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
-- **SIZE** — the dimension tool (see Dimensioning below).
+- **DIMS** — the dimension tool (see Dimensioning below).
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.
 - **LANG** — UI language switch (see Localization). Thumbstick up/down moves through the list
   (FR/EN/ZH); trigger picks the ray-aimed row, or advances one if the ray is off the panel.
@@ -50,7 +51,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 ## Localization (`src/core/i18n.js`)
 
 All user-facing AR text is localized (EN default, FR, ZH) — mode labels, per-mode help boxes,
-transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, SIZE dim title + edge/origin ref
+transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS title + edge/origin ref
 names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay English (diagnostic).
 
 - `i18n.js` mirrors `units.js`: a `current` language + an `onLangChange` bus, plus `t(key)`,
@@ -67,26 +68,32 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
 
 - **trigger** = mode action (place / pick / press a numpad or slot key).
 - **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
-  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (SIZE = undo a
+  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
-  reticle is over a drag target → **grip-drag** (SIZE over a dim panel = slide its offset; EDGE
+  reticle is over a drag target → **grip-drag** (DIMS over a dim panel = slide its offset; EDGE
   over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
   Marker drag adjusts existing X/Y pin values so the marker does not snap back on release.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - **thumbstick-x** = cycle mode; **thumbstick-y** = change floor (global up/down, no wrap);
   **thumbstick-hold (~1.2 s)** = exit AR.
 - **A/X** = prev mode. **B/Y** = next mode, EXCEPT: PLAN swaps the selected zone room↔wall;
-  SIZE (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
+  DIMS (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
   **LEVEL cycles to the next floor** (`cycleFloor`, wraps).
 - Only the last-active controller is read (`activeSource`/`pickSource`); the idle hand hides.
 
-## Dimensioning (SIZE)
+## Dimensioning (DIMS)
 
 Exact size = dimension constraints only (core design rule; no on-canvas size editor). Ref-pick
 is reticle-gated (`edgeAtPoint` / origin near gizmo / `dimLabelAtPoint` to select a constraint).
 Numpad row is **SWAP | DEL | ENTER**, shown only in the edit phase. Field prefills the current
 value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives rejected.
+
+- Outlet X/Y pins are selected through the outlet's **projected floor icon**, never its wall-height
+  glyph. Pick a plan edge and the floor icon in either order; the projection wins when its icon
+  overlaps an edge inside the reticle. Hovering or locking a projected icon also highlights its
+  linked wall-height outlet, disambiguating outlets that share X/Y at different heights. The
+  resulting one-way constraint moves the outlet, not the wall.
 
 - Distance = ordered + signed (`value = coord(b) − coord(a)`). **FLIP = `flipConstraintSide`**
   (negate value, keep order). `swapConstraint` is geometrically a NO-OP (swaps a,b AND negates;
@@ -110,7 +117,7 @@ basement negative). See `multi-floor-design` memory for the settled design.
 
 - Entering AR seeds **Basement · Ground · Upper** around Ground (`ensureFloors`; no-op if
   already multi-floor; default 2.8 m, persists via autosave).
-- **LEVEL mode**: **B/Y cycles** the active floor (wrap); the SIZE numpad is reused to type a
+- **LEVEL mode**: **B/Y cycles** the active floor (wrap); the DIMS numpad is reused to type a
   storey height, **ENTER** sets the active floor's height (`project.setHeight`) and re-stacks
   elevations. Heights are entered **by hand** — Quest can't measure the vertical offset. The
   pad's SWAP/DEL keys are inert here. Label reads `LEVEL · <FloorName>`; pad title shows the
@@ -147,7 +154,7 @@ world overlays. Per controller, stacked above the tip: mode **label**, hover **r
 ## Performance notes (per-frame cost)
 
 - **Dim-label textures are cached** by text+color (`dimTexCache`, evicted in `buildDimensions`,
-  bounded at 64). `buildPlan` no longer disposes the shared sprite `.map`. This makes the SIZE
+  bounded at 64). `buildPlan` no longer disposes the shared sprite `.map`. This makes the DIMS
   dim-offset grip-drag a per-frame cache hit.
 - **EDGE grip-drag** calls `buildPlan(false)` (skips `buildDimensions`, the dominant cost); the
   full rebuild is restored on drag release (`onSqueezeEnd`).

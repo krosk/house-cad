@@ -208,7 +208,7 @@ export function setupMR(view, project, getFootprint) {
 
     const DISP_H = 140, ROWS = 5, CELL_H = (H - DISP_H) / ROWS, COLS = 3, CELL_W = W / COLS;
     const grid = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['.', '0', 'back']];
-    // Localized at draw time (⌫ is language-neutral). swap = the SIZE FLIP action.
+    // Localized at draw time (⌫ is language-neutral). swap = the DIMS FLIP action.
     const keyLabel = (kid) => kid === 'back' ? '⌫'
       : kid === 'enter' ? t('key.enter')
       : kid === 'swap' ? t('key.flip')
@@ -476,7 +476,7 @@ export function setupMR(view, project, getFootprint) {
 
   // Highlights for the survey edge you're pointing at (magenta) or have locked
   // (yellow) — a strip drawn along that edge, just above the floor. Two of them so
-  // SIZE can show both picked references (edge A and edge B) at once.
+  // DIMS can show both picked references (edge A and edge B) at once.
   function makeEdgeHi() {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(18), 3)); // 2 triangles
@@ -632,6 +632,7 @@ export function setupMR(view, project, getFootprint) {
   const markerGroup = new THREE.Group();
   planGroup.add(markerGroup);
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
+  const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
   const fillMat = new THREE.MeshBasicMaterial({
     color: ACCENT, transparent: true, opacity: 0.22,
@@ -929,7 +930,7 @@ export function setupMR(view, project, getFootprint) {
   // A marker glyph: an outlet icon on a translucent disc, tinted WHITE once the marker
   // is fully pinned (both X and Y constrained), else the marker's type color. Drawn on
   // a canvas so the tint can change (an emoji couldn't go white-when-locked).
-  function makeMarkerSprite(marker) {
+  function markerTexture(marker) {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
@@ -942,12 +943,32 @@ export function setupMR(view, project, getFootprint) {
     ctx.fillRect(47, 38, 11, 36);
     ctx.fillRect(70, 38, 11, 36);
     ctx.beginPath(); ctx.arc(64, 92, 7, 0, Math.PI * 2); ctx.fill();
-    const tex = new THREE.CanvasTexture(canvas);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  function makeMarkerSprite(marker) {
+    const tex = markerTexture(marker);
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
     spr.scale.set(0.09, 0.09, 1);
     spr.renderOrder = 32; // above floor overlays/highlights (badges are 30)
     spr.userData.markerId = marker.id;
+    spr.userData.markerRole = 'wall';
     return spr;
+  }
+
+  // A second copy of the outlet glyph projected flat onto the plan overlay. DIMS
+  // uses this as the marker's dimension reference; OUTLET continues to target the
+  // wall-height sprite, keeping the two editing domains spatially unambiguous.
+  function makeMarkerFloorIcon(marker) {
+    const tex = markerTexture(marker);
+    const mesh = new THREE.Mesh(markerFloorGeom, new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0.78,
+      side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+    }));
+    mesh.renderOrder = 31;
+    mesh.userData.markerId = marker.id;
+    mesh.userData.markerRole = 'floor';
+    return mesh;
   }
 
   // Rebuild the marker glyphs into markerGroup (planGroup-local), placing each at
@@ -962,7 +983,9 @@ export function setupMR(view, project, getFootprint) {
     for (const m of project.markers) {
       const spr = makeMarkerSprite(m);
       spr.position.set(m.x, m.z, -m.y);
-      markerGroup.add(spr);
+      const floorIcon = makeMarkerFloorIcon(m);
+      floorIcon.position.set(m.x, 0.016, -m.y);
+      markerGroup.add(spr, floorIcon);
     }
   }
 
@@ -995,7 +1018,7 @@ export function setupMR(view, project, getFootprint) {
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
 
-  // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
+  // DIMS state (S2 numpad): the desktop dimension tool in AR. Pick two references
   // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
   // written as a hard constraint. edge<->edge = a size; edge<->origin = a position
   // lock. Also edits an existing constraint between the same two references.
@@ -1003,11 +1026,11 @@ export function setupMR(view, project, getFootprint) {
   let dimRefA = null;       // first-picked reference (the anchor, like desktop)
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
-  let hoverFloorPt = null;  // {px,py} reticle floor point this frame during SIZE ref-pick
+  let hoverFloorPt = null;  // {px,py} reticle floor point this frame during DIMS ref-pick
   let dimOffsetPt = null;   // {px,py} captured when a pair completes -> new dim's default line placement
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
-  let gripDrag = null;      // active grip-drag: dim (SIZE), edge (EDGE), or marker (EDIT)
-  let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
+  let gripDrag = null;      // active grip-drag: dim (DIMS), edge (EDGE), or marker (OUTLET)
+  let dimBuffer = '';       // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
   let hoverKey = null;      // numpad key under the ray this frame
@@ -1049,7 +1072,7 @@ export function setupMR(view, project, getFootprint) {
   // renders at its real height above that origin (see Project._recomputeElevations).
   const activeElevation = () => project.activeFloor?.elevation ?? 0;
   // World Y of the active floor's overlay plane = registered ground level +
-  // elevation. EDGE/SIZE ray hits and reticles use this so you edit at the floor
+  // elevation. EDGE/DIMS ray hits and reticles use this so you edit at the floor
   // you're standing on, not the ground. A pure Y lift, so worldToPlan (which
   // reads x/z only) is unaffected — plan coords stay correct on every storey.
   const overlayY = () => planPos.y + activeElevation();
@@ -1091,7 +1114,7 @@ export function setupMR(view, project, getFootprint) {
   // The edge the beam is actually pointing AT: the edge SEGMENT closest to the
   // aimed floor point (px,py), across ALL zones, within EDGE_PICK_M. Uses true
   // segment distance + a cap, so open floor picks nothing and the edge under your
-  // reticle wins. Shared by EDGE and SIZE ref-picking. Returns {rectId, edge} | null.
+  // reticle wins. Shared by EDGE and DIMS ref-picking. Returns {rectId, edge} | null.
   // Cap = the reticle's outer radius, so an edge is pickable ONLY when it actually
   // falls inside the ring you're aiming — not merely "somewhere near."
   const EDGE_PICK_M = RETICLE_OUTER; // m; edge must lie within the reticle ring to pick
@@ -1209,7 +1232,7 @@ export function setupMR(view, project, getFootprint) {
     badge.sprite.visible = true;
   }
 
-  // --- SIZE (S2 numpad) helpers: the desktop dimension tool in AR ---
+  // --- DIMS (S2 numpad) helpers: the desktop dimension tool in AR ---
 
   const isXEdge = (e) => e === 'left' || e === 'right';
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
@@ -1313,7 +1336,7 @@ export function setupMR(view, project, getFootprint) {
     dimRefA = dimRefB = null;
     editingId = null;
     dimOffsetPt = null;
-    sizeBuffer = '';
+    dimBuffer = '';
     bufferPristine = false;
     dimConflict = false;
     numpad.group.visible = false; // back to ref-pick: the pad has no role until a pair is chosen
@@ -1326,13 +1349,13 @@ export function setupMR(view, project, getFootprint) {
     return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  ' + t('dim.edit') : '');
   }
 
-  const redrawNumpad = () => numpad.draw(dimTitle() + (dimConflict ? '  ' + t('dim.conflict') : ''), sizeBuffer, hoverKey);
+  const redrawNumpad = () => numpad.draw(dimTitle() + (dimConflict ? '  ' + t('dim.conflict') : ''), dimBuffer, hoverKey);
 
   const conflictCount = () => project.constraints.reduce((n, k) => n + (k.conflict ? 1 : 0), 0);
 
   function commitEntry() {
     if (!dimRefA || !dimRefB) return;
-    const val = parseFloat(sizeBuffer);
+    const val = parseFloat(dimBuffer);
     // 0 m is valid: an edge<->origin lock puts the edge on the origin axis, and an
     // edge<->edge 0 makes two zones adjacent (shared wall). Only reject negatives/NaN.
     if (!Number.isFinite(val) || val < 0) return; // wait for valid input
@@ -1378,7 +1401,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Live update for an active grip-drag, from the reticle's floor point (px,py):
-  // in SIZE, slide the dim's perpendicular offset (akin to the desktop dim drag); in
+  // in DIMS, slide the dim's perpendicular offset (akin to the desktop dim drag); in
   // EDGE, move the grabbed edge to the touch coordinate. Rebuilt each frame while held.
   // Place a dimension's perpendicular line marker at the plan floor point (px,py) —
   // the signed offset the dim line sits at. Origin dims store the absolute coord;
@@ -1421,8 +1444,11 @@ export function setupMR(view, project, getFootprint) {
     project.moveMarker(marker.id, { x: px, y: py, z: Math.max(0, _dragPoint.y - overlayY()) });
     // mr.js is not subscribed to model changes. Move the existing sprite directly
     // during the drag; on release, buildPlan restores the canonical full rendering.
-    const sprite = markerGroup.children.find((s) => s.userData.markerId === marker.id);
-    if (sprite) sprite.position.set(marker.x, marker.z, -marker.y);
+    for (const visual of markerGroup.children) {
+      if (visual.userData.markerId !== marker.id) continue;
+      if (visual.userData.markerRole === 'wall') visual.position.set(marker.x, marker.z, -marker.y);
+      else visual.position.set(marker.x, 0.016, -marker.y);
+    }
   }
 
   function pressKey(k) {
@@ -1430,11 +1456,11 @@ export function setupMR(view, project, getFootprint) {
     if (k === 'swap') { swapDim(); return; } // ⇄ FLIP: move the edge to the other side
     if (k === 'del') { deleteDim(); return; } // 🗑 DEL: remove this constraint
     dimConflict = false; // any edit clears the refusal warning
-    if (bufferPristine && k !== 'back') sizeBuffer = ''; // typing over a prefilled edit value
+    if (bufferPristine && k !== 'back') dimBuffer = ''; // typing over a prefilled edit value
     bufferPristine = false;
-    if (k === 'back') sizeBuffer = sizeBuffer.slice(0, -1);
-    else if (k === '.') { if (!sizeBuffer.includes('.')) sizeBuffer += '.'; }
-    else if (sizeBuffer.replace('.', '').length < 6) sizeBuffer += k; // cap digit count
+    if (k === 'back') dimBuffer = dimBuffer.slice(0, -1);
+    else if (k === '.') { if (!dimBuffer.includes('.')) dimBuffer += '.'; }
+    else if (dimBuffer.replace('.', '').length < 6) dimBuffer += k; // cap digit count
     redrawNumpad();
   }
 
@@ -1447,7 +1473,7 @@ export function setupMR(view, project, getFootprint) {
     dimRefA = toRef(c.a);
     dimRefB = toRef(c.b);
     editingId = c.id;
-    sizeBuffer = fmt(Math.abs(c.value)); // open on the current value; first key replaces it
+    dimBuffer = fmt(Math.abs(c.value)); // open on the current value; first key replaces it
     bufferPristine = true;
     dimConflict = false;
     rlog('dim load', { id, a: refLabel(dimRefA), b: refLabel(dimRefB) });
@@ -1455,7 +1481,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // ---- LEVEL: per-storey height, entered by hand (Quest can't measure the vertical
-  // offset between floors). Reuses the SIZE numpad; the SWAP/DEL keys have no role here.
+  // offset between floors). Reuses the DIMS numpad; the SWAP/DEL keys have no role here.
   // B/Y cycles the active floor (see pollModeCycle); a floor's height re-stacks every
   // floor's elevation above it (Project._recomputeElevations).
   const levelTitle = () => {
@@ -1504,8 +1530,8 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // ---- EDIT marker height: a marker's inherent height above the floor, typed by hand
-  // on the SIZE numpad (reused, like LEVEL). SWAP is inert; DEL deletes the marker. X/Y
-  // are pinned separately in SIZE — height is never a constraint axis.
+  // on the DIMS numpad (reused, like LEVEL). SWAP is inert; DEL deletes the marker. X/Y
+  // are pinned separately in DIMS — height is never a constraint axis.
   const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${t('marker.height')}`;
   const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey);
 
@@ -1565,7 +1591,7 @@ export function setupMR(view, project, getFootprint) {
     rlog('floor cycle', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
   }
 
-  // SIZE trigger: while both refs aren't chosen, select the dim value panel under the
+  // DIMS trigger: while both refs aren't chosen, select the dim value panel under the
   // ray (edit that constraint) or pick a rect edge / the origin (two picks, like
   // clicking two edges on desktop). Once both are chosen, the ray drives the numpad.
   function onNumpadTouch() {
@@ -1581,14 +1607,14 @@ export function setupMR(view, project, getFootprint) {
     editingId = existing ? existing.id : null;
     // Prefill with the constrained value if one exists, else the current measured
     // span. Either way the field opens on the real value; the first keypress replaces it.
-    sizeBuffer = fmt(existing ? Math.abs(existing.value) : currentSpan(dimRefA, dimRefB));
+    dimBuffer = fmt(existing ? Math.abs(existing.value) : currentSpan(dimRefA, dimRefB));
     bufferPristine = true;
     rlog('dim B', { ref: refLabel(hoverRef), editing: !!existing });
     showNumpad(); // pair complete -> enter the numpad/edit phase
   }
 
   // Park a ray-aimed panel ~0.55 m in front of the headset, upright, facing the
-  // user (yaw-only). Shared by the SIZE numpad and the SAVE/LOAD slot menu.
+  // user (yaw-only). Shared by the DIMS numpad and the SAVE/LOAD slot menu.
   function placePanel(group) {
     const e = renderer.xr.getCamera().matrixWorld.elements;
     _cam.set(e[12], e[13], e[14]);
@@ -1602,7 +1628,7 @@ export function setupMR(view, project, getFootprint) {
     group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
   }
 
-  // Enter SIZE in the ref-pick phase; the pad itself appears only once a pair/constraint
+  // Enter DIMS in the ref-pick phase; the pad itself appears only once a pair/constraint
   // is chosen (see showNumpad), since it has no role while you're still picking refs.
   function activateNumpad() {
     resetDim();
@@ -1821,6 +1847,7 @@ export function setupMR(view, project, getFootprint) {
     markerGroup.updateWorldMatrix(true, true);
     let best = null, bestD = MARKER_PICK_RADIUS;
     for (const sprite of markerGroup.children) {
+      if (sprite.userData.markerRole !== 'wall') continue;
       sprite.getWorldPosition(_dp);
       _dv.copy(_dp).sub(_ro);
       const along = _dv.dot(_rd);
@@ -1834,10 +1861,25 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
-  function emphasizeMarker(marker, scale = 0.12) {
+  // DIMS picks the marker only through its floor projection, using the same
+  // reticle-radius gating as plan edges.
+  function markerAtFloorPoint(px, py) {
+    let best = null, bestD = RETICLE_OUTER;
+    for (const marker of project.markers) {
+      const d = Math.hypot(px - marker.x, py - marker.y);
+      if (d < bestD) { bestD = d; best = marker; }
+    }
+    return best;
+  }
+
+  function emphasizeMarker(marker, role = 'wall', factor = 1.3) {
     if (!marker) return;
-    const sprite = markerGroup.children.find((s) => s.userData.markerId === marker.id);
-    if (sprite) sprite.scale.set(scale, scale, 1);
+    const visual = markerGroup.children.find(
+      (o) => o.userData.markerId === marker.id && o.userData.markerRole === role,
+    );
+    if (!visual) return;
+    if (role === 'floor') visual.scale.set(factor, factor, 1);
+    else visual.scale.set(0.09 * factor, 0.09 * factor, 1);
   }
 
   // The dim value panel the RETICLE is over: the sprite whose plan position is nearest
@@ -1879,7 +1921,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Intersection of a controller's pointing ray with a canvas panel (with .uv), or
-  // null. Used by SIZE (numpad) and SAVE/LOAD (slot menu) to pick the cell under the ray.
+  // null. Used by DIMS (numpad) and SAVE/LOAD (slot menu) to pick the cell under the ray.
   const _raycaster = new THREE.Raycaster();
   function rayPanelHit(inputSource, mesh = numpad.mesh) {
     const space = inputSource?.targetRaySpace;
@@ -1930,10 +1972,10 @@ export function setupMR(view, project, getFootprint) {
     rlog('edit swap', { id: selectedRect.id, op: selectedRect.op });
   }
 
-  // SIZE mode: flip which SIDE ref B sits on relative to ref A — negates the signed
+  // DIMS mode: flip which SIDE ref B sits on relative to ref A — negates the signed
   // distance (magnitude kept). Works for edge<->edge (the edge jumps to A's other
   // side) AND edge<->origin (the edge jumps to the other side of the origin axis; the
-  // origin datum itself never moves). Bound to B/Y in SIZE. To flip an existing
+  // origin datum itself never moves). Bound to B/Y in DIMS. To flip an existing
   // dimension, re-pick its two refs (re-selects the constraint) then press B/Y. No-op
   // before a distance exists. A flip that would over-constrain is refused.
   function swapDim() {
@@ -1943,7 +1985,7 @@ export function setupMR(view, project, getFootprint) {
     if (!c) {
       // No constraint yet: create one at the current buffer value so FLIP has something
       // to act on (same as committing then flipping, without leaving the pad).
-      const val = parseFloat(sizeBuffer);
+      const val = parseFloat(dimBuffer);
       if (!Number.isFinite(val) || val < 0) { rlog('dim flip: enter a distance first'); return; }
       c = makeConstraintForRefs(dimRefA, dimRefB);
       project.setConstraintMagnitude(c.id, toMeters(val));
@@ -2073,7 +2115,7 @@ export function setupMR(view, project, getFootprint) {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
       // OUTLET editing domain. Aim at an existing outlet to edit its height; grip-drag
       // moves it and grip away deletes the selected outlet. Trigger on empty space drops
-      // a new outlet at the tip. SIZE remains the cross-domain tool for wall pins.
+      // a new outlet at the tip. DIMS remains the cross-domain tool for wall pins.
       onTouch: (pos) => {
         if (!placed) return;
         if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
@@ -2151,7 +2193,7 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'size', color: 0xfbbf24, // label/help via i18n: mode.size / help.size
+      id: 'dims', color: 0xfbbf24, // label/help via i18n: mode.dims / help.dims
       // The desktop dimension tool in AR: pick two references — each a rect EDGE
       // or the plan ORIGIN axis — then type the exact distance on the numpad.
       // edge<->edge = a size (width/height); edge<->origin = a position lock. If a
@@ -2201,7 +2243,7 @@ export function setupMR(view, project, getFootprint) {
     const m = modes[currentMode];
     applyModeVisual(t(`mode.${m.id}`), m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
     for (const h of helps) h.setText(t(`mode.${m.id}`), t(`help.${m.id}`), m.color); // mode guidance box
-    if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
+    if (m.id === 'dims') activateNumpad(); // spawn/refresh the numpad in front of you
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
@@ -2403,14 +2445,16 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
-  // of an undo — a dim value panel in SIZE, an edge in EDGE, or a marker in OUTLET.
+  // of an undo — a dim value panel in DIMS, an edge in EDGE, or a marker in OUTLET.
   function onSqueezeStart(event) {
     if (event?.data) activeSource = event.data;
     const id = modes[currentMode].id;
-    if (id === 'size' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
+    if (id === 'dims' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
     if (id === 'marker' && hoverMarker && setControllerRay(event.data)) {
-      const sprite = markerGroup.children.find((s) => s.userData.markerId === hoverMarker.id);
+      const sprite = markerGroup.children.find(
+        (s) => s.userData.markerId === hoverMarker.id && s.userData.markerRole === 'wall',
+      );
       if (!sprite) return;
       sprite.getWorldPosition(_dp);
       const distance = _dv.copy(_dp).sub(_ro).dot(_rd);
@@ -2436,15 +2480,15 @@ export function setupMR(view, project, getFootprint) {
   // other modes only cancel an in-progress gesture (or do nothing).
   //  - PLAN: delete the selected zone.
   //  - OUTLET: delete the selected outlet (an aimed grip starts a drag instead).
-  //  - SIZE: cancel the last dimension pick, step by step.
+  //  - DIMS: cancel the last dimension pick, step by step.
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
     if (event?.data) activeSource = event.data; // grip claims control too
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
-    if (mode.id === 'size') { // undo the last dimension pick, step by step
-      if (dimRefB || editingId) { dimRefB = null; editingId = null; sizeBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
+    if (mode.id === 'dims') { // undo the last dimension pick, step by step
+      if (dimRefB || editingId) { dimRefB = null; editingId = null; dimBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
     }
@@ -2554,11 +2598,11 @@ export function setupMR(view, project, getFootprint) {
       exitProgress = 0;
     }
     // Upper face button (B/Y) normally cycles to the next mode, but it's overridden
-    // in PLAN (swap the selected zone room<->wall) and in SIZE with a pair chosen
+    // in PLAN (swap the selected zone room<->wall) and in DIMS with a pair chosen
     // (reverse the dimension's direction). Thumbstick-x still cycles modes there.
     if (next && !btn.next) {
       if (modes[currentMode].id === 'edit') swapSelected();
-      else if (modes[currentMode].id === 'size' && dimRefA && dimRefB) swapDim();
+      else if (modes[currentMode].id === 'dims' && dimRefA && dimRefB) swapDim();
       else if (modes[currentMode].id === 'level') cycleFloor(); // dedicated floor-switch action
       else setMode(currentMode + 1);
     }
@@ -2642,12 +2686,12 @@ export function setupMR(view, project, getFootprint) {
       const ptr = ptrW ? worldToPlan(ptrW) : null;
       const ret = reticle.visible ? worldToPlan(reticle.position) : null;
       // Length of the currently highlighted edge (locked wins over hovered). In EDGE
-      // that's selectedEdge/hoverEdge; in SIZE it's the edge ref under the ray
+      // that's selectedEdge/hoverEdge; in DIMS it's the edge ref under the ray
       // (hoverRef). All hold last frame's value here — recomputed just below — the
       // same imperceptible lag the ret/ptr lines already accept.
       const modeId = modes[currentMode].id;
-      const sizeHoverEdge = modeId === 'size' && hoverRef?.kind === 'edge' ? hoverRef : null;
-      const edgeRef = selectedEdge || hoverEdge || sizeHoverEdge;
+      const dimHoverEdge = modeId === 'dims' && hoverRef?.kind === 'edge' ? hoverRef : null;
+      const edgeRef = selectedEdge || hoverEdge || dimHoverEdge;
       const edgeM = edgeLen(edgeRef);
       const lines = [
         `build:  ${BUILD_ID}`,
@@ -2668,7 +2712,10 @@ export function setupMR(view, project, getFootprint) {
     recalBadge1.sprite.visible = recalBadge2.sprite.visible = recalStep.sprite.visible = false;
     hoverStack = [];
     hoverMarker = null;
-    for (const sprite of markerGroup.children) sprite.scale.set(0.09, 0.09, 1);
+    for (const visual of markerGroup.children) {
+      if (visual.userData.markerRole === 'floor') visual.scale.set(1, 1, 1);
+      else visual.scale.set(0.09, 0.09, 1);
+    }
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
@@ -2756,8 +2803,8 @@ export function setupMR(view, project, getFootprint) {
           recalStep.sprite.visible = true;
         }
       }
-    } else if (modeId === 'size') {
-      // SIZE: pick two references (edge or origin) then type on the numpad. While
+    } else if (modeId === 'dims') {
+      // DIMS: pick two references (edge or origin) then type on the numpad. While
       // the pair isn't complete, aim at the floor to pick refs; once complete, the
       // ray drives the numpad. Locked refs (amber) and the hover ref (yellow) are
       // drawn — edges as strips, the origin by tinting its gizmo ring.
@@ -2779,10 +2826,9 @@ export function setupMR(view, project, getFootprint) {
         }
       } else {
         // Reference-pick phase. If the ray is on an existing dim value panel, THAT is
-        // the pick (select it to edit the constraint); otherwise ray the visible marker
-        // glyph directly, or the floor for an edge/origin.
+        // the pick (select it to edit the constraint); otherwise ray the floor for an
+        // outlet projection, edge, or origin. The wall-height outlet glyph is inert here.
         const source = pickSource(frame);
-        const aimedMarker = (dimRefA && dimRefA.kind === 'marker') ? null : pickMarker(source);
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true; // reticle always tracks the floor point
@@ -2792,19 +2838,12 @@ export function setupMR(view, project, getFootprint) {
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A dim panel is hovered only when the RETICLE is over it (before the first ref).
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
-          if (!hoverDim) { // a hovered dim panel takes over; otherwise marker beats floor refs
-            if (aimedMarker) {
-              hoverRef = { kind: 'marker', markerId: aimedMarker.id };
-              hoverFloorPt = { px: aimedMarker.x, py: aimedMarker.y };
-              reticle.visible = false; // the enlarged glyph is the pointer target
-            }
+          if (!hoverDim) { // a hovered dim panel takes over; otherwise projection beats plan refs
+            const floorMarker = (dimRefA && dimRefA.kind === 'marker') ? null : markerAtFloorPoint(px, py);
+            if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
             else if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
             else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
           }
-        } else if (aimedMarker) {
-          hoverRef = { kind: 'marker', markerId: aimedMarker.id };
-          hoverFloorPt = { px: aimedMarker.x, py: aimedMarker.y };
-          reticle.visible = false;
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
@@ -2814,7 +2853,14 @@ export function setupMR(view, project, getFootprint) {
       const showRef = (ref, color) => {
         if (!ref) return;
         if (ref.kind === 'origin') originRingMat.color.setHex(color);
-        else if (ref.kind === 'marker') emphasizeMarker(markerOf(ref));
+        else if (ref.kind === 'marker') {
+          const marker = markerOf(ref);
+          // The floor projection is DIMS' hit target, but it may overlap another
+          // outlet at the same X/Y. Emphasize the linked wall-height glyph too so
+          // the user can see exactly which vertical outlet this reference means.
+          emphasizeMarker(marker, 'floor');
+          emphasizeMarker(marker, 'wall');
+        }
         else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
       };
       if (hoverDim) {
@@ -2884,8 +2930,8 @@ export function setupMR(view, project, getFootprint) {
         selectedMarker = null;
         deactivateNumpad();
       }
-      emphasizeMarker(selectedMarker, 0.12);
-      emphasizeMarker(hoverMarker, 0.115);
+      emphasizeMarker(selectedMarker, 'wall', 1.33);
+      emphasizeMarker(hoverMarker, 'wall', 1.28);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.
