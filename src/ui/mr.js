@@ -156,7 +156,7 @@ export function setupMR(view, project, getFootprint) {
 
     const DISP_H = 140, ROWS = 5, CELL_H = (H - DISP_H) / ROWS, COLS = 3, CELL_W = W / COLS;
     const grid = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['.', '0', 'back']];
-    const keyLabel = { back: '⌫', enter: 'ENTER', swap: '⇄ FLIP' };
+    const keyLabel = { back: '⌫', enter: 'ENTER', swap: '⇄ FLIP', del: '🗑 DEL' };
 
     // Plane UV -> key id (or null). Texture flipY maps canvas-top to v=1.
     function keyAt(u, v) {
@@ -164,7 +164,7 @@ export function setupMR(view, project, getFootprint) {
       if (cy < DISP_H) return null;
       const row = Math.floor((cy - DISP_H) / CELL_H);
       if (row < 0 || row >= ROWS) return null;
-      if (row === 4) return cx < W / 2 ? 'swap' : 'enter'; // bottom row: SWAP | ENTER
+      if (row === 4) { const t = Math.floor(cx / (W / 3)); return t === 0 ? 'swap' : t === 1 ? 'del' : 'enter'; } // SWAP | DEL | ENTER
       const col = Math.min(COLS - 1, Math.max(0, Math.floor(cx / CELL_W)));
       return grid[row]?.[col] ?? null;
     }
@@ -189,6 +189,7 @@ export function setupMR(view, project, getFootprint) {
         const hot = hoverKey && hoverKey === kid;
         if (kid === 'enter') ctx.fillStyle = hot ? 'rgba(52,211,153,0.95)' : 'rgba(34,110,80,0.9)';
         else if (kid === 'swap') ctx.fillStyle = hot ? 'rgba(251,191,36,0.95)' : 'rgba(146,104,20,0.9)';
+        else if (kid === 'del') ctx.fillStyle = hot ? 'rgba(248,113,113,0.95)' : 'rgba(127,29,29,0.9)';
         else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
         ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
         ctx.fillStyle = '#e6edf3';
@@ -199,10 +200,12 @@ export function setupMR(view, project, getFootprint) {
           key(grid[r][c], c * CELL_W + 6, DISP_H + r * CELL_H + 6, CELL_W - 12, CELL_H - 12);
         }
       }
-      // Bottom row: SWAP (left half) | ENTER (right half).
-      const by = DISP_H + 4 * CELL_H + 6, bh = CELL_H - 12;
-      key('swap', 6, by, W / 2 - 12, bh);
-      key('enter', W / 2 + 6, by, W / 2 - 12, bh);
+      // Bottom row: SWAP | DEL | ENTER (thirds). Smaller font so labels fit.
+      ctx.font = 'bold 34px sans-serif';
+      const by = DISP_H + 4 * CELL_H + 6, bh = CELL_H - 12, tw = W / 3;
+      key('swap', 6, by, tw - 12, bh);
+      key('del', tw + 6, by, tw - 12, bh);
+      key('enter', 2 * tw + 6, by, tw - 12, bh);
       tex.needsUpdate = true;
     }
 
@@ -255,7 +258,9 @@ export function setupMR(view, project, getFootprint) {
     c.add(dbg.sprite);
     debugs.push(dbg);
     c.addEventListener('select', onSelect);   // trigger: run current mode
-    c.addEventListener('squeeze', onReset);   // grip: undo placement
+    c.addEventListener('squeezestart', onSqueezeStart); // grip press: begin a grip-drag if over a target
+    c.addEventListener('squeeze', onReset);   // grip: undo placement (unless a grip-drag ran)
+    c.addEventListener('squeezeend', onSqueezeEnd);     // grip release: end the grip-drag
     // Remember which XRInputSource drives this controller object so we can show
     // its tip/label only while it's the active hand.
     c.addEventListener('connected', (e) => { c.userData.inputSource = e.data; });
@@ -513,15 +518,15 @@ export function setupMR(view, project, getFootprint) {
         const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
         const color = conflict ? '#ff5c5c' : '#79c0ff';
         if (isXEdge(eref.edge)) {
-          const yMid = (le.p0.y + le.p1.y) / 2;
-          segs.push({ ax: 0, ay: yMid, bx: le.coord, by: yMid, conflict });             // origin -> edge line
+          const yLine = c.offset != null ? c.offset : (le.p0.y + le.p1.y) / 2; // grip-drag pins offset
+          segs.push({ ax: 0, ay: yLine, bx: le.coord, by: yLine, conflict });            // origin -> edge line
           segs.push({ ax: le.coord, ay: le.p0.y, bx: le.coord, by: le.p1.y, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, le.coord / 2, yMid), c);
+          pushDim(makeDimLabel(text, color, le.coord / 2, yLine), c);
         } else {
-          const xMid = (le.p0.x + le.p1.x) / 2;
-          segs.push({ ax: xMid, ay: 0, bx: xMid, by: le.coord, conflict });             // origin -> edge line
+          const xLine = c.offset != null ? c.offset : (le.p0.x + le.p1.x) / 2;
+          segs.push({ ax: xLine, ay: 0, bx: xLine, by: le.coord, conflict });            // origin -> edge line
           segs.push({ ax: le.p0.x, ay: le.coord, bx: le.p1.x, by: le.coord, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, xMid, le.coord / 2), c);
+          pushDim(makeDimLabel(text, color, xLine, le.coord / 2), c);
         }
         continue;
       }
@@ -533,7 +538,8 @@ export function setupMR(view, project, getFootprint) {
       if (c.axis === 'x') {
         const xa = la.coord, xb = lb.coord;
         const yBase = Math.max(la.p1.y, lb.p1.y);
-        const yLine = yBase + DIM_OFFSET + (xTier++) * DIM_TIER;
+        // Pinned offset (grip-dragged) overrides auto-stacking; unpinned dims still tier.
+        const yLine = c.offset != null ? yBase + c.offset : yBase + DIM_OFFSET + (xTier++) * DIM_TIER;
         segs.push({ ax: xa, ay: yLine, bx: xb, by: yLine, conflict });            // dim line
         segs.push({ ax: xa, ay: la.p1.y, bx: xa, by: yLine + DIM_EXT_OVER, conflict }); // ext a
         segs.push({ ax: xb, ay: lb.p1.y, bx: xb, by: yLine + DIM_EXT_OVER, conflict }); // ext b
@@ -541,7 +547,7 @@ export function setupMR(view, project, getFootprint) {
       } else {
         const ya = la.coord, yb = lb.coord;
         const xBase = Math.max(la.p1.x, lb.p1.x);
-        const xLine = xBase + DIM_OFFSET + (yTier++) * DIM_TIER;
+        const xLine = c.offset != null ? xBase + c.offset : xBase + DIM_OFFSET + (yTier++) * DIM_TIER;
         segs.push({ ax: xLine, ay: ya, bx: xLine, by: yb, conflict });            // dim line
         segs.push({ ax: la.p1.x, ay: ya, bx: xLine + DIM_EXT_OVER, by: ya, conflict }); // ext a
         segs.push({ ax: lb.p1.x, ay: yb, bx: xLine + DIM_EXT_OVER, by: yb, conflict }); // ext b
@@ -680,6 +686,7 @@ export function setupMR(view, project, getFootprint) {
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
+  let gripDrag = null;      // active grip-drag: {kind:'dim',cId} (SIZE) or {kind:'edge',rectId,edge} (EDGE)
   let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
@@ -910,6 +917,8 @@ export function setupMR(view, project, getFootprint) {
     sizeBuffer = '';
     bufferPristine = false;
     dimConflict = false;
+    numpad.group.visible = false; // back to ref-pick: the pad has no role until a pair is chosen
+    numpadCursor.visible = false;
   }
 
   function dimTitle() {
@@ -951,9 +960,51 @@ export function setupMR(view, project, getFootprint) {
     redrawNumpad();
   }
 
+  // 🗑 DEL: remove the constraint for the current pair (existing or just-loaded), then
+  // clear the pad. No-op if the pair has no constraint yet.
+  function deleteDim() {
+    if (!dimRefA || !dimRefB) return;
+    const c = editingId ? project.constraints.find((k) => k.id === editingId)
+                        : findConstraintForRefs(dimRefA, dimRefB);
+    if (!c) { rlog('dim delete: no constraint'); return; }
+    project.removeConstraint(c.id);
+    rlog('dim delete', { id: c.id });
+    resetDim();
+    buildPlan();
+    applyPlanMatrix();
+    redrawNumpad();
+  }
+
+  // Live update for an active grip-drag, from the reticle's floor point (px,py):
+  // in SIZE, slide the dim's perpendicular offset (akin to the desktop dim drag); in
+  // EDGE, move the grabbed edge to the touch coordinate. Rebuilt each frame while held.
+  function applyGripDrag(px, py) {
+    if (!gripDrag) return;
+    if (gripDrag.kind === 'dim') {
+      const c = project.constraints.find((k) => k.id === gripDrag.cId);
+      if (!c) return;
+      const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
+      if (aOrigin || bOrigin) {
+        c.offset = isXEdge(aOrigin ? c.b.edge : c.a.edge) ? py : px; // origin dim: absolute perpendicular coord
+      } else {
+        const la = edgeLine(c.a), lb = edgeLine(c.b);
+        if (!la || !lb) return;
+        c.offset = c.axis === 'x' ? py - Math.max(la.p1.y, lb.p1.y) : px - Math.max(la.p1.x, lb.p1.x);
+      }
+      buildPlan(); applyPlanMatrix(); // presentational; no re-solve needed
+    } else if (gripDrag.kind === 'edge') {
+      const rect = project.rectangles.find((r) => r.id === gripDrag.rectId);
+      if (!rect) return;
+      setEdge(rect, gripDrag.edge, px, py);
+      project.touch(); // edge moved in place -> re-solve + rebuild
+      buildPlan(); applyPlanMatrix();
+    }
+  }
+
   function pressKey(k) {
     if (k === 'enter') { commitEntry(); return; }
     if (k === 'swap') { swapDim(); return; } // ⇄ FLIP: move the edge to the other side
+    if (k === 'del') { deleteDim(); return; } // 🗑 DEL: remove this constraint
     dimConflict = false; // any edit clears the refusal warning
     if (bufferPristine && k !== 'back') sizeBuffer = ''; // typing over a prefilled edit value
     bufferPristine = false;
@@ -976,7 +1027,7 @@ export function setupMR(view, project, getFootprint) {
     bufferPristine = true;
     dimConflict = false;
     rlog('dim load', { id, a: refLabel(dimRefA), b: refLabel(dimRefB) });
-    redrawNumpad();
+    showNumpad();
   }
 
   // SIZE trigger: while both refs aren't chosen, select the dim value panel under the
@@ -997,7 +1048,7 @@ export function setupMR(view, project, getFootprint) {
     sizeBuffer = fmt(existing ? Math.abs(existing.value) : currentSpan(dimRefA, dimRefB));
     bufferPristine = true;
     rlog('dim B', { ref: refLabel(hoverRef), editing: !!existing });
-    redrawNumpad();
+    showNumpad(); // pair complete -> enter the numpad/edit phase
   }
 
   // Park the numpad ~0.55 m in front of the headset, upright, facing the user.
@@ -1014,9 +1065,15 @@ export function setupMR(view, project, getFootprint) {
     numpad.group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
   }
 
+  // Enter SIZE in the ref-pick phase; the pad itself appears only once a pair/constraint
+  // is chosen (see showNumpad), since it has no role while you're still picking refs.
   function activateNumpad() {
-    if (!placed || !activeRect) { numpad.group.visible = false; return; }
     resetDim();
+  }
+
+  // Park the pad in front of the user and show it — called when a pair is completed or
+  // an existing constraint is selected (i.e. entering the numpad/edit phase).
+  function showNumpad() {
     placeNumpad();
     numpad.group.visible = true;
     redrawNumpad();
@@ -1108,9 +1165,6 @@ export function setupMR(view, project, getFootprint) {
     return _rhit.copy(_ro).addScaledVector(_rd, t);
   }
 
-  // The dimension value whose label the controller's ray is aimed at, or null.
-  // Angular pick (nearest label within a small cone) so it works at any distance
-  // even when the in-world text is too small to hit precisely — that's the point.
   // The dim value panel the RETICLE is over: the sprite whose plan position is nearest
   // the floor point (px,py), within the reticle radius. Reticle-gated like edgeAtPoint,
   // so a panel is "hovered" only when the ring is actually on it. Returns the sprite | null.
@@ -1123,6 +1177,9 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // The dimension value whose label the controller's ray is aimed at, or null.
+  // Angular pick (nearest label within a small cone) so it works at any distance
+  // even when the in-world text is too small to hit precisely — that's the point.
   const _dp = new THREE.Vector3(), _dv = new THREE.Vector3();
   const DIM_HOVER_COS = Math.cos(5 * Math.PI / 180); // ~5° cone
   function pickDimLabel(inputSource) {
@@ -1544,6 +1601,21 @@ export function setupMR(view, project, getFootprint) {
     });
   }
 
+  // Grip PRESS: if the reticle is over a draggable target, start a grip-drag instead
+  // of an undo — a dim value panel in SIZE (ref-pick phase), or an edge in EDGE.
+  function onSqueezeStart(event) {
+    if (event?.data) activeSource = event.data;
+    const id = modes[currentMode].id;
+    if (id === 'size' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
+    if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
+  }
+
+  // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
+  function onSqueezeEnd() {
+    if (gripDrag) { project.touch(); rlog('grip-drag end', gripDrag); }
+    gripDrag = null;
+  }
+
   // Grip button: context-sensitive undo.
   //  - EDIT: delete the selected zone.
   //  - ROOM/WALL/EDGE: cancel a locked edge, else remove the last surveyed rectangle.
@@ -1551,6 +1623,7 @@ export function setupMR(view, project, getFootprint) {
   //  - otherwise: un-place the plan so you can register it again.
   function onReset(event) {
     if (event?.data) activeSource = event.data; // grip claims control too
+    if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
     if (mode.id === 'size') { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; sizeBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
@@ -1761,6 +1834,7 @@ export function setupMR(view, project, getFootprint) {
         hoverEdge = edgeAtPoint(px, py); // {rectId, edge} | null
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed edge to the reticle
       } else {
         hoverEdge = null;
         reticle.visible = false;
@@ -1831,6 +1905,7 @@ export function setupMR(view, project, getFootprint) {
           reticle.visible = true; // reticle always tracks the floor point
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
+          if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A dim panel is hovered only when the RETICLE is over it (before the first ref).
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
           if (!hoverDim) { // a hovered dim panel takes over the pick; otherwise pick a floor edge/origin
