@@ -2221,6 +2221,15 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => (hoverLang ? setLang(hoverLang) : cycleLang(1)),
     },
   ];
+  // Canonical controller-menu order. Keep the implementation blocks grouped by
+  // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
+  const MODE_ORDER = [
+    'register', 'floor', 'level', 'recal',
+    'drop', 'wall', 'edge', 'edit', 'marker',
+    'dims', 'save', 'load', 'lang',
+  ];
+  const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
+  modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
   let currentMode = 0;
 
   // Recolor the tip + reticle and set the floating label — used both by setMode

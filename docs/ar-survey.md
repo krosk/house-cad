@@ -12,15 +12,16 @@ editor (`ar-2d-parity` memory).
 
 ## Modes (13, stable `id`s), cycled by A/B / thumbstick-x
 
-`FLOOR` → `LEVEL` → `REGISTER`(id `register`, label ORIGIN) → `ROOM`(id `drop`) → `WALL` →
-`EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) → `RECAL` → `DIMS` → `SAVE` → `LOAD` → `LANG`.
+`ORIGIN`(id `register`) → `FLOOR` → `LEVEL` → `RECAL` →
+`ROOM`(id `drop`) → `WALL` → `EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) →
+`DIMS` → `SAVE` → `LOAD` → `LANG`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
 Per-frame mode visuals/highlights are the big if/else chain keyed on `modeId` near the end of
 the animation loop. `setMode` resets in-progress gestures and activates/deactivates the numpad
 (DIMS + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
-(= FLOOR at session start); everything else is keyed by `id` or `currentMode ± 1`.
+(= ORIGIN at session start); everything else is keyed by `id` or `currentMode ± 1`.
 
 - **FLOOR** — calibrate the ground base level `floorY` by touching the real ground. Guarded to
   the ground floor (a touch on an upper floor would double-count against its elevation).
