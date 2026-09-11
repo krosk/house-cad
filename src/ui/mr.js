@@ -373,6 +373,36 @@ export function setupMR(view, project, getFootprint) {
   const edgeHi = makeEdgeHi();
   const edgeHi2 = makeEdgeHi();
 
+  // A round numeric badge (canvas sprite, always faces you) — RECAL uses these to
+  // number the two walls "1"/"2" and to echo the current step on the reticle.
+  function makeBadge() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false }));
+    sprite.scale.set(0.10, 0.10, 1);
+    sprite.renderOrder = 30; // above the floor overlays/highlights
+    sprite.visible = false;
+    function setText(txt, color) {
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.fillStyle = 'rgba(15,18,24,0.92)';
+      ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 9; ctx.strokeStyle = color; ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 82px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(txt, 64, 72);
+      tex.needsUpdate = true;
+    }
+    scene.add(sprite);
+    return { sprite, setText };
+  }
+  const C_WALL1 = '#22d3ee', C_WALL2 = '#a78bfa'; // RECAL wall-1 (cyan) / wall-2 (purple)
+  const recalBadge1 = makeBadge(); recalBadge1.setText('1', C_WALL1); // rides wall 1
+  const recalBadge2 = makeBadge(); recalBadge2.setText('2', C_WALL2); // rides wall 2
+  const recalStep = makeBadge();                                      // rides the reticle (current step)
+
   // Whole-zone outline highlight for EDIT mode (the room/wall under your ray). All
   // four edges in one buffer (4 edges * 2 triangles * 3 verts = 24 verts / 72 floats).
   const rectHi = new THREE.Mesh(
@@ -746,9 +776,9 @@ export function setupMR(view, project, getFootprint) {
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
   let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
-  let awaitingRecalDir = false;        // RECAL two-step: corner locked, awaiting the edge-direction touch
-  let recalCorner = null;              // {cx, cy} plan corner being re-referenced by RECAL
-  const recalWc = new THREE.Vector3(); // world position of the touched real corner (RECAL step 1)
+  let recalPts = [];                   // RECAL 3-point gesture (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
+  let recalCorner = null;              // {cx, cy, a, b} plan corner being re-referenced + its two wall endpoints
+  let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -896,13 +926,22 @@ export function setupMR(view, project, getFootprint) {
 
   // Nearest plan-space corner of ANY surveyed rectangle to a plan point — RECAL's
   // reference-point pick (so you can re-zero off any known corner, not just origin).
+  // Returns {cx, cy, a, b} where a/b are the far endpoints of the two walls meeting
+  // at the corner (a = along the rectangle's X edge, b = along its Y edge), so RECAL
+  // can badge them "wall 1" / "wall 2".
   function nearestPlanCorner(px, py) {
     let best = null, bestD = Infinity;
     for (const r of project.rectangles) {
       const b = r.bounds;
-      for (const [cx, cy] of [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]]) {
-        const d = Math.hypot(px - cx, py - cy);
-        if (d < bestD) { bestD = d; best = { cx, cy }; }
+      const corners = [
+        { cx: b.x0, cy: b.y0, a: { x: b.x1, y: b.y0 }, b: { x: b.x0, y: b.y1 } },
+        { cx: b.x1, cy: b.y0, a: { x: b.x0, y: b.y0 }, b: { x: b.x1, y: b.y1 } },
+        { cx: b.x1, cy: b.y1, a: { x: b.x0, y: b.y1 }, b: { x: b.x1, y: b.y0 } },
+        { cx: b.x0, cy: b.y1, a: { x: b.x1, y: b.y1 }, b: { x: b.x0, y: b.y0 } },
+      ];
+      for (const c of corners) {
+        const d = Math.hypot(px - c.cx, py - c.cy);
+        if (d < bestD) { bestD = d; best = c; }
       }
     }
     return best;
@@ -936,6 +975,16 @@ export function setupMR(view, project, getFootprint) {
     const rx = corner.cx * c1 - corner.cy * s1;   // Ry(yaw1)·(cx,0,-cy), horizontal
     const rz = -corner.cx * s1 - corner.cy * c1;
     placeAt(Wc.x - rx, floorY, Wc.z - rz); // sets planPos, keeps the new yaw, re-anchors at origin
+  }
+
+  // Show a RECAL wall badge 35% of the way along the wall from the corner (cx,cy)
+  // toward its far endpoint `end` — near enough the corner to read as "this wall".
+  const _wb = new THREE.Vector3();
+  function placeWallBadge(badge, cx, cy, end) {
+    const t = 0.35;
+    planToWorld(cx + t * (end.x - cx), cy + t * (end.y - cy), _wb);
+    badge.sprite.position.set(_wb.x, overlayY() + 0.05, _wb.z);
+    badge.sprite.visible = true;
   }
 
   // --- SIZE (S2 numpad) helpers: the desktop dimension tool in AR ---
@@ -1556,27 +1605,42 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'recal', label: 'RECAL', color: C_RECAL,
-      // Correct drift: re-zero the plan against a KNOWN corner. Two touches (like
-      // REGISTER, but referencing any surveyed corner, not just plan-origin):
-      // 1st = the real corner; 2nd = a point along one of its real edges. Both
-      // rotational and positional drift are corrected; the whole plan follows.
+      // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
+      // corner apex needn't be reachable. The nearest surveyed corner is highlighted
+      // with its two walls badged 1 & 2. Touch P1,P2 along real wall 1 (sets the true
+      // orientation), then P3 on real wall 2; the real corner = P3 projected onto the
+      // wall-1 line. recalibrate() then re-solves yaw + position so the highlighted
+      // plan corner lands on it — both rotational and positional drift are corrected.
       onTouch: (pos) => {
         if (!placed) return;
-        if (!awaitingRecalDir) {
+        const n = recalPts.length;
+        if (n === 0) {
           const { px, py } = worldToPlan(pos);
           const corner = nearestPlanCorner(px, py);
           if (!corner) return; // no surveyed corners to reference yet
-          recalCorner = corner;
-          recalWc.copy(pos);
-          awaitingRecalDir = true;
-          applyModeVisual('RECAL DIR', C_RECAL_DIR); // cue step 2
-          rlog('recal corner', { cx: +corner.cx.toFixed(3), cy: +corner.cy.toFixed(3) });
+          recalCorner = corner;            // lock the corner this first touch is nearest to
+          recalPts.push({ x: pos.x, z: pos.z }); // P1 along wall 1
+          applyModeVisual('WALL 1 · P2', C_RECAL);
+          rlog('recal p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
           return;
         }
-        const wdx = pos.x - recalWc.x, wdz = pos.z - recalWc.z;
-        if (Math.hypot(wdx, wdz) < 0.05) return; // too close to define a direction
-        recalibrate(recalCorner, recalWc, wdx, wdz);
-        awaitingRecalDir = false;
+        if (n === 1) {
+          const p1 = recalPts[0];
+          if (Math.hypot(pos.x - p1.x, pos.z - p1.z) < 0.05) return; // too close to define wall 1
+          recalPts.push({ x: pos.x, z: pos.z }); // P2 along wall 1
+          applyModeVisual('WALL 2', C_RECAL_DIR);
+          rlog('recal p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
+          return;
+        }
+        // 3rd touch: P3 on wall 2 -> derive the real corner + wall-1 direction.
+        const [p1, p2] = recalPts;
+        recalPts = [];
+        const dx = p2.x - p1.x, dz = p2.z - p1.z;
+        const len = Math.hypot(dx, dz);
+        const ux = dx / len, uz = dz / len;                   // unit wall-1 direction
+        const proj = (pos.x - p1.x) * ux + (pos.z - p1.z) * uz; // P3 -> foot on the wall-1 line
+        const Wc = { x: p1.x + proj * ux, z: p1.z + proj * uz }; // = the real corner (walls ⊥)
+        recalibrate(recalCorner, Wc, dx, dz);
         recalCorner = null;
         buildPlan();       // geometry unchanged, but reassert against the new transform
         applyModeVisual('RECAL', C_RECAL); // ready to re-recal next time
@@ -1618,8 +1682,7 @@ export function setupMR(view, project, getFootprint) {
   function setMode(i) {
     currentMode = (i + modes.length) % modes.length;
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
-    awaitingRecalDir = false; // ... and the RECAL two-step
-    recalCorner = null;
+    recalPts = []; recalCorner = null; // ... and the RECAL 3-point gesture
     selectedRect = null; // clear the EDIT selection when changing modes
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     rectHi.visible = false;
@@ -1843,11 +1906,12 @@ export function setupMR(view, project, getFootprint) {
       rlog('register undo', { remaining: n });
       return;
     }
-    if (mode.id === 'recal' && awaitingRecalDir) { // cancel the pending direction step
-      awaitingRecalDir = false;
-      recalCorner = null;
-      applyModeVisual('RECAL', C_RECAL);
-      rlog('recal dir cancelled');
+    if (mode.id === 'recal' && recalPts.length) { // back out the last RECAL touch, step by step
+      recalPts.pop();
+      if (recalPts.length === 0) recalCorner = null; // unlocked the corner
+      const lbl = recalPts.length === 0 ? 'RECAL' : recalPts.length === 1 ? 'WALL 1 · P2' : 'WALL 2';
+      applyModeVisual(lbl, recalPts.length === 2 ? C_RECAL_DIR : C_RECAL);
+      rlog('recal undo', { remaining: recalPts.length });
       return;
     }
     // No destructive fallback: rooms are removed only via EDIT; re-register via REGISTER.
@@ -1987,6 +2051,7 @@ export function setupMR(view, project, getFootprint) {
     cornerHi.visible = false;
     rectHi.visible = false;
     zebra.visible = false;
+    recalBadge1.sprite.visible = recalBadge2.sprite.visible = recalStep.sprite.visible = false;
     hoverStack = [];
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
@@ -2023,7 +2088,7 @@ export function setupMR(view, project, getFootprint) {
       }
     } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
       // Tip-touch modes: a ring under whichever controller tip is tracked, so you
-      // see where FLOOR/ORIGIN/ALIGN/RECAL will land (both two-step gestures incl.).
+      // see where FLOOR/REGISTER/RECAL will land (REGISTER & RECAL are 3-point gestures).
       const tipPos = tipPosition(pickSource(frame));
       if (tipPos) {
         reticle.visible = true;
@@ -2032,20 +2097,30 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       edgeHi.visible = false;
-      // RECAL: mark the corner. While locking (step 1), preview the nearest plan
-      // corner under the tip (cyan); once locked (step 2), ride the locked corner
-      // (purple) so you see what you're aligning as you touch the edge direction.
+      // RECAL: highlight the corner (nearest to the tip until the first touch locks
+      // it), badge its two walls 1 & 2 to guide the touch order, and echo the current
+      // step number on the reticle. Wall 1 = the corner's X-edge, wall 2 = its Y-edge.
       if (modeId === 'recal') {
+        // Before the first touch the corner previews under the tip; after, it's locked.
         let c = recalCorner;
-        if (!awaitingRecalDir) {
+        if (recalPts.length === 0) {
           if (tipPos) { const { px, py } = worldToPlan(tipPos); c = nearestPlanCorner(px, py); }
           else c = null;
         }
         if (c) {
           planToWorld(c.cx, c.cy, _cw);
           cornerHi.position.set(_cw.x, overlayY() + 0.008, _cw.z);
-          cornerHi.material.color.setHex(awaitingRecalDir ? C_RECAL_DIR : C_RECAL);
+          cornerHi.material.color.setHex(C_RECAL);
           cornerHi.visible = true;
+          placeWallBadge(recalBadge1, c.cx, c.cy, c.a);
+          placeWallBadge(recalBadge2, c.cx, c.cy, c.b);
+        }
+        // Reticle badge: "1" while still on wall 1 (0-1 touches), "2" once on wall 2.
+        if (reticle.visible && c) {
+          const step = recalPts.length === 2 ? 2 : 1;
+          if (step !== prevRecalStep) { recalStep.setText(String(step), step === 2 ? C_WALL2 : C_WALL1); prevRecalStep = step; }
+          recalStep.sprite.position.set(reticle.position.x, reticle.position.y + 0.05, reticle.position.z);
+          recalStep.sprite.visible = true;
         }
       }
     } else if (modeId === 'size') {
