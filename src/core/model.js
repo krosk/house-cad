@@ -248,6 +248,15 @@ export class Project {
     this._emit();
   }
 
+  // Change a marker's kind in place (outlet/switch/…). Type is pure annotation —
+  // it doesn't touch geometry or pins — so this only swaps the field and notifies.
+  setMarkerType(id, type) {
+    const m = this.markers.find((m) => m.id === id);
+    if (!m) return;
+    m.type = type;
+    this._emit();
+  }
+
   // Move a marker while preserving its pin relationships. A pin's signed value
   // is the marker-to-reference offset, so dragging changes that value by the same
   // axis delta instead of letting solveMarkers snap the marker back afterward.

@@ -18,7 +18,7 @@ const STRINGS = {
   // --- master mode groups -----------------------------------------------------
   'group.setup':   { en: 'SETUP',   fr: 'CONFIG', zh: '设置' },
   'group.plan':    { en: 'PLAN',    fr: 'PLAN',   zh: '平面' },
-  'group.outlet':  { en: 'OUTLET',  fr: 'PRISE',  zh: '插座' },
+  'group.marker':  { en: 'MARKER', fr: 'MARQUEUR', zh: '标记' },
   'group.project': { en: 'PROJECT', fr: 'PROJET', zh: '项目' },
 
   // --- mode labels (key = mode.<id>) ------------------------------------------
@@ -44,9 +44,9 @@ const STRINGS = {
     zh: '用笔尖触碰真实地面以设定基准标高。仅在首层重新校平。',
   },
   'help.level': {
-    en: 'Thumbstick up/down: previous/next floor. B/Y: next floor (wrap). Type a storey height and ENTER to set the active floor.',
-    fr: 'Joystick haut/bas : étage précédent/suivant. B/Y : étage suivant (boucle). Tapez une hauteur d’étage et VALIDER pour la définir.',
-    zh: '摇杆上/下：上一/下一楼层。B/Y：切换到下一楼层（循环）。输入层高并按确定以设定当前楼层。',
+    en: 'Thumbstick up/down: previous/next floor. Type a storey height and ENTER to set the active floor.',
+    fr: 'Joystick haut/bas : étage précédent/suivant. Tapez une hauteur d’étage et VALIDER pour la définir.',
+    zh: '摇杆上/下：上一/下一楼层。输入层高并按确定以设定当前楼层。',
   },
   'help.register': {
     en: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',
@@ -54,14 +54,9 @@ const STRINGS = {
     zh: '标记原点。沿墙1触碰2个点，再在墙2上触碰1个点。墙角会自动推算。',
   },
   'help.drop': {
-    en: 'Trigger to drop a roomspace box where you stand. Push its edges out to the walls in EDGE.',
-    fr: 'Gâchette pour poser une pièce là où vous êtes. Poussez ses bords vers les murs dans BORD.',
-    zh: '扣动扳机在所站位置放置一个房间盒。到“边”模式将其边推向墙面。',
-  },
-  'help.wall': {
-    en: 'Trigger to drop a wall (subtract) box where you stand. Snap its edges to the wall faces in EDGE.',
-    fr: 'Gâchette pour poser un mur (soustraction) là où vous êtes. Alignez ses bords aux faces des murs dans BORD.',
-    zh: '扣动扳机在所站位置放置一个墙体（减去）盒。到“边”模式将其边贴到墙面。',
+    en: 'Thumbstick up/down picks ROOM (add) or WALL (subtract). Trigger to drop that box where you stand; push its edges out to the walls in EDGE.',
+    fr: 'Joystick haut/bas : PIÈCE (ajout) ou MUR (soustraction). Gâchette pour poser ce bloc là où vous êtes ; poussez ses bords vers les murs dans BORD.',
+    zh: '摇杆上/下：选择房间（添加）或墙体（减去）。扣动扳机在所站位置放置该盒；到“边”模式将其边推向墙面。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
@@ -69,14 +64,14 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. Aim at a zone and trigger to select it; trigger again cycles buried zones. Grip deletes; B/Y swaps room/wall.',
-    fr: 'Modifiez seulement le plan. Visez une zone et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; B/Y : pièce/mur.',
-    zh: '仅编辑平面。瞄准区域并扣动扳机选择；再次扣动可循环下层区域。握把删除；B/Y切换房间/墙。',
+    en: 'Edit the plan only. Aim at a zone and trigger to select it; trigger again cycles buried zones. Grip deletes; thumbstick up/down swaps room/wall.',
+    fr: 'Modifiez seulement le plan. Visez une zone et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : pièce/mur.',
+    zh: '仅编辑平面。瞄准区域并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下切换房间/墙。',
   },
   'help.marker': {
-    en: 'Edit outlets only. Aim and trigger to edit height; ENTER saves and closes the pad. Grip-drag moves one, grip away deletes the selection. Trigger empty space to place at the tip.',
-    fr: 'Modifiez seulement les prises. Visez + gâchette : hauteur ; VALIDER enregistre et ferme le pavé. Poignée-glisser : déplacer ; poignée ailleurs : supprimer. Gâchette dans le vide : poser.',
-    zh: '仅编辑插座。瞄准并扣动扳机编辑高度；按确定保存并关闭键盘。按住握把拖动，移开后按握把删除所选项；对空处扣动扳机可放置。',
+    en: 'Edit markers only. Thumbstick up/down picks the drop type — or retypes the selected marker. Trigger empty space to place at the tip. Aim a marker + trigger to edit height; ENTER saves. Grip-drag moves one, grip away deletes.',
+    fr: 'Modifiez seulement les marqueurs. Joystick haut/bas : choisit le type à poser, ou change le type du marqueur sélectionné. Gâchette dans le vide : poser à la pointe. Visez un marqueur + gâchette : hauteur ; VALIDER enregistre. Poignée-glisser : déplacer ; poignée ailleurs : supprimer.',
+    zh: '仅编辑标记。摇杆上/下：选择放置类型，或更改所选标记的类型。对空处扣动扳机在笔尖处放置。瞄准标记并扣动扳机编辑高度；按确定保存。按住握把拖动，移开后按握把删除。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
@@ -84,14 +79,14 @@ const STRINGS = {
     zh: '修正漂移。用指针准星瞄准至墙1高亮，扣动扳机选择墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
   },
   'help.plan_dims': {
-    en: 'Plan dimensions only. Pick two compatible edges, or an edge and the origin, then type the distance. Outlet icons are inert.',
-    fr: 'Cotes du plan uniquement. Choisissez deux bords compatibles, ou un bord et l’origine, puis tapez la distance. Les icônes de prises sont inertes.',
-    zh: '仅编辑平面尺寸。选择两条兼容的边，或一条边与原点，再输入距离。插座图标在此模式下无效。',
+    en: 'Plan dimensions only. Pick two compatible edges, or an edge and the origin, then type the distance. Marker icons are inert.',
+    fr: 'Cotes du plan uniquement. Choisissez deux bords compatibles, ou un bord et l’origine, puis tapez la distance. Les icônes de marqueurs sont inertes.',
+    zh: '仅编辑平面尺寸。选择两条兼容的边，或一条边与原点，再输入距离。标记图标在此模式下无效。',
   },
   'help.outlet_dims': {
-    en: 'Outlet dimensions only. Pick an outlet floor icon first, then a plan edge and type the distance (0 = on wall). The wall outlet highlights too.',
-    fr: 'Cotes des prises uniquement. Choisissez d’abord l’icône au sol, puis un bord du plan et tapez la distance (0 = au mur). La prise murale est aussi surlignée.',
-    zh: '仅编辑插座尺寸。先选择插座地面图标，再选择平面边并输入距离（0 = 贴墙）。对应的墙上插座也会高亮。',
+    en: 'Marker dimensions only. Pick a marker floor icon first, then a plan edge and type the distance (0 = on wall). The wall marker highlights too.',
+    fr: 'Cotes des marqueurs uniquement. Choisissez d’abord l’icône au sol, puis un bord du plan et tapez la distance (0 = au mur). Le marqueur mural est aussi surligné.',
+    zh: '仅编辑标记尺寸。先选择标记地面图标，再选择平面边并输入距离（0 = 贴墙）。对应的墙上标记也会高亮。',
   },
   'help.save': {
     en: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
@@ -123,7 +118,7 @@ const STRINGS = {
 
   // --- DIMS dimension title ---------------------------------------------------
   'dim.pickPlan':   { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },
-  'dim.pickOutlet': { en: 'pick outlet floor icon', fr: 'icône de prise au sol', zh: '选择插座地面图标' },
+  'dim.pickOutlet': { en: 'pick marker floor icon', fr: 'icône de marqueur au sol', zh: '选择标记地面图标' },
   'dim.edit':     { en: '(edit)', fr: '(modif.)', zh: '（编辑）' },
   'dim.conflict': { en: '!CONFLICT', fr: '!CONFLIT', zh: '！冲突' },
   'ref.origin':   { en: 'ORIGIN', fr: 'ORIGINE', zh: '原点' },
@@ -151,8 +146,9 @@ const STRINGS = {
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },
 
   // --- markers (wall-anchored annotations) ------------------------------------
-  'marker.outlet': { en: 'outlet', fr: 'prise',   zh: '插座' },
-  'marker.height': { en: 'height', fr: 'hauteur', zh: '高度' },
+  'marker.outlet': { en: 'outlet', fr: 'prise',        zh: '插座' },
+  'marker.switch': { en: 'switch', fr: 'interrupteur', zh: '开关' },
+  'marker.height': { en: 'height', fr: 'hauteur',      zh: '高度' },
 };
 
 let current = 'en';

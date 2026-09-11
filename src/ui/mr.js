@@ -968,38 +968,54 @@ export function setupMR(view, project, getFootprint) {
     return planGroup.children.length > 0;
   }
 
-  // A marker glyph styled as a standard white French Type E socket: white faceplate,
-  // circular recess, two round contact holes, and the upper earth pin. The socket stays
-  // white; only its outer status ring changes from orange to white when fully pinned.
+  // A wall-fixture glyph on a white faceplate. The dark badge + white faceplate + outer
+  // status ring are shared across types; the faceplate interior is drawn per type (outlet
+  // = French Type E socket, switch = rocker). The ring changes orange->white when fully
+  // pinned. Extend markerFace() for new types (light, ethernet, …).
   function markerTexture(marker) {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
     const ringColor = marker._full ? '#ffffff' : '#ff9f43';
-    // Dark badge + constraint-status ring keep the white socket readable over
+    // Dark badge + constraint-status ring keep the white faceplate readable over
     // passthrough and on the projected floor copy.
     ctx.fillStyle = 'rgba(15,18,24,0.82)';
     ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 6; ctx.strokeStyle = ringColor; ctx.stroke();
 
-    // White square faceplate.
+    // White square faceplate (shared by every type).
     ctx.beginPath(); ctx.roundRect(27, 23, 74, 82, 14);
     ctx.fillStyle = '#f8fafc'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#cbd5e1'; ctx.stroke();
 
-    // Type E circular recessed well.
+    markerFace(ctx, marker.type);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // Per-type faceplate interior, drawn inside the shared white faceplate above.
+  function markerFace(ctx, type) {
+    if (type === 'switch') {
+      // French rocker switch: a centered rounded rocker with a horizontal split and a
+      // shaded lower (pressed) half.
+      ctx.beginPath(); ctx.roundRect(48, 38, 32, 52, 8);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(48, 64, 32, 26, 8);
+      ctx.fillStyle = 'rgba(100,116,139,0.20)'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(50, 64); ctx.lineTo(78, 64);
+      ctx.lineWidth = 2; ctx.strokeStyle = '#64748b'; ctx.stroke();
+      return;
+    }
+    // Default: outlet — Type E circular recessed well, upper earth pin, two contacts.
     ctx.beginPath(); ctx.arc(64, 67, 28, 0, Math.PI * 2);
     ctx.fillStyle = '#e5e7eb'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
-
-    // Raised protective-earth pin above two horizontally aligned round contacts.
     ctx.beginPath(); ctx.arc(64, 47, 7, 0, Math.PI * 2);
     ctx.fillStyle = '#f8fafc'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#64748b'; ctx.stroke();
     ctx.fillStyle = '#1f2937';
     ctx.beginPath(); ctx.arc(49, 73, 6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(79, 73, 6, 0, Math.PI * 2); ctx.fill();
-    return new THREE.CanvasTexture(canvas);
   }
 
   // Highlight overlay for an outlet. It occupies the exact same footprint as the
@@ -1092,6 +1108,18 @@ export function setupMR(view, project, getFootprint) {
   let recalCorner = null;              // {cx, cy, a, b} selected corner; after lock a=wall 1 end, b=wall 2 end
   let recalLocked = false;             // RECAL: corner + wall order explicitly selected (else still previewing)
   let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
+  // MARKER · EDIT drop type. Cycled by B/Y (or thumbstick-y) while in the mode, like
+  // LEVEL cycles floors. Session-level (persists across mode switches). Extend the list
+  // for new fixture types (light, ethernet, wire); each also needs a markerFace() branch,
+  // a marker.<type> i18n key, and serialize already round-trips the type.
+  const MARKER_TYPES = ['outlet', 'switch'];
+  let currentMarkerType = MARKER_TYPES[0];
+  // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
+  // "add" action instead of separate ROOM/WALL modes. room = add roomspace, wall = subtract.
+  const ZONE_KINDS = ['room', 'wall'];
+  let currentZoneKind = ZONE_KINDS[0];
+  const zoneOp = (k) => (k === 'wall' ? 'subtract' : 'add');
+  const zoneColor = (k) => (k === 'wall' ? 0xff6b6b : 0x2dd4bf); // red wall / green room (add/subtract language)
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -1693,16 +1721,32 @@ export function setupMR(view, project, getFootprint) {
     redrawMarkerPad();
   }
 
-  // Cycle the active storey Basement -> Ground -> Upper -> (wrap) — the dedicated
-  // floor-switch action (B/Y in LEVEL). Thumbstick-y also switches only while LEVEL
-  // is active, without wrapping. afterFloorChange re-seats the pad + label.
-  function cycleFloor() {
-    const floors = project.floors;
-    const i = floors.findIndex((f) => f.id === project.activeFloorId);
-    const j = (i + 1) % floors.length;
-    project.setActiveFloor(floors[j].id);
-    afterFloorChange();
-    rlog('floor cycle', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
+  // MARKER · EDIT thumbstick-y: if a marker is selected, RETYPE it in place (outlet
+  // <-> switch); otherwise cycle the DROP type used for the next placement. One control,
+  // context-dependent — matches LEVEL/LANG where thumbstick-y cycles the current thing.
+  // Extends trivially as MARKER_TYPES grows.
+  function cycleMarkerType(dir = 1) {
+    const step = (cur) => MARKER_TYPES[(MARKER_TYPES.indexOf(cur) + dir + MARKER_TYPES.length) % MARKER_TYPES.length];
+    if (selectedMarker) {
+      project.setMarkerType(selectedMarker.id, step(selectedMarker.type)); // mutates the same object
+      buildPlan(); applyPlanMatrix(); // swap the glyph immediately
+      if (numpad.group.visible) refreshMarkerPad(); // pad title tracks the type
+      rlog('marker retype', { id: selectedMarker.id, type: selectedMarker.type });
+      return;
+    }
+    currentMarkerType = step(currentMarkerType);
+    applyModeVisual(modeChildLabel('marker'), C_MARKER); // label shows MARKER · EDIT · <type>
+    rlog('marker type', { type: currentMarkerType });
+  }
+
+  // PLAN · DROP thumbstick-y: pick which kind the next drop places (room <-> wall). The
+  // label (ROOM/WALL) and accent (green/red) track it, so a glance shows what a trigger
+  // adds. Existing zones are untouched — swap those room<->wall in EDIT.
+  function cycleZoneKind(dir = 1) {
+    const i = ZONE_KINDS.indexOf(currentZoneKind);
+    currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
+    applyModeVisual(modeChildLabel('drop'), zoneColor(currentZoneKind));
+    rlog('zone kind', { kind: currentZoneKind });
   }
 
   // Shared dimension trigger. Frame-time picking enforces the domain, and these
@@ -2069,7 +2113,7 @@ export function setupMR(view, project, getFootprint) {
     return hits.length ? hits[0] : null;
   }
 
-  const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
+  const C_ORIGIN = 0x4ea1ff; // REGISTER accent — one color across all 3 gesture steps
   const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
   const C_LEVEL = 0x38bdf8; // LEVEL (storey height / floor switch) accent
   const C_LANG = 0x94a3b8; // LANG (UI language switch) accent — neutral slate
@@ -2172,11 +2216,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: (pos) => {
         registerPts.push({ x: pos.x, z: pos.z });
         const n = registerPts.length;
-        if (n === 1) { applyModeVisual(t('lbl.wall2'), C_ALIGN); rlog('register p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return; }
+        if (n === 1) { applyModeVisual(t('lbl.wall2'), C_ORIGIN); rlog('register p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return; }
         if (n === 2) {
           const [p1, p2] = registerPts;
           if (Math.hypot(p2.x - p1.x, p2.z - p1.z) < 0.05) { registerPts.pop(); return; } // too close to define the wall
-          applyModeVisual(t('lbl.perp'), C_ALIGN); rlog('register p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return;
+          applyModeVisual(t('lbl.perp'), C_ORIGIN); rlog('register p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return;
         }
         // 3rd touch: derive the corner (projection of P3 onto the P1->P2 wall line) + yaw.
         const [p1, p2, p3] = registerPts;
@@ -2193,17 +2237,11 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'drop', color: 0x2dd4bf, // label/help via i18n: mode.drop / help.drop
-      // Drop a ROOMSPACE (add) rectangle at your standing position. It becomes the
-      // active rectangle; push its edges to the walls in EDGE.
-      onTouch: () => dropRect('add'),
-    },
-    {
-      id: 'wall', color: 0xff6b6b, // label/help via i18n: mode.wall / help.wall
-      // Drop a WALL (subtract) rectangle — solid, no roomspace — the same way. It
-      // carves a hole in the footprint fill; push its edges to the real wall faces
-      // in EDGE. add = roomspace, subtract = wall.
-      onTouch: () => dropRect('subtract'),
+      id: 'drop', color: 0x2dd4bf, // fallback; live color = zoneColor(currentZoneKind), see modeColor
+      // One "add" action: drop a rectangle of the current zone kind (ROOM = add roomspace /
+      // WALL = subtract solid) at your standing position. Thumbstick up/down picks the kind
+      // (label + accent track it); push the edges to the real walls in EDGE.
+      onTouch: () => dropRect(zoneOp(currentZoneKind)),
     },
     {
       id: 'edge', color: 0xff5db1, // label/help via i18n: mode.edge / help.edge
@@ -2245,9 +2283,10 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
-      // OUTLET editing domain. Aim at an existing outlet to edit its height; grip-drag
-      // moves it and grip away deletes the selected outlet. Trigger on empty space drops
-      // a new outlet at the tip. OUTLET DIMS owns its wall-pin constraints.
+      // MARKER editing domain. B/Y (or thumbstick-y) picks the drop type (currentMarkerType).
+      // Aim at an existing marker to edit its height; grip-drag moves it and grip away deletes
+      // the selection. Trigger on empty space drops a new marker of the current type at the
+      // tip. MARKER DIMS owns its wall-pin constraints.
       onTouch: (pos) => {
         if (!placed) return;
         if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
@@ -2257,14 +2296,14 @@ export function setupMR(view, project, getFootprint) {
           rlog('marker select', { id: selectedMarker.id });
           return;
         }
-        // First empty-space trigger leaves an existing edit before another outlet
+        // First empty-space trigger leaves an existing edit before another marker
         // can be dropped, avoiding accidental duplicates while operating the pad.
         if (selectedMarker) { selectedMarker = null; deactivateNumpad(); return; }
         const { px, py } = worldToPlan(pos);
         const z = Math.max(0, pos.y - overlayY());
-        const m = project.addMarker({ type: 'outlet', x: px, y: py, z });
+        const m = project.addMarker({ type: currentMarkerType, x: px, y: py, z });
         buildPlan(); applyPlanMatrix();
-        rlog('marker drop', { id: m.id, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });
+        rlog('marker drop', { id: m.id, type: m.type, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });
       },
     },
     {
@@ -2360,13 +2399,13 @@ export function setupMR(view, project, getFootprint) {
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'level',
-    'drop', 'wall', 'edge', 'edit', 'plan_dims',
+    'drop', 'edge', 'edit', 'plan_dims',
     'marker', 'outlet_dims', 'save', 'load', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', level: 'setup',
-    drop: 'plan', wall: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
-    marker: 'outlet', outlet_dims: 'outlet',
+    drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
+    marker: 'marker', outlet_dims: 'marker',
     save: 'project', load: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
@@ -2376,6 +2415,19 @@ export function setupMR(view, project, getFootprint) {
   // The interaction remains a fast linear cycle, but every label is presented as
   // GROUP · TOOL so the growing tool list has an explicit, localized hierarchy.
   const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
+
+  // The tool portion of a mode's label. Two modes carry a thumbstick-picked kind in the
+  // label so a glance tells you what a trigger will place: MARKER · EDIT appends the marker
+  // type; PLAN · DROP shows the current zone kind (ROOM/WALL) as its tool name. Others are
+  // just their tool name.
+  const markerTypeName = () => t(`marker.${currentMarkerType}`);
+  const modeChildLabel = (id) =>
+    id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
+    : id === 'drop' ? t(currentZoneKind === 'wall' ? 'mode.wall' : 'mode.drop')
+    : t(`mode.${id}`);
+  // PLAN · DROP's accent follows the kind (green room / red wall — the add/subtract color
+  // language); every other mode uses its static color.
+  const modeColor = (m) => (m.id === 'drop' ? zoneColor(currentZoneKind) : m.color);
 
   // Recolor the tip + reticle and set the floating label — used both by setMode
   // and by REGISTER to flip ORIGIN<->ALIGN mid-gesture.
@@ -2397,8 +2449,8 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    applyModeVisual(t(`mode.${m.id}`), m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
-    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), m.color); // mode guidance box
+    applyModeVisual(modeChildLabel(m.id), modeColor(m)); // MARKER/DROP carry their picked kind in label + color
+    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), modeColor(m)); // mode guidance box
     if (isDimMode(m.id)) activateNumpad(); // start the selected domain in ref-pick phase
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
@@ -2413,8 +2465,8 @@ export function setupMR(view, project, getFootprint) {
   // LANG's; any open pad/menu is redrawn too for good measure.
   onLangChange(() => {
     const m = modes[currentMode];
-    applyModeVisual(t(`mode.${m.id}`), m.color);
-    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), m.color);
+    applyModeVisual(modeChildLabel(m.id), modeColor(m));
+    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), modeColor(m));
     if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
@@ -2675,7 +2727,7 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'register' && registerPts.length) { // back out the last REGISTER point
       registerPts.pop();
       const n = registerPts.length;
-      applyModeVisual(n === 0 ? t('mode.register') : n === 1 ? t('lbl.wall2') : t('lbl.perp'), n === 0 ? C_ORIGIN : C_ALIGN);
+      applyModeVisual(n === 0 ? t('mode.register') : n === 1 ? t('lbl.wall2') : t('lbl.perp'), C_ORIGIN);
       rlog('register undo', { remaining: n });
       return;
     }
@@ -2725,9 +2777,9 @@ export function setupMR(view, project, getFootprint) {
 
   function pollModeCycle(frame, time) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
-    // buttons[4]=A/X (lower), buttons[5]=B/Y (upper),
-    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y
-    // (LEVEL floor / LANG selection).
+    // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS flip only; does NOT cycle modes),
+    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
+    // thing: LEVEL floor / LANG language / MARKER type / EDIT room-wall).
     // Latch onto whichever controller is being used, then read ONLY that one.
     for (const src of frame.session.inputSources) {
       if (src.gamepad && isActing(src.gamepad)) activeSource = src;
@@ -2754,14 +2806,12 @@ export function setupMR(view, project, getFootprint) {
       exitHoldStart = 0;
       exitProgress = 0;
     }
-    // Upper face button (B/Y) normally cycles to the next mode, but it's overridden
-    // in PLAN (swap the selected zone room<->wall) and either DIMS mode with a pair
-    // (reverse the dimension's direction). Thumbstick-x still cycles modes there.
+    // Upper face button (B/Y) does NOT cycle modes — mode nav is thumbstick-x (both ways)
+    // and A/X (prev). B/Y's only action is flipping a completed dimension in either DIMS
+    // mode; it is otherwise inert. Contextual "cycle the current thing" actions live on
+    // thumbstick-y.
     if (next && !btn.next) {
-      if (modes[currentMode].id === 'edit') swapSelected();
-      else if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
-      else if (modes[currentMode].id === 'level') cycleFloor(); // dedicated floor-switch action
-      else setMode(currentMode + 1);
+      if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
     }
     if (prev && !btn.prev) setMode(currentMode - 1);
     btn.next = next;
@@ -2774,12 +2824,17 @@ export function setupMR(view, project, getFootprint) {
     } else if (Math.abs(stickX) < 0.3) {
       btn.stick = false;
     }
-    // Stick up/down switches floors only in LEVEL. In LANG, the same gesture moves
-    // through the language list. It is intentionally inert in every other mode.
+    // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
+    // LANG = language, MARKER = retype the selected marker (or the drop type if none
+    // selected), PLAN·DROP = room/wall to add, PLAN·EDIT = the selected zone's room<->wall.
+    // Inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
       const modeId = modes[currentMode].id;
       if (modeId === 'lang') cycleLang(stickY < 0 ? -1 : 1); // up = previous in the list
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
+      else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
+      else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick room / wall to add
+      else if (modeId === 'edit') swapSelected(); // toggle the selected zone room<->wall
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;
@@ -2945,11 +3000,13 @@ export function setupMR(view, project, getFootprint) {
           cornerHi.visible = true;
           placeWallBadge(recalBadge1, c.cx, c.cy, c.a);
           placeWallBadge(recalBadge2, c.cx, c.cy, c.b);
-          // Use the standard edge strip to make the pointer-selected wall explicit.
-          // Before/during wall-1 capture it follows wall 1; for P3 it switches to wall 2.
+          // Standard edge strip marks the pointer-selected wall (wall 1 during selection +
+          // wall-1 capture; wall 2 for P3), in the RECAL accent (C_RECAL) so the highlight
+          // reads as part of the recal action. NOT C_WALL1/C_WALL2: those are CSS strings for
+          // the canvas badges, and setHex() on a string yields NaN → the strip renders black.
+          // The 1/2 badges carry wall identity.
           const activeWall = recalLocked && recalPts.length === 2 ? c.b : c.a;
-          const wallColor = recalLocked && recalPts.length === 2 ? C_WALL2 : C_WALL1;
-          showPlanEdge(c.cx, c.cy, activeWall.x, activeWall.y, wallColor);
+          showPlanEdge(c.cx, c.cy, activeWall.x, activeWall.y, C_RECAL);
         }
         // Reticle step badge only after the corner is selected: "1" while on wall 1
         // (0-1 touches), "2" once on wall 2. During SELECT the wall badges already lead.

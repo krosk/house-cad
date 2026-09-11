@@ -10,13 +10,24 @@
 - Claude memory (auto-loads): `phase5-xr-intent`, `multi-floor-design`, `ar-2d-parity`,
   `quest-guardian-limitation` — Phase-5 rationale and XR gotchas. Don't duplicate them here.
 
-**Date:** 2026-09-11 (session 13)
-**Status:** Quest APK path WORKING (installs, verifies origin, launches into AR — proven on
-device). Everything committed and pushed (`main` = `origin/main`, tree clean). Session 13
-**split the outlet workflow into fully separate plan vs. outlet domains** (EDIT and DIMS each split
-in two), gave every outlet a **projected floor icon** for X/Y pinning, regrouped the modes into a
-SETUP·PLAN·OUTLET·PROJECT hierarchy, and hardened pointer target selection. **All build-verified
-only — no AR surface has ever been walked on the Quest (the owed QA keeps growing).**
+**Date:** 2026-09-11 (session 15)
+**Status:** Quest APK path WORKING. **FIRST ON-DEVICE FUNCTIONAL QA DONE (session 14):** SETUP
+(ORIGIN, FLOOR, RECAL incl. the corner-select reticle) + PLAN (ROOM/WALL, EDGE, EDIT, DIMS) +
+PROJECT (SAVE/LOAD, LANG) all confirmed OK on the Quest. **Session 15 (code, build-verified only):**
+added a **`switch` marker type** (distinct rocker glyph via `markerFace`) with a **MARKER · EDIT
+type picker on thumbstick up/down** — cycles the drop type, or **retypes the selected marker in
+place** (`setMarkerType`); label reads `MARKER · EDIT · <type>`. **Renamed the OUTLET mode group →
+MARKER** (`group.marker`; modes keep ids `marker`/`outlet_dims`). **Consolidated the input model:**
+thumbstick up/down is now the single "cycle the current thing" control (LEVEL floor, LANG language,
+MARKER type, PLAN·EDIT room↔wall); **mode nav is thumbstick-x (both ways) + A/X (prev); B/Y no
+longer cycles modes** — its only action is the DIMS flip (completed pair), else inert. `cycleFloor`
+removed; PLAN·EDIT swap moved off B/Y onto thumbstick-y. **Merged the ROOM + WALL modes into one
+PLAN · DROP action** (13 modes now, was 14): thumbstick up/down picks the kind to add (room↔wall),
+label + accent (green/red) track it (`cycleZoneKind`); the RECAL wall strip + ORIGIN gesture colors
+were also fixed (strip was black from a `setHex`-on-string bug → now the RECAL accent).
+**Still unverified on device: LEVEL (multi-floor), MARKER EDIT/DIMS incl. the new switch + picker,
+the cross-cutting HUD/input items, and accuracy (drift, storey heights).** See
+`docs/ar-qa-checklist.md` for the tick-by-tick record.
 
 ## Where things stand in one paragraph
 
@@ -123,20 +134,19 @@ assetlinks repo (`~/krosk.github.io`), `~/.bw_pw`, and Bubblewrap's JDK/SDK alre
 
 ## Next step
 
-- **A — ON-DEVICE FUNCTIONAL QA (owed since session 5; sessions 8–13 all added untested surface).**
-  Nothing beyond "AR launches" is functionally verified, and s13 stacked the whole domain split +
-  projected icons on top. Walk: REGISTER → ROOM/WALL → EDGE (SNAP prompt) → **PLAN EDIT** (select/
-  cycle overlapping zones, B/Y swap room↔wall, grip delete) → **PLAN DIMS** (edge↔edge + edge↔origin;
-  FLIP/DEL; grip-drag offset; `!CONFLICT`; 0 m) → **OUTLET EDIT** (drop → aim outlet → type height →
-  ENTER; grip-drag in 3D; grip-away delete) → **OUTLET DIMS** (pick the projected FLOOR ICON first,
-  then a plan edge; orange dashed dim-line appears; glyph goes white at the 2nd pin) → RECAL
-  (aim the pointer so the ring/corner-preview hugs the wall you want as "1" → trigger to lock →
-  P1,P2 on real wall 1, P3 on real wall 2) → LEVEL (B/Y floors; type height + ENTER) → SAVE/LOAD
-  round-trip. Debug via the plain Quest Browser
-  (`?ar=1`) or Oculus Remote Web Inspector — the release TWA has no console.
-- **B — Markers: the next increments** (`docs/markers-plan.md` → follow-ons). switch / ethernet /
-  light types + a MARKER-mode type picker (B/Y-cycle, like LEVEL); light's z defaults to the ceiling
-  (storey height). Then wires (a `THREE.Line` polyline). Keep each an increment.
+- **A — FINISH ON-DEVICE QA (session 14 did the first pass; SETUP + PLAN + PROJECT save/load/lang
+  all OK).** Remaining to walk, tracked in `docs/ar-qa-checklist.md`: **LEVEL** (seed Basement/
+  Ground/Upper; B/Y cycles floors; type storey height + ENTER; stacking — editing Ground lifts
+  Upper); **OUTLET EDIT** (drop → aim outlet → type height → ENTER; grip-drag in 3D; grip-away
+  delete; `markerAtPoint`-first); **OUTLET DIMS** (pick the projected FLOOR ICON first, then a plan
+  edge; orange dashed dim-line; glyph goes white at the 2nd pin); the **outlet-inert cross-checks**
+  in PLAN EDIT/DIMS and the **markers round-trip** in SAVE/LOAD (all need an outlet in the scene);
+  plus the cross-cutting HUD/input items and the accuracy checks (drift, storey heights). Debug via
+  the plain Quest Browser (`?ar=1`) or Oculus Remote Web Inspector — the release TWA has no console.
+- **B — Markers: the next increments** (`docs/markers-plan.md` → follow-ons). ~~switch type +
+  MARKER-mode type picker~~ **DONE (s15).** Remaining: **light / ethernet** types (add to
+  `MARKER_TYPES` + a `markerFace()` branch + `marker.<type>` i18n; light's z could default to the
+  ceiling = storey height). Then **wires** (a `THREE.Line` polyline). Keep each an increment.
 - ~~**C — RECAL corner-select reticle**~~ — **DONE (already shipped in `5560020`, s13).** The
   unlocked SELECT phase now drives off `rayFloorHit` (a pointer/ray floor point, not the tip), shows
   the reticle ring there, and previews the nearest corner + wall-1/2 ordering under it. Verify it on
@@ -157,14 +167,15 @@ assetlinks repo (`~/krosk.github.io`), `~/.bw_pw`, and Bubblewrap's JDK/SDK alre
 
 ## Known open questions
 
-- **The entire session-8→13 AR workflow is build-verified only** — never walked end-to-end on the
-  Quest. No runtime/XR regression guard exists. The s13 domain split + projected icons are the most
-  unexercised surface yet.
-- **Most likely to need an on-device eyeball (s13 split):** whether PLAN EDIT/DIMS truly ignore
-  outlet targets and OUTLET EDIT/DIMS truly ignore zone/edge targets (the disjoint-domain promise);
-  the `markerAtPoint`-first rule picking an outlet over the wall it sits on; the projected floor
-  icon being pickable and visually distinct from the wall-height glyph; the bold outline linking
-  icon↔glyph; and whether the depth-test-off glyphs/icons read clearly through walls.
+- **SETUP + PLAN + PROJECT(save/load/lang) are on-device verified (session 14).** Still
+  build-verified-only: **LEVEL, OUTLET EDIT/DIMS**, cross-cutting HUD/input, and accuracy. No
+  runtime/XR regression guard exists — the checklist is the only record.
+- **Most likely to need an on-device eyeball (still untested, s13 split):** whether OUTLET EDIT/DIMS
+  truly ignore zone/edge targets and PLAN EDIT/DIMS truly ignore outlet targets (the disjoint-domain
+  promise — the outlet-inert half is unconfirmed until an outlet exists in the scene); the
+  `markerAtPoint`-first rule picking an outlet over the wall it sits on; the projected floor icon
+  being pickable and distinct from the wall-height glyph; the bold outline linking icon↔glyph;
+  whether depth-test-off glyphs/icons read clearly through walls.
 - **Most likely to need an eyeball (markers, from s12):** the OUTLET drop landing at the captured
   tip height; the white-when-pinned transition on the 2nd pin.
 - **Upper/basement overlay height** depends on hand-entered storey heights (LEVEL) — accuracy is

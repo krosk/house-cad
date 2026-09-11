@@ -10,19 +10,19 @@ AR (`src/ui/mr.js`) is the **only** authoring surface on the Quest — the immer
 AR by quitting, there is no 2D editor on-device — so it must reach parity with the desktop 2D
 editor (`ar-2d-parity` memory).
 
-## Mode hierarchy (14 tools with stable `id`s)
+## Mode hierarchy (13 tools with stable `id`s)
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → LEVEL
-PLAN     · ROOM → WALL → EDGE → EDIT → DIMS
-OUTLET   · EDIT → DIMS
+PLAN     · DROP (room/wall) → EDGE → EDIT → DIMS
+MARKER   · EDIT → DIMS
 PROJECT  · SAVE → LOAD → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
-Internal IDs in traversal order are `register`, `floor`, `recal`, `level`, `drop`, `wall`, `edge`,
+Internal IDs in traversal order are `register`, `floor`, `recal`, `level`, `drop`, `edge`,
 `edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -38,20 +38,27 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
-- **ROOM / WALL** — drop a starter rectangle at the standing position. ROOM = add (roomspace),
-  WALL = subtract (solid wall). Edges get pushed to real walls in EDGE.
+- **DROP** (`id: drop`) — one "add" action: drop a starter rectangle at the standing position.
+  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add (roomspace) or WALL =
+  subtract (solid wall); the label (ROOM/WALL) and accent (green/red) track it. Edges get pushed to
+  real walls in EDGE. (Was two modes, ROOM and WALL, merged in s15.)
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
-  through overlapping zones), grip deletes it, and B/Y swaps it room↔wall. Outlet glyphs are inert.
+  through overlapping zones), grip deletes it, and thumbstick up/down swaps it room↔wall. Outlet glyphs are inert.
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
-  position locks. Outlet floor icons and outlet pins are inert.
-- **OUTLET · EDIT** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
-  pointing directly at an outlet and triggering opens its height pad; ENTER commits the height,
-  closes the pad, and clears the selection. Grip-drag moves it in 3D; grip away deletes the selected
-  outlet. Every outlet also has a flat projected floor icon showing its plan X/Y. Plan zones are inert.
-- **OUTLET · DIMS** (`id: outlet_dims`) — outlet pins only. The first reference must be an outlet's
+  position locks. Marker floor icons and marker pins are inert.
+- **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
+  type** (`MARKER_TYPES` = outlet, switch; extend for light/ethernet/wire) — or, if a marker is
+  selected, **retypes that marker in place** (`setMarkerType`). The label reads
+  `MARKER · EDIT · <type>` so a glance tells you what a trigger will place. Empty-space trigger places
+  a marker of the current type at the tip; pointing directly at a marker and triggering opens its
+  height pad; ENTER commits the height, closes the pad, and clears the selection. Grip-drag moves it
+  in 3D; grip away deletes the selected marker. Every marker also has a flat projected floor icon
+  showing its plan X/Y, and a per-type wall glyph (`markerFace`: outlet = Type E socket, switch =
+  rocker). Plan zones are inert.
+- **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
@@ -82,41 +89,45 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
 
 - **trigger** = mode action (place / pick / press a numpad or slot key).
 - **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
-  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
+  MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
   reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = slide its offset; EDGE
-  over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
+  over an edge = move it; MARKER aimed at a marker = move it in 3D at its initial pointer depth).
   Marker drag adjusts existing X/Y pin values so the marker does not snap back on release. Its
   per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
   `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
-- **thumbstick-x** = cycle mode; **thumbstick-y** = change floor only in LEVEL
-  (up/down, no wrap), choose language only in LANG, and no-op elsewhere;
-  **thumbstick-hold (~1.2 s)** = exit AR.
-- **A/X** = prev mode. **B/Y** = next mode, EXCEPT: PLAN swaps the selected zone room↔wall;
-  either DIMS mode (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
-  **LEVEL cycles to the next floor** (`cycleFloor`, wraps).
+- **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
+  no-op where nothing applies: **LEVEL** = floor (`switchFloor`, up/down, no wrap); **LANG** =
+  language; **MARKER** = retype the selected marker, or the drop type if none selected
+  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall kind to add (`cycleZoneKind`);
+  **PLAN · EDIT** = the selected zone's room↔wall (`swapSelected`). **thumbstick-hold (~1.2 s)** =
+  exit AR.
+- **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
+  (prev). B/Y's only action is flipping the dimension side in either DIMS mode with a completed pair
+  (`flipConstraintSide`, NOT `swapConstraint`); it is otherwise inert. All contextual cycling lives
+  on thumbstick-y (above).
 - Only the last-active controller is read (`activeSource`/`pickSource`); the idle hand hides.
 
-## Dimensioning (PLAN DIMS / OUTLET DIMS)
+## Dimensioning (PLAN DIMS / MARKER DIMS)
 
 Exact size = dimension constraints only (core design rule; no on-canvas size editor). The two
 dimension modes are hard-filtered domains, not one mixed picker. PLAN DIMS permits edge↔edge and
-edge↔origin; OUTLET DIMS permits outlet↔edge only and requires the outlet first. Ref-pick is
+edge↔origin; MARKER DIMS permits marker↔edge only and requires the marker first. Ref-pick is
 reticle-gated (`edgeAtPoint` / origin near gizmo / `dimLabelAtPoint` to select a plan constraint).
 Numpad row is **SWAP | DEL | ENTER**, shown only in the edit phase. Field prefills the current
 value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives rejected.
 
-- Outlet X/Y pins are selected through the outlet's **projected floor icon**, never its wall-height
-  glyph. In OUTLET DIMS, pick the floor icon first and a plan edge second. Before the icon is
-  selected, edges are inert; after it is selected, other outlet icons and the origin are inert.
+- Marker X/Y pins are selected through the marker's **projected floor icon**, never its wall-height
+  glyph. In MARKER DIMS, pick the floor icon first and a plan edge second. Before the icon is
+  selected, edges are inert; after it is selected, other marker icons and the origin are inert.
   Hovering or locking a projected icon adds a bold outline to it and its linked wall-height
-  outlet without resizing either icon, disambiguating outlets that share X/Y at different heights. The
-  resulting one-way constraint moves the outlet, not the wall.
-- Every outlet pin renders an orange dashed floor dimension from the anchored wall edge to the
-  outlet's projected coordinate, plus a value label. That label can be selected or grip-dragged
-  only in OUTLET DIMS; PLAN DIMS ignores it.
+  glyph without resizing either icon, disambiguating markers that share X/Y at different heights. The
+  resulting one-way constraint moves the marker, not the wall.
+- Every marker pin renders an orange dashed floor dimension from the anchored wall edge to the
+  marker's projected coordinate, plus a value label. That label can be selected or grip-dragged
+  only in MARKER DIMS; PLAN DIMS ignores it.
 
 - Distance = ordered + signed (`value = coord(b) − coord(a)`). **FLIP = `flipConstraintSide`**
   (negate value, keep order). `swapConstraint` is geometrically a NO-OP (swaps a,b AND negates;
@@ -140,13 +151,12 @@ basement negative). See `multi-floor-design` memory for the settled design.
 
 - Entering AR seeds **Basement · Ground · Upper** around Ground (`ensureFloors`; no-op if
   already multi-floor; default 2.8 m, persists via autosave).
-- **LEVEL mode**: **B/Y cycles** the active floor (wrap); the DIMS numpad is reused to type a
-  storey height, **ENTER** sets the active floor's height (`project.setHeight`) and re-stacks
-  elevations. Heights are entered **by hand** — Quest can't measure the vertical offset. The
-  pad's SWAP/DEL keys are inert here. Label reads `LEVEL · <FloorName>`; pad title shows the
-  floor's base elevation.
-- `afterFloorChange()` is shared by LEVEL's B/Y `cycleFloor` and vertical-thumbstick
-  `switchFloor`: it rebuilds the
+- **LEVEL mode**: **thumbstick up/down switches** the active floor (`switchFloor`, no wrap); the
+  DIMS numpad is reused to type a storey height, **ENTER** sets the active floor's height
+  (`project.setHeight`) and re-stacks elevations. Heights are entered **by hand** — Quest can't
+  measure the vertical offset. The pad's SWAP/DEL keys are inert here. Label reads
+  `LEVEL · <FloorName>`; pad title shows the floor's base elevation.
+- `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the
   overlay at the new elevation and re-shows the LEVEL pad (which `refreshFloorEditState`'s
   `resetDim` hides).
 - **Stacking gotcha**: a storey's elevation is driven by the floor *below*. To lift the Upper
@@ -188,6 +198,10 @@ world overlays. Per controller, stacked above the tip: mode **label**, hover **r
 
 ## Durable traps
 
+- **`material.color.setHex()` needs a NUMBER, not a CSS string.** `C_WALL1`/`C_WALL2` (`'#22d3ee'`,
+  `'#a78bfa'`) are canvas-`ctx` strings for the RECAL badges; passing one to `setHex` gives `NaN` →
+  the mesh renders **black**. Highlight/strip colors must be numeric hex (`0x…`). (This bug made the
+  RECAL wall strip black; fixed to the numeric `C_RECAL` accent.)
 - **`View3D.setGeometry` rebuilds meshes every change** — MR uses `hideMesh` + `view.house` (the
   floor Group), not `view.mesh`. `mr.js` does NOT subscribe to `project.onChange`; it rebuilds
   overlays manually via `buildPlan()`/`applyPlanMatrix()`, so any model-changing action (incl.
