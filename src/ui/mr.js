@@ -886,6 +886,8 @@ export function setupMR(view, project, getFootprint) {
   let hoverSlot = null;     // SAVE/LOAD slot under the ray this frame (0-based)
   let prevHoverSlot = null; // last drawn slot hover
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
+  let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
+  let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
 
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
   // (x, 0, -y), and planGroup adds planYaw + planPos; worldToLocal inverts both
@@ -1190,14 +1192,14 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // 🗑 DEL: remove the constraint for the current pair (existing or just-loaded), then
-  // clear the pad. No-op if the pair has no constraint yet.
+  // clear the pad. For a NEW pair with no constraint yet, DEL cancels the in-progress
+  // definition and closes the pad (same "clear + back to ref-pick" result either way).
   function deleteDim() {
     if (!dimRefA || !dimRefB) return;
     const c = editingId ? project.constraints.find((k) => k.id === editingId)
                         : findConstraintForRefs(dimRefA, dimRefB);
-    if (!c) { rlog('dim delete: no constraint'); return; }
-    project.removeConstraint(c.id);
-    rlog('dim delete', { id: c.id });
+    if (c) { project.removeConstraint(c.id); rlog('dim delete', { id: c.id }); }
+    else rlog('dim cancel (no constraint)');
     resetDim();
     buildPlan();
     applyPlanMatrix();
@@ -1265,6 +1267,67 @@ export function setupMR(view, project, getFootprint) {
     dimConflict = false;
     rlog('dim load', { id, a: refLabel(dimRefA), b: refLabel(dimRefB) });
     showNumpad();
+  }
+
+  // ---- LEVEL: per-storey height, entered by hand (Quest can't measure the vertical
+  // offset between floors). Reuses the SIZE numpad; the SWAP/DEL keys have no role here.
+  // B/Y cycles the active floor (see pollModeCycle); a floor's height re-stacks every
+  // floor's elevation above it (Project._recomputeElevations).
+  const levelTitle = () => {
+    const f = project.activeFloor;
+    return `${f.name}  base ${fmt(f.elevation)} ${unitLabel()}  ·  storey height`;
+  };
+  const redrawLevelPad = () => numpad.draw(levelTitle(), levelBuffer, hoverKey);
+
+  // Prefill the field with the active floor's current height (without re-parking the
+  // panel) — used on enter and after cycling to another floor.
+  function refreshLevelPad() {
+    levelBuffer = fmt(project.activeFloor.height);
+    levelPristine = true;
+    redrawLevelPad();
+  }
+
+  function activateLevelPad() {
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    refreshLevelPad();
+  }
+
+  function commitLevelHeight() {
+    const val = parseFloat(levelBuffer);
+    if (!Number.isFinite(val) || val <= 0) return; // a storey must have positive height
+    project.setHeight(toMeters(val)); // sets the active floor's height, re-solves + re-stacks elevations
+    rlog('floor height set', { floor: project.activeFloor.name, m: +toMeters(val).toFixed(3) });
+    buildPlan(); applyPlanMatrix(); // elevations changed -> the overlay re-seats at the new height
+    refreshLevelPad();
+  }
+
+  function pressLevelKey(k) {
+    if (k === 'enter') { commitLevelHeight(); return; }
+    if (k === 'swap' || k === 'del') return; // not used when entering a height
+    if (levelPristine && k !== 'back') levelBuffer = '';
+    levelPristine = false;
+    if (k === 'back') levelBuffer = levelBuffer.slice(0, -1);
+    else if (k === '.') { if (!levelBuffer.includes('.')) levelBuffer += '.'; }
+    else if (levelBuffer.replace('.', '').length < 6) levelBuffer += k;
+    redrawLevelPad();
+  }
+
+  // LEVEL trigger: drive the numpad key under the ray.
+  function onLevelTouch() {
+    if (hoverKey) pressLevelKey(hoverKey);
+  }
+
+  // Cycle the active storey Basement -> Ground -> Upper -> (wrap) — the dedicated
+  // floor-switch action (B/Y in LEVEL). Distinct from thumbstick-y (global up/down,
+  // no wrap). afterFloorChange re-seats the LEVEL pad + label for the new floor.
+  function cycleFloor() {
+    const floors = project.floors;
+    const i = floors.findIndex((f) => f.id === project.activeFloorId);
+    const j = (i + 1) % floors.length;
+    project.setActiveFloor(floors[j].id);
+    afterFloorChange();
+    rlog('floor cycle', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
   }
 
   // SIZE trigger: while both refs aren't chosen, select the dim value panel under the
@@ -1542,6 +1605,7 @@ export function setupMR(view, project, getFootprint) {
 
   const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
   const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
+  const C_LEVEL = 0x38bdf8; // LEVEL (storey height / floor switch) accent
 
   // Drop a throwaway starter rectangle (ROOM = add / WALL = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
@@ -1624,6 +1688,13 @@ export function setupMR(view, project, getFootprint) {
         floorY = pos.y;
         if (placed) placeAt(planPos.x, floorY, planPos.z);
       },
+    },
+    {
+      id: 'level', label: 'LEVEL', color: C_LEVEL,
+      help: 'B/Y: switch to the next floor (Basement/Ground/Upper). Type a storey height and ENTER to set the active floor.',
+      // Per-storey height, entered by hand (Quest can't measure the vertical offset).
+      // Trigger drives the numpad; B/Y cycles the active floor (see pollModeCycle).
+      onTouch: onLevelTouch,
     },
     {
       // REGISTER: a 3-point gesture that DERIVES the origin corner, so the corner
@@ -1811,9 +1882,10 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    applyModeVisual(m.label, m.color);
+    applyModeVisual(m.id === 'level' ? `LEVEL · ${project.activeFloor.name}` : m.label, m.color);
     for (const h of helps) h.setText(m.label, m.help ?? '', m.color); // mode guidance box
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
+    else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
     else deactivateSlotMenu();
@@ -1831,6 +1903,34 @@ export function setupMR(view, project, getFootprint) {
     resetDim();
   }
 
+  // Ensure the survey has the three storeys we author on-device: a Basement below
+  // and an Upper above the existing Ground. Only seeds a fresh single-floor project
+  // (a loaded/already-multi-floor project is left alone). Heights are the Floor
+  // default; they're meant to be corrected by hand in LEVEL mode (Quest can't measure
+  // the vertical offset between floors). All three share the same plan origin (0,0).
+  function ensureFloors() {
+    if (project.floors.length > 1) return;
+    const groundId = project.groundFloorId;
+    project.addFloor({ refId: groundId, above: false, name: 'Basement' }); // below ground
+    project.addFloor({ refId: groundId, above: true, name: 'Upper' });     // above ground
+    project.setActiveFloor(groundId); // start on the ground floor (the registration storey)
+  }
+
+  // Shared refresh after the active floor changes (cycle or thumbstick). Re-seats the
+  // survey edit state + overlay at the new elevation, and — because refreshFloorEditState
+  // hides the numpad via resetDim — re-shows the LEVEL height pad + label if that's the
+  // current mode.
+  function afterFloorChange() {
+    refreshFloorEditState();
+    buildPlan();
+    applyPlanMatrix(); // overlay lifts to the new floor's elevation
+    if (modes[currentMode].id === 'level') {
+      applyModeVisual(`LEVEL · ${project.activeFloor.name}`, C_LEVEL);
+      numpad.group.visible = true; // refreshFloorEditState hid it; LEVEL keeps it up
+      refreshLevelPad();
+    }
+  }
+
   // Switch the active storey up (+1) / down (-1) in the stack. Register-once
   // means the frame is shared; only the overlay's elevation changes. No wrap —
   // you can't step past the top or bottom floor.
@@ -1840,11 +1940,8 @@ export function setupMR(view, project, getFootprint) {
     const j = i + delta;
     if (j < 0 || j >= floors.length) return;
     project.setActiveFloor(floors[j].id);
-    refreshFloorEditState();
-    buildPlan();
-    applyPlanMatrix(); // overlay lifts to the new floor's elevation
-    const f = project.activeFloor;
-    rlog('floor switch', { name: f.name, elev: +f.elevation.toFixed(3) });
+    afterFloorChange();
+    rlog('floor switch', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
   }
 
   function placeAt(x, y, z) {
@@ -1882,6 +1979,7 @@ export function setupMR(view, project, getFootprint) {
     view.hideMesh = true; // keep them hidden even as survey edits rebuild the mesh
     view.controls.enabled = false;
 
+    ensureFloors(); // seed Basement + Upper around Ground on first AR entry
     buildPlan();
     scene.add(planGroup);
     planGroup.visible = false;
@@ -2115,6 +2213,7 @@ export function setupMR(view, project, getFootprint) {
     if (next && !btn.next) {
       if (modes[currentMode].id === 'edit') swapSelected();
       else if (modes[currentMode].id === 'size' && dimRefA && dimRefB) swapDim();
+      else if (modes[currentMode].id === 'level') cycleFloor(); // dedicated floor-switch action
       else setMode(currentMode + 1);
     }
     if (prev && !btn.prev) setMode(currentMode - 1);
@@ -2344,6 +2443,20 @@ export function setupMR(view, project, getFootprint) {
         showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
       }
       if (hoverKey !== prevHoverKey) { redrawNumpad(); prevHoverKey = hoverKey; }
+    } else if (modeId === 'level') {
+      // LEVEL: the numpad is always shown (height entry); ray it for the key under the
+      // beam. No floor target — B/Y cycles the floor, the pad sets its height.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(pickSource(frame));
+      if (numpad.group.visible && panelHit) {
+        hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      if (hoverKey !== prevHoverKey) { redrawLevelPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'edit') {
       // EDIT: ray the floor, gather the overlap stack under the reticle. The
       // persistent selection (if any) is zebra-filled + outlined in its op color;
