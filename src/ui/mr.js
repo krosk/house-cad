@@ -136,6 +136,49 @@ export function setupMR(view, project, getFootprint) {
     return { sprite, setLines };
   }
 
+  // A word-wrapped "what does this mode do" box that rides above the debug HUD so
+  // the current survey action always carries its own on-headset instructions.
+  function makeHelp() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 384;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    sprite.scale.set(0.26, 0.195, 1); // match the 512x384 aspect
+    // Greedy word-wrap `text` into lines no wider than `maxW` px at the current font.
+    const wrap = (text, maxW) => {
+      const out = [];
+      for (const para of text.split('\n')) {
+        let line = '';
+        for (const word of para.split(' ')) {
+          const trial = line ? `${line} ${word}` : word;
+          if (line && ctx.measureText(trial).width > maxW) { out.push(line); line = word; }
+          else line = trial;
+        }
+        out.push(line);
+      }
+      return out;
+    };
+    const setText = (title, body, colorHex) => {
+      ctx.clearRect(0, 0, 512, 384);
+      ctx.fillStyle = 'rgba(15, 18, 24, 0.82)';
+      ctx.beginPath();
+      ctx.roundRect(6, 6, 500, 372, 14);
+      ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#' + (colorHex ?? 0xffffff).toString(16).padStart(6, '0');
+      ctx.font = 'bold 34px sans-serif';
+      ctx.fillText(title, 24, 22);
+      ctx.fillStyle = '#cdd9e5';
+      ctx.font = '28px sans-serif';
+      wrap(body, 464).forEach((line, i) => ctx.fillText(line, 24, 76 + i * 36));
+      tex.needsUpdate = true;
+    };
+    return { sprite, setText };
+  }
+
   // S2 numpad: a canvas-textured panel you aim the controller ray at to enter
   // exact tape dimensions. Keys are hit-tested by the ray's UV on the plane (no
   // per-key meshes). Layout: a display line (field + typed value + unit) over a
@@ -305,6 +348,7 @@ export function setupMR(view, project, getFootprint) {
   const labels = [];
   const debugs = [];
   const readouts = []; // per-controller dimension-value pill (shown on ray hover)
+  const helps = [];    // per-controller mode explanation box
   for (const i of [0, 1]) {
     const c = renderer.xr.getController(i); // target-ray space: -Z is the pointing dir
     const tip = new THREE.Mesh(tipGeom, tipMat);
@@ -330,6 +374,11 @@ export function setupMR(view, project, getFootprint) {
     dbg.sprite.renderOrder = HUD_ORDER;
     c.add(dbg.sprite);
     debugs.push(dbg);
+    const help = makeHelp(); // mode instructions, above the debug HUD
+    help.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.42, TIP_OFFSET.z);
+    help.sprite.renderOrder = HUD_ORDER;
+    c.add(help.sprite);
+    helps.push(help);
     c.addEventListener('select', onSelect);   // trigger: run current mode
     c.addEventListener('squeezestart', onSqueezeStart); // grip press: begin a grip-drag if over a target
     c.addEventListener('squeeze', onReset);   // grip: undo placement (unless a grip-drag ran)
@@ -584,8 +633,16 @@ export function setupMR(view, project, getFootprint) {
   // is echoed big on the controller). Rebuilt with the plan each edit.
   let dimSprites = [];
 
-  // A billboarded value label (canvas pill, always faces the user) at a plan point.
-  function makeDimLabel(text, color, px, py) {
+  // Cache dim-label textures by their content (text+color). buildPlan rebuilds every
+  // label sprite on each change, but a label's canvas only depends on text+color, so
+  // reusing the CanvasTexture avoids a fresh canvas draw + GPU upload per rebuild. This
+  // is what makes dragging a dim offset cheap: the value text is constant through the
+  // drag, so every frame is a cache hit. Bounded by evicting (disposing) in buildDimensions.
+  const dimTexCache = new Map(); // `${text}|${color}` -> CanvasTexture
+  function dimLabelTexture(text, color) {
+    const key = `${text}|${color}`;
+    let tex = dimTexCache.get(key);
+    if (tex) return tex;
     const canvas = document.createElement('canvas');
     canvas.width = 256; canvas.height = 64;
     const ctx = canvas.getContext('2d');
@@ -595,7 +652,14 @@ export function setupMR(view, project, getFootprint) {
     ctx.font = 'bold 30px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, 128, 33);
-    const tex = new THREE.CanvasTexture(canvas);
+    tex = new THREE.CanvasTexture(canvas);
+    dimTexCache.set(key, tex);
+    return tex;
+  }
+
+  // A billboarded value label (canvas pill, always faces the user) at a plan point.
+  function makeDimLabel(text, color, px, py) {
+    const tex = dimLabelTexture(text, color);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
     sprite.scale.set(0.16, 0.04, 1);
     sprite.position.set(px, 0.04, -py); // plan (x,y) -> local (x,0,-y), lifted 4 cm
@@ -606,6 +670,11 @@ export function setupMR(view, project, getFootprint) {
   // Draw every distance constraint of the active floor into planGroup: a dim line
   // between the two edges (offset outward), extension lines, and the value label.
   function buildDimensions() {
+    // Bound the label-texture cache. Safe here: buildPlan already tore down the old dim
+    // sprites (materials disposed), and the new ones aren't built yet, so nothing
+    // references these textures right now. Distinct value strings accrue slowly; cap to
+    // avoid an unbounded session leak. The drag case stays a hit (one key, size 1).
+    if (dimTexCache.size > 64) { for (const t of dimTexCache.values()) t.dispose(); dimTexCache.clear(); }
     const segs = [];        // {ax,ay,bx,by,conflict} strips to build
     dimSprites = [];        // value labels, for hover pick
     // A dim value label carries its constraint id + both refs, so ray-hovering it can
@@ -730,13 +799,18 @@ export function setupMR(view, project, getFootprint) {
     return white;
   }
 
-  function buildPlan() {
-    // Clear any previous geometry. Dispose sprite textures/materials too (dim
-    // labels create a CanvasTexture each rebuild) so they don't leak.
+  // `withDims=false` skips buildDimensions — the per-frame dimension rebuild creates
+  // a CanvasTexture per label, which is the dominant cost. During a live edge drag we
+  // pass false (edge strip + fill still update for feedback); a full rebuild on the
+  // drag release (onSqueezeEnd) brings the dims back correct.
+  function buildPlan(withDims = true) {
+    // Clear any previous geometry. Dispose per-rebuild materials; do NOT dispose the
+    // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
+    // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
       planGroup.remove(child);
       child.geometry?.dispose();
-      if (child.isSprite) { child.material.map?.dispose(); child.material.dispose(); }
+      if (child.isSprite) child.material.dispose();
     }
     const footprint = getFootprint?.() ?? [];
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = total free space
@@ -763,7 +837,7 @@ export function setupMR(view, project, getFootprint) {
       pushStrips([activeRect], activeRect.op === 'subtract' ? activeSubMat : activeMat, 0.006, notLocked);
       pushStrips([activeRect], lockedMat, 0.007, isLocked); // white locked edges of the active zone
     }
-    buildDimensions(); // constraint dimension lines + value labels
+    if (withDims) buildDimensions(); // constraint dimension lines + value labels
     return planGroup.children.length > 0;
   }
 
@@ -1160,7 +1234,7 @@ export function setupMR(view, project, getFootprint) {
       if (!rect) return;
       setEdge(rect, gripDrag.edge, px, py);
       project.touch(); // edge moved in place -> re-solve + rebuild
-      buildPlan(); applyPlanMatrix();
+      buildPlan(false); applyPlanMatrix(); // skip dim-label textures while dragging (restored on release)
     }
   }
 
@@ -1539,6 +1613,7 @@ export function setupMR(view, project, getFootprint) {
   const modes = [
     {
       id: 'floor', label: 'FLOOR', color: 0x51d88a,
+      help: 'Touch the tip to the real ground to set the base level. Re-level only on the ground floor.',
       // Calibrate the GROUND base level (the datum every storey's overlay lifts
       // off). A touch on an upper floor is at that floor's height, which would
       // double-count against its elevation — so only re-level on the ground floor.
@@ -1558,6 +1633,7 @@ export function setupMR(view, project, getFootprint) {
       // where the two walls meet = P3 projected onto the P1->P2 wall line. The tip
       // label steps WALL 1 -> WALL 2 -> PERP so the current step is always visible.
       id: 'register', label: 'ORIGIN', color: C_ORIGIN,
+      help: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',
       onTouch: (pos) => {
         registerPts.push({ x: pos.x, z: pos.z });
         const n = registerPts.length;
@@ -1583,12 +1659,14 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'drop', label: 'ROOM', color: 0x2dd4bf,
+      help: 'Trigger to drop a roomspace box where you stand. Push its edges out to the walls in EDGE.',
       // Drop a ROOMSPACE (add) rectangle at your standing position. It becomes the
       // active rectangle; push its edges to the walls in EDGE.
       onTouch: () => dropRect('add'),
     },
     {
       id: 'wall', label: 'WALL', color: 0xff6b6b,
+      help: 'Trigger to drop a wall (subtract) box where you stand. Snap its edges to the wall faces in EDGE.',
       // Drop a WALL (subtract) rectangle — solid, no roomspace — the same way. It
       // carves a hole in the footprint fill; push its edges to the real wall faces
       // in EDGE. add = roomspace, subtract = wall.
@@ -1596,6 +1674,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'edge', label: 'EDGE', color: 0xff5db1,
+      help: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
       // Two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS that edge;
       // 2nd (tip touching the real wall) snaps the locked edge to the wall. The ray
       // picks the edge across all zones; the touch supplies only the perpendicular
@@ -1620,6 +1699,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'edit', label: 'EDIT', color: 0xa78bfa,
+      help: 'Aim at a zone and trigger to select it (trigger again cycles buried zones). Grip deletes; B/Y swaps room/wall.',
       // Select a zone to edit. TRIGGER picks the zone under your ray; pressing again
       // cycles DOWN through overlapping zones (wraps), so any buried zone is
       // reachable. The selection persists + is zebra-highlighted. Then GRIP deletes
@@ -1634,6 +1714,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'recal', label: 'RECAL', color: C_RECAL,
+      help: 'Fix drift. Aim so the reticle hugs wall 1 and trigger to pick a known corner, then touch 2 points on wall 1 and 1 on wall 2.',
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
       // corner apex needn't be reachable. First SELECT a corner — aim so the reticle
       // hugs the wall you want as "wall 1" (the nearer wall becomes 1, the other 2) and
@@ -1688,6 +1769,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'size', label: 'SIZE', color: 0xfbbf24,
+      help: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side.',
       // The desktop dimension tool in AR: pick two references — each a rect EDGE
       // or the plan ORIGIN axis — then type the exact distance on the numpad.
       // edge<->edge = a size (width/height); edge<->origin = a position lock. If a
@@ -1697,12 +1779,14 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'save', label: 'SAVE', color: 0x51d88a,
+      help: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
       // Aim the ray at a slot on the menu and trigger to write the whole project
       // there (overwrites a filled slot). Slots show their save time + rect count.
       onTouch: onSlotTouch,
     },
     {
       id: 'load', label: 'LOAD', color: 0x4ea1ff,
+      help: 'Aim at a filled slot and trigger to load it into the frame you already registered. Empty slots do nothing.',
       // Aim at a filled slot and trigger to replace the project with it; the loaded
       // plan drops into the frame you already registered. Empty slots are a no-op.
       onTouch: onSlotTouch,
@@ -1728,6 +1812,7 @@ export function setupMR(view, project, getFootprint) {
     zebra.visible = false;
     const m = modes[currentMode];
     applyModeVisual(m.label, m.color);
+    for (const h of helps) h.setText(m.label, m.help ?? '', m.color); // mode guidance box
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
@@ -1898,7 +1983,12 @@ export function setupMR(view, project, getFootprint) {
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
   function onSqueezeEnd() {
-    if (gripDrag) { project.touch(); rlog('grip-drag end', gripDrag); }
+    if (gripDrag) {
+      const wasEdge = gripDrag.kind === 'edge';
+      project.touch(); rlog('grip-drag end', gripDrag);
+      // The edge drag skipped dim labels per-frame; rebuild once now so they return.
+      if (wasEdge) { buildPlan(); applyPlanMatrix(); }
+    }
     gripDrag = null;
   }
 
@@ -1967,6 +2057,8 @@ export function setupMR(view, project, getFootprint) {
   const EXIT_HOLD_MS = 1200;
   let exitHoldStart = 0; // performance-time when the hold began (0 = not held)
   let exitProgress = 0;  // 0..1, for the HUD countdown
+  let lastHudAt = -Infinity; // ms of the last debug-HUD redraw (throttled; see onXRFrame)
+  let exitWasActive = false; // EXIT bar shown last frame -> force one redraw when it clears
   let exiting = false;   // guard so session.end() fires once
 
   // The controller the user is currently driving with. Two controllers reading
@@ -2046,6 +2138,19 @@ export function setupMR(view, project, getFootprint) {
   }
 
   const f2 = (n) => (Number.isFinite(n) ? n.toFixed(3) : '—');
+  // Length (meters) of an edge ref {rectId, edge}, or null if it can't be resolved.
+  const edgeLen = (ref) => {
+    if (!ref) return null;
+    const r = project.rectangles.find((x) => x.id === ref.rectId);
+    if (!r) return null;
+    const [[ax, ay], [bx, by]] = edgeEndpoints(r, ref.edge);
+    return Math.hypot(bx - ax, by - ay);
+  };
+  // Headset battery for the HUD. getBattery() resolves once to a live BatteryManager
+  // whose .level/.charging update in place, so we just read it per-frame. Not all
+  // browsers expose it — stays null (and off the HUD) when unavailable.
+  let battery = null;
+  if (navigator.getBattery) navigator.getBattery().then((b) => { battery = b; }).catch(() => {});
   // Active floor as "Name i/N" for the HUD.
   const floorLabel = () => {
     const fl = project.floors;
@@ -2078,16 +2183,32 @@ export function setupMR(view, project, getFootprint) {
     // Before REGISTER the plan sits at the session origin, so it degrades gracefully.
     // ptr's 3rd value is height above the registered floor. reticle.position is this
     // frame's value from the previous mode pass — one frame of lag is imperceptible.
-    const ptrW = tipPosition(activeCtl);
-    const ptr = ptrW ? worldToPlan(ptrW) : null;
-    const ret = reticle.visible ? worldToPlan(reticle.position) : null;
-    const lines = [
-      `build:  ${BUILD_ID}`,
-      ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
-      `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
-      `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
-    ];
-    for (const d of debugs) d.setLines(lines);
+    // Throttle the debug HUD to ~2 Hz: its coordinate readouts change every frame, so
+    // redrawing the two 512x320 canvases + re-uploading their textures each frame is
+    // pure waste for numbers no one reads that fast. The EXIT hold bar bypasses the
+    // throttle so its countdown stays smooth. The worldToPlan calls that only feed the
+    // HUD are inside the gate too, so they're skipped between refreshes.
+    if (exitProgress > 0 || exitWasActive || time - lastHudAt >= 500) {
+      lastHudAt = time;
+      exitWasActive = exitProgress > 0;
+      const ptrW = tipPosition(activeCtl);
+      const ptr = ptrW ? worldToPlan(ptrW) : null;
+      const ret = reticle.visible ? worldToPlan(reticle.position) : null;
+      // Length of the currently highlighted edge (locked wins over hovered). Both
+      // hold last frame's value here — hoverEdge is recomputed just below — which is
+      // the same imperceptible lag the ret/ptr lines already accept.
+      const edgeRef = selectedEdge || hoverEdge;
+      const edgeM = edgeLen(edgeRef);
+      const lines = [
+        `build:  ${BUILD_ID}`,
+        ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
+        `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
+        `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
+        ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
+        ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
+      ];
+      for (const d of debugs) d.setLines(lines);
+    }
     // Floor preview + edge highlight, depending on the current mode.
     hoverEdge = null;
     cornerHi.visible = false;
