@@ -102,7 +102,11 @@ export function setupMR(view, project, getFootprint) {
       ctx.roundRect(8, 8, 240, 48, 12);
       ctx.fill();
       ctx.fillStyle = '#' + colorHex.toString(16).padStart(6, '0');
+      // Breadcrumbs are longer than the old flat labels. Fit them within the pill
+      // while keeping short tool names at the original, highly legible size.
       ctx.font = 'bold 40px sans-serif';
+      const fontSize = Math.max(24, Math.min(40, Math.floor(40 * 216 / Math.max(216, ctx.measureText(text).width))));
+      ctx.font = `bold ${fontSize}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 128, 34);
@@ -1018,11 +1022,9 @@ export function setupMR(view, project, getFootprint) {
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
 
-  // DIMS state (S2 numpad): the desktop dimension tool in AR. Pick two references
-  // (each a rect EDGE or the plan ORIGIN axis), then type the exact distance,
-  // written as a hard constraint. edge<->edge = a size; edge<->origin = a position
-  // lock. Also edits an existing constraint between the same two references.
-  // A reference is { kind:'edge', rectId, edge } or { kind:'origin' }.
+  // Shared state for the two hard-separated dimension domains. PLAN DIMS accepts
+  // edge<->edge and edge<->origin pairs. OUTLET DIMS requires an outlet floor icon
+  // first, then an edge. Neither mode can select or mutate the other's constraints.
   let dimRefA = null;       // first-picked reference (the anchor, like desktop)
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
@@ -1232,9 +1234,10 @@ export function setupMR(view, project, getFootprint) {
     badge.sprite.visible = true;
   }
 
-  // --- DIMS (S2 numpad) helpers: the desktop dimension tool in AR ---
+  // --- PLAN DIMS / OUTLET DIMS (S2 numpad) helpers ---
 
   const isXEdge = (e) => e === 'left' || e === 'right';
+  const isDimMode = (id) => id === 'plan_dims' || id === 'outlet_dims';
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
 
   // A reference is a rect EDGE, the plan ORIGIN axis, or a MARKER (pinned to a wall).
@@ -1344,7 +1347,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function dimTitle() {
-    if (!dimRefA) return t('dim.pick');
+    if (!dimRefA) return t(modes[currentMode]?.id === 'outlet_dims' ? 'dim.pickOutlet' : 'dim.pickPlan');
     if (!dimRefB) return refLabel(dimRefA) + '  <->  ?';
     return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  ' + t('dim.edit') : '');
   }
@@ -1591,15 +1594,25 @@ export function setupMR(view, project, getFootprint) {
     rlog('floor cycle', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
   }
 
-  // DIMS trigger: while both refs aren't chosen, select the dim value panel under the
-  // ray (edit that constraint) or pick a rect edge / the origin (two picks, like
-  // clicking two edges on desktop). Once both are chosen, the ray drives the numpad.
+  // Shared dimension trigger. Frame-time picking enforces the domain, and these
+  // guards enforce it again at mutation time: PLAN DIMS accepts plan refs only;
+  // OUTLET DIMS requires outlet-first then edge. Once paired, the ray drives the pad.
   function onNumpadTouch() {
     if (!placed || !activeRect) return;
+    const modeId = modes[currentMode].id;
     if (dimRefA && dimRefB) { if (hoverKey) pressKey(hoverKey); return; }
-    if (hoverDim) { loadConstraint(hoverDim.userData.cId); return; } // select a constraint by its panel
+    if (modeId === 'plan_dims' && hoverDim) { loadConstraint(hoverDim.userData.cId); return; }
     if (!hoverRef) return;
-    if (!dimRefA) { dimRefA = hoverRef; rlog('dim A', { ref: refLabel(hoverRef) }); redrawNumpad(); return; }
+    if (!dimRefA) {
+      if ((modeId === 'plan_dims' && hoverRef.kind === 'marker') ||
+          (modeId === 'outlet_dims' && hoverRef.kind !== 'marker')) return;
+      dimRefA = hoverRef;
+      rlog('dim A', { domain: modeId, ref: refLabel(hoverRef) });
+      redrawNumpad();
+      return;
+    }
+    if (modeId === 'plan_dims' && hoverRef.kind === 'marker') return;
+    if (modeId === 'outlet_dims' && (dimRefA.kind !== 'marker' || hoverRef.kind !== 'edge')) return;
     if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
     dimRefB = hoverRef;
     dimOffsetPt = hoverFloorPt; // where the tip stands as the pair completes -> new dim's default line
@@ -1628,8 +1641,8 @@ export function setupMR(view, project, getFootprint) {
     group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
   }
 
-  // Enter DIMS in the ref-pick phase; the pad itself appears only once a pair/constraint
-  // is chosen (see showNumpad), since it has no role while you're still picking refs.
+  // Enter either dimension domain in the ref-pick phase; the pad itself appears only
+  // once a pair/constraint is chosen, since it has no role while picking references.
   function activateNumpad() {
     resetDim();
   }
@@ -2115,7 +2128,7 @@ export function setupMR(view, project, getFootprint) {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
       // OUTLET editing domain. Aim at an existing outlet to edit its height; grip-drag
       // moves it and grip away deletes the selected outlet. Trigger on empty space drops
-      // a new outlet at the tip. DIMS remains the cross-domain tool for wall pins.
+      // a new outlet at the tip. OUTLET DIMS owns its wall-pin constraints.
       onTouch: (pos) => {
         if (!placed) return;
         if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
@@ -2193,12 +2206,15 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'dims', color: 0xfbbf24, // label/help via i18n: mode.dims / help.dims
-      // The desktop dimension tool in AR: pick two references — each a rect EDGE
-      // or the plan ORIGIN axis — then type the exact distance on the numpad.
-      // edge<->edge = a size (width/height); edge<->origin = a position lock. If a
-      // constraint already exists between the pair, its value is prefilled to edit.
-      // Written as a hard constraint (exact size = dimension constraints).
+      id: 'plan_dims', color: 0xfbbf24,
+      // Plan constraint domain: edge<->edge size or edge<->origin position lock.
+      // Outlet references and pins are completely unavailable here.
+      onTouch: onNumpadTouch,
+    },
+    {
+      id: 'outlet_dims', color: C_MARKER,
+      // Outlet constraint domain: explicitly select an outlet floor projection first,
+      // then a plan edge. Plan edge<->edge/origin constraints are unavailable here.
       onTouch: onNumpadTouch,
     },
     {
@@ -2225,19 +2241,31 @@ export function setupMR(view, project, getFootprint) {
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'level',
-    'drop', 'wall', 'edge', 'edit', 'marker',
-    'dims', 'save', 'load', 'lang',
+    'drop', 'wall', 'edge', 'edit', 'plan_dims',
+    'marker', 'outlet_dims', 'save', 'load', 'lang',
   ];
+  const MODE_GROUP = {
+    register: 'setup', floor: 'setup', recal: 'setup', level: 'setup',
+    drop: 'plan', wall: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
+    marker: 'outlet', outlet_dims: 'outlet',
+    save: 'project', load: 'project', lang: 'project',
+  };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
   let currentMode = 0;
+
+  // The interaction remains a fast linear cycle, but every label is presented as
+  // GROUP · TOOL so the growing tool list has an explicit, localized hierarchy.
+  const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
 
   // Recolor the tip + reticle and set the floating label — used both by setMode
   // and by REGISTER to flip ORIGIN<->ALIGN mid-gesture.
   function applyModeVisual(label, color) {
     tipMat.color.setHex(color);
     reticle.material.color.setHex(color);
-    for (const l of labels) l.setText(label, color);
+    const id = modes[currentMode]?.id;
+    const title = id ? modeBreadcrumb(id, label) : label;
+    for (const l of labels) l.setText(title, color);
   }
 
   function setMode(i) {
@@ -2251,8 +2279,8 @@ export function setupMR(view, project, getFootprint) {
     zebra.visible = false;
     const m = modes[currentMode];
     applyModeVisual(t(`mode.${m.id}`), m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
-    for (const h of helps) h.setText(t(`mode.${m.id}`), t(`help.${m.id}`), m.color); // mode guidance box
-    if (m.id === 'dims') activateNumpad(); // spawn/refresh the numpad in front of you
+    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), m.color); // mode guidance box
+    if (isDimMode(m.id)) activateNumpad(); // start the selected domain in ref-pick phase
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
@@ -2267,7 +2295,7 @@ export function setupMR(view, project, getFootprint) {
   onLangChange(() => {
     const m = modes[currentMode];
     applyModeVisual(t(`mode.${m.id}`), m.color);
-    for (const h of helps) h.setText(t(`mode.${m.id}`), t(`help.${m.id}`), m.color);
+    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), m.color);
     if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
@@ -2454,11 +2482,11 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
-  // of an undo — a dim value panel in DIMS, an edge in EDGE, or a marker in OUTLET.
+  // of an undo — a plan-dim value panel, an edge in EDGE, or a marker in OUTLET.
   function onSqueezeStart(event) {
     if (event?.data) activeSource = event.data;
     const id = modes[currentMode].id;
-    if (id === 'dims' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
+    if (id === 'plan_dims' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
     if (id === 'marker' && hoverMarker && setControllerRay(event.data)) {
       const sprite = markerGroup.children.find(
@@ -2489,14 +2517,14 @@ export function setupMR(view, project, getFootprint) {
   // other modes only cancel an in-progress gesture (or do nothing).
   //  - PLAN: delete the selected zone.
   //  - OUTLET: delete the selected outlet (an aimed grip starts a drag instead).
-  //  - DIMS: cancel the last dimension pick, step by step.
+  //  - PLAN DIMS / OUTLET DIMS: cancel the last dimension pick, step by step.
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
     if (event?.data) activeSource = event.data; // grip claims control too
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
-    if (mode.id === 'dims') { // undo the last dimension pick, step by step
+    if (isDimMode(mode.id)) { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; dimBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
@@ -2608,11 +2636,11 @@ export function setupMR(view, project, getFootprint) {
       exitProgress = 0;
     }
     // Upper face button (B/Y) normally cycles to the next mode, but it's overridden
-    // in PLAN (swap the selected zone room<->wall) and in DIMS with a pair chosen
+    // in PLAN (swap the selected zone room<->wall) and either DIMS mode with a pair
     // (reverse the dimension's direction). Thumbstick-x still cycles modes there.
     if (next && !btn.next) {
       if (modes[currentMode].id === 'edit') swapSelected();
-      else if (modes[currentMode].id === 'dims' && dimRefA && dimRefB) swapDim();
+      else if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
       else if (modes[currentMode].id === 'level') cycleFloor(); // dedicated floor-switch action
       else setMode(currentMode + 1);
     }
@@ -2697,11 +2725,11 @@ export function setupMR(view, project, getFootprint) {
       const ptr = ptrW ? worldToPlan(ptrW) : null;
       const ret = reticle.visible ? worldToPlan(reticle.position) : null;
       // Length of the currently highlighted edge (locked wins over hovered). In EDGE
-      // that's selectedEdge/hoverEdge; in DIMS it's the edge ref under the ray
+      // that's selectedEdge/hoverEdge; in either DIMS mode it's the edge under the ray
       // (hoverRef). All hold last frame's value here — recomputed just below — the
       // same imperceptible lag the ret/ptr lines already accept.
       const modeId = modes[currentMode].id;
-      const dimHoverEdge = modeId === 'dims' && hoverRef?.kind === 'edge' ? hoverRef : null;
+      const dimHoverEdge = isDimMode(modeId) && hoverRef?.kind === 'edge' ? hoverRef : null;
       const edgeRef = selectedEdge || hoverEdge || dimHoverEdge;
       const edgeM = edgeLen(edgeRef);
       const lines = [
@@ -2814,11 +2842,10 @@ export function setupMR(view, project, getFootprint) {
           recalStep.sprite.visible = true;
         }
       }
-    } else if (modeId === 'dims') {
-      // DIMS: pick two references (edge or origin) then type on the numpad. While
-      // the pair isn't complete, aim at the floor to pick refs; once complete, the
-      // ray drives the numpad. Locked refs (amber) and the hover ref (yellow) are
-      // drawn — edges as strips, the origin by tinting its gizmo ring.
+    } else if (isDimMode(modeId)) {
+      // The two DIMS modes share mechanics but not targets. PLAN DIMS exposes only
+      // plan edges/origin and existing plan constraints. OUTLET DIMS exposes only
+      // an outlet floor icon for the first pick and a plan edge for the second.
       reticle.visible = false;
       hoverKey = null;
       hoverRef = null;
@@ -2836,9 +2863,9 @@ export function setupMR(view, project, getFootprint) {
           numpadCursor.visible = true;
         }
       } else {
-        // Reference-pick phase. If the ray is on an existing dim value panel, THAT is
-        // the pick (select it to edit the constraint); otherwise ray the floor for an
-        // outlet projection, edge, or origin. The wall-height outlet glyph is inert here.
+        // Reference-pick phase. Plan value panels are selectable only in PLAN DIMS.
+        // OUTLET DIMS requires the projected outlet icon first, making it impossible
+        // for an accidental edge-to-edge pick to alter a room dimension.
         const source = pickSource(frame);
         const hit = rayFloorHit(source);
         if (hit) {
@@ -2847,13 +2874,24 @@ export function setupMR(view, project, getFootprint) {
           const { px, py } = worldToPlan(hit);
           hoverFloorPt = { px, py }; // remember where the tip stands (for a new dim's default placement)
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
-          // A dim panel is hovered only when the RETICLE is over it (before the first ref).
-          hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
-          if (!hoverDim) { // a hovered dim panel takes over; otherwise projection beats plan refs
-            const floorMarker = (dimRefA && dimRefA.kind === 'marker') ? null : markerAtFloorPoint(px, py);
+          if (modeId === 'plan_dims') {
+            // A plan-dim panel takes priority before the first reference. Marker-pin
+            // constraints stay excluded defensively if their labels are drawn later.
+            const candidate = dimRefA ? null : dimLabelAtPoint(px, py);
+            const candidateConstraint = candidate
+              ? project.constraints.find((c) => c.id === candidate.userData.cId)
+              : null;
+            hoverDim = candidateConstraint && !isMarkerConstraint(candidateConstraint) ? candidate : null;
+            if (!hoverDim) {
+              if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
+              else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+            }
+          } else if (!dimRefA) {
+            const floorMarker = markerAtFloorPoint(px, py);
             if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
-            else if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
-            else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+          } else {
+            const e = edgeAtPoint(px, py);
+            if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge };
           }
         }
       }

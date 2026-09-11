@@ -10,17 +10,26 @@ AR (`src/ui/mr.js`) is the **only** authoring surface on the Quest — the immer
 AR by quitting, there is no 2D editor on-device — so it must reach parity with the desktop 2D
 editor (`ar-2d-parity` memory).
 
-## Modes (13, stable `id`s), cycled by A/B / thumbstick-x
+## Mode hierarchy (14 tools with stable `id`s)
 
-`ORIGIN`(id `register`) → `FLOOR` → `RECAL` → `LEVEL` →
-`ROOM`(id `drop`) → `WALL` → `EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) →
-`DIMS` → `SAVE` → `LOAD` → `LANG`.
+```text
+SETUP    · ORIGIN → FLOOR → RECAL → LEVEL
+PLAN     · ROOM → WALL → EDGE → EDIT → DIMS
+OUTLET   · EDIT → DIMS
+PROJECT  · SAVE → LOAD → LANG
+```
+
+The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
+navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
+presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
+Internal IDs in traversal order are `register`, `floor`, `recal`, `level`, `drop`, `wall`, `edge`,
+`edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
 Per-frame mode visuals/highlights are the big if/else chain keyed on `modeId` near the end of
 the animation loop. `setMode` resets in-progress gestures and activates/deactivates the numpad
-(DIMS + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
+(both DIMS modes + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
 (= ORIGIN at session start); everything else is keyed by `id` or `currentMode ± 1`.
 
 - **FLOOR** — calibrate the ground base level `floorY` by touching the real ground. Guarded to
@@ -34,17 +43,21 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
-- **PLAN** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
+- **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), grip deletes it, and B/Y swaps it room↔wall. Outlet glyphs are inert.
-- **OUTLET** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
+- **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
+  position locks. Outlet floor icons and outlet pins are inert.
+- **OUTLET · EDIT** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
   pointing directly at an outlet and triggering opens its height pad; grip-drag moves it in 3D;
   grip away deletes the selected outlet. Every outlet also has a flat projected floor icon showing
   its plan X/Y. Plan zones are inert.
+- **OUTLET · DIMS** (`id: outlet_dims`) — outlet pins only. The first reference must be an outlet's
+  projected floor icon; only then do plan edges become eligible for the second reference. Plan
+  dimensions cannot be selected or changed.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
-- **DIMS** — the dimension tool (see Dimensioning below).
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.
 - **LANG** — UI language switch (see Localization). Thumbstick up/down moves through the list
   (FR/EN/ZH); trigger picks the ray-aimed row, or advances one if the ray is off the panel.
@@ -52,7 +65,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 ## Localization (`src/core/i18n.js`)
 
 All user-facing AR text is localized (EN default, FR, ZH) — mode labels, per-mode help boxes,
-transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS title + edge/origin ref
+transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS titles + edge/origin ref
 names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay English (diagnostic).
 
 - `i18n.js` mirrors `units.js`: a `current` language + an `onLangChange` bus, plus `t(key)`,
@@ -69,10 +82,10 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
 
 - **trigger** = mode action (place / pick / press a numpad or slot key).
 - **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
-  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (DIMS = undo a
+  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
-  reticle is over a drag target → **grip-drag** (DIMS over a dim panel = slide its offset; EDGE
+  reticle is over a drag target → **grip-drag** (PLAN DIMS over a dim panel = slide its offset; EDGE
   over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
   Marker drag adjusts existing X/Y pin values so the marker does not snap back on release.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
@@ -80,20 +93,23 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   (up/down, no wrap), choose language only in LANG, and no-op elsewhere;
   **thumbstick-hold (~1.2 s)** = exit AR.
 - **A/X** = prev mode. **B/Y** = next mode, EXCEPT: PLAN swaps the selected zone room↔wall;
-  DIMS (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
+  either DIMS mode (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
   **LEVEL cycles to the next floor** (`cycleFloor`, wraps).
 - Only the last-active controller is read (`activeSource`/`pickSource`); the idle hand hides.
 
-## Dimensioning (DIMS)
+## Dimensioning (PLAN DIMS / OUTLET DIMS)
 
-Exact size = dimension constraints only (core design rule; no on-canvas size editor). Ref-pick
-is reticle-gated (`edgeAtPoint` / origin near gizmo / `dimLabelAtPoint` to select a constraint).
+Exact size = dimension constraints only (core design rule; no on-canvas size editor). The two
+dimension modes are hard-filtered domains, not one mixed picker. PLAN DIMS permits edge↔edge and
+edge↔origin; OUTLET DIMS permits outlet↔edge only and requires the outlet first. Ref-pick is
+reticle-gated (`edgeAtPoint` / origin near gizmo / `dimLabelAtPoint` to select a plan constraint).
 Numpad row is **SWAP | DEL | ENTER**, shown only in the edit phase. Field prefills the current
 value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives rejected.
 
 - Outlet X/Y pins are selected through the outlet's **projected floor icon**, never its wall-height
-  glyph. Pick a plan edge and the floor icon in either order; the projection wins when its icon
-  overlaps an edge inside the reticle. Hovering or locking a projected icon also highlights its
+  glyph. In OUTLET DIMS, pick the floor icon first and a plan edge second. Before the icon is
+  selected, edges are inert; after it is selected, other outlet icons and the origin are inert.
+  Hovering or locking a projected icon also highlights its
   linked wall-height outlet, disambiguating outlets that share X/Y at different heights. The
   resulting one-way constraint moves the outlet, not the wall.
 

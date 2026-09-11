@@ -15,6 +15,12 @@ const STORE_KEY = 'house-cad:lang:v1';
 
 // key -> per-language string. Missing language falls back to en, then the key.
 const STRINGS = {
+  // --- master mode groups -----------------------------------------------------
+  'group.setup':   { en: 'SETUP',   fr: 'CONFIG', zh: '设置' },
+  'group.plan':    { en: 'PLAN',    fr: 'PLAN',   zh: '平面' },
+  'group.outlet':  { en: 'OUTLET',  fr: 'PRISE',  zh: '插座' },
+  'group.project': { en: 'PROJECT', fr: 'PROJET', zh: '项目' },
+
   // --- mode labels (key = mode.<id>) ------------------------------------------
   'mode.floor':    { en: 'FLOOR',  fr: 'SOL',      zh: '地面' },
   'mode.level':    { en: 'LEVEL',  fr: 'NIVEAU',   zh: '楼层' },
@@ -22,10 +28,11 @@ const STRINGS = {
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
-  'mode.edit':     { en: 'PLAN',   fr: 'PLAN',     zh: '平面' },
-  'mode.marker':   { en: 'OUTLET', fr: 'PRISE',    zh: '插座' },
+  'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
+  'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
-  'mode.dims':     { en: 'DIMS',   fr: 'COTE',     zh: '尺寸' },
+  'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
+  'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
@@ -76,10 +83,15 @@ const STRINGS = {
     fr: 'Corrige la dérive. Visez avec le réticule jusqu’à surligner le mur 1, gâchette pour choisir son coin, puis 2 points sur le mur 1 et 1 sur le mur 2.',
     zh: '修正漂移。用指针准星瞄准至墙1高亮，扣动扳机选择墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
   },
-  'help.dims': {
-    en: 'Pick two floor references, then type the distance. For an outlet, pick a plan edge and its floor icon (either order; 0 = on wall). The linked wall outlet highlights too.',
-    fr: 'Choisissez deux références au sol, puis tapez la distance. Pour une prise : bord du plan + icône au sol (ordre libre ; 0 = au mur). La prise liée est aussi surlignée.',
-    zh: '选择两个地面参照，再输入距离。固定插座时选择平面边和地面图标（顺序不限；0 = 贴墙），对应的墙上插座也会高亮。',
+  'help.plan_dims': {
+    en: 'Plan dimensions only. Pick two compatible edges, or an edge and the origin, then type the distance. Outlet icons are inert.',
+    fr: 'Cotes du plan uniquement. Choisissez deux bords compatibles, ou un bord et l’origine, puis tapez la distance. Les icônes de prises sont inertes.',
+    zh: '仅编辑平面尺寸。选择两条兼容的边，或一条边与原点，再输入距离。插座图标在此模式下无效。',
+  },
+  'help.outlet_dims': {
+    en: 'Outlet dimensions only. Pick an outlet floor icon first, then a plan edge and type the distance (0 = on wall). The wall outlet highlights too.',
+    fr: 'Cotes des prises uniquement. Choisissez d’abord l’icône au sol, puis un bord du plan et tapez la distance (0 = au mur). La prise murale est aussi surlignée.',
+    zh: '仅编辑插座尺寸。先选择插座地面图标，再选择平面边并输入距离（0 = 贴墙）。对应的墙上插座也会高亮。',
   },
   'help.save': {
     en: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
@@ -110,7 +122,8 @@ const STRINGS = {
   'key.flip':  { en: '⇄ FLIP',  fr: '⇄ INVERSER', zh: '⇄ 翻转' },
 
   // --- DIMS dimension title ---------------------------------------------------
-  'dim.pick':     { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },
+  'dim.pickPlan':   { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },
+  'dim.pickOutlet': { en: 'pick outlet floor icon', fr: 'icône de prise au sol', zh: '选择插座地面图标' },
   'dim.edit':     { en: '(edit)', fr: '(modif.)', zh: '（编辑）' },
   'dim.conflict': { en: '!CONFLICT', fr: '!CONFLIT', zh: '！冲突' },
   'ref.origin':   { en: 'ORIGIN', fr: 'ORIGINE', zh: '原点' },
