@@ -1735,7 +1735,7 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     currentMarkerType = step(currentMarkerType);
-    applyModeVisual(modeChildLabel('marker'), C_MARKER); // label shows MARKER · EDIT · <type>
+    setModeInfo(); // label shows MARKER · EDIT · <type>; help box stays in sync
     rlog('marker type', { type: currentMarkerType });
   }
 
@@ -1745,7 +1745,7 @@ export function setupMR(view, project, getFootprint) {
   function cycleZoneKind(dir = 1) {
     const i = ZONE_KINDS.indexOf(currentZoneKind);
     currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
-    applyModeVisual(modeChildLabel('drop'), zoneColor(currentZoneKind));
+    setModeInfo(); // update label chip + help/info box together
     rlog('zone kind', { kind: currentZoneKind });
   }
 
@@ -2439,6 +2439,17 @@ export function setupMR(view, project, getFootprint) {
     for (const l of labels) l.setText(title, color);
   }
 
+  // Refresh EVERY per-mode panel (label chip + help/info box) to the current mode's tool
+  // label and color — including any thumbstick-picked kind (DROP room/wall, MARKER type).
+  // Shared by setMode, the language switch, and the kind pickers so the help box never goes
+  // stale behind the label (e.g. switching ROOM->WALL must update both, not just the chip).
+  function setModeInfo() {
+    const m = modes[currentMode];
+    const child = modeChildLabel(m.id), color = modeColor(m);
+    applyModeVisual(child, color);
+    for (const h of helps) h.setText(modeBreadcrumb(m.id, child), t(`help.${m.id}`), color);
+  }
+
   function setMode(i) {
     currentMode = (i + modes.length) % modes.length;
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
@@ -2449,8 +2460,7 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    applyModeVisual(modeChildLabel(m.id), modeColor(m)); // MARKER/DROP carry their picked kind in label + color
-    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), modeColor(m)); // mode guidance box
+    setModeInfo(); // label chip + help box (carries MARKER/DROP picked kind + color)
     if (isDimMode(m.id)) activateNumpad(); // start the selected domain in ref-pick phase
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
@@ -2465,8 +2475,7 @@ export function setupMR(view, project, getFootprint) {
   // LANG's; any open pad/menu is redrawn too for good measure.
   onLangChange(() => {
     const m = modes[currentMode];
-    applyModeVisual(modeChildLabel(m.id), modeColor(m));
-    for (const h of helps) h.setText(modeBreadcrumb(m.id), t(`help.${m.id}`), modeColor(m));
+    setModeInfo();
     if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
