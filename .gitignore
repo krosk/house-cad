@@ -12,3 +12,7 @@ dist/
 
 # Local Quest headset debug log (dev-only)
 quest-debug.log
+
+# Local Codex launcher + config
+/codex.sh
+/.codex/config.toml
