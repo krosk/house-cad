@@ -37,9 +37,9 @@ const STRINGS = {
     zh: '用笔尖触碰真实地面以设定基准标高。仅在首层重新校平。',
   },
   'help.level': {
-    en: 'B/Y: switch to the next floor (Basement/Ground/Upper). Type a storey height and ENTER to set the active floor.',
-    fr: 'B/Y : passe à l’étage suivant (Sous-sol/RdC/Étage). Tapez une hauteur d’étage et VALIDER pour la définir.',
-    zh: 'B/Y：切换到下一楼层（地下室/首层/上层）。输入层高并按确定以设定当前楼层。',
+    en: 'Thumbstick up/down: previous/next floor. B/Y: next floor (wrap). Type a storey height and ENTER to set the active floor.',
+    fr: 'Joystick haut/bas : étage précédent/suivant. B/Y : étage suivant (boucle). Tapez une hauteur d’étage et VALIDER pour la définir.',
+    zh: '摇杆上/下：上一/下一楼层。B/Y：切换到下一楼层（循环）。输入层高并按确定以设定当前楼层。',
   },
   'help.register': {
     en: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',

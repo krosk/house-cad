@@ -1580,8 +1580,8 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Cycle the active storey Basement -> Ground -> Upper -> (wrap) — the dedicated
-  // floor-switch action (B/Y in LEVEL). Distinct from thumbstick-y (global up/down,
-  // no wrap). afterFloorChange re-seats the LEVEL pad + label for the new floor.
+  // floor-switch action (B/Y in LEVEL). Thumbstick-y also switches only while LEVEL
+  // is active, without wrapping. afterFloorChange re-seats the pad + label.
   function cycleFloor() {
     const floors = project.floors;
     const i = floors.findIndex((f) => f.id === project.activeFloorId);
@@ -2224,7 +2224,7 @@ export function setupMR(view, project, getFootprint) {
   // Canonical controller-menu order. Keep the implementation blocks grouped by
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
-    'register', 'floor', 'level', 'recal',
+    'register', 'floor', 'recal', 'level',
     'drop', 'wall', 'edge', 'edit', 'marker',
     'dims', 'save', 'load', 'lang',
   ];
@@ -2579,7 +2579,8 @@ export function setupMR(view, project, getFootprint) {
   function pollModeCycle(frame, time) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
     // buttons[4]=A/X (lower), buttons[5]=B/Y (upper),
-    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (change floor).
+    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y
+    // (LEVEL floor / LANG selection).
     // Latch onto whichever controller is being used, then read ONLY that one.
     for (const src of frame.session.inputSources) {
       if (src.gamepad && isActing(src.gamepad)) activeSource = src;
@@ -2626,11 +2627,12 @@ export function setupMR(view, project, getFootprint) {
     } else if (Math.abs(stickX) < 0.3) {
       btn.stick = false;
     }
-    // Stick up (negative Y) = floor above; down = floor below. In LANG mode the same
-    // up/down flick moves through the language list instead of the floors.
+    // Stick up/down switches floors only in LEVEL. In LANG, the same gesture moves
+    // through the language list. It is intentionally inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
-      if (modes[currentMode].id === 'lang') cycleLang(stickY < 0 ? -1 : 1); // up = previous in the list
-      else switchFloor(stickY < 0 ? 1 : -1);
+      const modeId = modes[currentMode].id;
+      if (modeId === 'lang') cycleLang(stickY < 0 ? -1 : 1); // up = previous in the list
+      else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;

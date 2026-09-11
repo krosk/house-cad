@@ -12,7 +12,7 @@ editor (`ar-2d-parity` memory).
 
 ## Modes (13, stable `id`s), cycled by A/B / thumbstick-x
 
-`ORIGIN`(id `register`) → `FLOOR` → `LEVEL` → `RECAL` →
+`ORIGIN`(id `register`) → `FLOOR` → `RECAL` → `LEVEL` →
 `ROOM`(id `drop`) → `WALL` → `EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) →
 `DIMS` → `SAVE` → `LOAD` → `LANG`.
 
@@ -76,7 +76,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
   Marker drag adjusts existing X/Y pin values so the marker does not snap back on release.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
-- **thumbstick-x** = cycle mode; **thumbstick-y** = change floor (global up/down, no wrap);
+- **thumbstick-x** = cycle mode; **thumbstick-y** = change floor only in LEVEL
+  (up/down, no wrap), choose language only in LANG, and no-op elsewhere;
   **thumbstick-hold (~1.2 s)** = exit AR.
 - **A/X** = prev mode. **B/Y** = next mode, EXCEPT: PLAN swaps the selected zone room↔wall;
   DIMS (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
@@ -123,7 +124,8 @@ basement negative). See `multi-floor-design` memory for the settled design.
   elevations. Heights are entered **by hand** — Quest can't measure the vertical offset. The
   pad's SWAP/DEL keys are inert here. Label reads `LEVEL · <FloorName>`; pad title shows the
   floor's base elevation.
-- `afterFloorChange()` is shared by `cycleFloor` + thumbstick `switchFloor`: it rebuilds the
+- `afterFloorChange()` is shared by LEVEL's B/Y `cycleFloor` and vertical-thumbstick
+  `switchFloor`: it rebuilds the
   overlay at the new elevation and re-shows the LEVEL pad (which `refreshFloorEditState`'s
   `resetDim` hides).
 - **Stacking gotcha**: a storey's elevation is driven by the floor *below*. To lift the Upper
