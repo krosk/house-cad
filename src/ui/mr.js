@@ -1782,22 +1782,16 @@ export function setupMR(view, project, getFootprint) {
       readouts[i].sprite.visible = on;
       if (on) readouts[i].setText(hovDim, 0x79c0ff);
     });
+    // Minimal HUD: build stamp + the controller pointer (tip, world m) and the
+    // reticle's floor point (plan m). reticle.position is this frame's value from
+    // the previous frame's mode pass — one frame of lag is imperceptible here.
+    const ptr = tipPosition(activeCtl);
+    const ret = reticle.visible ? worldToPlan(reticle.position) : null;
     const lines = [
       `build:  ${BUILD_ID}`,
       ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
-      `mode:   ${modes[currentMode].label}${modes[currentMode].id === 'register' && registerPts.length ? ' >P' + (registerPts.length + 1) : ''}${awaitingRecalDir ? ' >DIR' : ''}${modes[currentMode].id === 'size' ? ' ' + refLabel(dimRefA) + '/' + (dimRefB ? refLabel(dimRefB) : (hoverRef ? refLabel(hoverRef) : '?')) + '=' + (sizeBuffer || '0') : ''}`,
-      `placed: ${placed}   anchor: ${!!anchor}`,
-      `floor:  ${floorLabel()}  e${f2(activeElevation())}`,
-      `rooms:  ${surveyed.length}   active: ${!!activeRect}`,
-      `edge:   sel=${selectedEdge ? selectedEdge.edge : '-'} hov=${hoverEdge ? hoverEdge.edge : '-'} rc=${recalCorner ? recalCorner.cx.toFixed(1) + ',' + recalCorner.cy.toFixed(1) : '-'}`,
-      ...(modes[currentMode].id === 'edit' ? [selectedRect
-        ? `edit:   SEL ${selectedRect.op === 'subtract' ? 'WALL' : 'ROOM'} #${selectedRect.id}  B=swap grip=del`
-        : `edit:   trig=pick${hoverStack.length ? ' (' + hoverStack.length + ')' : ''}`] : []),
-      ...(modes[currentMode].id === 'size' && dimRefA && dimRefB
-        ? [`size:   ${refLabel(dimRefA)}->${refLabel(dimRefB)}  B=flip side`] : []),
-      `floorY:   ${f2(floorY)}`,
-      `plan.y:   ${f2(planPos.y)}`,
-      `cam.y:    ${f2(camWorldY())}`,
+      `ptr:    ${ptr ? `${f2(ptr.x)}, ${f2(ptr.y)}, ${f2(ptr.z)}` : '—'}`,
+      `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
     ];
     for (const d of debugs) d.setLines(lines);
     // Floor preview + edge highlight, depending on the current mode.
