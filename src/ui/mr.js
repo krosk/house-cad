@@ -776,8 +776,9 @@ export function setupMR(view, project, getFootprint) {
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
   let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
-  let recalPts = [];                   // RECAL 3-point gesture (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
-  let recalCorner = null;              // {cx, cy, a, b} plan corner being re-referenced + its two wall endpoints
+  let recalPts = [];                   // RECAL wall touches (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
+  let recalCorner = null;              // {cx, cy, a, b} selected corner; after lock a=wall 1 end, b=wall 2 end
+  let recalLocked = false;             // RECAL: corner + wall order explicitly selected (else still previewing)
   let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
   const UP = new THREE.Vector3(0, 1, 0);
 
@@ -799,6 +800,8 @@ export function setupMR(view, project, getFootprint) {
   let dimRefA = null;       // first-picked reference (the anchor, like desktop)
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
+  let hoverFloorPt = null;  // {px,py} reticle floor point this frame during SIZE ref-pick
+  let dimOffsetPt = null;   // {px,py} captured when a pair completes -> new dim's default line placement
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
   let gripDrag = null;      // active grip-drag: {kind:'dim',cId} (SIZE) or {kind:'edge',rectId,edge} (EDGE)
   let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
@@ -947,6 +950,18 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // Order a corner's two walls so that a = "wall 1" = the wall the reticle (px,py) is
+  // hugging, b = "wall 2" = the other. corner.a is the X-edge (horizontal), corner.b
+  // the Y-edge (vertical); the reticle is nearer the horizontal wall when its vertical
+  // offset from the corner is the smaller one. Lets you pick which wall is 1 by aiming.
+  function orderWallsByReticle(corner, px, py) {
+    const offX = Math.abs(px - corner.cx), offY = Math.abs(py - corner.cy);
+    const closerToHorizontal = offY < offX; // hugging the X-edge (corner.a)
+    const w1 = closerToHorizontal ? corner.a : corner.b;
+    const w2 = closerToHorizontal ? corner.b : corner.a;
+    return { cx: corner.cx, cy: corner.cy, a: w1, b: w2 };
+  }
+
   // Re-zero the whole plan against a KNOWN plan corner to correct drift. Given the
   // corner's real-world position (Wc) and a world direction along one of its real
   // edges (wdx,wdz), solve the rigid floor transform (planYaw + planPos) so both
@@ -1050,6 +1065,7 @@ export function setupMR(view, project, getFootprint) {
   function resetDim() {
     dimRefA = dimRefB = null;
     editingId = null;
+    dimOffsetPt = null;
     sizeBuffer = '';
     bufferPristine = false;
     dimConflict = false;
@@ -1089,6 +1105,9 @@ export function setupMR(view, project, getFootprint) {
       rlog('dim refused (conflict)', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
       return;
     }
+    // Default a NEW dim's line placement to where the tip stood when the pair was made
+    // (after the solve, so edgeLine reflects final geometry — same baseline the dim draws at).
+    if (!existing && dimOffsetPt) setDimOffset(c, dimOffsetPt.px, dimOffsetPt.py);
     rlog('dim set', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
     resetDim();
     buildPlan();       // solver changed geometry; refresh the MR view
@@ -1114,19 +1133,27 @@ export function setupMR(view, project, getFootprint) {
   // Live update for an active grip-drag, from the reticle's floor point (px,py):
   // in SIZE, slide the dim's perpendicular offset (akin to the desktop dim drag); in
   // EDGE, move the grabbed edge to the touch coordinate. Rebuilt each frame while held.
+  // Place a dimension's perpendicular line marker at the plan floor point (px,py) —
+  // the signed offset the dim line sits at. Origin dims store the absolute coord;
+  // edge<->edge dims store it relative to the outer edge (the auto-stack baseline),
+  // matching buildDimensions. Shared by grip-drag and the default-on-create placement.
+  function setDimOffset(c, px, py) {
+    const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
+    if (aOrigin || bOrigin) {
+      c.offset = isXEdge(aOrigin ? c.b.edge : c.a.edge) ? py : px; // origin dim: absolute perpendicular coord
+      return;
+    }
+    const la = edgeLine(c.a), lb = edgeLine(c.b);
+    if (!la || !lb) return;
+    c.offset = c.axis === 'x' ? py - Math.max(la.p1.y, lb.p1.y) : px - Math.max(la.p1.x, lb.p1.x);
+  }
+
   function applyGripDrag(px, py) {
     if (!gripDrag) return;
     if (gripDrag.kind === 'dim') {
       const c = project.constraints.find((k) => k.id === gripDrag.cId);
       if (!c) return;
-      const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
-      if (aOrigin || bOrigin) {
-        c.offset = isXEdge(aOrigin ? c.b.edge : c.a.edge) ? py : px; // origin dim: absolute perpendicular coord
-      } else {
-        const la = edgeLine(c.a), lb = edgeLine(c.b);
-        if (!la || !lb) return;
-        c.offset = c.axis === 'x' ? py - Math.max(la.p1.y, lb.p1.y) : px - Math.max(la.p1.x, lb.p1.x);
-      }
+      setDimOffset(c, px, py);
       buildPlan(); applyPlanMatrix(); // presentational; no re-solve needed
     } else if (gripDrag.kind === 'edge') {
       const rect = project.rectangles.find((r) => r.id === gripDrag.rectId);
@@ -1177,6 +1204,7 @@ export function setupMR(view, project, getFootprint) {
     if (!dimRefA) { dimRefA = hoverRef; rlog('dim A', { ref: refLabel(hoverRef) }); redrawNumpad(); return; }
     if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
     dimRefB = hoverRef;
+    dimOffsetPt = hoverFloorPt; // where the tip stands as the pair completes -> new dim's default line
     const existing = findConstraintForRefs(dimRefA, dimRefB);
     editingId = existing ? existing.id : null;
     // Prefill with the constrained value if one exists, else the current measured
@@ -1488,6 +1516,7 @@ export function setupMR(view, project, getFootprint) {
       if (!Number.isFinite(val) || val < 0) { rlog('dim flip: enter a distance first'); return; }
       c = makeConstraintForRefs(dimRefA, dimRefB);
       project.setConstraintMagnitude(c.id, toMeters(val));
+      if (dimOffsetPt) setDimOffset(c, dimOffsetPt.px, dimOffsetPt.py); // default line where the tip stood
       editingId = c.id;
     }
     const before = conflictCount();
@@ -1606,19 +1635,28 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'recal', label: 'RECAL', color: C_RECAL,
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
-      // corner apex needn't be reachable. The nearest surveyed corner is highlighted
-      // with its two walls badged 1 & 2. Touch P1,P2 along real wall 1 (sets the true
-      // orientation), then P3 on real wall 2; the real corner = P3 projected onto the
-      // wall-1 line. recalibrate() then re-solves yaw + position so the highlighted
-      // plan corner lands on it — both rotational and positional drift are corrected.
+      // corner apex needn't be reachable. First SELECT a corner — aim so the reticle
+      // hugs the wall you want as "wall 1" (the nearer wall becomes 1, the other 2) and
+      // touch to lock it. Then touch P1,P2 along real wall 1 (sets the true orientation)
+      // and P3 on real wall 2; the real corner = P3 projected onto the wall-1 line.
+      // recalibrate() re-solves yaw + position so the selected plan corner lands on it —
+      // both rotational and positional drift are corrected.
       onTouch: (pos) => {
         if (!placed) return;
+        if (!recalLocked) {
+          // SELECT phase: lock the corner + wall order the reticle is showing.
+          const { px, py } = worldToPlan(pos);
+          const near = nearestPlanCorner(px, py);
+          if (!near) return; // no surveyed corners to reference yet
+          recalCorner = orderWallsByReticle(near, px, py); // a = wall 1 (hugged wall), b = wall 2
+          recalLocked = true;
+          recalPts = [];
+          applyModeVisual('WALL 1 · P1', C_RECAL);
+          rlog('recal corner', { cx: +recalCorner.cx.toFixed(3), cy: +recalCorner.cy.toFixed(3) });
+          return;
+        }
         const n = recalPts.length;
         if (n === 0) {
-          const { px, py } = worldToPlan(pos);
-          const corner = nearestPlanCorner(px, py);
-          if (!corner) return; // no surveyed corners to reference yet
-          recalCorner = corner;            // lock the corner this first touch is nearest to
           recalPts.push({ x: pos.x, z: pos.z }); // P1 along wall 1
           applyModeVisual('WALL 1 · P2', C_RECAL);
           rlog('recal p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
@@ -1642,6 +1680,7 @@ export function setupMR(view, project, getFootprint) {
         const Wc = { x: p1.x + proj * ux, z: p1.z + proj * uz }; // = the real corner (walls ⊥)
         recalibrate(recalCorner, Wc, dx, dz);
         recalCorner = null;
+        recalLocked = false;
         buildPlan();       // geometry unchanged, but reassert against the new transform
         applyModeVisual('RECAL', C_RECAL); // ready to re-recal next time
         rlog('recal done', { yaw: +planYaw.toFixed(3) });
@@ -1682,7 +1721,7 @@ export function setupMR(view, project, getFootprint) {
   function setMode(i) {
     currentMode = (i + modes.length) % modes.length;
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
-    recalPts = []; recalCorner = null; // ... and the RECAL 3-point gesture
+    recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
     selectedRect = null; // clear the EDIT selection when changing modes
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     rectHi.visible = false;
@@ -1906,12 +1945,15 @@ export function setupMR(view, project, getFootprint) {
       rlog('register undo', { remaining: n });
       return;
     }
-    if (mode.id === 'recal' && recalPts.length) { // back out the last RECAL touch, step by step
-      recalPts.pop();
-      if (recalPts.length === 0) recalCorner = null; // unlocked the corner
-      const lbl = recalPts.length === 0 ? 'RECAL' : recalPts.length === 1 ? 'WALL 1 · P2' : 'WALL 2';
-      applyModeVisual(lbl, recalPts.length === 2 ? C_RECAL_DIR : C_RECAL);
-      rlog('recal undo', { remaining: recalPts.length });
+    if (mode.id === 'recal' && (recalPts.length || recalLocked)) { // back out RECAL step by step
+      if (recalPts.length) {
+        recalPts.pop(); // undo a wall touch; corner stays selected
+        applyModeVisual(recalPts.length === 0 ? 'WALL 1 · P1' : 'WALL 1 · P2', C_RECAL);
+      } else {
+        recalLocked = false; recalCorner = null; // deselect the corner
+        applyModeVisual('RECAL', C_RECAL);
+      }
+      rlog('recal undo', { locked: recalLocked, pts: recalPts.length });
       return;
     }
     // No destructive fallback: rooms are removed only via EDIT; re-register via REGISTER.
@@ -2097,14 +2139,14 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       edgeHi.visible = false;
-      // RECAL: highlight the corner (nearest to the tip until the first touch locks
-      // it), badge its two walls 1 & 2 to guide the touch order, and echo the current
-      // step number on the reticle. Wall 1 = the corner's X-edge, wall 2 = its Y-edge.
+      // RECAL: highlight the corner and badge its two walls 1 & 2. Until you SELECT
+      // (first touch), the nearest corner previews under the tip and the wall order
+      // tracks which wall the reticle hugs — so aim at the wall you want as "1". Once
+      // selected, the order is locked and the reticle echoes the current wall-touch step.
       if (modeId === 'recal') {
-        // Before the first touch the corner previews under the tip; after, it's locked.
-        let c = recalCorner;
-        if (recalPts.length === 0) {
-          if (tipPos) { const { px, py } = worldToPlan(tipPos); c = nearestPlanCorner(px, py); }
+        let c = recalCorner; // the locked corner (a=wall 1, b=wall 2)
+        if (!recalLocked) {  // preview: nearest corner, walls ordered live by the reticle
+          if (tipPos) { const { px, py } = worldToPlan(tipPos); const near = nearestPlanCorner(px, py); c = near ? orderWallsByReticle(near, px, py) : null; }
           else c = null;
         }
         if (c) {
@@ -2115,8 +2157,9 @@ export function setupMR(view, project, getFootprint) {
           placeWallBadge(recalBadge1, c.cx, c.cy, c.a);
           placeWallBadge(recalBadge2, c.cx, c.cy, c.b);
         }
-        // Reticle badge: "1" while still on wall 1 (0-1 touches), "2" once on wall 2.
-        if (reticle.visible && c) {
+        // Reticle step badge only after the corner is selected: "1" while on wall 1
+        // (0-1 touches), "2" once on wall 2. During SELECT the wall badges already lead.
+        if (recalLocked && reticle.visible && c) {
           const step = recalPts.length === 2 ? 2 : 1;
           if (step !== prevRecalStep) { recalStep.setText(String(step), step === 2 ? C_WALL2 : C_WALL1); prevRecalStep = step; }
           recalStep.sprite.position.set(reticle.position.x, reticle.position.y + 0.05, reticle.position.z);
@@ -2153,6 +2196,7 @@ export function setupMR(view, project, getFootprint) {
           reticle.visible = true; // reticle always tracks the floor point
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
+          hoverFloorPt = { px, py }; // remember where the tip stands (for a new dim's default placement)
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A dim panel is hovered only when the RETICLE is over it (before the first ref).
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
