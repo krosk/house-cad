@@ -156,7 +156,7 @@ export function setupMR(view, project, getFootprint) {
 
     const DISP_H = 140, ROWS = 5, CELL_H = (H - DISP_H) / ROWS, COLS = 3, CELL_W = W / COLS;
     const grid = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['.', '0', 'back']];
-    const keyLabel = { back: '⌫', enter: 'ENTER' };
+    const keyLabel = { back: '⌫', enter: 'ENTER', swap: '⇄ FLIP' };
 
     // Plane UV -> key id (or null). Texture flipY maps canvas-top to v=1.
     function keyAt(u, v) {
@@ -164,7 +164,7 @@ export function setupMR(view, project, getFootprint) {
       if (cy < DISP_H) return null;
       const row = Math.floor((cy - DISP_H) / CELL_H);
       if (row < 0 || row >= ROWS) return null;
-      if (row === 4) return 'enter'; // full-width ENTER
+      if (row === 4) return cx < W / 2 ? 'swap' : 'enter'; // bottom row: SWAP | ENTER
       const col = Math.min(COLS - 1, Math.max(0, Math.floor(cx / CELL_W)));
       return grid[row]?.[col] ?? null;
     }
@@ -185,23 +185,24 @@ export function setupMR(view, project, getFootprint) {
       // Keys.
       ctx.font = 'bold 46px sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      for (let r = 0; r < ROWS; r++) {
+      const key = (kid, x, y, w, h) => {
+        const hot = hoverKey && hoverKey === kid;
+        if (kid === 'enter') ctx.fillStyle = hot ? 'rgba(52,211,153,0.95)' : 'rgba(34,110,80,0.9)';
+        else if (kid === 'swap') ctx.fillStyle = hot ? 'rgba(251,191,36,0.95)' : 'rgba(146,104,20,0.9)';
+        else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
+        ctx.fillStyle = '#e6edf3';
+        ctx.fillText(keyLabel[kid] ?? kid, x + w / 2, y + h / 2 + 2);
+      };
+      for (let r = 0; r < 4; r++) { // digit rows
         for (let c = 0; c < COLS; c++) {
-          if (r === 4 && c > 0) continue; // ENTER spans the row
-          const isEnter = r === 4;
-          const kid = isEnter ? 'enter' : grid[r][c];
-          const x = (isEnter ? 0 : c * CELL_W) + 6;
-          const y = DISP_H + r * CELL_H + 6;
-          const w = (isEnter ? W : CELL_W) - 12;
-          const h = CELL_H - 12;
-          const hot = hoverKey && hoverKey === kid;
-          if (kid === 'enter') ctx.fillStyle = hot ? 'rgba(52,211,153,0.95)' : 'rgba(34,110,80,0.9)';
-          else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
-          ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
-          ctx.fillStyle = '#e6edf3';
-          ctx.fillText(keyLabel[kid] ?? kid, x + w / 2, y + h / 2 + 2);
+          key(grid[r][c], c * CELL_W + 6, DISP_H + r * CELL_H + 6, CELL_W - 12, CELL_H - 12);
         }
       }
+      // Bottom row: SWAP (left half) | ENTER (right half).
+      const by = DISP_H + 4 * CELL_H + 6, bh = CELL_H - 12;
+      key('swap', 6, by, W / 2 - 12, bh);
+      key('enter', W / 2 + 6, by, W / 2 - 12, bh);
       tex.needsUpdate = true;
     }
 
@@ -487,6 +488,15 @@ export function setupMR(view, project, getFootprint) {
   function buildDimensions() {
     const segs = [];        // {ax,ay,bx,by,conflict} strips to build
     dimSprites = [];        // value labels, for hover pick
+    // A dim value label carries its constraint id + both refs, so ray-hovering it can
+    // highlight that constraint's edges and selecting it loads the constraint to edit.
+    const endpointToRef = (ep) => ep.rect === ORIGIN_ID ? { kind: 'origin' } : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+    const pushDim = (sprite, c) => {
+      sprite.userData.cId = c.id;
+      sprite.userData.refA = endpointToRef(c.a);
+      sprite.userData.refB = endpointToRef(c.b);
+      dimSprites.push(sprite);
+    };
     let xTier = 0, yTier = 0;
     for (const c of (project.constraints || [])) {
       if (c.type !== 'distance') continue;
@@ -504,12 +514,12 @@ export function setupMR(view, project, getFootprint) {
           const yMid = (le.p0.y + le.p1.y) / 2;
           segs.push({ ax: 0, ay: yMid, bx: le.coord, by: yMid, conflict });             // origin -> edge line
           segs.push({ ax: le.coord, ay: le.p0.y, bx: le.coord, by: le.p1.y, conflict }); // tick along the edge
-          dimSprites.push(makeDimLabel(text, color, le.coord / 2, yMid));
+          pushDim(makeDimLabel(text, color, le.coord / 2, yMid), c);
         } else {
           const xMid = (le.p0.x + le.p1.x) / 2;
           segs.push({ ax: xMid, ay: 0, bx: xMid, by: le.coord, conflict });             // origin -> edge line
           segs.push({ ax: le.p0.x, ay: le.coord, bx: le.p1.x, by: le.coord, conflict }); // tick along the edge
-          dimSprites.push(makeDimLabel(text, color, xMid, le.coord / 2));
+          pushDim(makeDimLabel(text, color, xMid, le.coord / 2), c);
         }
         continue;
       }
@@ -525,7 +535,7 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xa, ay: yLine, bx: xb, by: yLine, conflict });            // dim line
         segs.push({ ax: xa, ay: la.p1.y, bx: xa, by: yLine + DIM_EXT_OVER, conflict }); // ext a
         segs.push({ ax: xb, ay: lb.p1.y, bx: xb, by: yLine + DIM_EXT_OVER, conflict }); // ext b
-        dimSprites.push(makeDimLabel(text, color, (xa + xb) / 2, yLine));
+        pushDim(makeDimLabel(text, color, (xa + xb) / 2, yLine), c);
       } else {
         const ya = la.coord, yb = lb.coord;
         const xBase = Math.max(la.p1.x, lb.p1.x);
@@ -533,7 +543,7 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xLine, ay: ya, bx: xLine, by: yb, conflict });            // dim line
         segs.push({ ax: la.p1.x, ay: ya, bx: xLine + DIM_EXT_OVER, by: ya, conflict }); // ext a
         segs.push({ ax: lb.p1.x, ay: yb, bx: xLine + DIM_EXT_OVER, by: yb, conflict }); // ext b
-        dimSprites.push(makeDimLabel(text, color, xLine, (ya + yb) / 2));
+        pushDim(makeDimLabel(text, color, xLine, (ya + yb) / 2), c);
       }
     }
     // Build strips in two batches so conflict lines share a material with the rest.
@@ -656,6 +666,7 @@ export function setupMR(view, project, getFootprint) {
   let dimRefA = null;       // first-picked reference (the anchor, like desktop)
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
+  let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
   let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
@@ -929,6 +940,7 @@ export function setupMR(view, project, getFootprint) {
 
   function pressKey(k) {
     if (k === 'enter') { commitEntry(); return; }
+    if (k === 'swap') { swapDim(); return; } // ⇄ FLIP: move the edge to the other side
     dimConflict = false; // any edit clears the refusal warning
     if (bufferPristine && k !== 'back') sizeBuffer = ''; // typing over a prefilled edit value
     bufferPristine = false;
@@ -938,12 +950,29 @@ export function setupMR(view, project, getFootprint) {
     redrawNumpad();
   }
 
-  // SIZE trigger: while both refs aren't chosen, a rect edge / the origin under the
-  // ray is picked (two picks, like clicking two edges on desktop). Once both are
-  // chosen, the ray drives the numpad and a key under it is pressed.
+  // Load an existing constraint straight into the numpad for editing — used when you
+  // select its value panel instead of re-picking both edges. Jumps to the numpad phase.
+  function loadConstraint(id) {
+    const c = project.constraints.find((k) => k.id === id);
+    if (!c) return;
+    const toRef = (ep) => ep.rect === ORIGIN_ID ? { kind: 'origin' } : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+    dimRefA = toRef(c.a);
+    dimRefB = toRef(c.b);
+    editingId = c.id;
+    sizeBuffer = fmt(Math.abs(c.value)); // open on the current value; first key replaces it
+    bufferPristine = true;
+    dimConflict = false;
+    rlog('dim load', { id, a: refLabel(dimRefA), b: refLabel(dimRefB) });
+    redrawNumpad();
+  }
+
+  // SIZE trigger: while both refs aren't chosen, select the dim value panel under the
+  // ray (edit that constraint) or pick a rect edge / the origin (two picks, like
+  // clicking two edges on desktop). Once both are chosen, the ray drives the numpad.
   function onNumpadTouch() {
     if (!placed || !activeRect) return;
     if (dimRefA && dimRefB) { if (hoverKey) pressKey(hoverKey); return; }
+    if (hoverDim) { loadConstraint(hoverDim.userData.cId); return; } // select a constraint by its panel
     if (!hoverRef) return;
     if (!dimRefA) { dimRefA = hoverRef; rlog('dim A', { ref: refLabel(hoverRef) }); redrawNumpad(); return; }
     if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
@@ -1089,7 +1118,7 @@ export function setupMR(view, project, getFootprint) {
       const cos = _dv.normalize().dot(_rd);
       if (cos > bestCos) { bestCos = cos; best = s; }
     }
-    return best?.userData.dimText ?? null;
+    return best; // the hovered dim sprite (userData: dimText, cId, refA, refB) or null
   }
 
   // Intersection of a controller's pointing ray with the numpad panel (with .uv),
@@ -1150,9 +1179,17 @@ export function setupMR(view, project, getFootprint) {
   // before a distance exists. A flip that would over-constrain is refused.
   function swapDim() {
     if (!dimRefA || !dimRefB) return;
-    const c = editingId ? project.constraints.find((k) => k.id === editingId)
-                        : findConstraintForRefs(dimRefA, dimRefB);
-    if (!c) { rlog('dim swap: set a distance first'); return; }
+    let c = editingId ? project.constraints.find((k) => k.id === editingId)
+                      : findConstraintForRefs(dimRefA, dimRefB);
+    if (!c) {
+      // No constraint yet: create one at the current buffer value so FLIP has something
+      // to act on (same as committing then flipping, without leaving the pad).
+      const val = parseFloat(sizeBuffer);
+      if (!Number.isFinite(val) || val < 0) { rlog('dim flip: enter a distance first'); return; }
+      c = makeConstraintForRefs(dimRefA, dimRefB);
+      project.setConstraintMagnitude(c.id, toMeters(val));
+      editingId = c.id;
+    }
     const before = conflictCount();
     project.flipConstraintSide(c.id); // move ref B to the other side of ref A
     if (conflictCount() > before) {
@@ -1657,7 +1694,8 @@ export function setupMR(view, project, getFootprint) {
     for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
     // Echo the pointed-at constraint's value big on the active controller so
     // small in-world dimension text can be read up close.
-    const hovDim = pickDimLabel(activeCtl);
+    const hovSprite = pickDimLabel(activeCtl);
+    const hovDim = hovSprite?.userData.dimText ?? null;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === activeCtl && !!hovDim;
       readouts[i].sprite.visible = on;
@@ -1746,6 +1784,7 @@ export function setupMR(view, project, getFootprint) {
       reticle.visible = false;
       hoverKey = null;
       hoverRef = null;
+      hoverDim = null;
       numpadCursor.visible = false;
       edgeHi.visible = false;
       edgeHi2.visible = false;
@@ -1759,19 +1798,23 @@ export function setupMR(view, project, getFootprint) {
           numpadCursor.visible = true;
         }
       } else {
-        // Reference-pick phase: ray the floor; the origin (near the gizmo) or the
-        // edge under the reticle is the candidate. Same rule as EDGE mode: edgeAtPoint
-        // caps at the reticle radius, so an edge is pickable only when it falls in the ring.
-        const hit = rayFloorHit(pickSource(frame));
-        if (hit) {
-          const { px, py } = worldToPlan(hit);
-          if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
-          else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
-          reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        // Reference-pick phase. If the ray is on an existing dim value panel, THAT is
+        // the pick (select it to edit the constraint); otherwise ray the floor for an
+        // edge/origin. edgeAtPoint caps at the reticle radius, same as EDGE mode.
+        hoverDim = dimRefA ? null : hovSprite; // dim-panel select only before the first ref
+        if (!hoverDim) {
+          const hit = rayFloorHit(pickSource(frame));
+          if (hit) {
+            const { px, py } = worldToPlan(hit);
+            if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
+            else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+            reticle.visible = true;
+            reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          }
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
+      // When hovering a dim panel, preview BOTH its edges (cyan) so you see how it's defined.
       let ei = 0;
       const slots = [edgeHi, edgeHi2];
       const showRef = (ref, color) => {
@@ -1779,8 +1822,13 @@ export function setupMR(view, project, getFootprint) {
         if (ref.kind === 'origin') originRingMat.color.setHex(color);
         else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
       };
-      showRef(dimRefA, 0xfbbf24);
-      showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
+      if (hoverDim) {
+        showRef(hoverDim.userData.refA, 0x22d3ee);
+        showRef(hoverDim.userData.refB, 0x22d3ee);
+      } else {
+        showRef(dimRefA, 0xfbbf24);
+        showRef(dimRefB ?? hoverRef, dimRefB ? 0xfbbf24 : 0xffe14d);
+      }
       if (hoverKey !== prevHoverKey) { redrawNumpad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'edit') {
       // EDIT: ray the floor, gather the overlap stack under the reticle. The
