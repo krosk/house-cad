@@ -10,10 +10,10 @@ AR (`src/ui/mr.js`) is the **only** authoring surface on the Quest — the immer
 AR by quitting, there is no 2D editor on-device — so it must reach parity with the desktop 2D
 editor (`ar-2d-parity` memory).
 
-## Modes (12, stable `id`s), cycled by A/B / thumbstick-x
+## Modes (13, stable `id`s), cycled by A/B / thumbstick-x
 
 `FLOOR` → `LEVEL` → `REGISTER`(id `register`, label ORIGIN) → `ROOM`(id `drop`) → `WALL` →
-`EDGE` → `EDIT` → `RECAL` → `SIZE` → `SAVE` → `LOAD` → `LANG`.
+`EDGE` → `PLAN`(id `edit`) → `OUTLET`(id `marker`) → `RECAL` → `SIZE` → `SAVE` → `LOAD` → `LANG`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -33,9 +33,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
-- **EDIT** — select a zone (trigger; press again cycles down through overlapping zones). Grip
-  deletes it (the ONLY grip delete); B/Y swaps it room↔wall. Markers are picked directly at their
-  visible wall-height glyph rather than through the floor reticle.
+- **PLAN** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
+  through overlapping zones), grip deletes it, and B/Y swaps it room↔wall. Outlet glyphs are inert.
+- **OUTLET** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
+  pointing directly at an outlet and triggering opens its height pad; grip-drag moves it in 3D;
+  grip away deletes the selected outlet. Plan zones are inert.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
@@ -64,15 +66,17 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
 ## Inputs
 
 - **trigger** = mode action (place / pick / press a numpad or slot key).
-- **grip** = context action. Deletes geometry ONLY in EDIT (the selected zone); everywhere else
-  a non-destructive cancel/undo of an in-progress gesture (SIZE = undo a dim pick; EDGE = cancel
-  a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL = nothing). UNLESS the
+- **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
+  OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (SIZE = undo a
+  dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
+  nothing). UNLESS the
   reticle is over a drag target → **grip-drag** (SIZE over a dim panel = slide its offset; EDGE
-  over an edge = move it). `onReset` early-returns while `gripDrag` is set (`squeeze` fires
-  before `squeezeend`).
+  over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
+  Marker drag adjusts existing X/Y pin values so the marker does not snap back on release.
+  `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - **thumbstick-x** = cycle mode; **thumbstick-y** = change floor (global up/down, no wrap);
   **thumbstick-hold (~1.2 s)** = exit AR.
-- **A/X** = prev mode. **B/Y** = next mode, EXCEPT: EDIT swaps the selected zone room↔wall;
+- **A/X** = prev mode. **B/Y** = next mode, EXCEPT: PLAN swaps the selected zone room↔wall;
   SIZE (pair active) flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`);
   **LEVEL cycles to the next floor** (`cycleFloor`, wraps).
 - Only the last-active controller is read (`activeSource`/`pickSource`); the idle hand hides.

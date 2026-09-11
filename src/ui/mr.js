@@ -524,7 +524,7 @@ export function setupMR(view, project, getFootprint) {
   const recalBadge2 = makeBadge(); recalBadge2.setText('2', C_WALL2); // rides wall 2
   const recalStep = makeBadge();                                      // rides the reticle (current step)
 
-  // Whole-zone outline highlight for EDIT mode (the room/wall under your ray). All
+  // Whole-zone outline highlight for PLAN mode (the room/wall under your ray). All
   // four edges in one buffer (4 edges * 2 triangles * 3 verts = 24 verts / 72 floats).
   const rectHi = new THREE.Mesh(
     new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(72), 3)),
@@ -535,7 +535,7 @@ export function setupMR(view, project, getFootprint) {
   rectHi.frustumCulled = false; // positions rewritten each frame (see makeEdgeHi note)
   scene.add(rectHi);
 
-  // Zebra fill for the SELECTED zone in EDIT mode: a seamless 45° diagonal stripe
+  // Zebra fill for the SELECTED zone in PLAN mode: a seamless 45° diagonal stripe
   // texture over the whole rectangle, so the active selection reads instantly and
   // distinctly from the op-colored outline. Tiles at a constant world size (repeat
   // is set per-frame from the zone's dimensions), so stripes stay the same width
@@ -988,11 +988,11 @@ export function setupMR(view, project, getFootprint) {
   let selectedEdge = null;  // {rectId, edge} locked, awaiting a wall touch
   let edgeSnapPrompt = false; // EDGE label currently shows the "snap to wall" state (edge locked)
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
-  let selectedRect = null;  // EDIT mode: the persistently-selected zone (survives aim)
-  let hoverStack = [];      // EDIT mode: zones under the ray this frame, topmost-first
-  let selectedMarker = null; // EDIT mode: the marker being height-edited (suspends zone select)
-  let hoverMarker = null;    // EDIT mode: the marker under the reticle this frame
-  let markerBuffer = '';     // EDIT height pad: typed digits (prefilled with the marker's z)
+  let selectedRect = null;  // PLAN mode: the persistently-selected zone (survives aim)
+  let hoverStack = [];      // PLAN mode: zones under the ray this frame, topmost-first
+  let selectedMarker = null; // OUTLET mode: marker being height-edited
+  let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
+  let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
 
   // SIZE state (S2 numpad): the desktop dimension tool in AR. Pick two references
@@ -1006,7 +1006,7 @@ export function setupMR(view, project, getFootprint) {
   let hoverFloorPt = null;  // {px,py} reticle floor point this frame during SIZE ref-pick
   let dimOffsetPt = null;   // {px,py} captured when a pair completes -> new dim's default line placement
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
-  let gripDrag = null;      // active grip-drag: {kind:'dim',cId} (SIZE) or {kind:'edge',rectId,edge} (EDGE)
+  let gripDrag = null;      // active grip-drag: dim (SIZE), edge (EDGE), or marker (EDIT)
   let sizeBuffer = '';      // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
@@ -1111,7 +1111,7 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
-  // All zones containing a plan point, TOPMOST (last-created) first — EDIT mode's
+  // All zones containing a plan point, TOPMOST (last-created) first — PLAN mode's
   // overlap stack, which the trigger cycles down through.
   function rectsAtPoint(px, py) {
     const out = [];
@@ -1409,6 +1409,20 @@ export function setupMR(view, project, getFootprint) {
       project.touch(); // edge moved in place -> re-solve + rebuild
       buildPlan(false); applyPlanMatrix(); // skip dim-label textures while dragging (restored on release)
     }
+  }
+
+  const _dragPoint = new THREE.Vector3();
+  function applyMarkerGripDrag(inputSource) {
+    if (gripDrag?.kind !== 'marker' || !setControllerRay(inputSource)) return;
+    const marker = project.markers.find((m) => m.id === gripDrag.markerId);
+    if (!marker) return;
+    _dragPoint.copy(_ro).addScaledVector(_rd, gripDrag.distance);
+    const { px, py } = worldToPlan(_dragPoint);
+    project.moveMarker(marker.id, { x: px, y: py, z: Math.max(0, _dragPoint.y - overlayY()) });
+    // mr.js is not subscribed to model changes. Move the existing sprite directly
+    // during the drag; on release, buildPlan restores the canonical full rendering.
+    const sprite = markerGroup.children.find((s) => s.userData.markerId === marker.id);
+    if (sprite) sprite.position.set(marker.x, marker.z, -marker.y);
   }
 
   function pressKey(k) {
@@ -1734,7 +1748,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Outline a whole rectangle (all four edges) into rectHi, in the given color —
-  // EDIT mode's "this is the zone under your ray" highlight.
+  // PLAN mode's "this is the zone under your ray" highlight.
   function showRectOutline(rect, colorHex) {
     const b = rect.bounds;
     const edges = [
@@ -1772,18 +1786,24 @@ export function setupMR(view, project, getFootprint) {
     zebra.visible = true;
   }
 
-  // World point where a controller's pointing ray meets the floor plane, or null.
+  // Resolve the controller's target ray into shared world-space scratch vectors.
   const _ro = new THREE.Vector3(), _rd = new THREE.Vector3();
   const _rhit = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rm = new THREE.Matrix4();
-  function rayFloorHit(inputSource) {
+  function setControllerRay(inputSource) {
     const space = inputSource?.targetRaySpace;
-    if (!space || !currentFrame) return null;
+    if (!space || !currentFrame) return false;
     const pose = currentFrame.getPose(space, localSpace);
-    if (!pose) return null;
+    if (!pose) return false;
     _rm.fromArray(pose.transform.matrix);
     _ro.setFromMatrixPosition(_rm);
     _rq.setFromRotationMatrix(_rm);
-    _rd.set(0, 0, -1).applyQuaternion(_rq); // pointing ray = controller -Z
+    _rd.set(0, 0, -1).applyQuaternion(_rq).normalize();
+    return true;
+  }
+
+  // World point where a controller's pointing ray meets the floor plane, or null.
+  function rayFloorHit(inputSource) {
+    if (!setControllerRay(inputSource)) return null;
     if (Math.abs(_rd.y) < 1e-4) return null; // parallel to the floor
     const t = (overlayY() - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
@@ -1797,14 +1817,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_PICK_RADIUS = 0.065;
   function pickMarker(inputSource) {
     if (!markerGroup.children.length) return null;
-    const space = inputSource?.targetRaySpace;
-    if (!space || !currentFrame) return null;
-    const pose = currentFrame.getPose(space, localSpace);
-    if (!pose) return null;
-    _rm.fromArray(pose.transform.matrix);
-    _ro.setFromMatrixPosition(_rm);
-    _rq.setFromRotationMatrix(_rm);
-    _rd.set(0, 0, -1).applyQuaternion(_rq).normalize();
+    if (!setControllerRay(inputSource)) return null;
     markerGroup.updateWorldMatrix(true, true);
     let best = null, bestD = MARKER_PICK_RADIUS;
     for (const sprite of markerGroup.children) {
@@ -1906,8 +1919,8 @@ export function setupMR(view, project, getFootprint) {
     rlog('drop rect', { id: rect.id, op, px: +px.toFixed(3), py: +py.toFixed(3) });
   }
 
-  // EDIT mode: flip the selected zone room<->wall (add<->subtract). Bound to the
-  // upper face button (B/Y) while in EDIT — see pollModeCycle.
+  // PLAN mode: flip the selected zone room<->wall (add<->subtract). Bound to the
+  // upper face button (B/Y) while in PLAN — see pollModeCycle.
   function swapSelected() {
     if (!selectedRect) return;
     selectedRect.op = selectedRect.op === 'subtract' ? 'add' : 'subtract';
@@ -2044,25 +2057,12 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'edit', color: 0xa78bfa, // label/help via i18n: mode.edit / help.edit
-      // Select a zone to edit. TRIGGER picks the zone under your ray; pressing again
+      // PLAN editing domain: select a zone under the floor pointer; pressing again
       // cycles DOWN through overlapping zones (wraps), so any buried zone is
-      // reachable. The selection persists + is zebra-highlighted. Then GRIP deletes
-      // it (see onReset), or the upper face button B/Y swaps it room<->wall (see
-      // swapSelected / pollModeCycle).
+      // reachable. Outlets are deliberately ignored here. The selection persists +
+      // is zebra-highlighted. GRIP deletes it; B/Y swaps room<->wall.
       onTouch: () => {
         if (!placed) return;
-        // Height pad is up and the ray is on it -> drive the pad.
-        if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
-        // A marker under the reticle takes priority: select it + open the height pad.
-        if (hoverMarker) {
-          selectedMarker = hoverMarker;
-          selectedRect = null; // marker editing suspends zone selection (B/Y swap no-ops)
-          activateMarkerPad();
-          rlog('marker select', { id: selectedMarker.id });
-          return;
-        }
-        // Otherwise it's zone selection — leave marker-height mode first.
-        if (selectedMarker) { selectedMarker = null; deactivateNumpad(); }
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
@@ -2071,11 +2071,21 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
-      // Drop an OUTLET marker at the tip. x/y come from the tip's plan position; z = the
-      // tip's height above the active floor (a first guess). Edit the height in EDIT; pin
-      // x/y to the walls in SIZE. Markers are annotations — NOT part of the massing.
+      // OUTLET editing domain. Aim at an existing outlet to edit its height; grip-drag
+      // moves it and grip away deletes the selected outlet. Trigger on empty space drops
+      // a new outlet at the tip. SIZE remains the cross-domain tool for wall pins.
       onTouch: (pos) => {
         if (!placed) return;
+        if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
+        if (hoverMarker) {
+          selectedMarker = hoverMarker;
+          activateMarkerPad();
+          rlog('marker select', { id: selectedMarker.id });
+          return;
+        }
+        // First empty-space trigger leaves an existing edit before another outlet
+        // can be dropped, avoiding accidental duplicates while operating the pad.
+        if (selectedMarker) { selectedMarker = null; deactivateNumpad(); return; }
         const { px, py } = worldToPlan(pos);
         const z = Math.max(0, pos.y - overlayY());
         const m = project.addMarker({ type: 'outlet', x: px, y: py, z });
@@ -2392,30 +2402,40 @@ export function setupMR(view, project, getFootprint) {
     });
   }
 
-  // Grip PRESS: if the reticle is over a draggable target, start a grip-drag instead
-  // of an undo — a dim value panel in SIZE (ref-pick phase), or an edge in EDGE.
+  // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
+  // of an undo — a dim value panel in SIZE, an edge in EDGE, or a marker in OUTLET.
   function onSqueezeStart(event) {
     if (event?.data) activeSource = event.data;
     const id = modes[currentMode].id;
     if (id === 'size' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
+    if (id === 'marker' && hoverMarker && setControllerRay(event.data)) {
+      const sprite = markerGroup.children.find((s) => s.userData.markerId === hoverMarker.id);
+      if (!sprite) return;
+      sprite.getWorldPosition(_dp);
+      const distance = _dv.copy(_dp).sub(_ro).dot(_rd);
+      if (distance <= 0) return;
+      gripDrag = { kind: 'marker', markerId: hoverMarker.id, distance };
+      rlog('grip-drag marker', { id: hoverMarker.id });
+    }
   }
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
   function onSqueezeEnd() {
     if (gripDrag) {
-      const wasEdge = gripDrag.kind === 'edge';
+      const rebuild = gripDrag.kind === 'edge' || gripDrag.kind === 'marker';
       project.touch(); rlog('grip-drag end', gripDrag);
-      // The edge drag skipped dim labels per-frame; rebuild once now so they return.
-      if (wasEdge) { buildPlan(); applyPlanMatrix(); }
+      // Edge and marker drags use a lightweight live visual; rebuild once so all
+      // dimensions, marker lock colors, and canonical geometry return on release.
+      if (rebuild) { buildPlan(); applyPlanMatrix(); }
     }
     gripDrag = null;
   }
 
-  // Grip button: context-sensitive, but it only ever DELETES geometry in EDIT — every
-  // other mode does a non-destructive cancel of an in-progress gesture (or nothing), so
-  // grip can't wipe a room/dimension/registration by accident.
-  //  - EDIT: delete the selected zone.
+  // Grip button: context-sensitive deletion belongs to the active editing domain;
+  // other modes only cancel an in-progress gesture (or do nothing).
+  //  - PLAN: delete the selected zone.
+  //  - OUTLET: delete the selected outlet (an aimed grip starts a drag instead).
   //  - SIZE: cancel the last dimension pick, step by step.
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
@@ -2428,8 +2448,7 @@ export function setupMR(view, project, getFootprint) {
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
     }
-    if (mode.id === 'edit') { // grip deletes the selected zone (the ONLY grip delete)
-      if (selectedMarker) { deleteSelectedMarker(); return; } // ...or the selected marker
+    if (mode.id === 'edit') { // PLAN domain: grip deletes only a selected zone
       if (!selectedRect) return;
       const id = selectedRect.id;
       project.removeRectangle(id);
@@ -2442,6 +2461,10 @@ export function setupMR(view, project, getFootprint) {
       buildPlan();
       applyPlanMatrix();
       rlog('edit delete', { id });
+      return;
+    }
+    if (mode.id === 'marker' && selectedMarker) {
+      deleteSelectedMarker();
       return;
     }
     if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -2531,7 +2554,7 @@ export function setupMR(view, project, getFootprint) {
       exitProgress = 0;
     }
     // Upper face button (B/Y) normally cycles to the next mode, but it's overridden
-    // in EDIT (swap the selected zone room<->wall) and in SIZE with a pair chosen
+    // in PLAN (swap the selected zone room<->wall) and in SIZE with a pair chosen
     // (reverse the dimension's direction). Thumbstick-x still cycles modes there.
     if (next && !btn.next) {
       if (modes[currentMode].id === 'edit') swapSelected();
@@ -2644,6 +2667,7 @@ export function setupMR(view, project, getFootprint) {
     zebra.visible = false;
     recalBadge1.sprite.visible = recalBadge2.sprite.visible = recalStep.sprite.visible = false;
     hoverStack = [];
+    hoverMarker = null;
     for (const sprite of markerGroup.children) sprite.scale.set(0.09, 0.09, 1);
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
@@ -2816,28 +2840,13 @@ export function setupMR(view, project, getFootprint) {
       }
       if (hoverKey !== prevHoverKey) { redrawLevelPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'edit') {
-      // EDIT: ray the floor, gather the overlap stack under the reticle. A marker under
-      // the reticle takes priority (select it to edit its height). The persistent zone
-      // selection (if any) is zebra-filled + outlined; else preview the topmost zone.
+      // PLAN: ray the floor and edit only the zone overlap stack. Marker glyphs are
+      // intentionally inert in this domain; OUTLET owns all marker interactions.
       hoverKey = null;
-      hoverMarker = null;
       numpadCursor.visible = false;
-      // While a marker is selected, its height pad is up — raycast it for the key.
-      if (selectedMarker && numpad.group.visible) {
-        const panelHit = rayPanelHit(pickSource(frame));
-        if (panelHit) {
-          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
-          numpadCursor.position.copy(panelHit.point);
-          numpadCursor.visible = true;
-        }
-      }
       const source = pickSource(frame);
-      hoverMarker = hoverKey ? null : pickMarker(source);
       const hit = rayFloorHit(source);
-      if (hoverMarker) {
-        hoverStack = [];
-        reticle.visible = false; // the enlarged glyph is the pointer target
-      } else if (hit) {
+      if (hit) {
         const { px, py } = worldToPlan(hit);
         hoverStack = rectsAtPoint(px, py);
         reticle.visible = true;
@@ -2846,13 +2855,34 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
         hoverStack = [];
       }
-      if (selectedMarker && !project.markers.includes(selectedMarker)) { selectedMarker = null; deactivateNumpad(); }
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
       if (selectedRect) {
         showRectOutline(selectedRect, selectedRect.op === 'subtract' ? 0xff6b6b : 0x51d88a);
         showZebra(selectedRect);
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
+      }
+    } else if (modeId === 'marker') {
+      // OUTLET: existing glyphs are the only pointer targets. Trigger selects one
+      // for height entry; grip-drag moves it. With none selected/aimed, trigger drops
+      // a new outlet at the controller tip (handled by the mode's onTouch).
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = pickSource(frame);
+      if (selectedMarker && numpad.group.visible) {
+        const panelHit = rayPanelHit(source);
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
+      if (gripDrag?.kind === 'marker') applyMarkerGripDrag(source);
+      hoverMarker = hoverKey ? null : pickMarker(source);
+      reticle.visible = false;
+      if (selectedMarker && !project.markers.includes(selectedMarker)) {
+        selectedMarker = null;
+        deactivateNumpad();
       }
       emphasizeMarker(selectedMarker, 0.12);
       emphasizeMarker(hoverMarker, 0.115);

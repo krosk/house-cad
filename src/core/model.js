@@ -248,6 +248,25 @@ export class Project {
     this._emit();
   }
 
+  // Move a marker while preserving its pin relationships. A pin's signed value
+  // is the marker-to-reference offset, so dragging changes that value by the same
+  // axis delta instead of letting solveMarkers snap the marker back afterward.
+  moveMarker(id, { x, y, z }) {
+    const m = this.markers.find((m) => m.id === id);
+    if (!m) return;
+    const delta = { x: x - m.x, y: y - m.y };
+    for (const c of this.constraints) {
+      const markerIsA = c.a?.marker === id;
+      const markerIsB = c.b?.marker === id;
+      if ((!markerIsA && !markerIsB) || (c.axis !== 'x' && c.axis !== 'y')) continue;
+      c.value += markerIsB ? delta[c.axis] : -delta[c.axis];
+    }
+    m.x = x;
+    m.y = y;
+    m.z = z;
+    this._emit();
+  }
+
   addConstraint(c) {
     this.constraints.push(c);
     this._emit();
