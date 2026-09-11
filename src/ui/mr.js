@@ -490,8 +490,31 @@ export function setupMR(view, project, getFootprint) {
     let xTier = 0, yTier = 0;
     for (const c of (project.constraints || [])) {
       if (c.type !== 'distance') continue;
+      const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
+      // Edge<->origin position lock: draw a dim from the origin axis (coord 0) to the
+      // edge, so the lock is visible (desktop skips it; the AR survey needs to see it).
+      if (aOrigin || bOrigin) {
+        const eref = aOrigin ? c.b : c.a;
+        const le = edgeLine(eref);
+        if (!le) continue;
+        const conflict = !!c.conflict;
+        const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
+        const color = conflict ? '#ff5c5c' : '#79c0ff';
+        if (isXEdge(eref.edge)) {
+          const yMid = (le.p0.y + le.p1.y) / 2;
+          segs.push({ ax: 0, ay: yMid, bx: le.coord, by: yMid, conflict });             // origin -> edge line
+          segs.push({ ax: le.coord, ay: le.p0.y, bx: le.coord, by: le.p1.y, conflict }); // tick along the edge
+          dimSprites.push(makeDimLabel(text, color, le.coord / 2, yMid));
+        } else {
+          const xMid = (le.p0.x + le.p1.x) / 2;
+          segs.push({ ax: xMid, ay: 0, bx: xMid, by: le.coord, conflict });             // origin -> edge line
+          segs.push({ ax: le.p0.x, ay: le.coord, bx: le.p1.x, by: le.coord, conflict }); // tick along the edge
+          dimSprites.push(makeDimLabel(text, color, xMid, le.coord / 2));
+        }
+        continue;
+      }
       const la = edgeLine(c.a), lb = edgeLine(c.b);
-      if (!la || !lb) continue; // skip origin-referenced (no line, per desktop)
+      if (!la || !lb) continue;
       const conflict = !!c.conflict;
       const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
       const color = conflict ? '#ff5c5c' : '#79c0ff';
@@ -1119,18 +1142,28 @@ export function setupMR(view, project, getFootprint) {
     rlog('edit swap', { id: selectedRect.id, op: selectedRect.op });
   }
 
-  // SIZE mode: reverse the picked dimension's direction (like desktop swapConstraint) —
-  // flips which edge anchors (a holds, b moves) and the A->B order. Bound to B/Y while
-  // in SIZE with both refs chosen. No-op for an origin lock (the origin datum can't move).
+  // SIZE mode: flip which SIDE ref B sits on relative to ref A — negates the signed
+  // distance (magnitude kept). Works for edge<->edge (the edge jumps to A's other
+  // side) AND edge<->origin (the edge jumps to the other side of the origin axis; the
+  // origin datum itself never moves). Bound to B/Y in SIZE. To flip an existing
+  // dimension, re-pick its two refs (re-selects the constraint) then press B/Y. No-op
+  // before a distance exists. A flip that would over-constrain is refused.
   function swapDim() {
     if (!dimRefA || !dimRefB) return;
-    if (dimRefA.kind === 'origin' || dimRefB.kind === 'origin') { rlog('dim swap n/a (origin)'); return; }
-    [dimRefA, dimRefB] = [dimRefB, dimRefA]; // reverse the pair for the next commit
     const c = editingId ? project.constraints.find((k) => k.id === editingId)
                         : findConstraintForRefs(dimRefA, dimRefB);
-    if (c) { project.swapConstraint(c.id); buildPlan(); applyPlanMatrix(); } // flip live + re-solve
-    redrawNumpad(); // title now reads B <-> A
-    rlog('dim swap', { a: refLabel(dimRefA), b: refLabel(dimRefB) });
+    if (!c) { rlog('dim swap: set a distance first'); return; }
+    const before = conflictCount();
+    project.flipConstraintSide(c.id); // move ref B to the other side of ref A
+    if (conflictCount() > before) {
+      project.flipConstraintSide(c.id); // undo — the flip can't hold
+      dimConflict = true; redrawNumpad();
+      rlog('dim flip refused (conflict)', { id: c.id });
+      return;
+    }
+    buildPlan(); applyPlanMatrix();
+    redrawNumpad();
+    rlog('dim flip', { id: c.id, value: +c.value.toFixed(3) });
   }
 
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
@@ -1641,8 +1674,8 @@ export function setupMR(view, project, getFootprint) {
       ...(modes[currentMode].id === 'edit' ? [selectedRect
         ? `edit:   SEL ${selectedRect.op === 'subtract' ? 'WALL' : 'ROOM'} #${selectedRect.id}  B=swap grip=del`
         : `edit:   trig=pick${hoverStack.length ? ' (' + hoverStack.length + ')' : ''}`] : []),
-      ...(modes[currentMode].id === 'size' && dimRefA && dimRefB && dimRefA.kind !== 'origin' && dimRefB.kind !== 'origin'
-        ? [`size:   ${refLabel(dimRefA)}->${refLabel(dimRefB)}  B=swap dir`] : []),
+      ...(modes[currentMode].id === 'size' && dimRefA && dimRefB
+        ? [`size:   ${refLabel(dimRefA)}->${refLabel(dimRefB)}  B=flip side`] : []),
       `floorY:   ${f2(floorY)}`,
       `plan.y:   ${f2(planPos.y)}`,
       `cam.y:    ${f2(camWorldY())}`,

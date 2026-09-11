@@ -229,6 +229,16 @@ export class Project {
     this._emit();
   }
 
+  // Flip which SIDE b sits on relative to a: negate the signed value but KEEP the
+  // ordered pair (and anchor). Unlike swapConstraint (order+value both flip =
+  // geometrically identical), this actually moves b to the opposite side of a.
+  flipConstraintSide(id) {
+    const c = this.constraints.find((c) => c.id === id);
+    if (!c) return;
+    c.value = -c.value;
+    this._emit();
+  }
+
   // Pin a dimension's perpendicular placement (signed meters), or pass null to
   // return it to automatic stacking. Purely presentational — not solved.
   setConstraintOffset(id, offset) {
