@@ -34,9 +34,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **EDIT** — select a zone (trigger; press again cycles down through overlapping zones). Grip
-  deletes it (the ONLY grip delete); B/Y swaps it room↔wall.
-- **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner (aim so the
-  reticle hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple; touch to lock)
+  deletes it (the ONLY grip delete); B/Y swaps it room↔wall. Markers are picked directly at their
+  visible wall-height glyph rather than through the floor reticle.
+- **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
+  pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
+  the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
 - **SIZE** — the dimension tool (see Dimensioning below).
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.

@@ -72,9 +72,9 @@ const STRINGS = {
     zh: '扣动扳机在笔尖处放置一个插座；初始高度为笔尖离地高度。在“尺寸”中把 X/Y 固定到墙面，在“编辑”中调整高度。',
   },
   'help.recal': {
-    en: 'Fix drift. Aim so the reticle hugs wall 1 and trigger to pick a known corner, then touch 2 points on wall 1 and 1 on wall 2.',
-    fr: 'Corrige la dérive. Visez pour que le réticule longe le mur 1, gâchette pour choisir un coin connu, puis 2 points sur le mur 1 et 1 sur le mur 2.',
-    zh: '修正漂移。瞄准使准星贴住墙1并扣动扳机选择一个已知墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
+    en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
+    fr: 'Corrige la dérive. Visez avec le réticule jusqu’à surligner le mur 1, gâchette pour choisir son coin, puis 2 points sur le mur 1 et 1 sur le mur 2.',
+    zh: '修正漂移。用指针准星瞄准至墙1高亮，扣动扳机选择墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
   },
   'help.size': {
     en: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side. To pin a marker: pick it, then a wall edge (0 = on the wall).',

@@ -575,8 +575,8 @@ export function setupMR(view, project, getFootprint) {
   const _zp = new THREE.Vector3(); // scratch: selected-zone center in world
 
   // RECAL corner marker: a floor ring at a plan corner — previews the nearest
-  // corner under your tip (cyan) before you lock it, then rides the locked corner
-  // (purple) while you touch the edge direction.
+  // corner under the pointer (cyan) before you lock it, then rides the locked
+  // corner (purple) while you touch the edge direction.
   const cornerHi = new THREE.Mesh(
     new THREE.RingGeometry(0.035, 0.06, 24).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
@@ -946,6 +946,7 @@ export function setupMR(view, project, getFootprint) {
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
     spr.scale.set(0.09, 0.09, 1);
     spr.renderOrder = 32; // above floor overlays/highlights (badges are 30)
+    spr.userData.markerId = marker.id;
     return spr;
   }
 
@@ -1106,17 +1107,6 @@ export function setupMR(view, project, getFootprint) {
         const d = ptSegDist(px, py, ax, ay, bx, by);
         if (d < bestD) { bestD = d; best = { rectId: r.id, edge }; }
       }
-    }
-    return best;
-  }
-
-  // The marker nearest the aimed floor point (px,py), within the reticle radius —
-  // reticle-gated like edgeAtPoint. Used by SIZE (pin its X/Y) and EDIT (edit height).
-  function markerAtPoint(px, py) {
-    let best = null, bestD = EDGE_PICK_M;
-    for (const m of project.markers) {
-      const d = Math.hypot(px - m.x, py - m.y);
-      if (d < bestD) { bestD = d; best = m; }
     }
     return best;
   }
@@ -1718,12 +1708,11 @@ export function setupMR(view, project, getFootprint) {
     redrawSlotMenu();
   }
 
-  // Draw the edge-highlight strip along `edge` of `rect`, in the given color —
-  // same thickened-quad style as the resting edges, a touch bolder and on top.
+  // Draw an edge-highlight strip between two plan-space endpoints — the same
+  // thickened-quad style as the resting edges, a touch bolder and on top.
   const _c0 = new THREE.Vector3(), _c1 = new THREE.Vector3();
   const _c2 = new THREE.Vector3(), _c3 = new THREE.Vector3();
-  function showEdge(rect, edge, colorHex, mesh = edgeHi) {
-    const [[ax, ay], [bx, by]] = edgeEndpoints(rect, edge);
+  function showPlanEdge(ax, ay, bx, by, colorHex, mesh = edgeHi) {
     const c = stripCorners(ax, ay, bx, by, EDGE_HI_HALF); // bolder than the resting edges
     planToWorld(c[0][0], c[0][1], _c0);
     planToWorld(c[1][0], c[1][1], _c1);
@@ -1736,6 +1725,12 @@ export function setupMR(view, project, getFootprint) {
     mesh.geometry.attributes.position.needsUpdate = true;
     mesh.material.color.setHex(colorHex);
     mesh.visible = true;
+  }
+
+  // Draw the edge-highlight strip along `edge` of `rect`.
+  function showEdge(rect, edge, colorHex, mesh = edgeHi) {
+    const [[ax, ay], [bx, by]] = edgeEndpoints(rect, edge);
+    showPlanEdge(ax, ay, bx, by, colorHex, mesh);
   }
 
   // Outline a whole rectangle (all four edges) into rectHi, in the given color —
@@ -1793,6 +1788,43 @@ export function setupMR(view, project, getFootprint) {
     const t = (overlayY() - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
     return _rhit.copy(_ro).addScaledVector(_rd, t);
+  }
+
+  // The visible marker glyph nearest the controller ray. Markers sit at their real
+  // wall height, so testing only the ray's eventual floor intersection misses them
+  // whenever the user aims directly at the glyph. Use a small world-space radius
+  // around each sprite center instead; this works even when the ray never hits floor.
+  const MARKER_PICK_RADIUS = 0.065;
+  function pickMarker(inputSource) {
+    if (!markerGroup.children.length) return null;
+    const space = inputSource?.targetRaySpace;
+    if (!space || !currentFrame) return null;
+    const pose = currentFrame.getPose(space, localSpace);
+    if (!pose) return null;
+    _rm.fromArray(pose.transform.matrix);
+    _ro.setFromMatrixPosition(_rm);
+    _rq.setFromRotationMatrix(_rm);
+    _rd.set(0, 0, -1).applyQuaternion(_rq).normalize();
+    markerGroup.updateWorldMatrix(true, true);
+    let best = null, bestD = MARKER_PICK_RADIUS;
+    for (const sprite of markerGroup.children) {
+      sprite.getWorldPosition(_dp);
+      _dv.copy(_dp).sub(_ro);
+      const along = _dv.dot(_rd);
+      if (along <= 0) continue;
+      const d = Math.sqrt(Math.max(0, _dv.lengthSq() - along * along));
+      if (d < bestD) {
+        bestD = d;
+        best = project.markers.find((m) => m.id === sprite.userData.markerId) ?? null;
+      }
+    }
+    return best;
+  }
+
+  function emphasizeMarker(marker, scale = 0.12) {
+    if (!marker) return;
+    const sprite = markerGroup.children.find((s) => s.userData.markerId === marker.id);
+    if (sprite) sprite.scale.set(scale, scale, 1);
   }
 
   // The dim value panel the RETICLE is over: the sprite whose plan position is nearest
@@ -2054,17 +2086,20 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'recal', color: C_RECAL, // label/help via i18n: mode.recal / help.recal
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
-      // corner apex needn't be reachable. First SELECT a corner — aim so the reticle
+      // corner apex needn't be reachable. First SELECT a corner — point so the reticle
       // hugs the wall you want as "wall 1" (the nearer wall becomes 1, the other 2) and
-      // touch to lock it. Then touch P1,P2 along real wall 1 (sets the true orientation)
+      // trigger to lock it. Then touch P1,P2 along real wall 1 (sets the true orientation)
       // and P3 on real wall 2; the real corner = P3 projected onto the wall-1 line.
       // recalibrate() re-solves yaw + position so the selected plan corner lands on it —
       // both rotational and positional drift are corrected.
-      onTouch: (pos) => {
+      onTouch: (pos, inputSource) => {
         if (!placed) return;
         if (!recalLocked) {
-          // SELECT phase: lock the corner + wall order the reticle is showing.
-          const { px, py } = worldToPlan(pos);
+          // SELECT phase is pointer-driven: lock the corner + wall order at the
+          // ray/floor reticle, not at the floor projection beneath the physical tip.
+          const hit = rayFloorHit(inputSource);
+          if (!hit) return;
+          const { px, py } = worldToPlan(hit);
           const near = nearestPlanCorner(px, py);
           if (!near) return; // no surveyed corners to reference yet
           recalCorner = orderWallsByReticle(near, px, py); // a = wall 1 (hugged wall), b = wall 2
@@ -2346,7 +2381,7 @@ export function setupMR(view, project, getFootprint) {
       touchY: +pos.y.toFixed(3), floorY: +floorY.toFixed(3), planY: +planPos.y.toFixed(3),
     });
     // Run whatever the current mode does with the touched point.
-    modes[currentMode].onTouch(pos);
+    modes[currentMode].onTouch(pos, event.data);
     // Force matrixWorld so we log the ACTUAL rendered world position, not just planPos.
     planGroup.updateMatrixWorld(true);
     const wp = planGroup.getWorldPosition(new THREE.Vector3());
@@ -2609,6 +2644,7 @@ export function setupMR(view, project, getFootprint) {
     zebra.visible = false;
     recalBadge1.sprite.visible = recalBadge2.sprite.visible = recalStep.sprite.visible = false;
     hoverStack = [];
+    for (const sprite of markerGroup.children) sprite.scale.set(0.09, 0.09, 1);
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
@@ -2643,10 +2679,21 @@ export function setupMR(view, project, getFootprint) {
         edgeHi.visible = false;
       }
     } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
-      // Tip-touch modes: a ring under whichever controller tip is tracked, so you
-      // see where FLOOR/REGISTER/RECAL will land (REGISTER & RECAL are 3-point gestures).
-      const tipPos = tipPosition(pickSource(frame));
-      if (tipPos) {
+      // FLOOR and REGISTER are tip-touch modes. RECAL starts with a pointer-driven
+      // corner pick; after the corner locks, its three real-wall points are tip touches.
+      const source = pickSource(frame);
+      const tipPos = tipPosition(source);
+      let recalAim = null;
+      if (modeId === 'recal' && !recalLocked) {
+        const hit = rayFloorHit(source);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          recalAim = worldToPlan(hit);
+        } else {
+          reticle.visible = false;
+        }
+      } else if (tipPos) {
         reticle.visible = true;
         reticle.position.set(tipPos.x, floorY + 0.002, tipPos.z);
       } else {
@@ -2654,13 +2701,13 @@ export function setupMR(view, project, getFootprint) {
       }
       edgeHi.visible = false;
       // RECAL: highlight the corner and badge its two walls 1 & 2. Until you SELECT
-      // (first touch), the nearest corner previews under the tip and the wall order
-      // tracks which wall the reticle hugs — so aim at the wall you want as "1". Once
+      // (first trigger), the nearest corner previews under the pointer and the wall
+      // order tracks which wall the reticle hugs — so aim at the wall you want as "1". Once
       // selected, the order is locked and the reticle echoes the current wall-touch step.
       if (modeId === 'recal') {
         let c = recalCorner; // the locked corner (a=wall 1, b=wall 2)
         if (!recalLocked) {  // preview: nearest corner, walls ordered live by the reticle
-          if (tipPos) { const { px, py } = worldToPlan(tipPos); const near = nearestPlanCorner(px, py); c = near ? orderWallsByReticle(near, px, py) : null; }
+          if (recalAim) { const { px, py } = recalAim; const near = nearestPlanCorner(px, py); c = near ? orderWallsByReticle(near, px, py) : null; }
           else c = null;
         }
         if (c) {
@@ -2670,6 +2717,11 @@ export function setupMR(view, project, getFootprint) {
           cornerHi.visible = true;
           placeWallBadge(recalBadge1, c.cx, c.cy, c.a);
           placeWallBadge(recalBadge2, c.cx, c.cy, c.b);
+          // Use the standard edge strip to make the pointer-selected wall explicit.
+          // Before/during wall-1 capture it follows wall 1; for P3 it switches to wall 2.
+          const activeWall = recalLocked && recalPts.length === 2 ? c.b : c.a;
+          const wallColor = recalLocked && recalPts.length === 2 ? C_WALL2 : C_WALL1;
+          showPlanEdge(c.cx, c.cy, activeWall.x, activeWall.y, wallColor);
         }
         // Reticle step badge only after the corner is selected: "1" while on wall 1
         // (0-1 touches), "2" once on wall 2. During SELECT the wall badges already lead.
@@ -2703,9 +2755,11 @@ export function setupMR(view, project, getFootprint) {
         }
       } else {
         // Reference-pick phase. If the ray is on an existing dim value panel, THAT is
-        // the pick (select it to edit the constraint); otherwise ray the floor for an
-        // edge/origin. edgeAtPoint caps at the reticle radius, same as EDGE mode.
-        const hit = rayFloorHit(pickSource(frame));
+        // the pick (select it to edit the constraint); otherwise ray the visible marker
+        // glyph directly, or the floor for an edge/origin.
+        const source = pickSource(frame);
+        const aimedMarker = (dimRefA && dimRefA.kind === 'marker') ? null : pickMarker(source);
+        const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true; // reticle always tracks the floor point
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
@@ -2714,14 +2768,19 @@ export function setupMR(view, project, getFootprint) {
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A dim panel is hovered only when the RETICLE is over it (before the first ref).
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
-          if (!hoverDim) { // a hovered dim panel takes over the pick; otherwise pick a floor marker/edge/origin
-            // A marker pin needs marker + edge: prefer a marker unless ref A is already a
-            // marker (then the second pick must be the wall edge).
-            const mk = (dimRefA && dimRefA.kind === 'marker') ? null : markerAtPoint(px, py);
-            if (mk) hoverRef = { kind: 'marker', markerId: mk.id };
+          if (!hoverDim) { // a hovered dim panel takes over; otherwise marker beats floor refs
+            if (aimedMarker) {
+              hoverRef = { kind: 'marker', markerId: aimedMarker.id };
+              hoverFloorPt = { px: aimedMarker.x, py: aimedMarker.y };
+              reticle.visible = false; // the enlarged glyph is the pointer target
+            }
             else if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
             else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
           }
+        } else if (aimedMarker) {
+          hoverRef = { kind: 'marker', markerId: aimedMarker.id };
+          hoverFloorPt = { px: aimedMarker.x, py: aimedMarker.y };
+          reticle.visible = false;
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
@@ -2731,7 +2790,7 @@ export function setupMR(view, project, getFootprint) {
       const showRef = (ref, color) => {
         if (!ref) return;
         if (ref.kind === 'origin') originRingMat.color.setHex(color);
-        else if (ref.kind === 'marker') { /* the marker glyph is its own highlight */ }
+        else if (ref.kind === 'marker') emphasizeMarker(markerOf(ref));
         else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
       };
       if (hoverDim) {
@@ -2772,11 +2831,15 @@ export function setupMR(view, project, getFootprint) {
           numpadCursor.visible = true;
         }
       }
-      const hit = rayFloorHit(pickSource(frame));
-      if (hit) {
+      const source = pickSource(frame);
+      hoverMarker = hoverKey ? null : pickMarker(source);
+      const hit = rayFloorHit(source);
+      if (hoverMarker) {
+        hoverStack = [];
+        reticle.visible = false; // the enlarged glyph is the pointer target
+      } else if (hit) {
         const { px, py } = worldToPlan(hit);
-        hoverMarker = markerAtPoint(px, py);
-        hoverStack = hoverMarker ? [] : rectsAtPoint(px, py); // a marker under the reticle wins
+        hoverStack = rectsAtPoint(px, py);
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
       } else {
@@ -2791,6 +2854,8 @@ export function setupMR(view, project, getFootprint) {
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
       }
+      emphasizeMarker(selectedMarker, 0.12);
+      emphasizeMarker(hoverMarker, 0.115);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.
