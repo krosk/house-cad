@@ -339,6 +339,14 @@ export function setupMR(view, project, getFootprint) {
   // so the controller panels are never hidden by a floor fill like the zebra.
   const HUD_ORDER = 100;
 
+  // Vertical offsets (m, above the controller) of the stacked controller panels,
+  // bottom -> top: mode label, hover readout, instructions (help), info (debug).
+  // The panels are re-seated straight up in WORLD space each frame (see onXRFrame)
+  // so they read upright regardless of how the controller is tilted; these are the
+  // heights of that world-vertical stack. Help below debug: instructions read
+  // nearest the hand, the info HUD on top.
+  const PANEL_Y = { label: 0.05, readout: 0.11, help: 0.26, debug: 0.46 };
+
   // Controllers, each with a small sphere "tip" you touch to the real floor, plus
   // a mode label. Placement uses the controller's tracked position (cm-accurate)
   // rather than a depth raycast, so the floor is defined by physically touching it.
@@ -355,7 +363,7 @@ export function setupMR(view, project, getFootprint) {
     tip.position.copy(TIP_OFFSET);
     c.add(tip);
     const label = makeLabel();
-    label.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.05, TIP_OFFSET.z);
+    label.sprite.position.set(0, PANEL_Y.label, 0);
     label.sprite.renderOrder = HUD_ORDER; // controller UI paints over every world overlay (zebra etc.)
     c.add(label.sprite);
     labels.push(label);
@@ -363,22 +371,23 @@ export function setupMR(view, project, getFootprint) {
     // constraint the ray is pointing at — a legible "close-up" of small in-world
     // dimension text. Hidden until the ray hovers a dimension.
     const readout = makeLabel();
-    readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.10, TIP_OFFSET.z);
+    readout.sprite.position.set(0, PANEL_Y.readout, 0);
     readout.sprite.scale.set(0.2, 0.05, 1);
     readout.sprite.visible = false;
     readout.sprite.renderOrder = HUD_ORDER;
     c.add(readout.sprite);
     readouts.push(readout);
-    const dbg = makeDebug(); // debug HUD above each tip so it's always in view
-    dbg.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.20, TIP_OFFSET.z);
-    dbg.sprite.renderOrder = HUD_ORDER;
-    c.add(dbg.sprite);
-    debugs.push(dbg);
-    const help = makeHelp(); // mode instructions, above the debug HUD
-    help.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + 0.42, TIP_OFFSET.z);
+    // Instructions (help) box sits BELOW the info (debug) HUD; info reads on top.
+    const help = makeHelp(); // mode instructions
+    help.sprite.position.set(0, PANEL_Y.help, 0);
     help.sprite.renderOrder = HUD_ORDER;
     c.add(help.sprite);
     helps.push(help);
+    const dbg = makeDebug(); // debug HUD (info panel), above the instructions box
+    dbg.sprite.position.set(0, PANEL_Y.debug, 0);
+    dbg.sprite.renderOrder = HUD_ORDER;
+    c.add(dbg.sprite);
+    debugs.push(dbg);
     c.addEventListener('select', onSelect);   // trigger: run current mode
     c.addEventListener('squeezestart', onSqueezeStart); // grip press: begin a grip-drag if over a target
     c.addEventListener('squeeze', onReset);   // grip: undo placement (unless a grip-drag ran)
@@ -1882,7 +1891,7 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    applyModeVisual(m.id === 'level' ? `LEVEL · ${project.activeFloor.name}` : m.label, m.color);
+    applyModeVisual(m.label, m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
     for (const h of helps) h.setText(m.label, m.help ?? '', m.color); // mode guidance box
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
@@ -1925,7 +1934,7 @@ export function setupMR(view, project, getFootprint) {
     buildPlan();
     applyPlanMatrix(); // overlay lifts to the new floor's elevation
     if (modes[currentMode].id === 'level') {
-      applyModeVisual(`LEVEL · ${project.activeFloor.name}`, C_LEVEL);
+      applyModeVisual('LEVEL', C_LEVEL); // floor name shows in the info HUD, not the label
       numpad.group.visible = true; // refreshFloorEditState hid it; LEVEL keeps it up
       refreshLevelPad();
     }
@@ -2257,6 +2266,7 @@ export function setupMR(view, project, getFootprint) {
     return `${project.activeFloor?.name ?? '-'} ${i + 1}/${fl.length}`;
   };
   const _wp = new THREE.Vector3();
+  const _panelUp = new THREE.Vector3(), _panelInvQ = new THREE.Quaternion(); // scratch: world-vertical panel re-seat
   // XR camera world height (matrixWorld, not .position which stays local/0).
   const camWorldY = () => renderer.xr.getCamera().matrixWorld.elements[13];
 
@@ -2267,6 +2277,18 @@ export function setupMR(view, project, getFootprint) {
     // markers are hidden so the two don't clutter or read as both being live.
     const activeCtl = pickSource(frame);
     for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
+    // Re-seat the controller panels straight up in WORLD space, so the stack reads
+    // upright no matter how the hand is tilted (the sprites already billboard; only
+    // their offset rode the controller's rotation). Each panel's local offset is the
+    // world-up vector de-rotated by the controller's orientation.
+    controllers.forEach((c, i) => {
+      if (!c.visible) return;
+      _panelInvQ.copy(c.quaternion).invert();
+      labels[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.label, 0).applyQuaternion(_panelInvQ));
+      readouts[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.readout, 0).applyQuaternion(_panelInvQ));
+      helps[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.help, 0).applyQuaternion(_panelInvQ));
+      debugs[i].sprite.position.copy(_panelUp.set(0, PANEL_Y.debug, 0).applyQuaternion(_panelInvQ));
+    });
     // Echo the pointed-at constraint's value big on the active controller so
     // small in-world dimension text can be read up close.
     const hovSprite = pickDimLabel(activeCtl);
@@ -2293,16 +2315,20 @@ export function setupMR(view, project, getFootprint) {
       const ptrW = tipPosition(activeCtl);
       const ptr = ptrW ? worldToPlan(ptrW) : null;
       const ret = reticle.visible ? worldToPlan(reticle.position) : null;
-      // Length of the currently highlighted edge (locked wins over hovered). Both
-      // hold last frame's value here — hoverEdge is recomputed just below — which is
-      // the same imperceptible lag the ret/ptr lines already accept.
-      const edgeRef = selectedEdge || hoverEdge;
+      // Length of the currently highlighted edge (locked wins over hovered). In EDGE
+      // that's selectedEdge/hoverEdge; in SIZE it's the edge ref under the ray
+      // (hoverRef). All hold last frame's value here — recomputed just below — the
+      // same imperceptible lag the ret/ptr lines already accept.
+      const modeId = modes[currentMode].id;
+      const sizeHoverEdge = modeId === 'size' && hoverRef?.kind === 'edge' ? hoverRef : null;
+      const edgeRef = selectedEdge || hoverEdge || sizeHoverEdge;
       const edgeM = edgeLen(edgeRef);
       const lines = [
         `build:  ${BUILD_ID}`,
         ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
+        ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
         ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
