@@ -17,6 +17,7 @@ import { Rectangle } from '../core/model.js';
 import { makeDistance, makeOriginDistance, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { toMeters, unitLabel, fmt } from '../core/units.js';
+import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import { serializeProject, deserializeInto } from '../io/serialize.js';
 import { rlog } from './remoteLog.js';
 
@@ -146,17 +147,24 @@ export function setupMR(view, project, getFootprint) {
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
     sprite.scale.set(0.26, 0.195, 1); // match the 512x384 aspect
-    // Greedy word-wrap `text` into lines no wider than `maxW` px at the current font.
+    // Greedy wrap `text` into lines no wider than `maxW` px. CJK-aware: Chinese has
+    // no inter-word spaces, so each CJK glyph is its own break token (Latin runs stay
+    // whole); a run of spaces collapses to one separator. Without this a ZH sentence
+    // is one giant "word" and overflows.
+    const CJK = '\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF';
+    const tokenRe = new RegExp(`[${CJK}]|[^\\s${CJK}]+|\\s+`, 'g');
     const wrap = (text, maxW) => {
       const out = [];
       for (const para of text.split('\n')) {
+        const tokens = para.match(tokenRe) || [''];
         let line = '';
-        for (const word of para.split(' ')) {
-          const trial = line ? `${line} ${word}` : word;
-          if (line && ctx.measureText(trial).width > maxW) { out.push(line); line = word; }
+        for (const tok of tokens) {
+          if (/^\s+$/.test(tok)) { if (line) line += ' '; continue; } // collapse spaces
+          const trial = line + tok;
+          if (line && ctx.measureText(trial).width > maxW) { out.push(line.trimEnd()); line = tok; }
           else line = trial;
         }
-        out.push(line);
+        out.push(line.trimEnd());
       }
       return out;
     };
@@ -200,7 +208,12 @@ export function setupMR(view, project, getFootprint) {
 
     const DISP_H = 140, ROWS = 5, CELL_H = (H - DISP_H) / ROWS, COLS = 3, CELL_W = W / COLS;
     const grid = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['.', '0', 'back']];
-    const keyLabel = { back: '⌫', enter: 'ENTER', swap: '⇄ FLIP', del: '🗑 DEL' };
+    // Localized at draw time (⌫ is language-neutral). swap = the SIZE FLIP action.
+    const keyLabel = (kid) => kid === 'back' ? '⌫'
+      : kid === 'enter' ? t('key.enter')
+      : kid === 'swap' ? t('key.flip')
+      : kid === 'del' ? t('key.del')
+      : kid;
 
     // Plane UV -> key id (or null). Texture flipY maps canvas-top to v=1.
     function keyAt(u, v) {
@@ -237,7 +250,7 @@ export function setupMR(view, project, getFootprint) {
         else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
         ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
         ctx.fillStyle = '#e6edf3';
-        ctx.fillText(keyLabel[kid] ?? kid, x + w / 2, y + h / 2 + 2);
+        ctx.fillText(keyLabel(kid), x + w / 2, y + h / 2 + 2);
       };
       for (let r = 0; r < 4; r++) { // digit rows
         for (let c = 0; c < COLS; c++) {
@@ -308,24 +321,75 @@ export function setupMR(view, project, getFootprint) {
         ctx.fillStyle = hot ? '#0d1117' : '#8b949e';
         ctx.font = 'bold 26px sans-serif';
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        ctx.fillText(`SLOT ${i + 1}`, x + 18, y + 14);
+        ctx.fillText(`${t('slot.slot')} ${i + 1}`, x + 18, y + 14);
         if (meta) {
           ctx.fillStyle = hot ? '#0d1117' : '#e6edf3';
           ctx.font = 'bold 32px sans-serif';
-          ctx.fillText(`${meta.rects} rect${meta.rects === 1 ? '' : 's'}`, x + 18, y + h - 78);
+          ctx.fillText(`${meta.rects} ${t('slot.rects')}`, x + 18, y + h - 78);
           ctx.fillStyle = hot ? '#0d1117' : '#79c0ff';
           ctx.font = '24px sans-serif';
           ctx.fillText(meta.when, x + 18, y + h - 40);
         } else {
           ctx.fillStyle = hot ? '#0d1117' : '#484f58';
           ctx.font = 'italic 30px sans-serif';
-          ctx.fillText('empty', x + 18, y + h - 56);
+          ctx.fillText(t('slot.empty'), x + 18, y + h - 56);
         }
       }
       tex.needsUpdate = true;
     }
 
     return { group, mesh, slotAt, draw };
+  }
+
+  // LANG menu: a small ray-aimed panel listing the languages with the active one
+  // highlighted. It's driven mainly by the thumbstick (up/down moves the selection,
+  // see pollModeCycle) and by trigger (advances one), so draw() just reflects the
+  // current language — no per-key hit-testing beyond an optional ray pick.
+  function makeLangMenu() {
+    const W = 384, H = 384;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.24),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+
+    const TITLE_H = 84, ROWS = LANG_ORDER.length, ROW_H = (H - TITLE_H) / ROWS;
+    // Plane UV -> language code (or null), for an optional ray+trigger pick.
+    function langAt(u, v) {
+      const cy = (1 - v) * H;
+      if (cy < TITLE_H) return null;
+      const row = Math.floor((cy - TITLE_H) / ROW_H);
+      return LANG_ORDER[row] ?? null;
+    }
+    function draw(accent, hoverLang) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.94)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.font = 'bold 40px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(t('lang.title'), 26, TITLE_H / 2);
+      const active = getLang();
+      LANG_ORDER.forEach((l, i) => {
+        const y = TITLE_H + i * ROW_H + 8, h = ROW_H - 16;
+        const on = l === active, hot = l === hoverLang;
+        ctx.fillStyle = on ? accent : (hot ? 'rgba(72,79,88,0.95)' : 'rgba(48,54,61,0.9)');
+        ctx.beginPath(); ctx.roundRect(12, y, W - 24, h, 16); ctx.fill();
+        ctx.fillStyle = on ? '#0d1117' : '#e6edf3';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(langLabel(l), W / 2, y + h / 2 + 2);
+      });
+      tex.needsUpdate = true;
+    }
+    return { group, mesh, langAt, draw };
   }
 
   // The marker sits ahead of the controller's tracked origin, along the pointing
@@ -536,6 +600,10 @@ export function setupMR(view, project, getFootprint) {
   // SAVE/LOAD slot menu panel (shares numpadCursor as its ray-hit dot).
   const slotMenu = makeSlotMenu();
   scene.add(slotMenu.group);
+
+  // LANG language-switch panel (shares numpadCursor as its ray-hit dot).
+  const langMenu = makeLangMenu();
+  scene.add(langMenu.group);
 
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
@@ -894,6 +962,8 @@ export function setupMR(view, project, getFootprint) {
   let prevHoverKey = null;  // last drawn hover (redraw only on change)
   let hoverSlot = null;     // SAVE/LOAD slot under the ray this frame (0-based)
   let prevHoverSlot = null; // last drawn slot hover
+  let hoverLang = null;     // LANG menu row under the ray this frame (lang code)
+  let prevHoverLang = null; // last drawn lang hover
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
   let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
@@ -1093,7 +1163,7 @@ export function setupMR(view, project, getFootprint) {
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
 
   // A reference is a rect EDGE or the plan ORIGIN axis.
-  const refLabel = (ref) => (!ref ? '?' : ref.kind === 'origin' ? 'ORIGIN' : ref.edge.toUpperCase());
+  const refLabel = (ref) => (!ref ? '?' : ref.kind === 'origin' ? t('ref.origin') : t(`edge.${ref.edge}`));
   const refsEqual = (a, b) =>
     !!a && !!b && a.kind === b.kind &&
     (a.kind === 'origin' || (a.rectId === b.rectId && a.edge === b.edge));
@@ -1159,12 +1229,12 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function dimTitle() {
-    if (!dimRefA) return 'pick edge / origin';
+    if (!dimRefA) return t('dim.pick');
     if (!dimRefB) return refLabel(dimRefA) + '  <->  ?';
-    return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  (edit)' : '');
+    return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  ' + t('dim.edit') : '');
   }
 
-  const redrawNumpad = () => numpad.draw(dimTitle() + (dimConflict ? '  !CONFLICT' : ''), sizeBuffer, hoverKey);
+  const redrawNumpad = () => numpad.draw(dimTitle() + (dimConflict ? '  ' + t('dim.conflict') : ''), sizeBuffer, hoverKey);
 
   const conflictCount = () => project.constraints.reduce((n, k) => n + (k.conflict ? 1 : 0), 0);
 
@@ -1284,7 +1354,7 @@ export function setupMR(view, project, getFootprint) {
   // floor's elevation above it (Project._recomputeElevations).
   const levelTitle = () => {
     const f = project.activeFloor;
-    return `${f.name}  base ${fmt(f.elevation)} ${unitLabel()}  ·  storey height`;
+    return `${f.name}  ${t('level.base')} ${fmt(f.elevation)} ${unitLabel()}  ·  ${t('level.storeyHeight')}`;
   };
   const redrawLevelPad = () => numpad.draw(levelTitle(), levelBuffer, hoverKey);
 
@@ -1427,7 +1497,7 @@ export function setupMR(view, project, getFootprint) {
     return { rects, when };
   }
 
-  const slotTitle = () => slotFlash || (modes[currentMode].id === 'save' ? 'SAVE — pick slot' : 'LOAD — pick slot');
+  const slotTitle = () => slotFlash || (modes[currentMode].id === 'save' ? t('slot.saveTitle') : t('slot.loadTitle'));
   const slotAccent = () => (modes[currentMode].id === 'save' ? '#51d88a' : '#4ea1ff');
   const redrawSlotMenu = () => slotMenu.draw(slotTitle(), slotAccent(), hoverSlot, slotMeta);
 
@@ -1446,6 +1516,22 @@ export function setupMR(view, project, getFootprint) {
     slotFlash = null;
   }
 
+  // ---- LANG: switch the UI language (see i18n.js) ----
+  const redrawLangMenu = () => langMenu.draw('#' + C_LANG.toString(16).padStart(6, '0'), hoverLang);
+
+  function showLangMenu() {
+    placePanel(langMenu.group);
+    hoverLang = prevHoverLang = null;
+    langMenu.group.visible = true;
+    redrawLangMenu();
+  }
+
+  function hideLangMenu() {
+    langMenu.group.visible = false;
+    numpadCursor.visible = false;
+    hoverLang = prevHoverLang = null;
+  }
+
   // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes/overwrites the
   // slot; LOAD replaces the whole project from a filled slot (empty = no-op) and
   // rebuilds the MR view (the registered frame/anchor is untouched — the loaded plan
@@ -1456,24 +1542,24 @@ export function setupMR(view, project, getFootprint) {
     if (modes[currentMode].id === 'save') {
       try {
         localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
-        slotFlash = `SAVED → ${i + 1}`;
+        slotFlash = `${t('slot.saved')} ${i + 1}`;
         rlog('slot save', { slot: i });
       } catch (e) {
-        slotFlash = 'SAVE FAILED';
+        slotFlash = t('slot.saveFailed');
         rlog('slot save FAIL', String(e));
       }
     } else {
       const o = readSlot(i);
-      if (!o) { slotFlash = `SLOT ${i + 1} empty`; redrawSlotMenu(); return; }
+      if (!o) { slotFlash = `${t('slot.slot')} ${i + 1} ${t('slot.empty')}`; redrawSlotMenu(); return; }
       try {
         deserializeInto(project, o.data); // emits a change (re-solves every floor)
         refreshFloorEditState();          // re-seed EDGE target + undo stack from the loaded active floor
         buildPlan();                      // mr.js rebuilds manually (no onChange subscription)
         applyPlanMatrix();
-        slotFlash = `LOADED ${i + 1}`;
+        slotFlash = `${t('slot.loaded')} ${i + 1}`;
         rlog('slot load', { slot: i });
       } catch (e) {
-        slotFlash = 'LOAD FAILED';
+        slotFlash = t('slot.loadFailed');
         rlog('slot load FAIL', String(e));
       }
     }
@@ -1615,6 +1701,7 @@ export function setupMR(view, project, getFootprint) {
   const C_ORIGIN = 0x4ea1ff, C_ALIGN = 0xffb454; // REGISTER step 1 / step 2 colors
   const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
   const C_LEVEL = 0x38bdf8; // LEVEL (storey height / floor switch) accent
+  const C_LANG = 0x94a3b8; // LANG (UI language switch) accent — neutral slate
 
   // Drop a throwaway starter rectangle (ROOM = add / WALL = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
@@ -1685,8 +1772,7 @@ export function setupMR(view, project, getFootprint) {
   // their edges to the real walls.
   const modes = [
     {
-      id: 'floor', label: 'FLOOR', color: 0x51d88a,
-      help: 'Touch the tip to the real ground to set the base level. Re-level only on the ground floor.',
+      id: 'floor', color: 0x51d88a, // label/help via i18n: mode.floor / help.floor
       // Calibrate the GROUND base level (the datum every storey's overlay lifts
       // off). A touch on an upper floor is at that floor's height, which would
       // double-count against its elevation — so only re-level on the ground floor.
@@ -1699,8 +1785,7 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'level', label: 'LEVEL', color: C_LEVEL,
-      help: 'B/Y: switch to the next floor (Basement/Ground/Upper). Type a storey height and ENTER to set the active floor.',
+      id: 'level', color: C_LEVEL, // label/help via i18n: mode.level / help.level
       // Per-storey height, entered by hand (Quest can't measure the vertical offset).
       // Trigger drives the numpad; B/Y cycles the active floor (see pollModeCycle).
       onTouch: onLevelTouch,
@@ -1712,16 +1797,15 @@ export function setupMR(view, project, getFootprint) {
       // then a third point P3 on the perpendicular wall. The origin is the corner
       // where the two walls meet = P3 projected onto the P1->P2 wall line. The tip
       // label steps WALL 1 -> WALL 2 -> PERP so the current step is always visible.
-      id: 'register', label: 'ORIGIN', color: C_ORIGIN,
-      help: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',
+      id: 'register', color: C_ORIGIN, // label/help via i18n: mode.register / help.register
       onTouch: (pos) => {
         registerPts.push({ x: pos.x, z: pos.z });
         const n = registerPts.length;
-        if (n === 1) { applyModeVisual('WALL 2', C_ALIGN); rlog('register p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return; }
+        if (n === 1) { applyModeVisual(t('lbl.wall2'), C_ALIGN); rlog('register p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return; }
         if (n === 2) {
           const [p1, p2] = registerPts;
           if (Math.hypot(p2.x - p1.x, p2.z - p1.z) < 0.05) { registerPts.pop(); return; } // too close to define the wall
-          applyModeVisual('PERP', C_ALIGN); rlog('register p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return;
+          applyModeVisual(t('lbl.perp'), C_ALIGN); rlog('register p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) }); return;
         }
         // 3rd touch: derive the corner (projection of P3 onto the P1->P2 wall line) + yaw.
         const [p1, p2, p3] = registerPts;
@@ -1733,28 +1817,25 @@ export function setupMR(view, project, getFootprint) {
         const cx = p1.x + proj * ux, cz = p1.z + proj * uz;         // the (possibly unreachable) corner
         planYaw = Math.atan2(-dz, dx);                              // orient +X along the P1->P2 wall
         placeAt(cx, floorY, cz);                                    // origin at the derived corner; applies yaw + re-anchors
-        applyModeVisual('ORIGIN', C_ORIGIN);                        // ready to re-register next time
+        applyModeVisual(t('mode.register'), C_ORIGIN);              // ready to re-register next time
         rlog('register corner', { cx: +cx.toFixed(3), cz: +cz.toFixed(3), yaw: +planYaw.toFixed(3) });
       },
     },
     {
-      id: 'drop', label: 'ROOM', color: 0x2dd4bf,
-      help: 'Trigger to drop a roomspace box where you stand. Push its edges out to the walls in EDGE.',
+      id: 'drop', color: 0x2dd4bf, // label/help via i18n: mode.drop / help.drop
       // Drop a ROOMSPACE (add) rectangle at your standing position. It becomes the
       // active rectangle; push its edges to the walls in EDGE.
       onTouch: () => dropRect('add'),
     },
     {
-      id: 'wall', label: 'WALL', color: 0xff6b6b,
-      help: 'Trigger to drop a wall (subtract) box where you stand. Snap its edges to the wall faces in EDGE.',
+      id: 'wall', color: 0xff6b6b, // label/help via i18n: mode.wall / help.wall
       // Drop a WALL (subtract) rectangle — solid, no roomspace — the same way. It
       // carves a hole in the footprint fill; push its edges to the real wall faces
       // in EDGE. add = roomspace, subtract = wall.
       onTouch: () => dropRect('subtract'),
     },
     {
-      id: 'edge', label: 'EDGE', color: 0xff5db1,
-      help: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
+      id: 'edge', color: 0xff5db1, // label/help via i18n: mode.edge / help.edge
       // Two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS that edge;
       // 2nd (tip touching the real wall) snaps the locked edge to the wall. The ray
       // picks the edge across all zones; the touch supplies only the perpendicular
@@ -1778,8 +1859,7 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'edit', label: 'EDIT', color: 0xa78bfa,
-      help: 'Aim at a zone and trigger to select it (trigger again cycles buried zones). Grip deletes; B/Y swaps room/wall.',
+      id: 'edit', color: 0xa78bfa, // label/help via i18n: mode.edit / help.edit
       // Select a zone to edit. TRIGGER picks the zone under your ray; pressing again
       // cycles DOWN through overlapping zones (wraps), so any buried zone is
       // reachable. The selection persists + is zebra-highlighted. Then GRIP deletes
@@ -1793,8 +1873,7 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'recal', label: 'RECAL', color: C_RECAL,
-      help: 'Fix drift. Aim so the reticle hugs wall 1 and trigger to pick a known corner, then touch 2 points on wall 1 and 1 on wall 2.',
+      id: 'recal', color: C_RECAL, // label/help via i18n: mode.recal / help.recal
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
       // corner apex needn't be reachable. First SELECT a corner — aim so the reticle
       // hugs the wall you want as "wall 1" (the nearer wall becomes 1, the other 2) and
@@ -1812,14 +1891,14 @@ export function setupMR(view, project, getFootprint) {
           recalCorner = orderWallsByReticle(near, px, py); // a = wall 1 (hugged wall), b = wall 2
           recalLocked = true;
           recalPts = [];
-          applyModeVisual('WALL 1 · P1', C_RECAL);
+          applyModeVisual(t('lbl.wall1p1'), C_RECAL);
           rlog('recal corner', { cx: +recalCorner.cx.toFixed(3), cy: +recalCorner.cy.toFixed(3) });
           return;
         }
         const n = recalPts.length;
         if (n === 0) {
           recalPts.push({ x: pos.x, z: pos.z }); // P1 along wall 1
-          applyModeVisual('WALL 1 · P2', C_RECAL);
+          applyModeVisual(t('lbl.wall1p2'), C_RECAL);
           rlog('recal p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
           return;
         }
@@ -1827,7 +1906,7 @@ export function setupMR(view, project, getFootprint) {
           const p1 = recalPts[0];
           if (Math.hypot(pos.x - p1.x, pos.z - p1.z) < 0.05) return; // too close to define wall 1
           recalPts.push({ x: pos.x, z: pos.z }); // P2 along wall 1
-          applyModeVisual('WALL 2', C_RECAL_DIR);
+          applyModeVisual(t('lbl.wall2'), C_RECAL_DIR);
           rlog('recal p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
           return;
         }
@@ -1843,13 +1922,12 @@ export function setupMR(view, project, getFootprint) {
         recalCorner = null;
         recalLocked = false;
         buildPlan();       // geometry unchanged, but reassert against the new transform
-        applyModeVisual('RECAL', C_RECAL); // ready to re-recal next time
+        applyModeVisual(t('mode.recal'), C_RECAL); // ready to re-recal next time
         rlog('recal done', { yaw: +planYaw.toFixed(3) });
       },
     },
     {
-      id: 'size', label: 'SIZE', color: 0xfbbf24,
-      help: 'Pick two references — a rect edge or the plan origin — then type the exact distance on the numpad. B/Y flips the side.',
+      id: 'size', color: 0xfbbf24, // label/help via i18n: mode.size / help.size
       // The desktop dimension tool in AR: pick two references — each a rect EDGE
       // or the plan ORIGIN axis — then type the exact distance on the numpad.
       // edge<->edge = a size (width/height); edge<->origin = a position lock. If a
@@ -1858,18 +1936,23 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onNumpadTouch,
     },
     {
-      id: 'save', label: 'SAVE', color: 0x51d88a,
-      help: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
+      id: 'save', color: 0x51d88a, // label/help via i18n: mode.save / help.save
       // Aim the ray at a slot on the menu and trigger to write the whole project
       // there (overwrites a filled slot). Slots show their save time + rect count.
       onTouch: onSlotTouch,
     },
     {
-      id: 'load', label: 'LOAD', color: 0x4ea1ff,
-      help: 'Aim at a filled slot and trigger to load it into the frame you already registered. Empty slots do nothing.',
+      id: 'load', color: 0x4ea1ff, // label/help via i18n: mode.load / help.load
       // Aim at a filled slot and trigger to replace the project with it; the loaded
       // plan drops into the frame you already registered. Empty slots are a no-op.
       onTouch: onSlotTouch,
+    },
+    {
+      id: 'lang', color: C_LANG, // label/help via i18n: mode.lang / help.lang
+      // UI language switch (FR/EN/ZH). The thumbstick up/down moves through the list
+      // (see pollModeCycle); a trigger picks the ray-aimed row, or advances one if the
+      // ray is off the panel. Applies everywhere via the i18n change bus (onLangChange).
+      onTouch: () => (hoverLang ? setLang(hoverLang) : cycleLang(1)),
     },
   ];
   let currentMode = 0;
@@ -1891,14 +1974,28 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    applyModeVisual(m.label, m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
-    for (const h of helps) h.setText(m.label, m.help ?? '', m.color); // mode guidance box
+    applyModeVisual(t(`mode.${m.id}`), m.color); // LEVEL keeps its plain label; the active floor shows in the info HUD
+    for (const h of helps) h.setText(t(`mode.${m.id}`), t(`help.${m.id}`), m.color); // mode guidance box
     if (m.id === 'size') activateNumpad(); // spawn/refresh the numpad in front of you
     else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
     else deactivateSlotMenu();
+    if (m.id === 'lang') showLangMenu(); // park the language menu in front of you
+    else hideLangMenu();
   }
+
+  // Re-render every localized on-screen string when the UI language changes. This
+  // only fires from LANG mode (cycleLang / trigger), so the current label/help is
+  // LANG's; any open pad/menu is redrawn too for good measure.
+  onLangChange(() => {
+    const m = modes[currentMode];
+    applyModeVisual(t(`mode.${m.id}`), m.color);
+    for (const h of helps) h.setText(t(`mode.${m.id}`), t(`help.${m.id}`), m.color);
+    if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
+    if (slotMenu.group.visible) redrawSlotMenu();
+    if (langMenu.group.visible) redrawLangMenu();
+  });
 
   // Point the survey edit-state at the active floor: EDGE edits its last rect,
   // and grip-undo pops from its own rects. Keeps `surveyed` scoped to the active
@@ -1934,7 +2031,7 @@ export function setupMR(view, project, getFootprint) {
     buildPlan();
     applyPlanMatrix(); // overlay lifts to the new floor's elevation
     if (modes[currentMode].id === 'level') {
-      applyModeVisual('LEVEL', C_LEVEL); // floor name shows in the info HUD, not the label
+      applyModeVisual(t('mode.level'), C_LEVEL); // floor name shows in the info HUD, not the label
       numpad.group.visible = true; // refreshFloorEditState hid it; LEVEL keeps it up
       refreshLevelPad();
     }
@@ -2064,7 +2161,7 @@ export function setupMR(view, project, getFootprint) {
     if (!pos) return;
     lastTouch.copy(pos); // for the debug HUD
     rlog('touch', {
-      mode: modes[currentMode].label, placed,
+      mode: modes[currentMode].id, placed,
       touchY: +pos.y.toFixed(3), floorY: +floorY.toFixed(3), planY: +planPos.y.toFixed(3),
     });
     // Run whatever the current mode does with the touched point.
@@ -2138,17 +2235,17 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'register' && registerPts.length) { // back out the last REGISTER point
       registerPts.pop();
       const n = registerPts.length;
-      applyModeVisual(n === 0 ? 'ORIGIN' : n === 1 ? 'WALL 2' : 'PERP', n === 0 ? C_ORIGIN : C_ALIGN);
+      applyModeVisual(n === 0 ? t('mode.register') : n === 1 ? t('lbl.wall2') : t('lbl.perp'), n === 0 ? C_ORIGIN : C_ALIGN);
       rlog('register undo', { remaining: n });
       return;
     }
     if (mode.id === 'recal' && (recalPts.length || recalLocked)) { // back out RECAL step by step
       if (recalPts.length) {
         recalPts.pop(); // undo a wall touch; corner stays selected
-        applyModeVisual(recalPts.length === 0 ? 'WALL 1 · P1' : 'WALL 1 · P2', C_RECAL);
+        applyModeVisual(recalPts.length === 0 ? t('lbl.wall1p1') : t('lbl.wall1p2'), C_RECAL);
       } else {
         recalLocked = false; recalCorner = null; // deselect the corner
-        applyModeVisual('RECAL', C_RECAL);
+        applyModeVisual(t('mode.recal'), C_RECAL);
       }
       rlog('recal undo', { locked: recalLocked, pts: recalPts.length });
       return;
@@ -2236,9 +2333,11 @@ export function setupMR(view, project, getFootprint) {
     } else if (Math.abs(stickX) < 0.3) {
       btn.stick = false;
     }
-    // Stick up (negative Y) = floor above; down = floor below.
+    // Stick up (negative Y) = floor above; down = floor below. In LANG mode the same
+    // up/down flick moves through the language list instead of the floors.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
-      switchFloor(stickY < 0 ? 1 : -1);
+      if (modes[currentMode].id === 'lang') cycleLang(stickY < 0 ? -1 : 1); // up = previous in the list
+      else switchFloor(stickY < 0 ? 1 : -1);
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;
@@ -2362,8 +2461,8 @@ export function setupMR(view, project, getFootprint) {
       // since applyModeVisual rebuilds the label texture).
       if (!!selectedEdge !== edgeSnapPrompt) {
         edgeSnapPrompt = !!selectedEdge;
-        if (edgeSnapPrompt) applyModeVisual('SNAP TO WALL', 0xffe14d);
-        else applyModeVisual('EDGE', 0xff5db1);
+        if (edgeSnapPrompt) applyModeVisual(t('lbl.snap'), 0xffe14d);
+        else applyModeVisual(t('mode.edge'), 0xff5db1);
       }
       // Locked edge shows yellow; otherwise preview the ray-picked edge in magenta.
       const shown = selectedEdge || hoverEdge;
@@ -2521,6 +2620,20 @@ export function setupMR(view, project, getFootprint) {
         redrawSlotMenu();
         prevHoverSlot = hoverSlot;
       }
+    } else if (modeId === 'lang') {
+      // LANG: thumbstick up/down is the primary selector, but also let the ray hover a
+      // language row so a trigger can pick it directly (see the lang mode onTouch).
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverLang = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(pickSource(frame), langMenu.mesh);
+      if (langMenu.group.visible && panelHit) {
+        hoverLang = langMenu.langAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      if (hoverLang !== prevHoverLang) { redrawLangMenu(); prevHoverLang = hoverLang; }
     } else {
       // ROOM/WALL: no floor target (drops at the standing position).
       reticle.visible = false;
