@@ -362,6 +362,11 @@ export function setupMR(view, project, getFootprint) {
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff5db1, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
     m.renderOrder = 10; // always on top of the resting/active edge strips
     m.visible = false;
+    // We rewrite the vertex positions (world-space) every frame in showEdge but never
+    // recompute the bounding sphere, so it stays at the origin with radius 0. Disable
+    // frustum culling or Three culls the strip whenever the world origin leaves view —
+    // i.e. the highlight vanishes when you turn away from origin with the reticle held.
+    m.frustumCulled = false;
     scene.add(m);
     return m;
   }
@@ -376,6 +381,7 @@ export function setupMR(view, project, getFootprint) {
   );
   rectHi.renderOrder = 11;
   rectHi.visible = false;
+  rectHi.frustumCulled = false; // positions rewritten each frame (see makeEdgeHi note)
   scene.add(rectHi);
 
   // Zebra fill for the SELECTED zone in EDIT mode: a seamless 45° diagonal stripe
@@ -750,6 +756,7 @@ export function setupMR(view, project, getFootprint) {
   const surveyed = [];      // Rectangle ids this session, in creation order (for undo)
   let activeRect = null;    // the rectangle whose edges EDGE mode edits (last dropped)
   let selectedEdge = null;  // {rectId, edge} locked, awaiting a wall touch
+  let edgeSnapPrompt = false; // EDGE label currently shows the "snap to wall" state (edge locked)
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
   let selectedRect = null;  // EDIT mode: the persistently-selected zone (survives aim)
   let hoverStack = [];      // EDIT mode: zones under the ray this frame, topmost-first
@@ -1614,6 +1621,7 @@ export function setupMR(view, project, getFootprint) {
     awaitingRecalDir = false; // ... and the RECAL two-step
     recalCorner = null;
     selectedRect = null; // clear the EDIT selection when changing modes
+    selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
@@ -1958,15 +1966,19 @@ export function setupMR(view, project, getFootprint) {
       readouts[i].sprite.visible = on;
       if (on) readouts[i].setText(hovDim, 0x79c0ff);
     });
-    // Minimal HUD: build stamp + the controller pointer (tip, world m) and the
-    // reticle's floor point (plan m). reticle.position is this frame's value from
-    // the previous frame's mode pass — one frame of lag is imperceptible here.
-    const ptr = tipPosition(activeCtl);
+    // Minimal HUD: build stamp + the controller pointer and the reticle's floor
+    // point, BOTH in plan coordinates (relative to the registered origin, yaw-
+    // corrected) so they read the same as the model — not the session-start frame.
+    // Before REGISTER the plan sits at the session origin, so it degrades gracefully.
+    // ptr's 3rd value is height above the registered floor. reticle.position is this
+    // frame's value from the previous mode pass — one frame of lag is imperceptible.
+    const ptrW = tipPosition(activeCtl);
+    const ptr = ptrW ? worldToPlan(ptrW) : null;
     const ret = reticle.visible ? worldToPlan(reticle.position) : null;
     const lines = [
       `build:  ${BUILD_ID}`,
       ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
-      `ptr:    ${ptr ? `${f2(ptr.x)}, ${f2(ptr.y)}, ${f2(ptr.z)}` : '—'}`,
+      `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
       `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
     ];
     for (const d of debugs) d.setLines(lines);
@@ -1991,6 +2003,14 @@ export function setupMR(view, project, getFootprint) {
       } else {
         hoverEdge = null;
         reticle.visible = false;
+      }
+      // Once an edge is locked, retitle/recolor the mode to YELLOW "SNAP TO WALL" so
+      // it's clear the next touch snaps the locked edge to the real wall (only on change,
+      // since applyModeVisual rebuilds the label texture).
+      if (!!selectedEdge !== edgeSnapPrompt) {
+        edgeSnapPrompt = !!selectedEdge;
+        if (edgeSnapPrompt) applyModeVisual('SNAP TO WALL', 0xffe14d);
+        else applyModeVisual('EDGE', 0xff5db1);
       }
       // Locked edge shows yellow; otherwise preview the ray-picked edge in magenta.
       const shown = selectedEdge || hoverEdge;
