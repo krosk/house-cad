@@ -74,9 +74,9 @@ const STRINGS = {
     zh: '仅编辑平面。瞄准区域并扣动扳机选择；再次扣动可循环下层区域。握把删除；B/Y切换房间/墙。',
   },
   'help.marker': {
-    en: 'Edit outlets only. Aim and trigger to edit height; grip-drag moves one, grip away deletes the selection. Trigger empty space to place at the tip. A floor icon marks X/Y.',
-    fr: 'Modifiez seulement les prises. Visez + gâchette : hauteur ; poignée-glisser : déplacer ; poignée ailleurs : supprimer. Gâchette dans le vide : poser à la pointe. Une icône au sol marque X/Y.',
-    zh: '仅编辑插座。瞄准并扣动扳机可编辑高度；按住握把拖动，移开后按握把删除所选项。对空处扣动扳机可在笔尖放置；地面图标标记X/Y。',
+    en: 'Edit outlets only. Aim and trigger to edit height; ENTER saves and closes the pad. Grip-drag moves one, grip away deletes the selection. Trigger empty space to place at the tip.',
+    fr: 'Modifiez seulement les prises. Visez + gâchette : hauteur ; VALIDER enregistre et ferme le pavé. Poignée-glisser : déplacer ; poignée ailleurs : supprimer. Gâchette dans le vide : poser.',
+    zh: '仅编辑插座。瞄准并扣动扳机编辑高度；按确定保存并关闭键盘。按住握把拖动，移开后按握把删除所选项；对空处扣动扳机可放置。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',

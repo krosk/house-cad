@@ -655,8 +655,10 @@ export function setupMR(view, project, getFootprint) {
   const activeSubMat = new THREE.MeshBasicMaterial({ color: 0xffb4b4, side: THREE.DoubleSide, depthWrite: false }); // active WALL (subtract) edges
   const lockedMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false });    // WHITE: an edge whose axis is fully pinned (position+size)
   // Dimension (constraint) annotations: thin blue floor strips for the dim/extension
-  // lines, red when the constraint conflicts. Value shown on a billboarded label.
+  // lines, orange for outlet-to-wall pins, and red when a constraint conflicts.
+  // Values are shown on billboarded labels.
   const dimMat = new THREE.MeshBasicMaterial({ color: 0x79c0ff, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+  const markerDimMat = new THREE.MeshBasicMaterial({ color: C_MARKER, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
   const dimConflictMat = new THREE.MeshBasicMaterial({ color: 0xff5c5c, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
 
   // Plan-space corners [c0,c1,c2,c3] of a thickened axis-aligned segment A->B.
@@ -763,11 +765,15 @@ export function setupMR(view, project, getFootprint) {
     // references these textures right now. Distinct value strings accrue slowly; cap to
     // avoid an unbounded session leak. The drag case stays a hit (one key, size 1).
     if (dimTexCache.size > 64) { for (const t of dimTexCache.values()) t.dispose(); dimTexCache.clear(); }
-    const segs = [];        // {ax,ay,bx,by,conflict} strips to build
+    const segs = [];        // {ax,ay,bx,by,conflict,marker?} strips to build
     dimSprites = [];        // value labels, for hover pick
     // A dim value label carries its constraint id + both refs, so ray-hovering it can
     // highlight that constraint's edges and selecting it loads the constraint to edit.
-    const endpointToRef = (ep) => ep.rect === ORIGIN_ID ? { kind: 'origin' } : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+    const endpointToRef = (ep) => ep.marker
+      ? { kind: 'marker', markerId: ep.marker }
+      : ep.rect === ORIGIN_ID
+        ? { kind: 'origin' }
+        : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
     const pushDim = (sprite, c) => {
       sprite.userData.cId = c.id;
       sprite.userData.refA = endpointToRef(c.a);
@@ -777,6 +783,34 @@ export function setupMR(view, project, getFootprint) {
     let xTier = 0, yTier = 0;
     for (const c of (project.constraints || [])) {
       if (c.type !== 'distance') continue;
+      if (isMarkerConstraint(c)) {
+        // Outlet pin: draw directly from its wall edge to its projected floor
+        // coordinate. The outlet is the dependent endpoint; changing the value
+        // moves it while the wall stays fixed.
+        const markerEnd = c.a.marker ? c.a : c.b;
+        const edgeEnd = c.a.marker ? c.b : c.a;
+        const marker = project.markers.find((m) => m.id === markerEnd.marker);
+        const le = edgeLine(edgeEnd);
+        if (!marker || !le) continue;
+        const conflict = !!c.conflict;
+        const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
+        const color = conflict ? '#ff5c5c' : '#ff9f43';
+        const tick = 0.045;
+        if (c.axis === 'x') {
+          const yLine = c.offset != null ? c.offset : marker.y;
+          segs.push({ ax: le.coord, ay: yLine, bx: marker.x, by: yLine, conflict, marker: true });
+          segs.push({ ax: le.coord, ay: marker.y - tick, bx: le.coord, by: yLine + tick, conflict, marker: true });
+          segs.push({ ax: marker.x, ay: marker.y - tick, bx: marker.x, by: yLine + tick, conflict, marker: true });
+          pushDim(makeDimLabel(text, color, (le.coord + marker.x) / 2, yLine), c);
+        } else {
+          const xLine = c.offset != null ? c.offset : marker.x;
+          segs.push({ ax: xLine, ay: le.coord, bx: xLine, by: marker.y, conflict, marker: true });
+          segs.push({ ax: marker.x - tick, ay: le.coord, bx: xLine + tick, by: le.coord, conflict, marker: true });
+          segs.push({ ax: marker.x - tick, ay: marker.y, bx: xLine + tick, by: marker.y, conflict, marker: true });
+          pushDim(makeDimLabel(text, color, xLine, (le.coord + marker.y) / 2), c);
+        }
+        continue;
+      }
       const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
       // Edge<->origin position lock: draw a dim from the origin axis (coord 0) to the
       // edge, so the lock is visible (desktop skips it; the AR survey needs to see it).
@@ -824,8 +858,9 @@ export function setupMR(view, project, getFootprint) {
         pushDim(makeDimLabel(text, color, xLine, (ya + yb) / 2), c);
       }
     }
-    // Build strips in two batches so conflict lines share a material with the rest.
-    for (const conflict of [false, true]) {
+    // Build strips in separate plan/outlet/conflict batches so each domain keeps
+    // its visual identity without allocating one material per segment.
+    for (const style of ['plan', 'marker', 'conflict']) {
       const arr = [];
       const tri = (p) => arr.push(p[0], 0, -p[1]);
       // Emit a segment as a row of dashes (thin quads) so dim lines read as dashed
@@ -842,13 +877,15 @@ export function setupMR(view, project, getFootprint) {
         }
       };
       for (const s of segs) {
-        if (s.conflict !== conflict) continue;
+        const segmentStyle = s.conflict ? 'conflict' : s.marker ? 'marker' : 'plan';
+        if (segmentStyle !== style) continue;
         pushDashed(s.ax, s.ay, s.bx, s.by);
       }
       if (!arr.length) continue;
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
-      const m = new THREE.Mesh(geo, conflict ? dimConflictMat : dimMat);
+      const material = style === 'conflict' ? dimConflictMat : style === 'marker' ? markerDimMat : dimMat;
+      const m = new THREE.Mesh(geo, material);
       m.position.y = 0.008; // above the edge strips
       m.renderOrder = 12;
       planGroup.add(m);
@@ -931,22 +968,48 @@ export function setupMR(view, project, getFootprint) {
     return planGroup.children.length > 0;
   }
 
-  // A marker glyph: an outlet icon on a translucent disc, tinted WHITE once the marker
-  // is fully pinned (both X and Y constrained), else the marker's type color. Drawn on
-  // a canvas so the tint can change (an emoji couldn't go white-when-locked).
+  // A marker glyph styled as a standard white French Type E socket: white faceplate,
+  // circular recess, two round contact holes, and the upper earth pin. The socket stays
+  // white; only its outer status ring changes from orange to white when fully pinned.
   function markerTexture(marker) {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
-    const color = marker._full ? '#ffffff' : '#ff9f43';
+    const ringColor = marker._full ? '#ffffff' : '#ff9f43';
+    // Dark badge + constraint-status ring keep the white socket readable over
+    // passthrough and on the projected floor copy.
     ctx.fillStyle = 'rgba(15,18,24,0.82)';
     ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 7; ctx.strokeStyle = color; ctx.stroke();
-    // Outlet glyph: two vertical slots + a ground hole.
-    ctx.fillStyle = color;
-    ctx.fillRect(47, 38, 11, 36);
-    ctx.fillRect(70, 38, 11, 36);
-    ctx.beginPath(); ctx.arc(64, 92, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = ringColor; ctx.stroke();
+
+    // White square faceplate.
+    ctx.beginPath(); ctx.roundRect(27, 23, 74, 82, 14);
+    ctx.fillStyle = '#f8fafc'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#cbd5e1'; ctx.stroke();
+
+    // Type E circular recessed well.
+    ctx.beginPath(); ctx.arc(64, 67, 28, 0, Math.PI * 2);
+    ctx.fillStyle = '#e5e7eb'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+
+    // Raised protective-earth pin above two horizontally aligned round contacts.
+    ctx.beginPath(); ctx.arc(64, 47, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#f8fafc'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#64748b'; ctx.stroke();
+    ctx.fillStyle = '#1f2937';
+    ctx.beginPath(); ctx.arc(49, 73, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(79, 73, 6, 0, Math.PI * 2); ctx.fill();
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // Highlight overlay for an outlet. It occupies the exact same footprint as the
+  // icon and draws inward from its edge, so hover/selection never changes its size.
+  function markerOutlineTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath(); ctx.arc(64, 64, 53, 0, Math.PI * 2);
+    ctx.lineWidth = 12; ctx.strokeStyle = '#ffffff'; ctx.stroke();
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -975,6 +1038,25 @@ export function setupMR(view, project, getFootprint) {
     return mesh;
   }
 
+  function makeMarkerOutline(marker, role) {
+    const tex = markerOutlineTexture();
+    const visual = role === 'wall'
+      ? new THREE.Sprite(new THREE.SpriteMaterial({
+          map: tex, color: 0xffffff,
+          depthTest: false, depthWrite: false, transparent: true,
+        }))
+      : new THREE.Mesh(markerFloorGeom, new THREE.MeshBasicMaterial({
+          map: tex, color: 0xffffff, transparent: true,
+          side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+        }));
+    if (role === 'wall') visual.scale.set(0.09, 0.09, 1);
+    visual.renderOrder = 33;
+    visual.visible = false;
+    visual.userData.markerId = marker.id;
+    visual.userData.markerRole = `${role}-outline`;
+    return visual;
+  }
+
   // Rebuild the marker glyphs into markerGroup (planGroup-local), placing each at
   // (x, z, -y): plan (x,y) maps to local (x,0,-y) and z lifts it above the floor
   // overlay (local y=0 = world overlayY()), so it sits at its real height.
@@ -989,7 +1071,11 @@ export function setupMR(view, project, getFootprint) {
       spr.position.set(m.x, m.z, -m.y);
       const floorIcon = makeMarkerFloorIcon(m);
       floorIcon.position.set(m.x, 0.016, -m.y);
-      markerGroup.add(spr, floorIcon);
+      const wallOutline = makeMarkerOutline(m, 'wall');
+      wallOutline.position.copy(spr.position);
+      const floorOutline = makeMarkerOutline(m, 'floor');
+      floorOutline.position.set(m.x, 0.018, -m.y);
+      markerGroup.add(spr, floorIcon, wallOutline, floorOutline);
     }
   }
 
@@ -1411,6 +1497,10 @@ export function setupMR(view, project, getFootprint) {
   // edge<->edge dims store it relative to the outer edge (the auto-stack baseline),
   // matching buildDimensions. Shared by grip-drag and the default-on-create placement.
   function setDimOffset(c, px, py) {
+    if (isMarkerConstraint(c)) {
+      c.offset = c.axis === 'x' ? py : px;
+      return;
+    }
     const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
     if (aOrigin || bOrigin) {
       c.offset = isXEdge(aOrigin ? c.b.edge : c.a.edge) ? py : px; // origin dim: absolute perpendicular coord
@@ -1444,13 +1534,19 @@ export function setupMR(view, project, getFootprint) {
     if (!marker) return;
     _dragPoint.copy(_ro).addScaledVector(_rd, gripDrag.distance);
     const { px, py } = worldToPlan(_dragPoint);
-    project.moveMarker(marker.id, { x: px, y: py, z: Math.max(0, _dragPoint.y - overlayY()) });
-    // mr.js is not subscribed to model changes. Move the existing sprite directly
-    // during the drag; on release, buildPlan restores the canonical full rendering.
+    // Update marker coordinates + pin offsets without emitting the project's full
+    // solve/listener cascade every XR frame. Release commits once via project.touch().
+    project.moveMarker(
+      marker.id,
+      { x: px, y: py, z: Math.max(0, _dragPoint.y - overlayY()) },
+      { emit: false },
+    );
+    // Move the existing visuals directly during the drag; on release, buildPlan
+    // restores canonical rendering after the single committed model notification.
     for (const visual of markerGroup.children) {
       if (visual.userData.markerId !== marker.id) continue;
-      if (visual.userData.markerRole === 'wall') visual.position.set(marker.x, marker.z, -marker.y);
-      else visual.position.set(marker.x, 0.016, -marker.y);
+      if (visual.userData.markerRole.startsWith('wall')) visual.position.set(marker.x, marker.z, -marker.y);
+      else visual.position.set(marker.x, visual.userData.markerRole === 'floor-outline' ? 0.018 : 0.016, -marker.y);
     }
   }
 
@@ -1472,9 +1568,22 @@ export function setupMR(view, project, getFootprint) {
   function loadConstraint(id) {
     const c = project.constraints.find((k) => k.id === id);
     if (!c) return;
-    const toRef = (ep) => ep.rect === ORIGIN_ID ? { kind: 'origin' } : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
-    dimRefA = toRef(c.a);
-    dimRefB = toRef(c.b);
+    const toRef = (ep) => ep.marker
+      ? { kind: 'marker', markerId: ep.marker }
+      : ep.rect === ORIGIN_ID
+        ? { kind: 'origin' }
+        : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+    if (isMarkerConstraint(c)) {
+      // Keep the outlet-first invariant even though the stored constraint anchors
+      // its wall edge as endpoint a.
+      const markerEnd = c.a.marker ? c.a : c.b;
+      const edgeEnd = c.a.marker ? c.b : c.a;
+      dimRefA = toRef(markerEnd);
+      dimRefB = toRef(edgeEnd);
+    } else {
+      dimRefA = toRef(c.a);
+      dimRefB = toRef(c.b);
+    }
     editingId = c.id;
     dimBuffer = fmt(Math.abs(c.value)); // open on the current value; first key replaces it
     bufferPristine = true;
@@ -1554,10 +1663,12 @@ export function setupMR(view, project, getFootprint) {
     if (!selectedMarker) return;
     const val = parseFloat(markerBuffer);
     if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
-    project.setMarkerHeight(selectedMarker.id, toMeters(val));
-    rlog('marker height', { id: selectedMarker.id, m: +toMeters(val).toFixed(3) });
+    const id = selectedMarker.id;
+    project.setMarkerHeight(id, toMeters(val));
+    rlog('marker height', { id, m: +toMeters(val).toFixed(3) });
+    selectedMarker = null; // ENTER completes the edit instead of leaving the pad active
+    deactivateNumpad();
     buildPlan(); applyPlanMatrix(); // z changed -> the glyph re-seats at the new height
-    refreshMarkerPad();
   }
 
   function deleteSelectedMarker() {
@@ -1601,7 +1712,11 @@ export function setupMR(view, project, getFootprint) {
     if (!placed || !activeRect) return;
     const modeId = modes[currentMode].id;
     if (dimRefA && dimRefB) { if (hoverKey) pressKey(hoverKey); return; }
-    if (modeId === 'plan_dims' && hoverDim) { loadConstraint(hoverDim.userData.cId); return; }
+    if (hoverDim) {
+      const c = project.constraints.find((k) => k.id === hoverDim.userData.cId);
+      const matchesDomain = c && (modeId === 'outlet_dims') === isMarkerConstraint(c);
+      if (matchesDomain) { loadConstraint(c.id); return; }
+    }
     if (!hoverRef) return;
     if (!dimRefA) {
       if ((modeId === 'plan_dims' && hoverRef.kind === 'marker') ||
@@ -1885,22 +2000,26 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
-  function emphasizeMarker(marker, role = 'wall', factor = 1.3) {
+  function outlineMarker(marker, role = 'wall', color = 0xffe14d) {
     if (!marker) return;
     const visual = markerGroup.children.find(
-      (o) => o.userData.markerId === marker.id && o.userData.markerRole === role,
+      (o) => o.userData.markerId === marker.id && o.userData.markerRole === `${role}-outline`,
     );
     if (!visual) return;
-    if (role === 'floor') visual.scale.set(factor, factor, 1);
-    else visual.scale.set(0.09 * factor, 0.09 * factor, 1);
+    visual.material.color.setHex(color);
+    visual.visible = true;
   }
 
-  // The dim value panel the RETICLE is over: the sprite whose plan position is nearest
-  // the floor point (px,py), within the reticle radius. Reticle-gated like edgeAtPoint,
-  // so a panel is "hovered" only when the ring is actually on it. Returns the sprite | null.
-  function dimLabelAtPoint(px, py) {
+  // The dim value panel the RETICLE is over: the nearest eligible sprite within the
+  // reticle radius. `markerDomain` hard-filters overlapping labels so a label from
+  // the other dimension domain cannot mask the intended target.
+  function dimLabelAtPoint(px, py, markerDomain = null) {
     let best = null, bestD = RETICLE_OUTER;
     for (const s of dimSprites) {
+      if (markerDomain != null) {
+        const c = project.constraints.find((k) => k.id === s.userData.cId);
+        if (!c || isMarkerConstraint(c) !== markerDomain) continue;
+      }
       const d = Math.hypot(px - s.position.x, py - (-s.position.z)); // local (x,0,-y) -> plan (x,y)
       if (d < bestD) { bestD = d; best = s; }
     }
@@ -2482,11 +2601,11 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
-  // of an undo — a plan-dim value panel, an edge in EDGE, or a marker in OUTLET.
+  // of an undo — a domain-matched dim value panel, an edge, or an outlet.
   function onSqueezeStart(event) {
     if (event?.data) activeSource = event.data;
     const id = modes[currentMode].id;
-    if (id === 'plan_dims' && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
+    if (isDimMode(id) && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
     if (id === 'marker' && hoverMarker && setControllerRay(event.data)) {
       const sprite = markerGroup.children.find(
@@ -2752,8 +2871,7 @@ export function setupMR(view, project, getFootprint) {
     hoverStack = [];
     hoverMarker = null;
     for (const visual of markerGroup.children) {
-      if (visual.userData.markerRole === 'floor') visual.scale.set(1, 1, 1);
-      else visual.scale.set(0.09, 0.09, 1);
+      if (visual.userData.markerRole.endsWith('-outline')) visual.visible = false;
     }
     const modeId = modes[currentMode].id;
     if (modeId === 'edge') {
@@ -2874,24 +2992,20 @@ export function setupMR(view, project, getFootprint) {
           const { px, py } = worldToPlan(hit);
           hoverFloorPt = { px, py }; // remember where the tip stands (for a new dim's default placement)
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
-          if (modeId === 'plan_dims') {
-            // A plan-dim panel takes priority before the first reference. Marker-pin
-            // constraints stay excluded defensively if their labels are drawn later.
-            const candidate = dimRefA ? null : dimLabelAtPoint(px, py);
-            const candidateConstraint = candidate
-              ? project.constraints.find((c) => c.id === candidate.userData.cId)
-              : null;
-            hoverDim = candidateConstraint && !isMarkerConstraint(candidateConstraint) ? candidate : null;
-            if (!hoverDim) {
+          // A value label takes priority before the first reference, but only when
+          // its constraint belongs to the active dimension domain.
+          hoverDim = dimRefA ? null : dimLabelAtPoint(px, py, modeId === 'outlet_dims');
+          if (!hoverDim) {
+            if (modeId === 'plan_dims') {
               if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
               else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+            } else if (!dimRefA) {
+              const floorMarker = markerAtFloorPoint(px, py);
+              if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
+            } else {
+              const e = edgeAtPoint(px, py);
+              if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge };
             }
-          } else if (!dimRefA) {
-            const floorMarker = markerAtFloorPoint(px, py);
-            if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
-          } else {
-            const e = edgeAtPoint(px, py);
-            if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge };
           }
         }
       }
@@ -2907,8 +3021,8 @@ export function setupMR(view, project, getFootprint) {
           // The floor projection is DIMS' hit target, but it may overlap another
           // outlet at the same X/Y. Emphasize the linked wall-height glyph too so
           // the user can see exactly which vertical outlet this reference means.
-          emphasizeMarker(marker, 'floor');
-          emphasizeMarker(marker, 'wall');
+          outlineMarker(marker, 'floor', color);
+          outlineMarker(marker, 'wall', color);
         }
         else { const r = rectOf(ref); if (r && ei < slots.length) showEdge(r, ref.edge, color, slots[ei++]); }
       };
@@ -2979,8 +3093,8 @@ export function setupMR(view, project, getFootprint) {
         selectedMarker = null;
         deactivateNumpad();
       }
-      emphasizeMarker(selectedMarker, 'wall', 1.33);
-      emphasizeMarker(hoverMarker, 'wall', 1.28);
+      outlineMarker(selectedMarker, 'wall', 0xfbbf24);
+      outlineMarker(hoverMarker, 'wall', 0xffe14d);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.

@@ -48,9 +48,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. Outlet floor icons and outlet pins are inert.
 - **OUTLET · EDIT** (`id: marker`) — the outlet editing domain. Empty-space trigger places at the tip;
-  pointing directly at an outlet and triggering opens its height pad; grip-drag moves it in 3D;
-  grip away deletes the selected outlet. Every outlet also has a flat projected floor icon showing
-  its plan X/Y. Plan zones are inert.
+  pointing directly at an outlet and triggering opens its height pad; ENTER commits the height,
+  closes the pad, and clears the selection. Grip-drag moves it in 3D; grip away deletes the selected
+  outlet. Every outlet also has a flat projected floor icon showing its plan X/Y. Plan zones are inert.
 - **OUTLET · DIMS** (`id: outlet_dims`) — outlet pins only. The first reference must be an outlet's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
@@ -85,9 +85,11 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   OUTLET = selected outlet); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
-  reticle is over a drag target → **grip-drag** (PLAN DIMS over a dim panel = slide its offset; EDGE
+  reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = slide its offset; EDGE
   over an edge = move it; OUTLET aimed at a marker = move it in 3D at its initial pointer depth).
-  Marker drag adjusts existing X/Y pin values so the marker does not snap back on release.
+  Marker drag adjusts existing X/Y pin values so the marker does not snap back on release. Its
+  per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
+  `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - **thumbstick-x** = cycle mode; **thumbstick-y** = change floor only in LEVEL
   (up/down, no wrap), choose language only in LANG, and no-op elsewhere;
@@ -109,9 +111,12 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
 - Outlet X/Y pins are selected through the outlet's **projected floor icon**, never its wall-height
   glyph. In OUTLET DIMS, pick the floor icon first and a plan edge second. Before the icon is
   selected, edges are inert; after it is selected, other outlet icons and the origin are inert.
-  Hovering or locking a projected icon also highlights its
-  linked wall-height outlet, disambiguating outlets that share X/Y at different heights. The
+  Hovering or locking a projected icon adds a bold outline to it and its linked wall-height
+  outlet without resizing either icon, disambiguating outlets that share X/Y at different heights. The
   resulting one-way constraint moves the outlet, not the wall.
+- Every outlet pin renders an orange dashed floor dimension from the anchored wall edge to the
+  outlet's projected coordinate, plus a value label. That label can be selected or grip-dragged
+  only in OUTLET DIMS; PLAN DIMS ignores it.
 
 - Distance = ordered + signed (`value = coord(b) − coord(a)`). **FLIP = `flipConstraintSide`**
   (negate value, keep order). `swapConstraint` is geometrically a NO-OP (swaps a,b AND negates;
@@ -121,8 +126,8 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
 - **DEL** removes the pair's constraint and closes the pad; for a NEW pair with no constraint
   yet, DEL cancels the in-progress definition and closes the pad (both resolve to "clear + back
   to ref-pick").
-- `c.offset` = signed perpendicular line placement (serialized): origin dims store it absolute,
-  edge↔edge relative to the outer edge; `setDimOffset` is the shared setter (grip-drag +
+- `c.offset` = signed perpendicular line placement (serialized): origin and outlet dims store it
+  absolute, edge↔edge relative to the outer edge; `setDimOffset` is the shared setter (grip-drag +
   default-on-create). A new dim's line defaults to the tip position when the pair completes.
 - AR renders edge↔origin dimensions (the DESKTOP draws none for origin refs — that parity note
   is AR-only).

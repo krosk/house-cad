@@ -251,7 +251,9 @@ export class Project {
   // Move a marker while preserving its pin relationships. A pin's signed value
   // is the marker-to-reference offset, so dragging changes that value by the same
   // axis delta instead of letting solveMarkers snap the marker back afterward.
-  moveMarker(id, { x, y, z }) {
+  // Continuous render-loop drags pass { emit:false } and call touch() once on
+  // release; this avoids a full solve + listener cascade on every XR frame.
+  moveMarker(id, { x, y, z }, { emit = true } = {}) {
     const m = this.markers.find((m) => m.id === id);
     if (!m) return;
     const delta = { x: x - m.x, y: y - m.y };
@@ -264,7 +266,7 @@ export class Project {
     m.x = x;
     m.y = y;
     m.z = z;
-    this._emit();
+    if (emit) this._emit();
   }
 
   addConstraint(c) {
