@@ -458,7 +458,9 @@ export function setupMR(view, project, getFootprint) {
   const DIM_OFFSET = 0.2;   // m, dim line sits this far outside the geometry
   const DIM_TIER = 0.14;    // m, stack successive dims on an axis to reduce overlap
   const DIM_EXT_OVER = 0.04; // m, extension line runs a little past the dim line
-  const DIM_T = 0.008;      // m, strip half-width (thinner than survey edges)
+  const DIM_T = 0.0025;     // m, strip half-width -> 0.5 cm thin, so dims don't cover room edges
+  const DIM_DASH = 0.04;    // m, dash length for the dashed dim/extension lines
+  const DIM_GAP = 0.03;     // m, gap between dashes
 
   // Dimension value labels currently in the plan, for ray-hover pick (their value
   // is echoed big on the controller). Rebuilt with the plan each edit.
@@ -550,11 +552,22 @@ export function setupMR(view, project, getFootprint) {
     for (const conflict of [false, true]) {
       const arr = [];
       const tri = (p) => arr.push(p[0], 0, -p[1]);
+      // Emit a segment as a row of dashes (thin quads) so dim lines read as dashed
+      // and don't visually cover the solid room edges underneath.
+      const pushDashed = (ax, ay, bx, by) => {
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < 1e-6) return;
+        const ux = (bx - ax) / len, uy = (by - ay) / len, period = DIM_DASH + DIM_GAP;
+        for (let t = 0; t < len; t += period) {
+          const t2 = Math.min(t + DIM_DASH, len);
+          const cc = stripCorners(ax + ux * t, ay + uy * t, ax + ux * t2, ay + uy * t2, DIM_T);
+          tri(cc[0]); tri(cc[1]); tri(cc[2]);
+          tri(cc[0]); tri(cc[2]); tri(cc[3]);
+        }
+      };
       for (const s of segs) {
         if (s.conflict !== conflict) continue;
-        const cc = stripCorners(s.ax, s.ay, s.bx, s.by, DIM_T);
-        tri(cc[0]); tri(cc[1]); tri(cc[2]);
-        tri(cc[0]); tri(cc[2]); tri(cc[3]);
+        pushDashed(s.ax, s.ay, s.bx, s.by);
       }
       if (!arr.length) continue;
       const geo = new THREE.BufferGeometry();
@@ -1098,6 +1111,18 @@ export function setupMR(view, project, getFootprint) {
   // The dimension value whose label the controller's ray is aimed at, or null.
   // Angular pick (nearest label within a small cone) so it works at any distance
   // even when the in-world text is too small to hit precisely — that's the point.
+  // The dim value panel the RETICLE is over: the sprite whose plan position is nearest
+  // the floor point (px,py), within the reticle radius. Reticle-gated like edgeAtPoint,
+  // so a panel is "hovered" only when the ring is actually on it. Returns the sprite | null.
+  function dimLabelAtPoint(px, py) {
+    let best = null, bestD = RETICLE_OUTER;
+    for (const s of dimSprites) {
+      const d = Math.hypot(px - s.position.x, py - (-s.position.z)); // local (x,0,-y) -> plan (x,y)
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
+  }
+
   const _dp = new THREE.Vector3(), _dv = new THREE.Vector3();
   const DIM_HOVER_COS = Math.cos(5 * Math.PI / 180); // ~5° cone
   function pickDimLabel(inputSource) {
@@ -1801,15 +1826,16 @@ export function setupMR(view, project, getFootprint) {
         // Reference-pick phase. If the ray is on an existing dim value panel, THAT is
         // the pick (select it to edit the constraint); otherwise ray the floor for an
         // edge/origin. edgeAtPoint caps at the reticle radius, same as EDGE mode.
-        hoverDim = dimRefA ? null : hovSprite; // dim-panel select only before the first ref
-        if (!hoverDim) {
-          const hit = rayFloorHit(pickSource(frame));
-          if (hit) {
-            const { px, py } = worldToPlan(hit);
+        const hit = rayFloorHit(pickSource(frame));
+        if (hit) {
+          reticle.visible = true; // reticle always tracks the floor point
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          // A dim panel is hovered only when the RETICLE is over it (before the first ref).
+          hoverDim = dimRefA ? null : dimLabelAtPoint(px, py);
+          if (!hoverDim) { // a hovered dim panel takes over the pick; otherwise pick a floor edge/origin
             if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
             else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
-            reticle.visible = true;
-            reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           }
         }
       }
