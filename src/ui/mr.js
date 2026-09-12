@@ -16,7 +16,7 @@ import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { Rectangle } from '../core/model.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
-import { toMeters, unitLabel, fmt } from '../core/units.js';
+import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import { serializeProject, deserializeInto } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
@@ -429,6 +429,54 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, langAt, draw };
   }
 
+  // UNIT menu mirrors LANG: thumbstick up/down changes the global display/input
+  // unit, while the ray and trigger can pick a specific row directly.
+  function makeUnitMenu() {
+    const W = 384, H = 384;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.24),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+
+    const TITLE_H = 84, ROWS = UNIT_ORDER.length, ROW_H = (H - TITLE_H) / ROWS;
+    function unitAt(u, v) {
+      const cy = (1 - v) * H;
+      if (cy < TITLE_H) return null;
+      const row = Math.floor((cy - TITLE_H) / ROW_H);
+      return UNIT_ORDER[row] ?? null;
+    }
+    function draw(accent, hoverUnit) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.94)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.font = 'bold 40px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(t('unit.title'), 26, TITLE_H / 2);
+      const active = getUnit();
+      UNIT_ORDER.forEach((u, i) => {
+        const y = TITLE_H + i * ROW_H + 8, h = ROW_H - 16;
+        const on = u === active, hot = u === hoverUnit;
+        ctx.fillStyle = on ? accent : (hot ? 'rgba(72,79,88,0.95)' : 'rgba(48,54,61,0.9)');
+        ctx.beginPath(); ctx.roundRect(12, y, W - 24, h, 16); ctx.fill();
+        ctx.fillStyle = on ? '#0d1117' : '#e6edf3';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(u, W / 2, y + h / 2 + 2);
+      });
+      tex.needsUpdate = true;
+    }
+    return { group, mesh, unitAt, draw };
+  }
+
   // The marker sits ahead of the controller's tracked origin, along the pointing
   // ray, so it clears the physical controller body (which would occlude it) and
   // reads as a "tip." Placement uses this same offset point (see tipPosition).
@@ -640,6 +688,10 @@ export function setupMR(view, project, getFootprint) {
   // LANG language-switch panel (shares numpadCursor as its ray-hit dot).
   const langMenu = makeLangMenu();
   scene.add(langMenu.group);
+
+  // UNIT display/input-unit panel (shares numpadCursor as its ray-hit dot).
+  const unitMenu = makeUnitMenu();
+  scene.add(unitMenu.group);
 
   // SHEET plan-preview panel (a rasterized to-scale sheet; read-only).
   const sheetPanel = makeSheetPanel();
@@ -1186,11 +1238,14 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
-  // "add" action instead of separate ROOM/WALL modes. room = add roomspace, wall = subtract.
-  const ZONE_KINDS = ['room', 'wall'];
+  // One DROP action instead of separate zone modes. ROOM adds; WALL and DOOR subtract.
+  const ZONE_KINDS = ['room', 'wall', 'door'];
   let currentZoneKind = ZONE_KINDS[0];
-  const zoneOp = (k) => (k === 'wall' ? 'subtract' : 'add');
-  const zoneColor = (k) => (k === 'wall' ? 0xff6b6b : 0x2dd4bf); // red wall / green room (add/subtract language)
+  const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
+  const zoneKindOf = (r) => ZONE_KINDS.includes(r?.kind)
+    ? r.kind : (r?.op === 'subtract' ? 'wall' : 'room');
+  const zoneModeId = (k) => (k === 'room' ? 'drop' : k);
+  const zoneColor = (k) => (k === 'room' ? 0x2dd4bf : 0xff6b6b); // wall + door subtract identically for now
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -1226,6 +1281,8 @@ export function setupMR(view, project, getFootprint) {
   let prevHoverSlot = null; // last drawn slot hover
   let hoverLang = null;     // LANG menu row under the ray this frame (lang code)
   let prevHoverLang = null; // last drawn lang hover
+  let hoverUnit = null;     // UNIT menu row under the ray this frame (unit id)
+  let prevHoverUnit = null; // last drawn unit hover
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
   let overwriteSlot = null; // occupied SAVE slot armed for a required second trigger
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
@@ -1832,9 +1889,8 @@ export function setupMR(view, project, getFootprint) {
     rlog('marker type', { type: currentMarkerType });
   }
 
-  // PLAN · DROP thumbstick-y: pick which kind the next drop places (room <-> wall). The
-  // label (ROOM/WALL) and accent (green/red) track it, so a glance shows what a trigger
-  // adds. Existing zones are untouched — swap those room<->wall in EDIT.
+  // PLAN · DROP thumbstick-y: pick which kind the next drop places. WALL and DOOR
+  // currently share subtract geometry, but the rectangle keeps its distinct kind.
   function cycleZoneKind(dir = 1) {
     const i = ZONE_KINDS.indexOf(currentZoneKind);
     currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
@@ -2088,6 +2144,22 @@ export function setupMR(view, project, getFootprint) {
     hoverLang = prevHoverLang = null;
   }
 
+  // ---- UNIT: switch display/input units without touching meter-based geometry ----
+  const redrawUnitMenu = () => unitMenu.draw('#' + C_UNIT.toString(16).padStart(6, '0'), hoverUnit);
+
+  function showUnitMenu() {
+    placePanel(unitMenu.group);
+    hoverUnit = prevHoverUnit = null;
+    unitMenu.group.visible = true;
+    redrawUnitMenu();
+  }
+
+  function hideUnitMenu() {
+    unitMenu.group.visible = false;
+    numpadCursor.visible = false;
+    hoverUnit = prevHoverUnit = null;
+  }
+
   // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes an empty slot
   // immediately but requires confirmation before overwrite; LOAD replaces the whole
   // project from a filled slot (empty = no-op) and
@@ -2307,7 +2379,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Intersection of a controller's pointing ray with a canvas panel (with .uv), or
-  // null. Used by DIMS (numpad) and SAVE/LOAD (slot menu) to pick the cell under the ray.
+  // null. Used by the numpad and every ray-picked menu to select a cell/row.
   const _raycaster = new THREE.Raycaster();
   function rayPanelHit(inputSource, mesh = numpad.mesh) {
     const space = inputSource?.targetRaySpace;
@@ -2326,36 +2398,42 @@ export function setupMR(view, project, getFootprint) {
   const C_ORIGIN = 0x4ea1ff; // REGISTER accent — one color across all 3 gesture steps
   const C_RECAL = 0x22d3ee, C_RECAL_DIR = 0xa78bfa; // RECAL step 1 (corner) / step 2 (direction) colors
   const C_LEVEL = 0x38bdf8; // LEVEL (storey height / floor switch) accent
+  const C_UNIT = 0xa78bfa; // UNIT (display/input units) accent
   const C_LANG = 0x94a3b8; // LANG (UI language switch) accent — neutral slate
 
-  // Drop a throwaway starter rectangle (ROOM = add / WALL = subtract) at the user's
+  // Drop a throwaway starter rectangle (ROOM = add; WALL/DOOR = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
   // edges get pushed to the real walls in EDGE mode. It becomes the active rect.
-  function dropRect(op) {
+  function dropRect(kind) {
     if (!placed) return; // need a registered frame (ORIGIN) to define plan space
     const e = renderer.xr.getCamera().matrixWorld.elements; // headset world pos
     _drop.set(e[12], floorY, e[14]);
     const { px, py } = worldToPlan(_drop);
     const half = 0.75; // 1.5 m starter box — size is throwaway, edges get pushed
-    const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op });
+    const op = zoneOp(kind);
+    const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op, kind });
     project.addRectangle(rect);
     surveyed.push(rect.id);
     activeRect = rect;
     selectedEdge = null;
     buildPlan();       // re-read footprint (now includes the new rect); keeps transform
     applyPlanMatrix(); // buildPlan swaps geometry only; reassert position/yaw
-    rlog('drop rect', { id: rect.id, op, px: +px.toFixed(3), py: +py.toFixed(3) });
+    rlog('drop rect', { id: rect.id, kind, op, px: +px.toFixed(3), py: +py.toFixed(3) });
   }
 
-  // PLAN mode: flip the selected zone room<->wall (add<->subtract). Bound to the
-  // upper face button (B/Y) while in PLAN — see pollModeCycle.
-  function swapSelected() {
+  // PLAN · EDIT thumbstick-y: cycle the selected zone's authored kind. WALL and
+  // DOOR both map to subtract until door-specific geometry arrives.
+  function cycleSelectedZoneKind(dir = 1) {
     if (!selectedRect) return;
-    selectedRect.op = selectedRect.op === 'subtract' ? 'add' : 'subtract';
+    const current = zoneKindOf(selectedRect);
+    const i = ZONE_KINDS.indexOf(current);
+    selectedRect.kind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
+    selectedRect.op = zoneOp(selectedRect.kind);
     project.touch();
     buildPlan();
     applyPlanMatrix();
-    rlog('edit swap', { id: selectedRect.id, op: selectedRect.op });
+    setModeInfo(); // PLAN · EDIT · ROOM/WALL/DOOR makes the persisted kind visible
+    rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
   }
 
   // DIMS mode: flip which SIDE ref B sits on relative to ref A — negates the signed
@@ -2393,7 +2471,7 @@ export function setupMR(view, project, getFootprint) {
 
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
-  // visible. FLOOR + REGISTER set up the frame; ROOM/WALL drop zones and EDGE snaps
+  // visible. FLOOR + REGISTER set up the frame; ROOM/WALL/DOOR drop zones and EDGE snaps
   // their edges to the real walls.
   const modes = [
     {
@@ -2454,10 +2532,10 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'drop', color: 0x2dd4bf, // fallback; live color = zoneColor(currentZoneKind), see modeColor
-      // One "add" action: drop a rectangle of the current zone kind (ROOM = add roomspace /
-      // WALL = subtract solid) at your standing position. Thumbstick up/down picks the kind
+      // One action: drop a rectangle of the current zone kind (ROOM = add roomspace;
+      // WALL/DOOR = subtract solid for now) at your standing position. Thumbstick up/down picks the kind
       // (label + accent track it); push the edges to the real walls in EDGE.
-      onTouch: () => dropRect(zoneOp(currentZoneKind)),
+      onTouch: () => dropRect(currentZoneKind),
     },
     {
       id: 'edge', color: 0xff5db1, // label/help via i18n: mode.edge / help.edge
@@ -2494,6 +2572,7 @@ export function setupMR(view, project, getFootprint) {
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
+        setModeInfo();
         rlog('edit select', { id: selectedRect.id, op: selectedRect.op, stack: hoverStack.length });
       },
     },
@@ -2623,6 +2702,13 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => moveFloorBy(-1),
     },
     {
+      id: 'unit', color: C_UNIT, // label/help via i18n: mode.unit / help.unit
+      // Display/input unit switch (m/cm/mm). The thumbstick moves through the list;
+      // a trigger picks the ray-aimed row, or advances one if the ray is off-panel.
+      // The unit is a persisted UI preference; authored geometry remains in meters.
+      onTouch: () => (hoverUnit ? setUnit(hoverUnit) : cycleUnit(1)),
+    },
+    {
       id: 'lang', color: C_LANG, // label/help via i18n: mode.lang / help.lang
       // UI language switch (FR/EN/ZH). The thumbstick up/down moves through the list
       // (see pollModeCycle); a trigger picks the ray-aimed row, or advances one if the
@@ -2635,13 +2721,13 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'move_up', 'move_down', 'save', 'load', 'sheet', 'lang',
+    'marker', 'outlet_dims', 'move_up', 'move_down', 'save', 'load', 'sheet', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
-    move_up: 'project', move_down: 'project', save: 'project', load: 'project', sheet: 'project', lang: 'project',
+    move_up: 'project', move_down: 'project', save: 'project', load: 'project', sheet: 'project', unit: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -2651,18 +2737,19 @@ export function setupMR(view, project, getFootprint) {
   // GROUP · TOOL so the growing tool list has an explicit, localized hierarchy.
   const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
 
-  // The tool portion of a mode's label. Two modes carry a thumbstick-picked kind in the
-  // label so a glance tells you what a trigger will place: MARKER · EDIT appends the marker
-  // type; PLAN · DROP shows the current zone kind (ROOM/WALL) as its tool name. Others are
-  // just their tool name.
+  // The tool portion of a mode's label. MARKER · EDIT appends the marker type,
+  // PLAN · DROP shows the current zone kind, UNIT shows the current unit, and SHEET
+  // names the previewed floor; the remaining modes use only their tool name.
   const markerTypeName = () => t(`marker.${currentMarkerType}`);
   const modeChildLabel = (id) =>
     id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
-    : id === 'drop' ? t(currentZoneKind === 'wall' ? 'mode.wall' : 'mode.drop')
+    : id === 'drop' ? t(`mode.${zoneModeId(currentZoneKind)}`)
+    : id === 'edit' && selectedRect ? `${t('mode.edit')} · ${t(`mode.${zoneModeId(zoneKindOf(selectedRect))}`)}`
     : id === 'sheet' ? `${t('mode.sheet')} · ${currentSheetFloor().name}` // TOOL part = previewed floor
+    : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
-  // PLAN · DROP's accent follows the kind (green room / red wall — the add/subtract color
-  // language); every other mode uses its static color.
+  // PLAN · DROP's accent follows boolean behavior (green ROOM; red WALL/DOOR);
+  // every other mode uses its static color.
   const modeColor = (m) => (m.id === 'drop' ? zoneColor(currentZoneKind) : m.color);
 
   // Recolor the tip + reticle and set the floating label — used both by setMode
@@ -2676,7 +2763,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Refresh EVERY per-mode panel (label chip + help/info box) to the current mode's tool
-  // label and color — including any thumbstick-picked kind (DROP room/wall, MARKER type).
+  // label and color — including any thumbstick-picked kind (DROP room/wall/door, MARKER type).
   // Shared by setMode, the language switch, and the kind pickers so the help box never goes
   // stale behind the label (e.g. switching ROOM->WALL must update both, not just the chip).
   function setModeInfo() {
@@ -2705,6 +2792,8 @@ export function setupMR(view, project, getFootprint) {
     else deactivateSlotMenu();
     if (m.id === 'lang') showLangMenu(); // park the language menu in front of you
     else hideLangMenu();
+    if (m.id === 'unit') showUnitMenu(); // park the unit menu in front of you
+    else hideUnitMenu();
     if (m.id === 'sheet') showSheet(); // park the plan-sheet preview in front of you
     else hideSheet();
   }
@@ -2718,7 +2807,23 @@ export function setupMR(view, project, getFootprint) {
     if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
+    if (unitMenu.group.visible) redrawUnitMenu(); // title follows the current language
     if (sheetPanel.group.visible) redrawSheet(); // legend/marker names are localized
+  });
+
+  // UNIT can be changed from either AR or the desktop selector. Refresh every
+  // meter-derived string in the immersive view and keep the selection panel current.
+  onUnitChange(() => {
+    const m = modes[currentMode];
+    setModeInfo();
+    buildPlan();
+    if (numpad.group.visible) {
+      if (m.id === 'level') refreshLevelPad();
+      else if (selectedMarker) refreshMarkerPad();
+      else redrawNumpad();
+    }
+    if (unitMenu.group.visible) redrawUnitMenu();
+    if (sheetPanel.group.visible) redrawSheet();
   });
 
   // Point the survey edit-state at the active floor: EDGE edits its last rect,
@@ -3037,7 +3142,7 @@ export function setupMR(view, project, getFootprint) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
     // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS flip only; does NOT cycle modes),
     // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
-    // thing: LEVEL floor / LANG language / MARKER type / EDIT room-wall).
+    // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT room-wall-door).
     // Latch onto whichever controller is being used, then read ONLY that one.
     for (const src of frame.session.inputSources) {
       if (src.gamepad && isActing(src.gamepad)) activeSource = src;
@@ -3083,16 +3188,17 @@ export function setupMR(view, project, getFootprint) {
       btn.stick = false;
     }
     // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
-    // LANG = language, MARKER = retype the selected marker (or the drop type if none
-    // selected), PLAN·DROP = room/wall to add, PLAN·EDIT = the selected zone's room<->wall.
+    // UNIT = display/input unit, LANG = language, MARKER = retype the selected marker (or the drop type if none
+    // selected), PLAN·DROP = room/wall/door to add, PLAN·EDIT = selected zone kind.
     // Inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
       const modeId = modes[currentMode].id;
       if (modeId === 'lang') cycleLang(stickY < 0 ? -1 : 1); // up = previous in the list
+      else if (modeId === 'unit') cycleUnit(stickY < 0 ? -1 : 1); // up = previous in the list
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
-      else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick room / wall to add
-      else if (modeId === 'edit') swapSelected(); // toggle the selected zone room<->wall
+      else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick room / wall / door
+      else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'sheet') cycleSheetFloor(stickY < 0 ? 1 : -1); // preview prev / next floor
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
@@ -3481,8 +3587,21 @@ export function setupMR(view, project, getFootprint) {
         numpadCursor.visible = true;
       }
       if (hoverLang !== prevHoverLang) { redrawLangMenu(); prevHoverLang = hoverLang; }
+    } else if (modeId === 'unit') {
+      // UNIT: thumbstick up/down cycles; ray + trigger directly picks m/cm/mm.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverUnit = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(pickSource(frame), unitMenu.mesh);
+      if (unitMenu.group.visible && panelHit) {
+        hoverUnit = unitMenu.unitAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      if (hoverUnit !== prevHoverUnit) { redrawUnitMenu(); prevHoverUnit = hoverUnit; }
     } else {
-      // ROOM/WALL: no floor target (drops at the standing position).
+      // ROOM/WALL/DOOR: no floor target (drops at the standing position).
       reticle.visible = false;
       edgeHi.visible = false;
     }

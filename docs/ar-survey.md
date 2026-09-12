@@ -14,9 +14,9 @@ editor (`ar-2d-parity` memory).
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
-PLAN     · DROP (room/wall) → EDGE → EDIT → DIMS
+PLAN     · DROP (room/wall/door) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
-PROJECT  · MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → LANG
+PROJECT  · MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → UNIT → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
@@ -42,15 +42,18 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
-- **DROP** (`id: drop`) — one "add" action: drop a starter rectangle at the standing position.
-  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add (roomspace) or WALL =
-  subtract (solid wall); the label (ROOM/WALL) and accent (green/red) track it. Edges get pushed to
-  real walls in EDGE. (Was two modes, ROOM and WALL, merged in s15.)
+- **DROP** (`id: drop`) — one action: drop a starter rectangle at the standing position.
+  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL and DOOR = subtract
+  for now. The rectangle persists `kind` independently from its boolean `op`, preserving doors for
+  later door-specific behavior. The label shows ROOM/WALL/DOOR; ROOM is green and both subtract
+  kinds are red. Edges get pushed to real walls in EDGE.
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
-  through overlapping zones), grip deletes it, and thumbstick up/down swaps it room↔wall. Outlet glyphs are inert.
+  through overlapping zones), grip deletes it, and thumbstick up/down cycles room→wall→door. Marker
+  glyphs are inert. Once selected, the breadcrumb includes the kind (`PLAN · EDIT · DOOR`, etc.)
+  because WALL and DOOR deliberately share their current geometry/color.
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
@@ -96,6 +99,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
   immersive session has no print dialog; the SVG blob is the off-headset deliverable
   (retrieve by cable). Desktop is where you actually print (Print menu → Save-as-PDF).
+- **UNIT** (`id: unit`) — display/input unit switch. Thumbstick up/down cycles `m` / `cm` / `mm`;
+  trigger picks the ray-aimed row, or advances one if the ray is off the panel. Dimension labels,
+  numeric entry pads, sheets, and the desktop selector update immediately. This is a persisted UI
+  preference (`house-cad:unit:v1`), not project geometry; all stored coordinates remain meters.
 - **LANG** — UI language switch (see Localization). Thumbstick up/down moves through the list
   (FR/EN/ZH); trigger picks the ray-aimed row, or advances one if the ray is off the panel.
 
@@ -103,7 +110,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 
 All user-facing AR text is localized (EN default, FR, ZH) — mode labels, per-mode help boxes,
 transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS titles + edge/origin ref
-names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay English (diagnostic).
+names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines stay English (diagnostic).
 
 - `i18n.js` mirrors `units.js`: a `current` language + an `onLangChange` bus, plus `t(key)`,
   `setLang`/`cycleLang`, and `getLang`/`langLabel`. The choice **persists** to localStorage
@@ -132,10 +139,11 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
-  no-op where nothing applies: **LEVEL** = floor (`switchFloor`, up/down, no wrap); **LANG** =
+  no-op where nothing applies: **LEVEL** = floor (`switchFloor`, up/down, no wrap); **UNIT** =
+  display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall kind to add (`cycleZoneKind`);
-  **PLAN · EDIT** = the selected zone's room↔wall (`swapSelected`). **thumbstick-hold (~1.2 s)** =
+  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall/door kind to add (`cycleZoneKind`);
+  **PLAN · EDIT** = the selected zone's room/wall/door kind (`cycleSelectedZoneKind`). **thumbstick-hold (~1.2 s)** =
   exit AR.
 - **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
   (prev). B/Y's only action is flipping the dimension side in either DIMS mode with a completed pair

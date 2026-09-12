@@ -338,6 +338,7 @@ export class Sketch2D {
           w,
           h,
           op: this.tool === 'subtract' ? 'subtract' : 'add',
+          kind: this.tool === 'subtract' ? 'wall' : 'room',
         });
         this.project.addRectangle(rect);
         this._select(rect.id);

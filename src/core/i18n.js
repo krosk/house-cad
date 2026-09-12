@@ -28,6 +28,7 @@ const STRINGS = {
   'mode.teleport': { en: 'TELEPORT', fr: 'TÉLÉPORT.', zh: '传送' },
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
+  'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
@@ -39,6 +40,7 @@ const STRINGS = {
   'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
   'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
   'mode.move_down': { en: 'MOVE DOWN', fr: 'DESCENDRE', zh: '下移' },
+  'mode.unit':     { en: 'UNIT',   fr: 'UNITÉ',     zh: '单位' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
@@ -63,9 +65,9 @@ const STRINGS = {
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
-    en: 'Thumbstick up/down picks ROOM (add) or WALL (subtract). Trigger to drop that box where you stand; push its edges out to the walls in EDGE.',
-    fr: 'Joystick haut/bas : PIÈCE (ajout) ou MUR (soustraction). Gâchette pour poser ce bloc là où vous êtes ; poussez ses bords vers les murs dans BORD.',
-    zh: '摇杆上/下：选择房间（添加）或墙体（减去）。扣动扳机在所站位置放置该盒；到“边”模式将其边推向墙面。',
+    en: 'Thumbstick up/down picks ROOM, WALL, or DOOR. WALL and DOOR both subtract for now. Trigger drops the box where you stand.',
+    fr: 'Joystick haut/bas : PIÈCE, MUR ou PORTE. MUR et PORTE soustraient pour l’instant. La gâchette pose le bloc là où vous êtes.',
+    zh: '摇杆上/下：选择房间、墙或门。墙和门目前都执行减去。扣动扳机在所站位置放置该盒。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
@@ -73,9 +75,9 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. Aim at a zone and trigger to select it; trigger again cycles buried zones. Grip deletes; thumbstick up/down swaps room/wall.',
-    fr: 'Modifiez seulement le plan. Visez une zone et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : pièce/mur.',
-    zh: '仅编辑平面。瞄准区域并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下切换房间/墙。',
+    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. Grip deletes; thumbstick up/down cycles room/wall/door.',
+    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : pièce/mur/porte.',
+    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下循环房间/墙/门。',
   },
   'help.marker': {
     en: 'Edit markers only. Thumbstick up/down picks the drop type — or retypes the selected marker. Trigger empty space to place at the tip. Aim a marker + trigger to edit height; ENTER saves. Grip-drag moves one, grip away deletes.',
@@ -121,6 +123,11 @@ const STRINGS = {
     en: 'Trigger to move the active floor’s complete plan to the empty floor immediately below. Occupied floors are never overwritten.',
     fr: 'Gâchette pour déplacer tout le plan de l’étage actif vers l’étage vide juste en dessous. Un étage occupé n’est jamais écrasé.',
     zh: '扣动扳机，将当前楼层的完整平面移动到紧邻的空白下层。绝不会覆盖已有内容。',
+  },
+  'help.unit': {
+    en: 'Push the thumbstick up/down to change the display and input unit. Geometry stays unchanged.',
+    fr: 'Poussez le joystick haut/bas pour changer l’unité d’affichage et de saisie. La géométrie reste inchangée.',
+    zh: '上下推动摇杆以切换显示和输入单位。几何尺寸保持不变。',
   },
   'help.lang': {
     en: 'Push the thumbstick up/down to change language. Applies everywhere at once.',
@@ -177,6 +184,9 @@ const STRINGS = {
 
   // --- LANG menu title --------------------------------------------------------
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },
+
+  // --- UNIT menu title --------------------------------------------------------
+  'unit.title': { en: 'UNIT', fr: 'UNITÉ', zh: '单位' },
 
   // --- markers (wall-anchored annotations) ------------------------------------
   'marker.outlet':   { en: 'outlet',   fr: 'prise',        zh: '插座' },

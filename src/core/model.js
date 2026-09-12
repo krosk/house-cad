@@ -45,13 +45,17 @@ export function syncFloorIdCounter(ids) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', id = nextId() }) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId() }) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
     this.w = w; // width  (>= 0)
     this.h = h; // height (>= 0)
-    this.op = op; // 'add' | 'subtract'
+    // `op` remains the boolean-geometry behavior. `kind` preserves user intent so
+    // WALL and DOOR can share subtract behavior today and diverge later.
+    const inferredKind = op === 'subtract' ? 'wall' : 'room';
+    this.kind = ['room', 'wall', 'door'].includes(kind) ? kind : inferredKind;
+    this.op = this.kind === 'room' ? 'add' : 'subtract';
   }
 
   // Normalized bounds (handles rectangles drawn right-to-left / top-to-bottom).

@@ -9,7 +9,7 @@ import { syncConstraintIdCounter } from '../core/constraints.js';
 export const FILE_VERSION = 2;
 
 function serializeRect(r) {
-  return { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op };
+  return { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op, kind: r.kind };
 }
 function serializeConstraint(c) {
   return {
@@ -101,7 +101,7 @@ export function deserializeInto(project, data) {
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
     rectangles: (f.rectangles || []).map(
-      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add' }),
+      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind }),
     ),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({

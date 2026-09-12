@@ -45,7 +45,7 @@ The key insight: because every rectangle edge is axis-aligned, each edge is a si
 
 ### Units: meters internal, display converts
 
-All geometry is stored in **meters** (maps 1:1 to the extruded mesh and future WebXR world scale). `src/core/units.js` converts only what the user reads/types (m/cm/mm) via `fmt()`, `toMeters()`, `unitLabel()`, and an `onUnitChange` bus. Never store display units in the model.
+All geometry is stored in **meters** (maps 1:1 to the extruded mesh and future WebXR world scale). `src/core/units.js` converts only what the user reads/types (m/cm/mm) via `fmt()`, `toMeters()`, `unitLabel()`, and an `onUnitChange` bus. The display-unit preference persists in localStorage and can be changed from either desktop or `PROJECT · UNIT` in AR; it is not project geometry. Never store display units in the model.
 
 ### Sizing is constraint-first (deliberate design decision)
 

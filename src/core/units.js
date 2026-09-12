@@ -7,8 +7,15 @@ export const UNITS = {
   cm: { label: 'cm', perMeter: 100, decimals: 1, snap: 0.01 },
   mm: { label: 'mm', perMeter: 1000, decimals: 0, snap: 0.001 },
 };
+export const UNIT_ORDER = ['m', 'cm', 'mm'];
+
+const STORE_KEY = 'house-cad:unit:v1';
 
 let current = 'm';
+try {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved && UNITS[saved]) current = saved;
+} catch { /* localStorage may be unavailable */ }
 const listeners = new Set();
 
 export function getUnit() {
@@ -23,8 +30,14 @@ export function unitLabel() {
 export function setUnit(u) {
   if (UNITS[u] && u !== current) {
     current = u;
+    try { localStorage.setItem(STORE_KEY, u); } catch { /* ignore */ }
     for (const fn of listeners) fn(current);
   }
+}
+export function cycleUnit(dir) {
+  const i = UNIT_ORDER.indexOf(current);
+  const n = UNIT_ORDER.length;
+  setUnit(UNIT_ORDER[(((i + dir) % n) + n) % n]);
 }
 export function onUnitChange(fn) {
   listeners.add(fn);

@@ -57,10 +57,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Switching modes keeps the teleported position; ORIGIN/FLOOR/RECAL clears it
 - [ ] Grip and thumbstick up/down are inert
 
-## PLAN · DROP (`drop`)  ⬜ merged ROOM+WALL into one action in s15 — retest the picker
-- [ ] **Thumbstick up/down picks ROOM ↔ WALL**; label (ROOM/WALL) + accent (green/red) track it
+## PLAN · DROP (`drop`)  ⬜ ROOM/WALL/DOOR picker needs Quest verification
+- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR** and wraps; label tracks the selected kind
 - [ ] Trigger with **ROOM** selected drops an **add** rectangle (roomspace) at your standing position
 - [ ] Trigger with **WALL** selected drops a **subtract** rectangle (solid wall)
+- [ ] Trigger with **DOOR** selected also drops a subtract rectangle, but saves `kind: "door"`
 - [ ] 3D extrusion updates live *(drop-of-a-box itself was verified s14; the kind picker is new)*
 
 ## PLAN · EDGE (`edge`)  ✅ session 14
@@ -72,7 +73,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PLAN · EDIT (`edit`)  ✅ session 14
 - [x] Trigger selects a zone; pressing again cycles DOWN through overlapping zones
 - [x] Grip deletes the selected zone
-- [ ] Thumbstick up/down swaps the selected zone room↔wall *(control changed from B/Y in s15 — retest)*
+- [ ] Thumbstick up/down cycles the selected zone room→wall→door; breadcrumb shows the selected kind and preserves it
 - [ ] Outlet glyphs are **inert** here *(needs an outlet placed to confirm — see OUTLET EDIT)*
 
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14
@@ -149,6 +150,13 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Grip is inert here (no delete/undo); leaving the mode hides the panel
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 
+## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
+- [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted
+- [ ] Trigger picks the ray-aimed row (or advances one if the ray is off the panel)
+- [ ] AR dimension labels, numeric pads, sheet preview, and desktop unit selector update immediately
+- [ ] Changing units does not change the plan geometry or stored meter values
+- [ ] Choice persists across an APK relaunch
+
 ## PROJECT · LANG (`lang`)  ✅ session 14
 - [x] Thumbstick up/down moves through FR / EN / ZH
 - [x] Trigger picks the ray-aimed row (or advances one if the ray is off the panel)
@@ -160,7 +168,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)
 - [ ] Mode label + help show the localized `GROUP · TOOL` breadcrumb
 - [ ] Thumbstick-x cycles modes (both ways); A/X = prev mode; **B/Y does NOT cycle modes** (only flips a completed DIMS pair, else inert)
-- [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / LANG language / MARKER type / EDIT room-wall), no-op elsewhere
+- [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / UNIT unit / LANG language / MARKER type / EDIT room-wall-door), no-op elsewhere
 - [ ] Thumbstick-hold (~1.2 s) exits AR; the EXIT bar shows during the hold
 - [ ] HUD debug lines present: `build` `ptr` `ret` `edge` (EDGE only) `batt`
 - [ ] Overlays ride the correct elevation on each floor

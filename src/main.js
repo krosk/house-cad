@@ -11,7 +11,7 @@ installRemoteLog(); // dev-only: mirror console/errors to the dev server for hea
 import { serializeProject, deserializeInto } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg } from './io/planSheet.js';
-import { setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
+import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
 
@@ -189,7 +189,7 @@ function updateProps() {
   };
   set(pX, b.x0);
   set(pY, b.y0);
-  pOp.textContent = r.op === 'add' ? '➕ Add' : '➖ Subtract';
+  pOp.textContent = r.kind === 'door' ? '🚪 Door' : r.op === 'add' ? '➕ Add' : '➖ Wall';
   pOp.className = `op-toggle ${r.op}`;
 }
 
@@ -204,7 +204,11 @@ pX.addEventListener('input', () => { const v = parseFloat(pX.value); if (selecte
 pY.addEventListener('input', () => { const v = parseFloat(pY.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.y = toMeters(v); project.touch(); } });
 pOp.addEventListener('click', () => {
   if (!selectedRect) return;
-  selectedRect.op = selectedRect.op === 'add' ? 'subtract' : 'add';
+  const kinds = ['room', 'wall', 'door'];
+  const current = kinds.includes(selectedRect.kind)
+    ? selectedRect.kind : (selectedRect.op === 'subtract' ? 'wall' : 'room');
+  selectedRect.kind = kinds[(kinds.indexOf(current) + 1) % kinds.length];
+  selectedRect.op = selectedRect.kind === 'room' ? 'add' : 'subtract';
   project.touch();
 });
 pDel.addEventListener('click', () => sketch.deleteSelected());
@@ -317,17 +321,20 @@ document.getElementById('clear').addEventListener('click', () => {
 
 // ---- unit selector (m / cm / mm) ----
 const unitSelect = document.getElementById('unit');
-unitSelect.value = 'm';
+unitSelect.value = getUnit();
 unitSelect.addEventListener('change', () => setUnit(unitSelect.value));
-onUnitChange(() => {
+const syncUnitUI = () => {
   // Update every visible unit label and re-render all numeric fields.
+  unitSelect.value = getUnit(); // AR can change the same global preference
   for (const el of document.querySelectorAll('.unit-label')) el.textContent = unitLabel();
   sketch.snapStep = unitInfo().snap;
   setHeightInput();
   updateProps();
   renderConstraints();
   sketch.render();
-});
+};
+onUnitChange(syncUnitUI);
+syncUnitUI(); // apply a preference restored from an earlier desktop/AR session
 
 // ---- resizable splitter ----
 (() => {
