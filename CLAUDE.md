@@ -55,6 +55,10 @@ A rectangle's exact size is authored **only** through dimension constraints. The
 
 `src/io/serialize.js` serializes the parametric definition (rectangles + constraints + height) to JSON; the footprint/mesh is always recomputed, never stored. On load, `syncRectIdCounter`/`syncConstraintIdCounter` advance the id counters past loaded ids so new items don't collide. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
 
+### Plan sheets (printing / SVG export)
+
+`src/io/planSheet.js` renders a **to-scale floor-plan sheet, one per floor**, from the model (recomputed, never stored — like the mesh). One set of draw calls feeds two backends — an **SVG** string and a **canvas** — so the desktop Print/Download output and the in-AR preview can't diverge. All layout is in **page millimeters**; annotation sizes are fixed paper sizes, geometry obeys the auto-picked ratio (finest of 1:20…1:1000 that fits, default A4). It draws the computed footprint, edge↔edge structural dimensions (via the shared `src/core/dimline.js` `edgeLineWorld`, which skips edge↔origin refs), marker floor-pin dimensions (where to place each fixture, in a distinct color), markers + a legend, and a scale bar. Dimensions that round to `0.00` at the display unit are omitted. Desktop UI: the toolbar **Print** menu (`printSheets()` → hidden iframe, one `@page` per floor → Save-as-PDF; **print at 100% for true scale**) and Download SVG. This shows dimension *values*, which is consistent with the constraint-first rule (they're the pinned constraints, not a re-added on-canvas size editor). Full AR side (the `sheet` mode) is in `docs/ar-survey.md`.
+
 ## Conventions
 
 - Coordinate mapping: plan `(x, y)` → world `(x, up, y)`. In `extrude.js` the shape is built in Three's XY plane, extruded along +Z, then rotated so height points up +Y.

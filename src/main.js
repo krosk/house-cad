@@ -10,6 +10,7 @@ import { installRemoteLog } from './ui/remoteLog.js';
 installRemoteLog(); // dev-only: mirror console/errors to the dev server for headset debugging
 import { serializeProject, deserializeInto } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
+import { floorToSvg } from './io/planSheet.js';
 import { setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
@@ -352,8 +353,8 @@ onUnitChange(() => {
 })();
 
 // ---- save / load ----
-function download(filename, text) {
-  const blob = new Blob([text], { type: 'application/json' });
+function download(filename, text, mime = 'application/json') {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -417,6 +418,67 @@ fileInput.addEventListener('change', async () => {
         sketch.onStatus?.(`Exported house.${fmt}`);
       } catch (err) {
         alert(`Export failed:\n${err.message}`);
+      }
+    });
+  });
+})();
+
+// ---- print / SVG plan sheets ----
+// A to-scale floor-plan sheet per floor, drawn from the model (src/io/planSheet.js).
+// "Print all floors" opens a hidden iframe holding every floor's SVG (one per page)
+// and invokes the browser print dialog → Save as PDF. "Download SVG" saves the
+// active floor as a vector file. Sheets are in real mm; print at 100% for true scale.
+function safeName(s) {
+  return (s || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor';
+}
+
+function printSheets(svgs) {
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>House CAD — plan</title>'
+    + '<style>@page{margin:0}html,body{margin:0;padding:0}'
+    + '.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}'
+    + 'svg{display:block}</style></head><body>'
+    + svgs.map((s) => `<div class="sheet">${s}</div>`).join('')
+    + '</body></html>';
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+  document.body.appendChild(iframe);
+  const cleanup = () => setTimeout(() => iframe.remove(), 500);
+  iframe.onload = () => {
+    const win = iframe.contentWindow;
+    win.addEventListener('afterprint', cleanup, { once: true });
+    try { win.focus(); win.print(); } catch { cleanup(); }
+    setTimeout(cleanup, 60000); // safety net if afterprint never fires
+  };
+  iframe.srcdoc = html;
+}
+
+(() => {
+  const btn = document.getElementById('print-btn');
+  const pop = document.getElementById('print-pop');
+  const close = () => { pop.hidden = true; };
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; });
+  pop.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', close);
+
+  const anyGeometry = () => project.floors.some((f) => f.rectangles.length > 0);
+
+  pop.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => {
+      close();
+      if (!anyGeometry()) { sketch.onStatus?.('Nothing to print — the plan is empty.'); return; }
+      try {
+        if (b.dataset.print === 'svg') {
+          const f = project.activeFloor;
+          download(`plan-${safeName(f.name)}.svg`, floorToSvg(f), 'image/svg+xml');
+          sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
+        } else {
+          printSheets(project.floors.map((f) => floorToSvg(f)));
+          sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');
+        }
+      } catch (err) {
+        alert(`Print failed:\n${err.message}`);
       }
     });
   });

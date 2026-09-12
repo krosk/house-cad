@@ -7,7 +7,8 @@
 //   screen = CSS pixels on the canvas, +y DOWN (canvas convention)
 
 import { Rectangle } from '../core/model.js';
-import { makeDistance, edgeCoord, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
+import { makeDistance, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
+import { edgeLineWorld } from '../core/dimline.js';
 import { fmt, unitLabel, unitInfo } from '../core/units.js';
 
 const MIN_DRAW = 0.05; // ignore tiny accidental drags (meters)
@@ -555,20 +556,9 @@ export class Sketch2D {
   }
 
   _edgeLineWorld(ref) {
-    // Return the [{x,y},{x,y}] world endpoints of an edge, and its coordinate.
-    // A marker endpoint ({marker}) or the origin axis has no rect edge here — bail
-    // (guards against ref.rect being undefined, which crashed the whole change bus).
-    if (!ref || ref.rect == null) return null;
-    const r = this.project.rectangles.find((x) => x.id === (ref.rect.id ?? ref.rect));
-    if (!r) return null;
-    const b = r.bounds;
-    const coord = edgeCoord(r, ref.edge);
-    switch (ref.edge) {
-      case 'left': return { p0: { x: b.x0, y: b.y0 }, p1: { x: b.x0, y: b.y1 }, coord };
-      case 'right': return { p0: { x: b.x1, y: b.y0 }, p1: { x: b.x1, y: b.y1 }, coord };
-      case 'bottom': return { p0: { x: b.x0, y: b.y0 }, p1: { x: b.x1, y: b.y0 }, coord };
-      case 'top': return { p0: { x: b.x0, y: b.y1 }, p1: { x: b.x1, y: b.y1 }, coord };
-    }
+    // Shared, guarded lookup (see src/core/dimline.js): returns the world-space
+    // edge line for a rect edge, or null for marker/origin endpoints.
+    return edgeLineWorld(ref, this.project.rectangles);
   }
 
   _drawEdgePick() {

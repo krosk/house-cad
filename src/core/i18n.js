@@ -35,6 +35,7 @@ const STRINGS = {
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
+  'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
@@ -97,6 +98,11 @@ const STRINGS = {
     en: 'Aim at a filled slot and trigger to load it into the frame you already registered. Empty slots do nothing.',
     fr: 'Visez un emplacement occupé et gâchette pour le charger dans le repère déjà enregistré. Les emplacements vides ne font rien.',
     zh: '瞄准一个已占用的槽位并扣动扳机，将其加载到已注册的坐标系中。空槽位无效。',
+  },
+  'help.sheet': {
+    en: 'Preview the to-scale plan sheet. Thumbstick up/down: previous/next floor. Trigger downloads this floor as an SVG (saved to the headset).',
+    fr: 'Aperçu de la planche à l’échelle. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en SVG (enregistré sur le casque).',
+    zh: '预览按比例的平面图纸。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为 SVG（保存到头显）。',
   },
   'help.lang': {
     en: 'Push the thumbstick up/down to change language. Applies everywhere at once.',

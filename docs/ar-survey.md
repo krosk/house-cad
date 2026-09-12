@@ -16,14 +16,14 @@ editor (`ar-2d-parity` memory).
 SETUP    · ORIGIN → FLOOR → RECAL → LEVEL
 PLAN     · DROP (room/wall) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
-PROJECT  · SAVE → LOAD → LANG
+PROJECT  · SAVE → LOAD → SHEET → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `level`, `drop`, `edge`,
-`edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `lang`.
+`edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `sheet`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -66,6 +66,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.
+- **SHEET** (`id: sheet`) — preview + download the to-scale plan sheet, ONE floor at a time.
+  A floating panel (`makeSheetPanel`) shows a floor rasterized by `floorToCanvas`
+  (`src/io/planSheet.js`) — the SAME renderer that produces the printable/downloadable SVG,
+  so preview == print. **Thumbstick up/down** cycles the previewed floor (`cycleSheetFloor`,
+  wraps; the label TOOL part shows the floor name). **Trigger** downloads that floor's SVG
+  (`floorToSvg` → blob → the headset's Download folder; the label flashes the filename).
+  Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
+  immersive session has no print dialog; the SVG blob is the off-headset deliverable
+  (retrieve by cable). Desktop is where you actually print (Print menu → Save-as-PDF).
 - **LANG** — UI language switch (see Localization). Thumbstick up/down moves through the list
   (FR/EN/ZH); trigger picks the ray-aimed row, or advances one if the ray is off the panel.
 
@@ -165,6 +174,35 @@ basement negative). See `multi-floor-design` memory for the settled design.
 - **Cross-floor size constraints are impossible by construction** — `edgeAtPoint` only scans the
   active floor's rectangles and constraints are stored per floor.
 
+## Plan sheets (printing / SVG) — `src/io/planSheet.js`
+
+A to-scale floor-plan sheet, one per floor, drawn from the parametric model (never stored;
+recomputed like the mesh). **One set of draw calls feeds two backends** so the preview can
+never diverge from the print: `svgBackend()` emits a self-contained SVG string (desktop
+print + download, AR blob download); `canvasBackend()` draws to a 2D canvas (the in-AR SHEET
+preview, `floorToCanvas`). Everything is computed in **page millimeters** (SVG viewBox is mm;
+the canvas backend multiplies by a px-per-mm factor) — so annotation sizes (text, dim offsets,
+arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obeys the ratio.
+
+- Scale is auto-picked: the finest round ratio (1:20…1:1000) whose content fits the page
+  (default A4, orientation auto), else an exact fit reported as `≈ 1:N`. Content = footprint
+  bbox ∪ rect bounds ∪ markers; a fixed margin reserves room for dims/legend/scale bar.
+- Draws: the **computed footprint** (`computeFootprint`, holes cut by nonzero winding); the
+  **edge↔edge structural dimensions** (via the shared `edgeLineWorld`, `src/core/dimline.js` —
+  edge↔origin refs have no drawable edge and are skipped, matching the 2D editor); the
+  **marker floor-pin dimensions** (`drawMarkerPins`, a distinct amber) — the surveyed
+  distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
+  the glyph; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend);
+  and a **scale bar + `1:N · unit` caption + floor name**. Marker/legend names come from
+  `opts.markerLabel` (desktop = English; AR passes `t('marker.<type>')`).
+- **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
+  rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
+  is clutter and isn't drawn.
+- Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →
+  browser Save-as-PDF; or Download SVG (active floor). **Print at 100% for true scale.**
+- Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
+  (AR preview) is build-verified only** — no browser/Quest raster test in CI.
+
 ## Coordinate mapping
 
 Plan `(x,y)` → planGroup-local `(x,0,−y)`; planGroup applies `planYaw` + `planPos`. Overlay lift
@@ -233,4 +271,6 @@ world overlays. Per controller, stacked above the tip: mode **label**, hover **r
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
 | `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints incl. `offset` + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
+| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET preview) |
+| `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

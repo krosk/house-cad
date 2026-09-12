@@ -110,6 +110,21 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] LOAD also round-trips **markers + outlet pins** *(needs an outlet in the scene to confirm)*
 - [x] Overlays rebuild correctly after LOAD
 
+## PROJECT · SHEET (`sheet`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
+> Preview + download a to-scale plan sheet. The SVG path is desktop-verified (rendered + eyeballed);
+> the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
+- [ ] Entering SHEET shows a floating panel with the ACTIVE floor's plan, correctly proportioned
+- [ ] The sheet reads clearly through passthrough (linework/text legible at the panel distance)
+- [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
+- [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
+- [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
+- [ ] **Thumbstick up/down** cycles the previewed floor (wraps); label reads `SHEET · <FloorName>`
+- [ ] The previewed floor's geometry matches that floor (not the active one) after cycling
+- [ ] **Trigger** downloads the SVG; the label flashes `⬇ plan-<floor>.svg` (or `download blocked`)
+- [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
+- [ ] Grip is inert here (no delete/undo); leaving the mode hides the panel
+- [ ] Marker legend names switch with LANG (outlet/switch localized)
+
 ## PROJECT · LANG (`lang`)  ✅ session 14
 - [x] Thumbstick up/down moves through FR / EN / ZH
 - [x] Trigger picks the ray-aimed row (or advances one if the ray is off the panel)

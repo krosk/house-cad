@@ -19,6 +19,7 @@ import { footprintFloorGeometry } from '../core/extrude.js';
 import { toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import { serializeProject, deserializeInto } from '../io/serialize.js';
+import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -345,6 +346,37 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, slotAt, draw };
   }
 
+  // SHEET preview: a floating panel showing one floor's to-scale plan sheet, rasterized
+  // from the SAME renderer that produces the printable/downloadable SVG (src/io/planSheet.js),
+  // so what you see here is what prints. redraw() re-rasters a floor and fits the plane to
+  // the page aspect (portrait or landscape). Read-only — a trigger downloads the SVG.
+  function makeSheetPanel() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1448; canvas.height = 2048; // A4 portrait; resized per render by floorToCanvas
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter; // NPOT canvas — no mipmaps
+    tex.generateMipmaps = false;
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+    const SIZE = 0.52; // meters on the long edge
+
+    function redraw(floor) {
+      floorToCanvas(floor, canvas, { page: 'a4', targetPx: 2048, markerLabel: (ty) => t(`marker.${ty}`) });
+      tex.needsUpdate = true;
+      const aspect = canvas.width / canvas.height;
+      if (aspect >= 1) mesh.scale.set(SIZE, SIZE / aspect, 1);
+      else mesh.scale.set(SIZE * aspect, SIZE, 1);
+    }
+
+    return { group, mesh, canvas, tex, redraw };
+  }
+
   // LANG menu: a small ray-aimed panel listing the languages with the active one
   // highlighted. It's driven mainly by the thumbstick (up/down moves the selection,
   // see pollModeCycle) and by trigger (advances one), so draw() just reflects the
@@ -607,6 +639,10 @@ export function setupMR(view, project, getFootprint) {
   // LANG language-switch panel (shares numpadCursor as its ray-hit dot).
   const langMenu = makeLangMenu();
   scene.add(langMenu.group);
+
+  // SHEET plan-preview panel (a rasterized to-scale sheet; read-only).
+  const sheetPanel = makeSheetPanel();
+  scene.add(sheetPanel.group);
 
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
@@ -1787,15 +1823,15 @@ export function setupMR(view, project, getFootprint) {
 
   // Park a ray-aimed panel ~0.55 m in front of the headset, upright, facing the
   // user (yaw-only). Shared by the DIMS numpad and the SAVE/LOAD slot menu.
-  function placePanel(group) {
+  function placePanel(group, dist = 0.55, drop = 0.12) {
     const e = renderer.xr.getCamera().matrixWorld.elements;
     _cam.set(e[12], e[13], e[14]);
     _camQ.setFromRotationMatrix(_rm.fromArray(e));
     _fwd.set(0, 0, -1).applyQuaternion(_camQ); _fwd.y = 0;
     if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
     _fwd.normalize();
-    group.position.copy(_cam).addScaledVector(_fwd, 0.55);
-    group.position.y = _cam.y - 0.12; // a touch below eye level
+    group.position.copy(_cam).addScaledVector(_fwd, dist);
+    group.position.y = _cam.y - drop; // a touch below eye level
     group.lookAt(_cam.x, group.position.y, _cam.z); // yaw-only face
     group.updateMatrixWorld(true); // so the same-frame raycast sees the new pose
   }
@@ -1868,6 +1904,74 @@ export function setupMR(view, project, getFootprint) {
     numpadCursor.visible = false;
     hoverSlot = prevHoverSlot = null;
     slotFlash = null;
+  }
+
+  // ---- SHEET: preview + download a to-scale plan sheet (one floor at a time) ----
+  // Read-only. Thumbstick-y cycles which floor is previewed; trigger downloads that
+  // floor's SVG (blob -> the headset's Download folder). No print on-device (no print
+  // service in an immersive session); the SVG is the off-headset deliverable.
+  let sheetFloorIdx = 0;      // index into project.floors for the preview
+  let sheetFlashTimer = null;
+
+  function currentSheetFloor() {
+    sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
+    return project.floors[sheetFloorIdx];
+  }
+  const redrawSheet = () => sheetPanel.redraw(currentSheetFloor());
+
+  function showSheet() {
+    sheetFloorIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
+    redrawSheet();
+    placePanel(sheetPanel.group, 0.72, 0.06); // a bit further out + higher; it's a big panel to read
+    sheetPanel.group.visible = true;
+  }
+
+  function hideSheet() {
+    sheetPanel.group.visible = false;
+    clearTimeout(sheetFlashTimer);
+  }
+
+  // Thumbstick-y in SHEET: preview the previous/next floor (wraps). The label's TOOL
+  // part shows the floor name so a glance says which sheet you're on.
+  function cycleSheetFloor(dir) {
+    const n = project.floors.length;
+    if (n < 1) return;
+    sheetFloorIdx = (sheetFloorIdx + dir + n) % n;
+    redrawSheet();
+    setModeInfo(); // label -> "SHEET · <FloorName>"
+  }
+
+  // Fire-and-forget blob download. In the immersive TWA the download UI isn't visible,
+  // but Android's DownloadManager still writes the file to the headset's Download folder
+  // (retrieve by cable). Returns false if the browser refused it.
+  function downloadBlob(filename, text, mime) {
+    try {
+      const blob = new Blob([text], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      return true;
+    } catch { return false; }
+  }
+
+  const sheetFileName = (f) =>
+    `plan-${(f.name || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor'}.svg`;
+
+  // Briefly show a message on the mode label, then restore the breadcrumb.
+  function sheetFlash(msg) {
+    for (const l of labels) l.setText(msg, modes[currentMode].color);
+    clearTimeout(sheetFlashTimer);
+    sheetFlashTimer = setTimeout(() => { if (modes[currentMode].id === 'sheet') setModeInfo(); }, 1600);
+  }
+
+  function onSheetTouch() {
+    const f = currentSheetFloor();
+    const name = sheetFileName(f);
+    const ok = downloadBlob(name, floorToSvg(f, { page: 'a4' }), 'image/svg+xml');
+    rlog('sheet download', { floor: f.name, name, ok });
+    sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
 
   // ---- LANG: switch the UI language (see i18n.js) ----
@@ -2388,6 +2492,13 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onSlotTouch,
     },
     {
+      id: 'sheet', color: 0xe0b341, // label/help via i18n: mode.sheet / help.sheet
+      // Preview the to-scale plan sheet (same renderer as the print/SVG output).
+      // Thumbstick-y cycles the previewed floor (see pollModeCycle); trigger downloads
+      // that floor's SVG to the headset. Read-only — no massing/pin edits here.
+      onTouch: onSheetTouch,
+    },
+    {
       id: 'lang', color: C_LANG, // label/help via i18n: mode.lang / help.lang
       // UI language switch (FR/EN/ZH). The thumbstick up/down moves through the list
       // (see pollModeCycle); a trigger picks the ray-aimed row, or advances one if the
@@ -2400,13 +2511,13 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'save', 'load', 'lang',
+    'marker', 'outlet_dims', 'save', 'load', 'sheet', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
-    save: 'project', load: 'project', lang: 'project',
+    save: 'project', load: 'project', sheet: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -2424,6 +2535,7 @@ export function setupMR(view, project, getFootprint) {
   const modeChildLabel = (id) =>
     id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
     : id === 'drop' ? t(currentZoneKind === 'wall' ? 'mode.wall' : 'mode.drop')
+    : id === 'sheet' ? `${t('mode.sheet')} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : t(`mode.${id}`);
   // PLAN · DROP's accent follows the kind (green room / red wall — the add/subtract color
   // language); every other mode uses its static color.
@@ -2468,6 +2580,8 @@ export function setupMR(view, project, getFootprint) {
     else deactivateSlotMenu();
     if (m.id === 'lang') showLangMenu(); // park the language menu in front of you
     else hideLangMenu();
+    if (m.id === 'sheet') showSheet(); // park the plan-sheet preview in front of you
+    else hideSheet();
   }
 
   // Re-render every localized on-screen string when the UI language changes. This
@@ -2479,6 +2593,7 @@ export function setupMR(view, project, getFootprint) {
     if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
+    if (sheetPanel.group.visible) redrawSheet(); // legend/marker names are localized
   });
 
   // Point the survey edit-state at the active floor: EDGE edits its last rect,
@@ -2844,6 +2959,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick room / wall to add
       else if (modeId === 'edit') swapSelected(); // toggle the selected zone room<->wall
+      else if (modeId === 'sheet') cycleSheetFloor(stickY < 0 ? 1 : -1); // preview prev / next floor
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;

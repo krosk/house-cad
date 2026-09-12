@@ -87,6 +87,13 @@
             <button data-fmt="glb" title="Binary glTF — single file, best for sharing">glTF (.glb)</button>
           </div>
         </div>
+        <div class="group menu" id="print-menu">
+          <button id="print-btn" title="Print or download a to-scale floor-plan sheet">🖨 Print ▾</button>
+          <div class="menu-pop" id="print-pop" hidden>
+            <button data-print="all" title="Print every floor, one to-scale sheet each — choose 'Save as PDF' and print at 100% (actual size)">Print all floors…</button>
+            <button data-print="svg" title="Download this floor as a vector SVG sheet (true scale; open in a viewer or drop into a PDF)">Download SVG (this floor)</button>
+          </div>
+        </div>
         <div class="group" id="ar-group"></div>
         <div class="group hint" id="hint">Drag on the grid to draw a rectangle.</div>
       </footer>
