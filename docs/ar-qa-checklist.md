@@ -81,6 +81,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Grip deletes the selected zone
 - [ ] Thumbstick up/down cycles all six zone kinds; breadcrumb shows the selected kind and preserves it
 - [ ] A selected zone continuously shows a prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` controller readout
+- [ ] Selecting a ROOM continuously shows its connected component's union area in m² in the info panel, independent of reticle position
+- [ ] Overlap and positive-length shared edges connect ROOM rectangles; corner-only contact does not
+- [ ] The area disappears when the selection is cleared or changed to a non-ROOM zone
+- [ ] SHEET preview, SVG, and print show one matching area chip inside each distinct ROOM component
 - [ ] Outlet glyphs are **inert** here *(needs an outlet placed to confirm — see OUTLET EDIT)*
 
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14

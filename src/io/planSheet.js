@@ -15,7 +15,7 @@
 // Annotation sizes (text, offsets, arrows) are therefore fixed PAPER sizes and
 // stay legible at any scale, while the geometry obeys the chosen ratio.
 
-import { computeFootprint } from '../core/geometry2d.js';
+import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
@@ -358,6 +358,24 @@ function drawMarkers(be, L, floor) {
   }
 }
 
+// One conventional floor-area chip per semantic ROOM component. Use the center
+// of its largest source rectangle as a stable point inside the union; this avoids
+// polygon-centroid labels falling outside an L-shaped room.
+function drawRoomAreas(be, L, floor) {
+  for (const component of connectedRoomComponents(floor.rectangles)) {
+    const anchor = component.rectangles.reduce((largest, r) => {
+      const b = r.bounds, lb = largest.bounds;
+      return (b.x1 - b.x0) * (b.y1 - b.y0) > (lb.x1 - lb.x0) * (lb.y1 - lb.y0) ? r : largest;
+    });
+    const b = anchor.bounds;
+    drawTextChip(
+      be, `${component.area.toFixed(2)} m²`,
+      L.X((b.x0 + b.x1) / 2), L.Y((b.y0 + b.y1) / 2),
+      2.2, C_LINE,
+    );
+  }
+}
+
 function drawStrip(be, L, floor, opts) {
   const { page, ratio, exact } = L;
   const yBase = page.h - MARGIN - STRIP;
@@ -423,6 +441,7 @@ function renderFloor(be, floor, opts = {}) {
   drawDimensions(be, L, floor);
   drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   drawMarkers(be, L, floor);
+  drawRoomAreas(be, L, floor); // area chips stay legible above linework + markers
   drawStrip(be, L, floor, opts);
   return L;
 }

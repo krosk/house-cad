@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { Rectangle } from '../core/model.js';
+import { connectedRoomComponent } from '../core/geometry2d.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
@@ -1360,6 +1361,9 @@ export function setupMR(view, project, getFootprint) {
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
   let selectedRect = null;  // PLAN mode: the persistently-selected zone (survives aim)
   let hoverStack = [];      // PLAN mode: zones under the ray this frame, topmost-first
+  let roomComponentCacheKey = '';
+  let roomComponentCache = null;
+  let roomAreaHud = null;   // m² shown in the info panel for the selected room component
   let selectedMarker = null; // OUTLET mode: marker being height-edited
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
@@ -1491,6 +1495,34 @@ export function setupMR(view, project, getFootprint) {
     const rects = project.rectangles;
     for (let i = rects.length - 1; i >= 0; i--) if (rects[i].contains(px, py)) out.push(rects[i]);
     return out;
+  }
+
+  // Connected-room geometry changes only when ROOM bounds/type or the selection
+  // changes. Cache the polygon union so PLAN · EDIT's frame loop does not run
+  // polygon clipping at headset frame rate.
+  function selectedRoomComponent() {
+    if (!selectedRect || zoneKindOf(selectedRect) !== 'room') return null;
+    const signature = project.rectangles
+      .filter((r) => zoneKindOf(r) === 'room')
+      .map((r) => {
+        const b = r.bounds;
+        return `${r.id}:${b.x0},${b.y0},${b.x1},${b.y1}`;
+      })
+      .join('|');
+    const key = `${project.activeFloorId}:${selectedRect.id}:${signature}`;
+    if (key !== roomComponentCacheKey) {
+      roomComponentCacheKey = key;
+      roomComponentCache = connectedRoomComponent(project.rectangles, selectedRect);
+    }
+    return roomComponentCache;
+  }
+
+  function updateRoomAreaHud() {
+    const component = selectedRoomComponent();
+    const next = component?.area ?? null;
+    if (next === roomAreaHud) return;
+    roomAreaHud = next;
+    lastHudAt = -Infinity; // redraw next frame instead of waiting for the 2 Hz diagnostic cadence
   }
 
   // Move one edge to a wall touch, keeping the OPPOSITE edge fixed and w/h >= 0.
@@ -2619,6 +2651,7 @@ export function setupMR(view, project, getFootprint) {
     project.touch();
     buildPlan();
     applyPlanMatrix();
+    updateRoomAreaHud();
     setModeInfo(); // the PLAN · EDIT breadcrumb makes the persisted kind visible
     rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
   }
@@ -2759,6 +2792,7 @@ export function setupMR(view, project, getFootprint) {
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
+        updateRoomAreaHud();
         setModeInfo();
         rlog('edit select', {
           id: selectedRect.id, kind: zoneKindOf(selectedRect), op: selectedRect.op, stack: hoverStack.length,
@@ -2979,6 +3013,10 @@ export function setupMR(view, project, getFootprint) {
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
     selectedRect = null; // clear the EDIT selection when changing modes
+    roomComponentCacheKey = '';
+    roomComponentCache = null;
+    roomAreaHud = null;
+    lastHudAt = -Infinity;
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     clearTimeout(projectFlashTimer);
@@ -3051,6 +3089,9 @@ export function setupMR(view, project, getFootprint) {
     activeRect = project.rectangles[project.rectangles.length - 1] || null;
     selectedEdge = null;
     selectedRect = null; // EDIT selection is per-floor; drop it on a floor switch
+    roomComponentCacheKey = '';
+    roomComponentCache = null;
+    roomAreaHud = null;
     selectedMarker = null; // ...and any marker being height-edited
     resetDim();
   }
@@ -3310,6 +3351,7 @@ export function setupMR(view, project, getFootprint) {
         activeRect = project.rectangles[project.rectangles.length - 1] || null;
       }
       selectedRect = null;
+      updateRoomAreaHud();
       buildPlan();
       applyPlanMatrix();
       rlog('edit delete', { id });
@@ -3518,6 +3560,7 @@ export function setupMR(view, project, getFootprint) {
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
+        ...(modeId === 'edit' && roomAreaHud != null ? [`room:   ${roomAreaHud.toFixed(2)} m²`] : []),
         ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
@@ -3739,6 +3782,7 @@ export function setupMR(view, project, getFootprint) {
         hoverStack = [];
       }
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
+      updateRoomAreaHud();
       if (selectedRect) {
         showRectOutline(selectedRect, selectedRect.op === 'subtract' ? 0xff6b6b : 0x51d88a);
         showZebra(selectedRect);

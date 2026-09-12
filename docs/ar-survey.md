@@ -55,7 +55,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   room→wall→door→window→stairs→cabinet. Marker
   glyphs are inert. Once selected, the breadcrumb includes the kind (`PLAN · EDIT · DOOR`, etc.)
   and a larger controller readout continuously shows `TYPE · <kind>` because all subtract kinds
-  deliberately share their current geometry/color.
+  deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
+  `room: <area> m²` to the info panel, independent of reticle position. Positive-length shared edges and
+  overlaps connect rectangles; corner-only contact does not, and overlapping area is counted once. The
+  plan sheet prints the same union area once inside every distinct ROOM component.
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
