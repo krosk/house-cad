@@ -79,8 +79,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PLAN · EDIT (`edit`)  ✅ session 14
 - [x] Trigger selects a zone; pressing again cycles DOWN through overlapping zones
 - [x] Grip deletes the selected zone
-- [ ] Thumbstick up/down cycles all five zone kinds; breadcrumb shows the selected kind and preserves it
-- [ ] A selected zone continuously shows a prominent `TYPE · ROOM/WALL/DOOR/STAIRS/CABINET` controller readout
+- [ ] Thumbstick up/down cycles all six zone kinds; breadcrumb shows the selected kind and preserves it
+- [ ] A selected zone continuously shows a prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` controller readout
 - [ ] Outlet glyphs are **inert** here *(needs an outlet placed to confirm — see OUTLET EDIT)*
 
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14
@@ -138,7 +138,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] COPY snapshots the active floor and flashes its name without changing the project
 - [ ] After loading a different save, PASTE replaces the currently active floor's plan
 - [ ] The destination floor keeps its id, name, height, elevation, and ground designation
-- [ ] The pasted plan preserves room/wall/door/stairs/cabinet kinds, dimensions, marker types and positions
+- [ ] The pasted plan preserves room/wall/door/window/stairs/cabinet kinds, dimensions, marker types and positions
 - [ ] Pasted rectangle, constraint and marker ids are fresh; every constraint points to pasted objects
 - [ ] The clipboard survives an APK relaunch and can be pasted repeatedly
 - [ ] An occupied target requires a second trigger; grip or changing mode cancels confirmation

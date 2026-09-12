@@ -1342,7 +1342,7 @@ export function setupMR(view, project, getFootprint) {
   // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
   // One DROP action instead of separate zone modes. ROOM adds; every other semantic
   // zone currently subtracts while keeping its distinct saved kind.
-  const ZONE_KINDS = ['room', 'wall', 'door', 'stairs', 'cabinet'];
+  const ZONE_KINDS = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'];
   let currentZoneKind = ZONE_KINDS[0];
   const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
   const zoneKindOf = (r) => ZONE_KINDS.includes(r?.kind)

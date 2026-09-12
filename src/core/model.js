@@ -54,7 +54,7 @@ export class Rectangle {
     // `op` remains the boolean-geometry behavior. `kind` preserves user intent so
     // Non-room zone kinds share subtract behavior today and can diverge later.
     const inferredKind = op === 'subtract' ? 'wall' : 'room';
-    this.kind = ['room', 'wall', 'door', 'stairs', 'cabinet'].includes(kind) ? kind : inferredKind;
+    this.kind = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'].includes(kind) ? kind : inferredKind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
   }
 

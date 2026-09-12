@@ -30,6 +30,7 @@ const STRINGS = {
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
+  'mode.window':   { en: 'WINDOW', fr: 'FENÊTRE',  zh: '窗' },
   'mode.stairs':   { en: 'STAIRS', fr: 'ESCALIER', zh: '楼梯' },
   'mode.cabinet':  { en: 'CABINET', fr: 'PLACARD', zh: '柜子' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
@@ -70,9 +71,9 @@ const STRINGS = {
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
-    en: 'Thumbstick up/down picks ROOM, WALL, DOOR, STAIRS, or CABINET. All except ROOM subtract for now. Trigger drops the box where you stand.',
-    fr: 'Joystick haut/bas : PIÈCE, MUR, PORTE, ESCALIER ou PLACARD. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
-    zh: '摇杆上/下：选择房间、墙、门、楼梯或柜子。除房间外目前均执行减去。扣动扳机放置该盒。',
+    en: 'Thumbstick up/down picks ROOM, WALL, DOOR, WINDOW, STAIRS, or CABINET. All except ROOM subtract for now. Trigger drops the box where you stand.',
+    fr: 'Joystick haut/bas : PIÈCE, MUR, PORTE, FENÊTRE, ESCALIER ou PLACARD. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
+    zh: '摇杆上/下：选择房间、墙、门、窗、楼梯或柜子。除房间外目前均执行减去。扣动扳机放置该盒。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',

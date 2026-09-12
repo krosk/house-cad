@@ -14,7 +14,7 @@ editor (`ar-2d-parity` memory).
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
-PLAN     · DROP (room/wall/door/stairs/cabinet) → EDGE → EDIT → DIMS
+PLAN     · DROP (room/wall/door/window/stairs/cabinet) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → UNIT → LANG
 ```
@@ -43,8 +43,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
 - **DROP** (`id: drop`) — one action: drop a starter rectangle at the standing position.
-  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL, DOOR, STAIRS, and
-  CABINET = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
+  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL, DOOR, WINDOW,
+  STAIRS, and CABINET = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
   preserving semantic identity for later type-specific behavior. The label shows the current kind;
   ROOM is green and all subtract kinds are red. Edges get pushed to real walls in EDGE.
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
@@ -52,7 +52,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), grip deletes it, and thumbstick up/down cycles
-  room→wall→door→stairs→cabinet. Marker
+  room→wall→door→window→stairs→cabinet. Marker
   glyphs are inert. Once selected, the breadcrumb includes the kind (`PLAN · EDIT · DOOR`, etc.)
   and a larger controller readout continuously shows `TYPE · <kind>` because all subtract kinds
   deliberately share their current geometry/color.
@@ -152,7 +152,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall/door/stairs/cabinet kind to add
+  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall/door/window/stairs/cabinet kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.

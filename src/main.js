@@ -193,7 +193,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', door: '🚪 Door', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet',
+    room: '➕ Room', wall: '➖ Wall', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
@@ -210,7 +210,7 @@ pX.addEventListener('input', () => { const v = parseFloat(pX.value); if (selecte
 pY.addEventListener('input', () => { const v = parseFloat(pY.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.y = toMeters(v); project.touch(); } });
 pOp.addEventListener('click', () => {
   if (!selectedRect) return;
-  const kinds = ['room', 'wall', 'door', 'stairs', 'cabinet'];
+  const kinds = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'];
   const current = kinds.includes(selectedRect.kind)
     ? selectedRect.kind : (selectedRect.op === 'subtract' ? 'wall' : 'room');
   selectedRect.kind = kinds[(kinds.indexOf(current) + 1) % kinds.length];
