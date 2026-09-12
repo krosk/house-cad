@@ -57,11 +57,12 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Switching modes keeps the teleported position; ORIGIN/FLOOR/RECAL clears it
 - [ ] Grip and thumbstick up/down are inert
 
-## PLAN · DROP (`drop`)  ⬜ ROOM/WALL/DOOR picker needs Quest verification
-- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR** and wraps; label tracks the selected kind
+## PLAN · DROP (`drop`)  ⬜ five-kind picker needs Quest verification
+- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → STAIRS → CABINET** and wraps; label tracks the selected kind
 - [ ] Trigger with **ROOM** selected drops an **add** rectangle (roomspace) at your standing position
 - [ ] Trigger with **WALL** selected drops a **subtract** rectangle (solid wall)
 - [ ] Trigger with **DOOR** selected also drops a subtract rectangle, but saves `kind: "door"`
+- [ ] **STAIRS** and **CABINET** also subtract for now while saving their distinct kinds
 - [ ] 3D extrusion updates live *(drop-of-a-box itself was verified s14; the kind picker is new)*
 
 ## PLAN · EDGE (`edge`)  ✅ session 14
@@ -73,7 +74,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PLAN · EDIT (`edit`)  ✅ session 14
 - [x] Trigger selects a zone; pressing again cycles DOWN through overlapping zones
 - [x] Grip deletes the selected zone
-- [ ] Thumbstick up/down cycles the selected zone room→wall→door; breadcrumb shows the selected kind and preserves it
+- [ ] Thumbstick up/down cycles all five zone kinds; breadcrumb shows the selected kind and preserves it
+- [ ] A selected zone continuously shows a prominent `TYPE · ROOM/WALL/DOOR/STAIRS/CABINET` controller readout
 - [ ] Outlet glyphs are **inert** here *(needs an outlet placed to confirm — see OUTLET EDIT)*
 
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14
@@ -131,7 +133,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] COPY snapshots the active floor and flashes its name without changing the project
 - [ ] After loading a different save, PASTE replaces the currently active floor's plan
 - [ ] The destination floor keeps its id, name, height, elevation, and ground designation
-- [ ] The pasted plan preserves room/wall/door kinds, dimensions, marker types and positions
+- [ ] The pasted plan preserves room/wall/door/stairs/cabinet kinds, dimensions, marker types and positions
 - [ ] Pasted rectangle, constraint and marker ids are fresh; every constraint points to pasted objects
 - [ ] The clipboard survives an APK relaunch and can be pasted repeatedly
 - [ ] An occupied target requires a second trigger; grip or changing mode cancels confirmation
@@ -181,7 +183,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)
 - [ ] Mode label + help show the localized `GROUP · TOOL` breadcrumb
 - [ ] Thumbstick-x cycles modes (both ways); A/X = prev mode; **B/Y does NOT cycle modes** (only flips a completed DIMS pair, else inert)
-- [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / UNIT unit / LANG language / MARKER type / EDIT room-wall-door), no-op elsewhere
+- [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / UNIT unit / LANG language / MARKER type / EDIT zone kind), no-op elsewhere
 - [ ] Thumbstick-hold (~1.2 s) exits AR; the EXIT bar shows during the hold
 - [ ] HUD debug lines present: `build` `ptr` `ret` `edge` (EDGE only) `batt`
 - [ ] Overlays ride the correct elevation on each floor

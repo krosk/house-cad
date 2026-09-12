@@ -29,6 +29,8 @@ const STRINGS = {
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
+  'mode.stairs':   { en: 'STAIRS', fr: 'ESCALIER', zh: '楼梯' },
+  'mode.cabinet':  { en: 'CABINET', fr: 'PLACARD', zh: '柜子' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
@@ -67,9 +69,9 @@ const STRINGS = {
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
-    en: 'Thumbstick up/down picks ROOM, WALL, or DOOR. WALL and DOOR both subtract for now. Trigger drops the box where you stand.',
-    fr: 'Joystick haut/bas : PIÈCE, MUR ou PORTE. MUR et PORTE soustraient pour l’instant. La gâchette pose le bloc là où vous êtes.',
-    zh: '摇杆上/下：选择房间、墙或门。墙和门目前都执行减去。扣动扳机在所站位置放置该盒。',
+    en: 'Thumbstick up/down picks ROOM, WALL, DOOR, STAIRS, or CABINET. All except ROOM subtract for now. Trigger drops the box where you stand.',
+    fr: 'Joystick haut/bas : PIÈCE, MUR, PORTE, ESCALIER ou PLACARD. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
+    zh: '摇杆上/下：选择房间、墙、门、楼梯或柜子。除房间外目前均执行减去。扣动扳机放置该盒。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
@@ -77,9 +79,9 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. Grip deletes; thumbstick up/down cycles room/wall/door.',
-    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : pièce/mur/porte.',
-    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下循环房间/墙/门。',
+    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. Grip deletes; thumbstick up/down cycles the zone type.',
+    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : type de zone.',
+    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下切换区域类型。',
   },
   'help.marker': {
     en: 'Edit markers only. Thumbstick up/down picks the drop type — or retypes the selected marker. Trigger empty space to place at the tip. Aim a marker + trigger to edit height; ENTER saves. Grip-drag moves one, grip away deletes.',
@@ -169,6 +171,7 @@ const STRINGS = {
   'edge.right':   { en: 'RIGHT',  fr: 'DROITE', zh: '右' },
   'edge.bottom':  { en: 'BOTTOM', fr: 'BAS',    zh: '下' },
   'edge.top':     { en: 'TOP',    fr: 'HAUT',   zh: '上' },
+  'zone.type':    { en: 'TYPE',   fr: 'TYPE',   zh: '类型' },
 
   // --- SAVE/LOAD slot menu ----------------------------------------------------
   'slot.saveTitle': { en: 'SAVE — pick slot', fr: 'ENREG. — choisir', zh: '保存 — 选择槽位' },

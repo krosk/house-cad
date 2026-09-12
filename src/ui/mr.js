@@ -1279,14 +1279,15 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
-  // One DROP action instead of separate zone modes. ROOM adds; WALL and DOOR subtract.
-  const ZONE_KINDS = ['room', 'wall', 'door'];
+  // One DROP action instead of separate zone modes. ROOM adds; every other semantic
+  // zone currently subtracts while keeping its distinct saved kind.
+  const ZONE_KINDS = ['room', 'wall', 'door', 'stairs', 'cabinet'];
   let currentZoneKind = ZONE_KINDS[0];
   const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
   const zoneKindOf = (r) => ZONE_KINDS.includes(r?.kind)
     ? r.kind : (r?.op === 'subtract' ? 'wall' : 'room');
   const zoneModeId = (k) => (k === 'room' ? 'drop' : k);
-  const zoneColor = (k) => (k === 'room' ? 0x2dd4bf : 0xff6b6b); // wall + door subtract identically for now
+  const zoneColor = (k) => (k === 'room' ? 0x2dd4bf : 0xff6b6b); // all subtract kinds share visuals for now
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -1932,8 +1933,8 @@ export function setupMR(view, project, getFootprint) {
     rlog('marker type', { type: currentMarkerType });
   }
 
-  // PLAN · DROP thumbstick-y: pick which kind the next drop places. WALL and DOOR
-  // currently share subtract geometry, but the rectangle keeps its distinct kind.
+  // PLAN · DROP thumbstick-y: pick which kind the next drop places. All non-room
+  // kinds currently share subtract geometry, but the rectangle keeps its identity.
   function cycleZoneKind(dir = 1) {
     const i = ZONE_KINDS.indexOf(currentZoneKind);
     currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
@@ -2521,7 +2522,7 @@ export function setupMR(view, project, getFootprint) {
   const C_UNIT = 0xa78bfa; // UNIT (display/input units) accent
   const C_LANG = 0x94a3b8; // LANG (UI language switch) accent — neutral slate
 
-  // Drop a throwaway starter rectangle (ROOM = add; WALL/DOOR = subtract) at the user's
+  // Drop a throwaway starter rectangle (ROOM = add; every other kind = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
   // edges get pushed to the real walls in EDGE mode. It becomes the active rect.
   function dropRect(kind) {
@@ -2541,8 +2542,8 @@ export function setupMR(view, project, getFootprint) {
     rlog('drop rect', { id: rect.id, kind, op, px: +px.toFixed(3), py: +py.toFixed(3) });
   }
 
-  // PLAN · EDIT thumbstick-y: cycle the selected zone's authored kind. WALL and
-  // DOOR both map to subtract until door-specific geometry arrives.
+  // PLAN · EDIT thumbstick-y: cycle the selected zone's authored kind. Every
+  // non-room kind maps to subtract until type-specific geometry arrives.
   function cycleSelectedZoneKind(dir = 1) {
     if (!selectedRect) return;
     const current = zoneKindOf(selectedRect);
@@ -2552,7 +2553,7 @@ export function setupMR(view, project, getFootprint) {
     project.touch();
     buildPlan();
     applyPlanMatrix();
-    setModeInfo(); // PLAN · EDIT · ROOM/WALL/DOOR makes the persisted kind visible
+    setModeInfo(); // the PLAN · EDIT breadcrumb makes the persisted kind visible
     rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
   }
 
@@ -2591,7 +2592,7 @@ export function setupMR(view, project, getFootprint) {
 
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
-  // visible. FLOOR + REGISTER set up the frame; ROOM/WALL/DOOR drop zones and EDGE snaps
+  // visible. FLOOR + REGISTER set up the frame; DROP authors typed zones and EDGE snaps
   // their edges to the real walls.
   const modes = [
     {
@@ -2653,7 +2654,7 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'drop', color: 0x2dd4bf, // fallback; live color = zoneColor(currentZoneKind), see modeColor
       // One action: drop a rectangle of the current zone kind (ROOM = add roomspace;
-      // WALL/DOOR = subtract solid for now) at your standing position. Thumbstick up/down picks the kind
+      // every other kind = subtract solid for now) at your standing position. Thumbstick up/down picks the kind
       // (label + accent track it); push the edges to the real walls in EDGE.
       onTouch: () => dropRect(currentZoneKind),
     },
@@ -2686,14 +2687,16 @@ export function setupMR(view, project, getFootprint) {
       // PLAN editing domain: select a zone under the floor pointer; pressing again
       // cycles DOWN through overlapping zones (wraps), so any buried zone is
       // reachable. Outlets are deliberately ignored here. The selection persists +
-      // is zebra-highlighted. GRIP deletes it; B/Y swaps room<->wall.
+      // is zebra-highlighted. GRIP deletes it; thumbstick-y cycles its zone kind.
       onTouch: () => {
         if (!placed) return;
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
         setModeInfo();
-        rlog('edit select', { id: selectedRect.id, op: selectedRect.op, stack: hoverStack.length });
+        rlog('edit select', {
+          id: selectedRect.id, kind: zoneKindOf(selectedRect), op: selectedRect.op, stack: hoverStack.length,
+        });
       },
     },
     {
@@ -2879,7 +2882,7 @@ export function setupMR(view, project, getFootprint) {
     : id === 'sheet' ? `${t('mode.sheet')} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
-  // PLAN · DROP's accent follows boolean behavior (green ROOM; red WALL/DOOR);
+  // PLAN · DROP's accent follows boolean behavior (green ROOM; red subtract kinds);
   // every other mode uses its static color.
   const modeColor = (m) => (m.id === 'drop' ? zoneColor(currentZoneKind) : m.color);
 
@@ -2894,7 +2897,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Refresh EVERY per-mode panel (label chip + help/info box) to the current mode's tool
-  // label and color — including any thumbstick-picked kind (DROP room/wall/door, MARKER type).
+  // label and color — including any thumbstick-picked kind (DROP zone kind, MARKER type).
   // Shared by setMode, the language switch, and the kind pickers so the help box never goes
   // stale behind the label (e.g. switching ROOM->WALL must update both, not just the chip).
   function setModeInfo() {
@@ -3281,7 +3284,7 @@ export function setupMR(view, project, getFootprint) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
     // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS flip only; does NOT cycle modes),
     // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
-    // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT room-wall-door).
+    // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT zone type).
     // Latch onto whichever controller is being used, then read ONLY that one.
     for (const src of frame.session.inputSources) {
       if (src.gamepad && isActing(src.gamepad)) activeSource = src;
@@ -3328,7 +3331,7 @@ export function setupMR(view, project, getFootprint) {
     }
     // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
     // UNIT = display/input unit, LANG = language, MARKER = retype the selected marker (or the drop type if none
-    // selected), PLAN·DROP = room/wall/door to add, PLAN·EDIT = selected zone kind.
+    // selected), PLAN·DROP = zone kind to add, PLAN·EDIT = selected zone kind.
     // Inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
       const modeId = modes[currentMode].id;
@@ -3336,7 +3339,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'unit') cycleUnit(stickY < 0 ? -1 : 1); // up = previous in the list
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
-      else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick room / wall / door
+      else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'sheet') cycleSheetFloor(stickY < 0 ? 1 : -1); // preview prev / next floor
       btn.stickY = true;
@@ -3376,14 +3379,17 @@ export function setupMR(view, project, getFootprint) {
     // markers are hidden so the two don't clutter or read as both being live.
     const activeCtl = pickSource(frame);
     for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
-    // Echo the pointed-at constraint's value big on the active controller so
-    // small in-world dimension text can be read up close.
+    // Echo the pointed-at constraint's value big on the active controller. PLAN ·
+    // EDIT instead owns this prominent pill for the selected zone kind; the small
+    // breadcrumb alone proved too easy to miss on-device.
     const hovSprite = pickDimLabel(activeCtl);
     const hovDim = hovSprite?.userData.dimText ?? null;
+    const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
+    const readoutText = editKind ? `${t('zone.type')} · ${t(`mode.${zoneModeId(editKind)}`)}` : hovDim;
     controllers.forEach((c, i) => {
-      const on = c.userData.inputSource === activeCtl && !!hovDim;
+      const on = c.userData.inputSource === activeCtl && !!readoutText;
       readouts[i].sprite.visible = on;
-      if (on) readouts[i].setText(hovDim, 0x79c0ff);
+      if (on) readouts[i].setText(readoutText, editKind ? zoneColor(editKind) : 0x79c0ff);
     });
     // Minimal HUD: build stamp + the controller pointer and the reticle's floor
     // point, BOTH in plan coordinates (relative to the registered origin, yaw-
@@ -3738,7 +3744,7 @@ export function setupMR(view, project, getFootprint) {
       }
       if (hoverUnit !== prevHoverUnit) { redrawUnitMenu(); prevHoverUnit = hoverUnit; }
     } else {
-      // ROOM/WALL/DOOR: no floor target (drops at the standing position).
+      // DROP modes: no floor target (zones drop at the standing position).
       reticle.visible = false;
       edgeHi.visible = false;
     }
