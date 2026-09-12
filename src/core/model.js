@@ -191,6 +191,29 @@ export class Project {
     this._emit();
   }
 
+  // Move one floor's complete authored plan into another EMPTY floor. Rectangle,
+  // constraint, and marker objects move together so every id/reference remains valid;
+  // storey metadata (name, height, elevation, ground designation) stays with its floor.
+  // Returns a result instead of overwriting or merging destination data implicitly.
+  moveFloorContents(sourceId, targetId) {
+    const source = this.floors.find((f) => f.id === sourceId);
+    const target = this.floors.find((f) => f.id === targetId);
+    if (!source || !target || source === target) return { ok: false, reason: 'invalid' };
+    const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length;
+    if (!hasContent(source)) return { ok: false, reason: 'empty' };
+    if (hasContent(target)) return { ok: false, reason: 'occupied' };
+
+    target.rectangles = source.rectangles;
+    target.constraints = source.constraints;
+    target.markers = source.markers;
+    source.rectangles = [];
+    source.constraints = [];
+    source.markers = [];
+    this.activeFloorId = target.id;
+    this._emit();
+    return { ok: true, source, target };
+  }
+
   addRectangle(rect) {
     this.rectangles.push(rect);
     this._emit();

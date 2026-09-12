@@ -122,6 +122,16 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] LOAD also round-trips **markers + outlet pins** *(needs an outlet in the scene to confirm)*
 - [x] Overlays rebuild correctly after LOAD
 
+## PROJECT · MOVE UP / MOVE DOWN (`move_up` / `move_down`)  ⬜ NEW — build-verified only
+- [ ] From Ground, trigger moves all rectangles, constraints, and markers to Upper
+- [ ] From Ground, MOVE DOWN transfers the same complete plan to Basement
+- [ ] Upper becomes active and its overlay appears at the Upper elevation; Ground becomes empty
+- [ ] Floor names, storey heights, elevations, and the ground-floor datum do not move
+- [ ] Trigger refuses an occupied Upper floor without changing either floor
+- [ ] MOVE UP on the top floor, MOVE DOWN on the bottom floor, or either action on an empty source is a visible no-op
+- [ ] SAVE/LOAD round-trips the moved plan on its new floor
+- [ ] Grip and thumbstick up/down are inert
+
 ## PROJECT · SHEET (`sheet`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
 > Preview + download a to-scale plan sheet. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).

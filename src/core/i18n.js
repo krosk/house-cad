@@ -37,6 +37,8 @@ const STRINGS = {
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
   'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
+  'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
+  'mode.move_down': { en: 'MOVE DOWN', fr: 'DESCENDRE', zh: '下移' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
@@ -110,6 +112,16 @@ const STRINGS = {
     fr: 'Aperçu de la planche à l’échelle. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en SVG (enregistré sur le casque).',
     zh: '预览按比例的平面图纸。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为 SVG（保存到头显）。',
   },
+  'help.move_up': {
+    en: 'Trigger to move the active floor’s complete plan to the empty floor immediately above. Occupied floors are never overwritten.',
+    fr: 'Gâchette pour déplacer tout le plan de l’étage actif vers l’étage vide juste au-dessus. Un étage occupé n’est jamais écrasé.',
+    zh: '扣动扳机，将当前楼层的完整平面移动到紧邻的空白上层。绝不会覆盖已有内容。',
+  },
+  'help.move_down': {
+    en: 'Trigger to move the active floor’s complete plan to the empty floor immediately below. Occupied floors are never overwritten.',
+    fr: 'Gâchette pour déplacer tout le plan de l’étage actif vers l’étage vide juste en dessous. Un étage occupé n’est jamais écrasé.',
+    zh: '扣动扳机，将当前楼层的完整平面移动到紧邻的空白下层。绝不会覆盖已有内容。',
+  },
   'help.lang': {
     en: 'Push the thumbstick up/down to change language. Applies everywhere at once.',
     fr: 'Poussez le joystick haut/bas pour changer de langue. S’applique partout aussitôt.',
@@ -149,6 +161,13 @@ const STRINGS = {
   'slot.loaded':    { en: 'LOADED',    fr: 'CHARGÉ',       zh: '已加载' },
   'slot.saveFailed': { en: 'SAVE FAILED', fr: 'ÉCHEC ENREG.', zh: '保存失败' },
   'slot.loadFailed': { en: 'LOAD FAILED', fr: 'ÉCHEC CHARG.', zh: '加载失败' },
+
+  // --- MOVE UP result flashes -------------------------------------------------
+  'moveFloor.moved':    { en: 'MOVED TO', fr: 'DÉPLACÉ VERS', zh: '已移动至' },
+  'moveFloor.noUpper':  { en: 'NO FLOOR ABOVE', fr: 'AUCUN ÉTAGE AU-DESSUS', zh: '没有上层' },
+  'moveFloor.noLower':  { en: 'NO FLOOR BELOW', fr: 'AUCUN ÉTAGE EN DESSOUS', zh: '没有下层' },
+  'moveFloor.empty':    { en: 'ACTIVE FLOOR EMPTY', fr: 'ÉTAGE ACTIF VIDE', zh: '当前楼层为空' },
+  'moveFloor.occupied': { en: 'DESTINATION NOT EMPTY', fr: 'DESTINATION NON VIDE', zh: '目标楼层不是空白楼层' },
 
   // --- LEVEL height pad title -------------------------------------------------
   'level.base':        { en: 'base', fr: 'base', zh: '标高' },

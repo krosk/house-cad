@@ -2030,6 +2030,41 @@ export function setupMR(view, project, getFootprint) {
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
 
+  // ---- MOVE UP: transfer the active floor's authored contents one storey up ----
+  let moveFloorFlashTimer = null;
+  function moveFloorFlash(msg) {
+    for (const l of labels) l.setText(msg, modes[currentMode].color);
+    clearTimeout(moveFloorFlashTimer);
+    moveFloorFlashTimer = setTimeout(() => {
+      if (modes[currentMode].id === 'move_up' || modes[currentMode].id === 'move_down') setModeInfo();
+    }, 1800);
+  }
+
+  function moveFloorBy(delta) {
+    const source = project.activeFloor;
+    const i = project.floors.indexOf(source);
+    const target = project.floors[i + delta];
+    if (!target) {
+      const reason = delta > 0 ? 'no upper floor' : 'no lower floor';
+      moveFloorFlash(t(delta > 0 ? 'moveFloor.noUpper' : 'moveFloor.noLower'));
+      rlog('move floor refused', { reason, source: source?.name });
+      return;
+    }
+    const result = project.moveFloorContents(source.id, target.id);
+    if (!result.ok) {
+      const key = result.reason === 'occupied' ? 'moveFloor.occupied' : 'moveFloor.empty';
+      moveFloorFlash(t(key));
+      rlog('move floor refused', { reason: result.reason, source: source.name, target: target.name });
+      return;
+    }
+    afterFloorChange(); // target is now active; rebuild at its elevation
+    moveFloorFlash(`${t('moveFloor.moved')} ${target.name}`);
+    rlog(delta > 0 ? 'move floor up' : 'move floor down', {
+      source: source.name, target: target.name,
+      rects: target.rectangles.length, constraints: target.constraints.length, markers: target.markers.length,
+    });
+  }
+
   // ---- LANG: switch the UI language (see i18n.js) ----
   const redrawLangMenu = () => langMenu.draw('#' + C_LANG.toString(16).padStart(6, '0'), hoverLang);
 
@@ -2559,6 +2594,16 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onSheetTouch,
     },
     {
+      id: 'move_up', color: 0x60a5fa,
+      // Safe whole-plan reassignment: the next higher floor must exist and be empty.
+      onTouch: () => moveFloorBy(1),
+    },
+    {
+      id: 'move_down', color: 0x818cf8,
+      // Symmetric whole-plan reassignment to the next lower empty floor.
+      onTouch: () => moveFloorBy(-1),
+    },
+    {
       id: 'lang', color: C_LANG, // label/help via i18n: mode.lang / help.lang
       // UI language switch (FR/EN/ZH). The thumbstick up/down moves through the list
       // (see pollModeCycle); a trigger picks the ray-aimed row, or advances one if the
@@ -2571,13 +2616,13 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'save', 'load', 'sheet', 'lang',
+    'marker', 'outlet_dims', 'move_up', 'move_down', 'save', 'load', 'sheet', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
-    save: 'project', load: 'project', sheet: 'project', lang: 'project',
+    move_up: 'project', move_down: 'project', save: 'project', load: 'project', sheet: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -2629,6 +2674,7 @@ export function setupMR(view, project, getFootprint) {
     selectedRect = null; // clear the EDIT selection when changing modes
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
+    clearTimeout(moveFloorFlashTimer);
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];

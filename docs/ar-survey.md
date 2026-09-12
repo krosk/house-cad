@@ -16,14 +16,14 @@ editor (`ar-2d-parity` memory).
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · DROP (room/wall) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
-PROJECT  · SAVE → LOAD → SHEET → LANG
+PROJECT  · MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `sheet`, `lang`.
+`edit`, `plan_dims`, `marker`, `outlet_dims`, `move_up`, `move_down`, `save`, `load`, `sheet`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -78,6 +78,12 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.
+- **PROJECT · MOVE UP / MOVE DOWN** (`id: move_up` / `move_down`) — trigger transfers the active
+  floor's complete authored contents (rectangles, constraints, and markers) to the immediately
+  higher/lower floor and makes it active. The source becomes empty. The operation refuses an absent
+  or occupied destination, so it
+  never overwrites or implicitly merges data; floor names, heights, elevations, and the ground datum
+  stay attached to their existing storeys.
 - **SHEET** (`id: sheet`) — preview + download the to-scale plan sheet, ONE floor at a time.
   A floating panel (`makeSheetPanel`) shows a floor rasterized by `floorToCanvas`
   (`src/io/planSheet.js`) — the SAME renderer that produces the printable/downloadable SVG,
