@@ -13,7 +13,7 @@ import {
   serializeProject, deserializeInto,
 } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
-import { floorToSvg } from './io/planSheet.js';
+import { floorToSvg, floorsToSharedScaleSvgs } from './io/planSheet.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
@@ -473,17 +473,25 @@ fileInput.addEventListener('change', async () => {
 // ---- print / SVG plan sheets ----
 // A to-scale floor-plan sheet per floor, drawn from the model (src/io/planSheet.js).
 // "Print all floors" opens a hidden iframe holding every floor's SVG (one per page)
-// and invokes the browser print dialog → Save as PDF. "Download SVG" saves the
-// active floor as a vector file. Sheets are in real mm; print at 100% for true scale.
+// at a shared, maximized scale, then invokes the browser print dialog → Save as PDF.
+// "Download SVG" saves the active floor as a vector file. Sheets are in real mm;
+// print at 100% for true scale.
 function safeName(s) {
   return (s || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor';
 }
 
 function printSheets(svgs) {
+  // Every SVG in a shared print set has the same physical page dimensions. Feed
+  // those dimensions to @page so the browser does not silently rotate/scale a
+  // landscape set back onto its default portrait paper.
+  const size = svgs[0]?.match(/width="([\d.]+)mm" height="([\d.]+)mm"/);
+  const pageSize = size ? `${size[1]}mm ${size[2]}mm` : 'auto';
+  const sheetSize = size ? `width:${size[1]}mm;height:${size[2]}mm;` : '';
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>House CAD — plan</title>'
-    + '<style>@page{margin:0}html,body{margin:0;padding:0}'
-    + '.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}'
-    + 'svg{display:block}</style></head><body>'
+    + `<style>@page{size:${pageSize};margin:0}html,body{margin:0;padding:0}`
+    + `.sheet{${sheetSize}overflow:hidden;break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always}`
+    + '.sheet:last-child{break-after:auto;page-break-after:auto}'
+    + 'svg{display:block;width:100%;height:100%}</style></head><body>'
     + svgs.map((s) => `<div class="sheet">${s}</div>`).join('')
     + '</body></html>';
   const iframe = document.createElement('iframe');
@@ -521,7 +529,7 @@ function printSheets(svgs) {
           download(`plan-${safeName(f.name)}.svg`, floorToSvg(f), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
         } else {
-          printSheets(project.floors.map((f) => floorToSvg(f)));
+          printSheets(floorsToSharedScaleSvgs(project.floors));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');
         }
       } catch (err) {

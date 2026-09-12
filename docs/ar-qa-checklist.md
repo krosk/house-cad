@@ -168,6 +168,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
+- [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
+- [ ] All printed pages share one orientation and page size; the complete stacked extent fills the available drawing area
+- [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
+- [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
 - [ ] **Thumbstick up/down** cycles the previewed floor (wraps); label reads `SHEET · <FloorName>`
 - [ ] The previewed floor's geometry matches that floor (not the active one) after cycling
 - [ ] **Trigger** downloads the SVG; the label flashes `⬇ plan-<floor>.svg` (or `download blocked`)

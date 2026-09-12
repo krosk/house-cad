@@ -256,7 +256,11 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   values and does not independently push labels or lines around rooms. Constraints without saved
   placement use the normal auto gap and midpoint. Marker heights sit in white knockout chips.
 - Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →
-  browser Save-as-PDF; or Download SVG (active floor). **Print at 100% for true scale.**
+  browser Save-as-PDF. Multi-floor print unions every floor's content bounds, chooses one shared
+  portrait/landscape orientation, and uses the largest exact scale that fits that complete stack
+  (`floorsToSharedScaleSvgs`). Every page therefore has the same paper size, scale, and transform:
+  model origin `(0,0)` lands at the same paper point, so printed floors can be superposed to inspect
+  overlap. Download SVG still optimizes the active floor alone. **Print at 100% for true scale.**
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
   (AR preview) is build-verified only** — no browser/Quest raster test in CI.
 

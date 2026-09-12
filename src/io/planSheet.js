@@ -207,14 +207,35 @@ function contentBBox(floor, footprint) {
   return { x0, y0, x1, y1 };
 }
 
+function pageDimensions(page, orientation) {
+  return orientation === 'landscape'
+    ? { w: Math.max(page.w, page.h), h: Math.min(page.w, page.h) }
+    : { w: Math.min(page.w, page.h), h: Math.max(page.w, page.h) };
+}
+
+function orientationCapacity(bbox, page, orientation) {
+  const oriented = pageDimensions(page, orientation);
+  const cw = Math.max(bbox.x1 - bbox.x0, 1e-3);
+  const ch = Math.max(bbox.y1 - bbox.y0, 1e-3);
+  const availW = oriented.w - 2 * MARGIN - DIM_RESERVE;
+  const availH = oriented.h - 2 * MARGIN - STRIP - DIM_RESERVE;
+  return Math.min(availW / cw, availH / ch);
+}
+
+function bestOrientation(bbox, page) {
+  return orientationCapacity(bbox, page, 'landscape') > orientationCapacity(bbox, page, 'portrait')
+    ? 'landscape' : 'portrait';
+}
+
 function layoutSheet(bbox, opts) {
   const page = PAGES[opts.page] || PAGES.a4;
   const cw = Math.max(bbox.x1 - bbox.x0, 1e-3);
   const ch = Math.max(bbox.y1 - bbox.y0, 1e-3);
-  // Orientation: match the content's aspect to the paper's.
-  const landscape = cw / ch > page.w / page.h;
-  const pageW = landscape ? Math.max(page.w, page.h) : Math.min(page.w, page.h);
-  const pageH = landscape ? Math.min(page.w, page.h) : Math.max(page.w, page.h);
+  // Pick the orientation by actual usable-space fit (the asymmetric title/dim
+  // reserves mean a raw content-vs-paper aspect comparison is not quite optimal).
+  const orientation = opts.orientation || bestOrientation(bbox, page);
+  const oriented = pageDimensions(page, orientation);
+  const pageW = oriented.w, pageH = oriented.h;
 
   const availW = pageW - 2 * MARGIN - DIM_RESERVE;         // right band reserved for y-dims
   const availH = pageH - 2 * MARGIN - STRIP - DIM_RESERVE; // top band reserved for x-dims
@@ -223,7 +244,11 @@ function layoutSheet(bbox, opts) {
 
   // Pick the finest round ratio that fits; else fit exactly and report it.
   let mmPerM = 0, ratio = 0, exact = false;
-  if (opts.ratio && RATIOS.includes(opts.ratio)) { ratio = opts.ratio; mmPerM = 1000 / ratio; }
+  if (Number.isFinite(opts.mmPerM) && opts.mmPerM > 0) {
+    mmPerM = opts.mmPerM;
+    ratio = 1000 / mmPerM;
+    exact = true;
+  } else if (opts.ratio && RATIOS.includes(opts.ratio)) { ratio = opts.ratio; mmPerM = 1000 / ratio; }
   else {
     for (const r of RATIOS) {
       const m = 1000 / r;
@@ -238,7 +263,7 @@ function layoutSheet(bbox, opts) {
   const X = (mx) => offX + (mx - bbox.x0) * mmPerM;
   const Y = (my) => offTopY + (bbox.y1 - my) * mmPerM;
 
-  return { page: { w: pageW, h: pageH }, mmPerM, ratio, exact, X, Y, bbox };
+  return { page: { w: pageW, h: pageH }, orientation, mmPerM, ratio, exact, X, Y, bbox };
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +460,8 @@ function drawStrip(be, L, floor, opts) {
   be.text(`${fmt(barMeters)} ${unitLabel()}`, bx + barMM, by + 2.6, { fill: '#000', size: 2.2, align: 'center' });
 
   // Scale + unit caption (center).
-  be.text(`${exact ? '≈ ' : ''}1:${ratio}  ·  ${unitLabel()}`, page.w / 2, rowY,
+  const ratioText = exact ? ratio.toFixed(1).replace(/\.0$/, '') : String(ratio);
+  be.text(`1:${ratioText}  ·  ${unitLabel()}`, page.w / 2, rowY,
     { fill: '#000', size: 3, align: 'center', baseline: 'middle' });
 
   // Legend (right): one entry per marker type present on this floor.
@@ -466,13 +492,20 @@ function renderFloor(be, floor, opts = {}) {
   const footprint = computeFootprint(floor.rectangles);
   const bbox = contentBBox(floor, footprint);
   if (!bbox) {
-    // Empty floor: just a name + note, centered.
+    // In a shared print set, even an empty floor uses the common page orientation
+    // and scale so its paper edges still align with every other storey.
+    if (opts.layoutBBox) {
+      const L = layoutSheet(opts.layoutBBox, opts);
+      be.text('(empty floor)', L.page.w / 2, L.page.h / 2, { fill: '#888', size: 4, align: 'center', baseline: 'middle' });
+      drawStrip(be, L, floor, opts);
+      return L;
+    }
     const page = PAGES[opts.page] || PAGES.a4;
     be.text(floor.name || 'Floor', MARGIN, MARGIN + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
     be.text('(empty floor)', page.w / 2, page.h / 2, { fill: '#888', size: 4, align: 'center', baseline: 'middle' });
     return { page, ratio: 0, exact: false };
   }
-  const L = layoutSheet(bbox, opts);
+  const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
   drawDimensions(be, L, floor);
   drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
@@ -495,6 +528,32 @@ export function floorToSvg(floor, opts = {}) {
 }
 
 /**
+ * Render one SVG per floor through one common paper transform. A union bounding
+ * box selects one orientation and the largest exact scale that fits the complete
+ * stack; therefore model origin (0,0) maps to the same paper point on every page.
+ */
+export function floorsToSharedScaleSvgs(floors, opts = {}) {
+  const page = PAGES[opts.page] || PAGES.a4;
+  const boxes = floors.map((floor) => {
+    const footprint = computeFootprint(floor.rectangles);
+    return contentBBox(floor, footprint);
+  }).filter(Boolean);
+  if (!boxes.length) return floors.map((floor) => floorToSvg(floor, opts));
+  const layoutBBox = boxes.reduce((all, bbox) => ({
+    x0: Math.min(all.x0, bbox.x0), y0: Math.min(all.y0, bbox.y0),
+    x1: Math.max(all.x1, bbox.x1), y1: Math.max(all.y1, bbox.y1),
+  }), { ...boxes[0] });
+  const orientation = opts.orientation || bestOrientation(layoutBBox, page);
+  const mmPerM = orientationCapacity(layoutBBox, page, orientation);
+  return floors.map((floor) => floorToSvg(floor, {
+    ...opts,
+    layoutBBox,
+    orientation,
+    mmPerM,
+  }));
+}
+
+/**
  * Render one floor onto a canvas at ~targetLongPx on its long edge. Sizes the
  * canvas to the page aspect, fills white, and draws. Returns the layout.
  * Used for the in-AR preview panel (canvas -> CanvasTexture).
@@ -503,7 +562,8 @@ export function floorToCanvas(floor, canvas, opts = {}) {
   // First lay out to know the page size (needs the bbox), then size the canvas.
   const footprint = computeFootprint(floor.rectangles);
   const bbox = contentBBox(floor, footprint);
-  const page = bbox ? layoutSheet(bbox, opts).page : (PAGES[opts.page] || PAGES.a4);
+  const sheetBBox = opts.layoutBBox || bbox;
+  const page = sheetBBox ? layoutSheet(sheetBBox, opts).page : (PAGES[opts.page] || PAGES.a4);
   const targetLong = opts.targetPx || 2048;
   const k = targetLong / Math.max(page.w, page.h); // px per mm
   canvas.width = Math.round(page.w * k);
