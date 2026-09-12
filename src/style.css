@@ -239,6 +239,19 @@ body {
   line-height: 1;
 }
 .fc-head button:hover { border-color: var(--accent); }
+.fc-transfer { display: flex; gap: 4px; padding: 4px; border-bottom: 1px solid var(--line); }
+.fc-transfer button {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 2px;
+  color: var(--text);
+  background: #30353f;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.fc-transfer button:hover { border-color: var(--accent); }
 .fc-list { display: flex; flex-direction: column; padding: 4px; gap: 2px; overflow-y: auto; }
 /* Rows render top floor first (highest storey on top), matching the stack. */
 .fc-row {

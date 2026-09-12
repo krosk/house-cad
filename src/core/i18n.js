@@ -38,6 +38,8 @@ const STRINGS = {
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
   'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
+  'mode.copy_floor': { en: 'COPY FLOOR', fr: 'COPIER ÉTAGE', zh: '复制楼层' },
+  'mode.paste_floor': { en: 'PASTE FLOOR', fr: 'COLLER ÉTAGE', zh: '粘贴楼层' },
   'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
   'mode.move_down': { en: 'MOVE DOWN', fr: 'DESCENDRE', zh: '下移' },
   'mode.unit':     { en: 'UNIT',   fr: 'UNITÉ',     zh: '单位' },
@@ -100,9 +102,9 @@ const STRINGS = {
     zh: '仅编辑标记尺寸。先选择标记地面图标，再选择平面边并输入距离（0 = 贴墙）。对应的墙上标记也会高亮。',
   },
   'help.save': {
-    en: 'Aim the ray at a slot and trigger to save the whole project there (overwrites a filled slot).',
-    fr: 'Visez un emplacement et gâchette pour y enregistrer tout le projet (écrase un emplacement occupé).',
-    zh: '用射线瞄准一个槽位并扣动扳机，将整个项目保存到该处（会覆盖已占用的槽位）。',
+    en: 'Aim at a slot and trigger to save. For an occupied slot, select the separate CONFIRM OVERWRITE button.',
+    fr: 'Visez un emplacement et appuyez pour enregistrer. S’il est occupé, sélectionnez le bouton CONFIRMER L’ÉCRASEMENT.',
+    zh: '瞄准槽位并扣动扳机保存。若槽位已有内容，请选择单独的“确认覆盖”按钮。',
   },
   'help.load': {
     en: 'Aim at a filled slot and trigger to load it into the frame you already registered. Empty slots do nothing.',
@@ -113,6 +115,16 @@ const STRINGS = {
     en: 'Preview the to-scale plan sheet. Thumbstick up/down: previous/next floor. Trigger downloads this floor as an SVG (saved to the headset).',
     fr: 'Aperçu de la planche à l’échelle. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en SVG (enregistré sur le casque).',
     zh: '预览按比例的平面图纸。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为 SVG（保存到头显）。',
+  },
+  'help.copy_floor': {
+    en: 'Trigger to copy the active floor, including its dimensions and markers. It remains available after loading another save.',
+    fr: 'Gâchette pour copier l’étage actif, avec ses cotes et marqueurs. Il reste disponible après le chargement d’une autre sauvegarde.',
+    zh: '扣动扳机复制当前楼层，包括尺寸和标记。加载另一个存档后仍可粘贴。',
+  },
+  'help.paste_floor': {
+    en: 'Trigger to replace the active floor’s plan from the clipboard. Its name and height stay. An occupied floor asks for a second trigger.',
+    fr: 'Gâchette pour remplacer le plan de l’étage actif. Son nom et sa hauteur restent. Un étage occupé demande une seconde gâchette.',
+    zh: '扣动扳机，用剪贴板替换当前楼层平面。名称和层高保持不变。非空楼层需再次扣动确认。',
   },
   'help.move_up': {
     en: 'Trigger to move the active floor’s complete plan to the empty floor immediately above. Occupied floors are never overwritten.',
@@ -166,6 +178,8 @@ const STRINGS = {
   'slot.rects':     { en: 'rects', fr: 'rect.',  zh: '个矩形' },
   'slot.saved':     { en: 'SAVED →',   fr: 'ENREGISTRÉ →', zh: '已保存 →' },
   'slot.overwrite': { en: 'OVERWRITE', fr: 'ÉCRASER', zh: '覆盖' },
+  'slot.confirmOverwrite': { en: 'CONFIRM OVERWRITE', fr: 'CONFIRMER ÉCRASEMENT', zh: '确认覆盖' },
+  'slot.cancel':    { en: 'CANCEL', fr: 'ANNULER', zh: '取消' },
   'slot.triggerAgain': { en: 'TRIGGER AGAIN', fr: 'GÂCHETTE ENCORE', zh: '再次扣动扳机' },
   'slot.loaded':    { en: 'LOADED',    fr: 'CHARGÉ',       zh: '已加载' },
   'slot.saveFailed': { en: 'SAVE FAILED', fr: 'ÉCHEC ENREG.', zh: '保存失败' },
@@ -177,6 +191,13 @@ const STRINGS = {
   'moveFloor.noLower':  { en: 'NO FLOOR BELOW', fr: 'AUCUN ÉTAGE EN DESSOUS', zh: '没有下层' },
   'moveFloor.empty':    { en: 'ACTIVE FLOOR EMPTY', fr: 'ÉTAGE ACTIF VIDE', zh: '当前楼层为空' },
   'moveFloor.occupied': { en: 'DESTINATION NOT EMPTY', fr: 'DESTINATION NON VIDE', zh: '目标楼层不是空白楼层' },
+
+  // --- COPY/PASTE FLOOR result flashes ---------------------------------------
+  'floorCopy.copied': { en: 'COPIED', fr: 'COPIÉ', zh: '已复制' },
+  'floorCopy.pasted': { en: 'PASTED', fr: 'COLLÉ', zh: '已粘贴' },
+  'floorCopy.replace': { en: 'REPLACE', fr: 'REMPLACER', zh: '替换' },
+  'floorCopy.empty':  { en: 'NOTHING COPIED', fr: 'RIEN À COLLER', zh: '没有可粘贴的楼层' },
+  'floorCopy.failed': { en: 'PASTE FAILED', fr: 'ÉCHEC DU COLLAGE', zh: '粘贴失败' },
 
   // --- LEVEL height pad title -------------------------------------------------
   'level.base':        { en: 'base', fr: 'base', zh: '标高' },

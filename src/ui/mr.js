@@ -18,7 +18,10 @@ import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstrain
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
-import { serializeProject, deserializeInto } from '../io/serialize.js';
+import {
+  FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
+  serializeProject, deserializeInto,
+} from '../io/serialize.js';
 import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { rlog } from './remoteLog.js';
@@ -296,6 +299,10 @@ export function setupMR(view, project, getFootprint) {
     group.visible = false;
 
     const TITLE_H = 96, CELL_H = (H - TITLE_H) / SLOT_ROWS, CELL_W = W / SLOT_COLS;
+    const ACTIONS = {
+      confirm: { x: 32, y: 244, w: W - 64, h: 126 },
+      cancel: { x: 32, y: 402, w: W - 64, h: 126 },
+    };
 
     // Plane UV -> slot index (or null). Texture flipY maps canvas-top to v=1.
     function slotAt(u, v) {
@@ -307,8 +314,18 @@ export function setupMR(view, project, getFootprint) {
       return row * SLOT_COLS + col;
     }
 
+    // Confirmation replaces the slot grid with two genuinely separate buttons.
+    // The old slot is therefore not a valid target for the confirming trigger.
+    function actionAt(u, v) {
+      const cx = u * W, cy = (1 - v) * H;
+      for (const [id, r] of Object.entries(ACTIONS)) {
+        if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) return id;
+      }
+      return null;
+    }
+
     // metaFor(i) -> {rects, when} | null ; accent is the mode's color as '#rrggbb'.
-    function draw(title, accent, hoverSlot, metaFor) {
+    function draw(title, accent, hoverSlot, metaFor, confirmSlot = null, hoverAction = null) {
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.94)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
@@ -316,6 +333,30 @@ export function setupMR(view, project, getFootprint) {
       ctx.font = 'bold 40px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(title, 26, TITLE_H / 2);
+      if (confirmSlot != null) {
+        const meta = metaFor(confirmSlot);
+        ctx.fillStyle = '#e6edf3';
+        ctx.font = 'bold 34px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${t('slot.slot')} ${confirmSlot + 1}`, W / 2, 142);
+        if (meta) {
+          ctx.fillStyle = '#8b949e';
+          ctx.font = '25px sans-serif';
+          ctx.fillText(`${meta.rects} ${t('slot.rects')}  ·  ${meta.when}`, W / 2, 186);
+        }
+        for (const [id, r] of Object.entries(ACTIONS)) {
+          const hot = id === hoverAction;
+          const color = id === 'confirm' ? '#ff9f43' : '#4b5563';
+          ctx.fillStyle = hot ? color : (id === 'confirm' ? 'rgba(120,65,20,0.9)' : 'rgba(48,54,61,0.95)');
+          ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 18); ctx.fill();
+          ctx.fillStyle = hot ? '#0d1117' : '#e6edf3';
+          ctx.font = 'bold 30px sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(t(id === 'confirm' ? 'slot.confirmOverwrite' : 'slot.cancel'), r.x + r.w / 2, r.y + r.h / 2);
+        }
+        tex.needsUpdate = true;
+        return;
+      }
       for (let i = 0; i < SLOT_COUNT; i++) {
         const row = Math.floor(i / SLOT_COLS), col = i % SLOT_COLS;
         const x = col * CELL_W + 8, y = TITLE_H + row * CELL_H + 8;
@@ -344,7 +385,7 @@ export function setupMR(view, project, getFootprint) {
       tex.needsUpdate = true;
     }
 
-    return { group, mesh, slotAt, draw };
+    return { group, mesh, slotAt, actionAt, draw };
   }
 
   // SHEET preview: a floating panel showing one floor's to-scale plan sheet, rasterized
@@ -1279,6 +1320,8 @@ export function setupMR(view, project, getFootprint) {
   let prevHoverKey = null;  // last drawn hover (redraw only on change)
   let hoverSlot = null;     // SAVE/LOAD slot under the ray this frame (0-based)
   let prevHoverSlot = null; // last drawn slot hover
+  let hoverSlotAction = null;     // overwrite screen button under the ray: confirm/cancel
+  let prevHoverSlotAction = null; // last drawn overwrite-button hover
   let hoverLang = null;     // LANG menu row under the ray this frame (lang code)
   let prevHoverLang = null; // last drawn lang hover
   let hoverUnit = null;     // UNIT menu row under the ray this frame (unit id)
@@ -2001,18 +2044,21 @@ export function setupMR(view, project, getFootprint) {
   }
 
   const slotTitle = () => overwriteSlot != null
-    ? `${t('slot.overwrite')} ${overwriteSlot + 1}? ${t('slot.triggerAgain')}`
+    ? `${t('slot.overwrite')} · ${t('slot.slot')} ${overwriteSlot + 1}?`
     : slotFlash || (modes[currentMode].id === 'save' ? t('slot.saveTitle') : t('slot.loadTitle'));
   const slotAccent = () => overwriteSlot != null
     ? '#ff9f43'
     : (modes[currentMode].id === 'save' ? '#51d88a' : '#4ea1ff');
-  const redrawSlotMenu = () => slotMenu.draw(slotTitle(), slotAccent(), hoverSlot, slotMeta);
+  const redrawSlotMenu = () => slotMenu.draw(
+    slotTitle(), slotAccent(), hoverSlot, slotMeta, overwriteSlot, hoverSlotAction,
+  );
 
   function showSlotMenu() {
     placePanel(slotMenu.group);
     slotFlash = null;
     overwriteSlot = null;
     hoverSlot = prevHoverSlot = null;
+    hoverSlotAction = prevHoverSlotAction = null;
     slotMenu.group.visible = true;
     redrawSlotMenu();
   }
@@ -2021,6 +2067,7 @@ export function setupMR(view, project, getFootprint) {
     slotMenu.group.visible = false;
     numpadCursor.visible = false;
     hoverSlot = prevHoverSlot = null;
+    hoverSlotAction = prevHoverSlotAction = null;
     slotFlash = null;
     overwriteSlot = null;
   }
@@ -2093,14 +2140,70 @@ export function setupMR(view, project, getFootprint) {
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
 
-  // ---- MOVE UP: transfer the active floor's authored contents one storey up ----
-  let moveFloorFlashTimer = null;
-  function moveFloorFlash(msg) {
+  // ---- PROJECT one-shot actions: floor clipboard + whole-plan movement ----
+  let projectFlashTimer = null;
+  function projectFlash(msg, sticky = false) {
     for (const l of labels) l.setText(msg, modes[currentMode].color);
-    clearTimeout(moveFloorFlashTimer);
-    moveFloorFlashTimer = setTimeout(() => {
-      if (modes[currentMode].id === 'move_up' || modes[currentMode].id === 'move_down') setModeInfo();
+    clearTimeout(projectFlashTimer);
+    if (sticky) return;
+    projectFlashTimer = setTimeout(() => {
+      if (['copy_floor', 'paste_floor', 'move_up', 'move_down'].includes(modes[currentMode].id)) setModeInfo();
     }, 1800);
+  }
+
+  // The in-memory copy survives LOAD (which replaces project contents), and the
+  // localStorage copy survives a browser/APK relaunch. COPY simply replaces the old
+  // clipboard; PASTE replaces the active floor's authored plan after confirmation.
+  let floorClipboard = null;
+  let pasteConfirmFloorId = null;
+  try {
+    const raw = localStorage.getItem(FLOOR_CLIPBOARD_KEY);
+    if (raw) floorClipboard = JSON.parse(raw);
+  } catch { /* unavailable or invalid storage: keep an in-memory clipboard */ }
+
+  function copyActiveFloor() {
+    floorClipboard = createFloorClipboard(project.activeFloor);
+    try { localStorage.setItem(FLOOR_CLIPBOARD_KEY, JSON.stringify(floorClipboard)); } catch { /* memory copy still works */ }
+    projectFlash(`${t('floorCopy.copied')} ${project.activeFloor.name}`);
+    rlog('floor copied', {
+      name: project.activeFloor.name,
+      rects: project.rectangles.length, constraints: project.constraints.length, markers: project.markers.length,
+    });
+  }
+
+  function pasteCopiedFloor() {
+    // Pick up a clipboard written by the desktop UI after setupMR initialized;
+    // retain the in-memory value if storage is unavailable.
+    try {
+      const raw = localStorage.getItem(FLOOR_CLIPBOARD_KEY);
+      if (raw) floorClipboard = JSON.parse(raw);
+    } catch { /* keep the in-memory clipboard */ }
+    if (!floorClipboard) {
+      projectFlash(t('floorCopy.empty'));
+      return;
+    }
+    const target = project.activeFloor;
+    const occupied = target.rectangles.length || target.constraints.length || target.markers.length;
+    if (occupied && pasteConfirmFloorId !== target.id) {
+      pasteConfirmFloorId = target.id;
+      projectFlash(`${t('floorCopy.replace')} ${target.name}? ${t('slot.triggerAgain')}`, true);
+      rlog('floor paste armed', { target: target.name });
+      return;
+    }
+    try {
+      const floor = pasteFloorClipboard(project, floorClipboard, { targetId: target.id });
+      pasteConfirmFloorId = null;
+      afterFloorChange(); // rebuild all per-floor edit state after replacing the active plan
+      projectFlash(`${t('floorCopy.pasted')} ${floor.name}`);
+      rlog('floor pasted', {
+        name: floor.name, rects: floor.rectangles.length,
+        constraints: floor.constraints.length, markers: floor.markers.length,
+      });
+    } catch (e) {
+      pasteConfirmFloorId = null;
+      projectFlash(t('floorCopy.failed'));
+      rlog('floor paste failed', String(e?.message || e));
+    }
   }
 
   function moveFloorBy(delta) {
@@ -2109,19 +2212,19 @@ export function setupMR(view, project, getFootprint) {
     const target = project.floors[i + delta];
     if (!target) {
       const reason = delta > 0 ? 'no upper floor' : 'no lower floor';
-      moveFloorFlash(t(delta > 0 ? 'moveFloor.noUpper' : 'moveFloor.noLower'));
+      projectFlash(t(delta > 0 ? 'moveFloor.noUpper' : 'moveFloor.noLower'));
       rlog('move floor refused', { reason, source: source?.name });
       return;
     }
     const result = project.moveFloorContents(source.id, target.id);
     if (!result.ok) {
       const key = result.reason === 'occupied' ? 'moveFloor.occupied' : 'moveFloor.empty';
-      moveFloorFlash(t(key));
+      projectFlash(t(key));
       rlog('move floor refused', { reason: result.reason, source: source.name, target: target.name });
       return;
     }
     afterFloorChange(); // target is now active; rebuild at its elevation
-    moveFloorFlash(`${t('moveFloor.moved')} ${target.name}`);
+    projectFlash(`${t('moveFloor.moved')} ${target.name}`);
     rlog(delta > 0 ? 'move floor up' : 'move floor down', {
       source: source.name, target: target.name,
       rects: target.rectangles.length, constraints: target.constraints.length, markers: target.markers.length,
@@ -2161,19 +2264,32 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes an empty slot
-  // immediately but requires confirmation before overwrite; LOAD replaces the whole
+  // immediately but requires its separate confirmation button before overwrite; LOAD replaces the whole
   // project from a filled slot (empty = no-op) and
   // rebuilds the MR view (the registered frame/anchor is untouched — the loaded plan
   // drops into wherever you already registered).
   function onSlotTouch() {
-    if (hoverSlot == null) return;
-    const i = hoverSlot;
     if (modes[currentMode].id === 'save') {
-      // Empty slots save immediately. A populated slot requires a second distinct
-      // trigger on that SAME cell; merely arming it performs no storage write.
-      if (readSlot(i) && overwriteSlot !== i) {
+      // Once armed, the slot grid is gone. Only the new CONFIRM button can write;
+      // CANCEL returns to the grid, and triggering blank panel space is inert.
+      if (overwriteSlot != null) {
+        if (hoverSlotAction === 'cancel') {
+          rlog('slot overwrite cancelled', { slot: overwriteSlot });
+          overwriteSlot = null;
+          hoverSlotAction = prevHoverSlotAction = null;
+          redrawSlotMenu();
+          return;
+        }
+        if (hoverSlotAction !== 'confirm') return;
+      } else if (hoverSlot == null) return;
+      const i = overwriteSlot ?? hoverSlot;
+      // Empty slots save immediately. A populated slot switches to the distinct
+      // confirmation screen; selecting that slot itself performs no storage write.
+      if (overwriteSlot == null && readSlot(i)) {
         overwriteSlot = i;
         slotFlash = null;
+        hoverSlot = prevHoverSlot = null;
+        hoverSlotAction = prevHoverSlotAction = null;
         redrawSlotMenu();
         rlog('slot overwrite armed', { slot: i });
         return;
@@ -2181,14 +2297,18 @@ export function setupMR(view, project, getFootprint) {
       try {
         localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
         overwriteSlot = null;
+        hoverSlotAction = prevHoverSlotAction = null;
         slotFlash = `${t('slot.saved')} ${i + 1}`;
         rlog('slot save', { slot: i });
       } catch (e) {
         overwriteSlot = null;
+        hoverSlotAction = prevHoverSlotAction = null;
         slotFlash = t('slot.saveFailed');
         rlog('slot save FAIL', String(e));
       }
     } else {
+      if (hoverSlot == null) return;
+      const i = hoverSlot;
       const o = readSlot(i);
       if (!o) { slotFlash = `${t('slot.slot')} ${i + 1} ${t('slot.empty')}`; redrawSlotMenu(); return; }
       try {
@@ -2692,6 +2812,16 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onSheetTouch,
     },
     {
+      id: 'copy_floor', color: 0x34d399,
+      // Snapshot the complete active floor into a clipboard that survives LOAD.
+      onTouch: copyActiveFloor,
+    },
+    {
+      id: 'paste_floor', color: 0x2dd4bf,
+      // Replace the active floor's plan with a fresh-ID copy; occupied floors confirm.
+      onTouch: pasteCopiedFloor,
+    },
+    {
       id: 'move_up', color: 0x60a5fa,
       // Safe whole-plan reassignment: the next higher floor must exist and be empty.
       onTouch: () => moveFloorBy(1),
@@ -2721,13 +2851,14 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'move_up', 'move_down', 'save', 'load', 'sheet', 'unit', 'lang',
+    'marker', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
-    move_up: 'project', move_down: 'project', save: 'project', load: 'project', sheet: 'project', unit: 'project', lang: 'project',
+    copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
+    save: 'project', load: 'project', sheet: 'project', unit: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -2780,7 +2911,8 @@ export function setupMR(view, project, getFootprint) {
     selectedRect = null; // clear the EDIT selection when changing modes
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
-    clearTimeout(moveFloorFlashTimer);
+    clearTimeout(projectFlashTimer);
+    pasteConfirmFloorId = null;
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
@@ -3054,8 +3186,15 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'save' && overwriteSlot != null) {
       rlog('slot overwrite cancelled', { slot: overwriteSlot });
       overwriteSlot = null;
+      hoverSlotAction = prevHoverSlotAction = null;
       slotFlash = null;
       redrawSlotMenu();
+      return;
+    }
+    if (mode.id === 'paste_floor' && pasteConfirmFloorId != null) {
+      rlog('floor paste cancelled', { target: pasteConfirmFloorId });
+      pasteConfirmFloorId = null;
+      setModeInfo();
       return;
     }
     if (isDimMode(mode.id)) { // undo the last dimension pick, step by step
@@ -3549,27 +3688,25 @@ export function setupMR(view, project, getFootprint) {
       outlineMarker(selectedMarker, 'wall', 0xfbbf24);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
-      // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.
+      // SAVE/LOAD: aim at a slot, or at the separate confirm/cancel buttons once
+      // an occupied SAVE slot has armed the overwrite screen.
       reticle.visible = false;
       edgeHi.visible = false;
       hoverSlot = null;
+      hoverSlotAction = null;
       numpadCursor.visible = false;
       const panelHit = rayPanelHit(pickSource(frame), slotMenu.mesh);
       if (slotMenu.group.visible && panelHit) {
-        hoverSlot = slotMenu.slotAt(panelHit.uv.x, panelHit.uv.y);
+        if (overwriteSlot != null) hoverSlotAction = slotMenu.actionAt(panelHit.uv.x, panelHit.uv.y);
+        else hoverSlot = slotMenu.slotAt(panelHit.uv.x, panelHit.uv.y);
         numpadCursor.position.copy(panelHit.point);
         numpadCursor.visible = true;
       }
-      // Leaving the armed cell cancels overwrite confirmation. Moving to another
-      // cell also clears a lingering SAVED/LOADED result flash.
-      if (hoverSlot !== prevHoverSlot) {
-        if (overwriteSlot != null && hoverSlot !== overwriteSlot) {
-          rlog('slot overwrite cancelled', { slot: overwriteSlot });
-          overwriteSlot = null;
-          slotFlash = null;
-        } else if (hoverSlot !== null) {
-          slotFlash = null;
-        }
+      if (overwriteSlot != null && hoverSlotAction !== prevHoverSlotAction) {
+        redrawSlotMenu();
+        prevHoverSlotAction = hoverSlotAction;
+      } else if (overwriteSlot == null && hoverSlot !== prevHoverSlot) {
+        if (hoverSlot !== null) slotFlash = null;
         redrawSlotMenu();
         prevHoverSlot = hoverSlot;
       }

@@ -8,7 +8,10 @@ import { setupMR } from './ui/mr.js';
 import { installRemoteLog } from './ui/remoteLog.js';
 
 installRemoteLog(); // dev-only: mirror console/errors to the dev server for headset debugging
-import { serializeProject, deserializeInto } from './io/serialize.js';
+import {
+  FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
+  serializeProject, deserializeInto,
+} from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg } from './io/planSheet.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
@@ -294,6 +297,40 @@ document.getElementById('fc-add-above').addEventListener('click', () => {
 document.getElementById('fc-add-below').addEventListener('click', () => {
   project.addFloor({ above: false, name: 'Basement' });
   sketch.clearSelection();
+});
+
+let desktopFloorClipboard = null;
+try {
+  const raw = localStorage.getItem(FLOOR_CLIPBOARD_KEY);
+  if (raw) desktopFloorClipboard = JSON.parse(raw);
+} catch { /* an in-memory copy still works */ }
+
+document.getElementById('fc-copy').addEventListener('click', () => {
+  desktopFloorClipboard = createFloorClipboard(project.activeFloor);
+  try {
+    localStorage.setItem(FLOOR_CLIPBOARD_KEY, JSON.stringify(desktopFloorClipboard));
+  } catch { /* the current-page clipboard still works */ }
+  sketch.onStatus?.(`Copied floor "${project.activeFloor.name}". Load another project, then paste.`);
+});
+
+document.getElementById('fc-paste').addEventListener('click', () => {
+  try {
+    // Refresh in case the clipboard was written from AR after this page initialized.
+    try {
+      const raw = localStorage.getItem(FLOOR_CLIPBOARD_KEY);
+      if (raw) desktopFloorClipboard = JSON.parse(raw);
+    } catch { /* keep the in-memory clipboard */ }
+    if (!desktopFloorClipboard) { sketch.onStatus?.('Nothing copied yet.'); return; }
+    const target = project.activeFloor;
+    const occupied = target.rectangles.length || target.constraints.length || target.markers.length;
+    if (occupied && !confirm(`Replace all plan content on "${target.name}" with the copied floor?`)) return;
+    const floor = pasteFloorClipboard(project, desktopFloorClipboard, { targetId: target.id });
+    sketch.clearSelection();
+    view.frameModel();
+    sketch.onStatus?.(`Replaced the plan on "${floor.name}" from the floor clipboard.`);
+  } catch (err) {
+    alert(`Could not paste the floor:\n${err.message}`);
+  }
 });
 
 document.getElementById('delete').addEventListener('click', () => sketch.deleteSelected());

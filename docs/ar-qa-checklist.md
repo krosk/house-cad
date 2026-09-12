@@ -120,10 +120,23 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Ray-aimed 6-slot menu appears
 - [x] SAVE persists the whole multi-floor project
 - [ ] Saving to an occupied slot prompts for overwrite and does NOT write on the first trigger
-- [ ] A second trigger on that same slot confirms; aiming elsewhere, changing mode, or grip cancels
+- [ ] The slot grid is replaced by separate CONFIRM OVERWRITE and CANCEL buttons
+- [ ] Triggering blank space cannot confirm; only the new CONFIRM OVERWRITE button writes
+- [ ] CANCEL, changing mode, or grip returns safely without overwriting
 - [x] LOAD round-trips rectangles + constraints (+ offsets), floors + heights
 - [ ] LOAD also round-trips **markers + outlet pins** *(needs an outlet in the scene to confirm)*
 - [x] Overlays rebuild correctly after LOAD
+
+## PROJECT · COPY FLOOR / PASTE FLOOR (`copy_floor` / `paste_floor`)  ⬜ NEW — build-verified only
+- [ ] COPY snapshots the active floor and flashes its name without changing the project
+- [ ] After loading a different save, PASTE replaces the currently active floor's plan
+- [ ] The destination floor keeps its id, name, height, elevation, and ground designation
+- [ ] The pasted plan preserves room/wall/door kinds, dimensions, marker types and positions
+- [ ] Pasted rectangle, constraint and marker ids are fresh; every constraint points to pasted objects
+- [ ] The clipboard survives an APK relaunch and can be pasted repeatedly
+- [ ] An occupied target requires a second trigger; grip or changing mode cancels confirmation
+- [ ] An empty target pastes immediately
+- [ ] PASTE with no valid clipboard reports NOTHING COPIED / PASTE FAILED without changing the project
 
 ## PROJECT · MOVE UP / MOVE DOWN (`move_up` / `move_down`)  ⬜ NEW — build-verified only
 - [ ] From Ground, trigger moves all rectangles, constraints, and markers to Upper

@@ -53,7 +53,7 @@ A rectangle's exact size is authored **only** through dimension constraints. The
 
 ### Persistence
 
-`src/io/serialize.js` serializes the parametric definition (rectangles + constraints + height) to JSON; the footprint/mesh is always recomputed, never stored. On load, `syncRectIdCounter`/`syncConstraintIdCounter` advance the id counters past loaded ids so new items don't collide. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
+`src/io/serialize.js` serializes the parametric definition (rectangles + constraints + height) to JSON; the footprint/mesh is always recomputed, never stored. On load, `syncRectIdCounter`/`syncConstraintIdCounter` advance the id counters past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`), and paste replaces the selected floor's authored plan with collision-free rectangle/constraint/marker ids plus remapped references. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
 
 ### Plan sheets (printing / SVG export)
 

@@ -16,7 +16,7 @@ editor (`ar-2d-parity` memory).
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · DROP (room/wall/door) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
-PROJECT  · MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → UNIT → LANG
+PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → UNIT → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
@@ -81,9 +81,17 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project. Empty SAVE
-  slots write immediately. An occupied slot requires two distinct triggers on the same cell: the
-  first displays an overwrite prompt without writing, and the second confirms. Aiming elsewhere,
-  changing mode, or pressing grip cancels the pending overwrite.
+  slots write immediately. Selecting an occupied slot replaces the slot grid with a confirmation
+  screen containing separate **CONFIRM OVERWRITE** and **CANCEL** buttons; the original slot is no
+  longer a trigger target. Only the confirmation button writes. Changing mode or pressing grip also
+  cancels the pending overwrite.
+- **PROJECT · COPY FLOOR / PASTE FLOOR** (`id: copy_floor` / `paste_floor`) — COPY snapshots the
+  complete active floor (name, storey height, rectangles, dimensions and markers) to a separate
+  persistent clipboard. It survives LOAD and an APK relaunch. PASTE **replaces the currently active
+  floor's authored plan** (rectangles, dimensions and markers), using collision-free ids and remapping
+  every internal reference. The destination level keeps its id, name, storey height, elevation and
+  ground designation. An empty target pastes immediately; an occupied target requires a second
+  trigger, and grip/mode change cancels confirmation. Desktop uses a native confirmation dialog.
 - **PROJECT · MOVE UP / MOVE DOWN** (`id: move_up` / `move_down`) — trigger transfers the active
   floor's complete authored contents (rectangles, constraints, and markers) to the immediately
   higher/lower floor and makes it active. The source becomes empty. The operation refuses an absent
