@@ -118,6 +118,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PROJECT · SAVE / LOAD (`save` / `load`)  ✅ session 14
 - [x] Ray-aimed 6-slot menu appears
 - [x] SAVE persists the whole multi-floor project
+- [ ] Saving to an occupied slot prompts for overwrite and does NOT write on the first trigger
+- [ ] A second trigger on that same slot confirms; aiming elsewhere, changing mode, or grip cancels
 - [x] LOAD round-trips rectangles + constraints (+ offsets), floors + heights
 - [ ] LOAD also round-trips **markers + outlet pins** *(needs an outlet in the scene to confirm)*
 - [x] Overlays rebuild correctly after LOAD

@@ -158,6 +158,8 @@ const STRINGS = {
   'slot.empty':     { en: 'empty', fr: 'vide',   zh: '空' },
   'slot.rects':     { en: 'rects', fr: 'rect.',  zh: '个矩形' },
   'slot.saved':     { en: 'SAVED →',   fr: 'ENREGISTRÉ →', zh: '已保存 →' },
+  'slot.overwrite': { en: 'OVERWRITE', fr: 'ÉCRASER', zh: '覆盖' },
+  'slot.triggerAgain': { en: 'TRIGGER AGAIN', fr: 'GÂCHETTE ENCORE', zh: '再次扣动扳机' },
   'slot.loaded':    { en: 'LOADED',    fr: 'CHARGÉ',       zh: '已加载' },
   'slot.saveFailed': { en: 'SAVE FAILED', fr: 'ÉCHEC ENREG.', zh: '保存失败' },
   'slot.loadFailed': { en: 'LOAD FAILED', fr: 'ÉCHEC CHARG.', zh: '加载失败' },

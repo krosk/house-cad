@@ -77,7 +77,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
   → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
-- **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project.
+- **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project. Empty SAVE
+  slots write immediately. An occupied slot requires two distinct triggers on the same cell: the
+  first displays an overwrite prompt without writing, and the second confirms. Aiming elsewhere,
+  changing mode, or pressing grip cancels the pending overwrite.
 - **PROJECT · MOVE UP / MOVE DOWN** (`id: move_up` / `move_down`) — trigger transfers the active
   floor's complete authored contents (rectangles, constraints, and markers) to the immediately
   higher/lower floor and makes it active. The source becomes empty. The operation refuses an absent

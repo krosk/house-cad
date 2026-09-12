@@ -1227,6 +1227,7 @@ export function setupMR(view, project, getFootprint) {
   let hoverLang = null;     // LANG menu row under the ray this frame (lang code)
   let prevHoverLang = null; // last drawn lang hover
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
+  let overwriteSlot = null; // occupied SAVE slot armed for a required second trigger
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
   let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
 
@@ -1943,13 +1944,18 @@ export function setupMR(view, project, getFootprint) {
     return { rects, when };
   }
 
-  const slotTitle = () => slotFlash || (modes[currentMode].id === 'save' ? t('slot.saveTitle') : t('slot.loadTitle'));
-  const slotAccent = () => (modes[currentMode].id === 'save' ? '#51d88a' : '#4ea1ff');
+  const slotTitle = () => overwriteSlot != null
+    ? `${t('slot.overwrite')} ${overwriteSlot + 1}? ${t('slot.triggerAgain')}`
+    : slotFlash || (modes[currentMode].id === 'save' ? t('slot.saveTitle') : t('slot.loadTitle'));
+  const slotAccent = () => overwriteSlot != null
+    ? '#ff9f43'
+    : (modes[currentMode].id === 'save' ? '#51d88a' : '#4ea1ff');
   const redrawSlotMenu = () => slotMenu.draw(slotTitle(), slotAccent(), hoverSlot, slotMeta);
 
   function showSlotMenu() {
     placePanel(slotMenu.group);
     slotFlash = null;
+    overwriteSlot = null;
     hoverSlot = prevHoverSlot = null;
     slotMenu.group.visible = true;
     redrawSlotMenu();
@@ -1960,6 +1966,7 @@ export function setupMR(view, project, getFootprint) {
     numpadCursor.visible = false;
     hoverSlot = prevHoverSlot = null;
     slotFlash = null;
+    overwriteSlot = null;
   }
 
   // ---- SHEET: preview + download a to-scale plan sheet (one floor at a time) ----
@@ -2081,19 +2088,31 @@ export function setupMR(view, project, getFootprint) {
     hoverLang = prevHoverLang = null;
   }
 
-  // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes/overwrites the
-  // slot; LOAD replaces the whole project from a filled slot (empty = no-op) and
+  // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes an empty slot
+  // immediately but requires confirmation before overwrite; LOAD replaces the whole
+  // project from a filled slot (empty = no-op) and
   // rebuilds the MR view (the registered frame/anchor is untouched — the loaded plan
   // drops into wherever you already registered).
   function onSlotTouch() {
     if (hoverSlot == null) return;
     const i = hoverSlot;
     if (modes[currentMode].id === 'save') {
+      // Empty slots save immediately. A populated slot requires a second distinct
+      // trigger on that SAME cell; merely arming it performs no storage write.
+      if (readSlot(i) && overwriteSlot !== i) {
+        overwriteSlot = i;
+        slotFlash = null;
+        redrawSlotMenu();
+        rlog('slot overwrite armed', { slot: i });
+        return;
+      }
       try {
         localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
+        overwriteSlot = null;
         slotFlash = `${t('slot.saved')} ${i + 1}`;
         rlog('slot save', { slot: i });
       } catch (e) {
+        overwriteSlot = null;
         slotFlash = t('slot.saveFailed');
         rlog('slot save FAIL', String(e));
       }
@@ -2927,6 +2946,13 @@ export function setupMR(view, project, getFootprint) {
     if (event?.data) activeSource = event.data; // grip claims control too
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
+    if (mode.id === 'save' && overwriteSlot != null) {
+      rlog('slot overwrite cancelled', { slot: overwriteSlot });
+      overwriteSlot = null;
+      slotFlash = null;
+      redrawSlotMenu();
+      return;
+    }
     if (isDimMode(mode.id)) { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; dimBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
@@ -3428,9 +3454,16 @@ export function setupMR(view, project, getFootprint) {
         numpadCursor.position.copy(panelHit.point);
         numpadCursor.visible = true;
       }
-      // Moving to a different slot clears a lingering "SAVED/LOADED" flash.
+      // Leaving the armed cell cancels overwrite confirmation. Moving to another
+      // cell also clears a lingering SAVED/LOADED result flash.
       if (hoverSlot !== prevHoverSlot) {
-        if (hoverSlot !== null) slotFlash = null;
+        if (overwriteSlot != null && hoverSlot !== overwriteSlot) {
+          rlog('slot overwrite cancelled', { slot: overwriteSlot });
+          overwriteSlot = null;
+          slotFlash = null;
+        } else if (hoverSlot !== null) {
+          slotFlash = null;
+        }
         redrawSlotMenu();
         prevHoverSlot = hoverSlot;
       }
