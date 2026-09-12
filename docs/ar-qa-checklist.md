@@ -2,11 +2,12 @@
 
 On-device functional verification for the Quest MR survey surface (`src/ui/mr.js`). Sessions 8→13
 shipped this surface build-verified only. **First on-device pass: session 14 — SETUP + PLAN +
-PROJECT(save/load/lang) confirmed OK.** Still unverified: LEVEL (multi-floor), MARKER EDIT/DIMS
-(incl. the session-15 **switch** type + thumbstick type picker/retype), the cross-cutting HUD/input items, and the
-accuracy items. Tick a box when confirmed on device.
+PROJECT(save/load/lang) confirmed OK. Session 16 — MARKER · DIMS commit + dim-line render confirmed
+(a real crash found + fixed there).** Still unverified: LEVEL (multi-floor), MARKER EDIT (incl. the
+session-15 **switch** type + picker/retype), the rest of MARKER DIMS (white-when-pinned, hover
+outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when confirmed on device.
 
-- Build tested: `__________`  ·  Date: `2026-09-11` (session 14)  ·  Device: Quest 3
+- Build tested: `0e98d02`  ·  Dates: `2026-09-11` (s14), `2026-09-12` (s16)  ·  Device: Quest 3
 - Debug: open `?ar=1` in the **plain Quest Browser** or the **Oculus Remote Web Inspector** — the
   release TWA has no console. `rlog` only works on the dev server.
 - Legend: `[ ]` untested · `[x]` verified · `[!]` broken (write what happened).
@@ -89,10 +90,14 @@ accuracy items. Tick a box when confirmed on device.
 - [ ] Plan zones are **inert** here
 - [ ] Depth-test-off glyphs/icons read clearly through walls
 
-## MARKER · DIMS (`outlet_dims`)  ⬜ NOT covered on device
-- [ ] First reference must be a marker's **projected floor icon** (plan edges inert until it's picked)
-- [ ] Second reference is a plan edge (other marker icons + origin inert after the first pick)
-- [ ] Orange dashed floor dim-line + value label from the anchored edge to the marker
+## MARKER · DIMS (`outlet_dims`)  🟡 commit + render VERIFIED (session 16); rest untested
+> s16: a real bug was found + fixed here — the desktop `Sketch2D` (live on `onChange` during AR)
+> threw on the marker `{marker}` endpoint, aborting `commitEntry` before `buildPlan`, so pins never
+> committed and no dim drew. Now confirmed on device for a TOP and a LEFT pin. See `0e98d02`.
+- [x] First reference must be a marker's **projected floor icon**, second a plan edge (floor-icon-first flow works)
+- [ ] Plan edges are inert until the floor icon is picked; other marker icons + origin inert after the first pick *(flow worked; the inert-half not explicitly forced)*
+- [x] Orange dashed floor dim-line + value label from the anchored edge to the marker
+- [x] ENTER commits and closes the pad (was the bug: it did nothing until s16)
 - [ ] Glyph turns **WHITE** once BOTH X and Y are pinned
 - [ ] Hover/lock adds a bold outline to the icon AND its linked wall-height glyph (shared-X/Y disambig)
 - [ ] Pin is one-way: it moves the outlet, not the wall
