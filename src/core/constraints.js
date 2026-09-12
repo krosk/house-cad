@@ -72,7 +72,7 @@ export function makeDistance(rectA, edgeA, rectB, edgeB) {
     b: { rect: rectB.id, edge: edgeB },
     value,
     offset: null, // signed perpendicular placement (m); null = auto-stack
-    labelT: 0.5, // normalized position along the measured span
+    labelT: 0.5, // affine position along the span (outside 0..1 is allowed)
     conflict: false,
   };
 }

@@ -95,7 +95,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Conflicting size refused → `!CONFLICT`, pair stays
 - [x] DEL removes the constraint (or cancels an in-progress new pair) and closes the pad
 - [x] Grip-drag over the dim panel slides its perpendicular offset
-- [ ] Parallel grip movement slides the value box along the dimension line; SAVE/LOAD and SHEET preserve that position
+- [ ] Parallel grip movement slides the value box along or beyond both endpoints; SAVE/LOAD and SHEET preserve that position
 - [ ] Outlet floor icons + outlet pins are **inert** here *(needs an outlet placed to confirm)*
 
 ## MARKER · EDIT (`marker`)  ⬜ NOT covered on device (type picker + switch are new in session 15)
@@ -126,6 +126,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Hover/lock adds a bold outline to the icon AND its linked wall-height glyph (shared-X/Y disambig)
 - [ ] Pin is one-way: it moves the outlet, not the wall
 - [ ] The floor dim label is selectable / grip-draggable here (PLAN DIMS ignores it)
+- [ ] A marker dim label can move beyond both endpoints and print at that outside position
 
 ## PROJECT · SAVE / LOAD (`save` / `load`)  ✅ session 14
 - [x] Ray-aimed 6-slot menu appears

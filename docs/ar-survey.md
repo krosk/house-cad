@@ -182,7 +182,8 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
   resulting one-way constraint moves the marker, not the wall.
 - Every marker pin renders an orange dashed floor dimension from the anchored wall edge to the
   marker's projected coordinate, plus a value label. That label can be selected or grip-dragged
-  only in MARKER DIMS; PLAN DIMS ignores it.
+  only in MARKER DIMS; PLAN DIMS ignores it. Parallel dragging may carry either a structural or
+  marker label beyond both measured endpoints; print preserves that outside placement.
 
 - Distance = ordered + signed (`value = coord(b) − coord(a)`). **FLIP = `flipConstraintSide`**
   (negate value, keep order). `swapConstraint` is geometrically a NO-OP (swaps a,b AND negates;
@@ -249,8 +250,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
-  perpendicular `offset` and the box's normalized position along the measured span (`labelT`). The
-  normalized position survives endpoint swaps and later geometry edits. Printing uses those same
+  perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
+  endpoints and values outside that interval are valid). The affine position survives endpoint
+  swaps and later geometry edits. Printing uses those same
   values and does not independently push labels or lines around rooms. Constraints without saved
   placement use the normal auto gap and midpoint. Marker heights sit in white knockout chips.
 - Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →

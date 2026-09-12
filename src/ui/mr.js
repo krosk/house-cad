@@ -1806,8 +1806,9 @@ export function setupMR(view, project, getFootprint) {
     c.offset = c.axis === 'x' ? py - Math.max(la.p1.y, lb.p1.y) : px - Math.max(la.p1.x, lb.p1.x);
   }
 
-  // Persist the value box's parallel position as a normalized coordinate along the
-  // measured span. The normalized form survives endpoint swaps and later geometry edits.
+  // Persist the value box's parallel position as an affine coordinate along the
+  // measured span. Values outside 0..1 put it beyond either edge; the affine form
+  // survives endpoint swaps and later geometry edits.
   function setDimLabelPosition(c, px, py) {
     const endpointCoord = (ep) => {
       if (ep.marker) return project.markers.find((m) => m.id === ep.marker)?.[c.axis];

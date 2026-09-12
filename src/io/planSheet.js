@@ -167,6 +167,42 @@ function contentBBox(floor, footprint) {
   // Raw rect bounds too, so an all-subtract or otherwise empty footprint still frames.
   for (const r of floor.rectangles) { const b = r.bounds; add(b.x0, b.y0); add(b.x1, b.y1); }
   for (const m of floor.markers || []) add(m.x, m.y);
+  // Saved dimension placement is authoritative, including a label dragged beyond
+  // its two endpoints. Include those model-space locations when choosing the print
+  // scale so an intentional outside label/line is not clipped off the sheet.
+  const endpointCoord = (ep, axis) => {
+    if (ep?.marker) return (floor.markers || []).find((m) => m.id === ep.marker)?.[axis];
+    if (ep?.rect === ORIGIN_ID) return 0;
+    const rectId = ep?.rect?.id ?? ep?.rect;
+    const rect = floor.rectangles.find((r) => r.id === rectId);
+    return rect ? edgeCoord(rect, ep.edge) : null;
+  };
+  for (const c of floor.constraints || []) {
+    if (c.type !== 'distance') continue;
+    const a = endpointCoord(c.a, c.axis), b = endpointCoord(c.b, c.axis);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    const label = dimLabelCoord(c, a, b);
+    if (isMarkerConstraint(c)) {
+      const markerEnd = c.a?.marker ? c.a : c.b;
+      const marker = (floor.markers || []).find((m) => m.id === markerEnd?.marker);
+      if (!marker) continue;
+      const line = c.offset != null ? c.offset : marker[c.axis === 'x' ? 'y' : 'x'];
+      if (c.axis === 'x') { add(a, line); add(b, line); add(label, line); }
+      else { add(line, a); add(line, b); add(line, label); }
+      continue;
+    }
+    const la = edgeLineWorld(c.a, floor.rectangles), lb = edgeLineWorld(c.b, floor.rectangles);
+    if (!la || !lb) continue;
+    if (c.axis === 'x') {
+      if (c.offset == null) { add(label, la.p0.y); continue; } // only parallel overflow affects model bbox
+      const line = Math.max(la.p1.y, lb.p1.y) + c.offset;
+      add(a, line); add(b, line); add(label, line);
+    } else {
+      if (c.offset == null) { add(la.p0.x, label); continue; }
+      const line = Math.max(la.p1.x, lb.p1.x) + c.offset;
+      add(line, a); add(line, b); add(line, label);
+    }
+  }
   if (!Number.isFinite(x0)) return null; // nothing to draw
   return { x0, y0, x1, y1 };
 }
@@ -313,13 +349,13 @@ function drawMarkerPins(be, L, floor) {
     }
     const label = fmt(Math.abs(c.value));
     if (c.axis === 'x') {
-      const y = L.Y(m.y), xa = L.X(refCoord), xb = L.X(m.x);
+      const y = L.Y(c.offset != null ? c.offset : m.y), xa = L.X(refCoord), xb = L.X(m.x);
       be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
       drawDimLabel(be, label, L.X(dimLabelCoord(c, refCoord, m.x)), y, C_PIN);
     } else {
-      const x = L.X(m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
+      const x = L.X(c.offset != null ? c.offset : m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
       be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');

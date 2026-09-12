@@ -112,7 +112,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       id: nextConstraintId(), type: c.type || 'distance', axis: c.axis,
       a, b, value: c.value,
       offset: typeof c.offset === 'number' ? c.offset : null,
-      labelT: Number.isFinite(c.labelT) ? Math.max(0, Math.min(1, c.labelT)) : 0.5,
+      labelT: Number.isFinite(c.labelT) ? c.labelT : 0.5,
       conflict: false,
     }];
   });
@@ -170,7 +170,7 @@ function makeConstraint(c) {
     b: { ...c.b },
     value: c.value,
     offset: typeof c.offset === 'number' ? c.offset : null,
-    labelT: Number.isFinite(c.labelT) ? Math.max(0, Math.min(1, c.labelT)) : 0.5,
+    labelT: Number.isFinite(c.labelT) ? c.labelT : 0.5,
     conflict: false,
   };
 }
