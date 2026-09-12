@@ -13,7 +13,7 @@ editor (`ar-2d-parity` memory).
 ## Mode hierarchy (13 tools with stable `id`s)
 
 ```text
-SETUP    · ORIGIN → FLOOR → RECAL → LEVEL
+SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · DROP (room/wall) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
 PROJECT  · SAVE → LOAD → SHEET → LANG
@@ -22,7 +22,7 @@ PROJECT  · SAVE → LOAD → SHEET → LANG
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
-Internal IDs in traversal order are `register`, `floor`, `recal`, `level`, `drop`, `edge`,
+Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
 `edit`, `plan_dims`, `marker`, `outlet_dims`, `save`, `load`, `sheet`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -35,6 +35,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **FLOOR** — calibrate the ground base level `floorY` by touching the real ground. Guarded to
   the ground floor (a touch on an upper floor would double-count against its elevation).
 - **LEVEL** — per-storey height + floor switch (see Multi-floor below).
+- **SETUP · TELEPORT** (`id: teleport`) — aim the pointer reticle at the active floor and trigger
+  to bring that plan coordinate beneath the headset. WebXR cannot move the physical passthrough
+  camera, so this applies a horizontal `navOffset` to the CAD frame while preserving the surveyed
+  `planPos`, yaw, and XR anchor. ORIGIN/FLOOR/RECAL (`placeAt`) clear the navigation offset.
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
@@ -109,7 +113,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
-  reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = slide its offset; EDGE
+  reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = place the line
+  perpendicularly and slide the value box along it; EDGE
   over an edge = move it; MARKER with the floor reticle over a marker's floor icon = grab it and move
   in 3D at its initial pointer depth).
   Marker drag **locks any pinned axis** (`marker._locked`, from its X/Y pins) so a measured position
@@ -208,19 +213,11 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.
-- **Structural dim placement**:
-  - *Auto* (`offset == null`, the desktop default): the line stacks above/right of the highest/
-    rightmost footprint over its SPAN (`clearanceTop`/`clearanceRight`, add-rects only) — so a
-    disconnected room *above* a width dim (or *right* of a height dim) is cleared, not just the
-    measured block — with a centred label. (Witness lines may still cross an intervening room —
-    conventional; only the line + label are kept clear.)
-  - *Pinned* (`offset` set, e.g. an AR dim whose default offset was the tip position): the line is
-    kept WHERE THE USER PLACED IT, but the value box is slid perpendicular (`pushBoxOut`) until it
-    clears EVERY room — including an unconnected room between it and open space, where it stops in
-    the gap, never inside — with a short leader back to the line. The thin line may cross the room;
-    the number never sits in it. Auto lines are already outside, so their box stays centred.
-  Marker pin labels are biased toward their wall (not the segment midpoint) for the same reason,
-  and marker heights sit in white knockout chips.
+- **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
+  perpendicular `offset` and the box's normalized position along the measured span (`labelT`). The
+  normalized position survives endpoint swaps and later geometry edits. Printing uses those same
+  values and does not independently push labels or lines around rooms. Constraints without saved
+  placement use the normal auto gap and midpoint. Marker heights sit in white knockout chips.
 - Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →
   browser Save-as-PDF; or Download SVG (active floor). **Print at 100% for true scale.**
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend

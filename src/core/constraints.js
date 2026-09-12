@@ -72,6 +72,7 @@ export function makeDistance(rectA, edgeA, rectB, edgeB) {
     b: { rect: rectB.id, edge: edgeB },
     value,
     offset: null, // signed perpendicular placement (m); null = auto-stack
+    labelT: 0.5, // normalized position along the measured span
     conflict: false,
   };
 }
@@ -92,6 +93,7 @@ export function makeOriginDistance(rect, edge) {
     b: { rect: rect.id, edge },
     value: edgeCoord(rect, edge),
     offset: null,
+    labelT: 0.5,
     conflict: false,
   };
 }
@@ -118,6 +120,7 @@ export function makeMarkerDistance(marker, refRect, refEdge) {
     b: { marker: marker.id },               // dependent (follows)
     value: marker[axis] - edgeCoord(refRect, refEdge),
     offset: null,
+    labelT: 0.5,
     conflict: false,
   };
 }
@@ -132,6 +135,7 @@ export function makeMarkerOriginDistance(marker, axis) {
     b: { marker: marker.id },
     value: marker[axis],
     offset: null,
+    labelT: 0.5,
     conflict: false,
   };
 }

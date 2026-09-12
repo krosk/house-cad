@@ -20,6 +20,7 @@ import { toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import { serializeProject, deserializeInto } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
+import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -837,13 +838,13 @@ export function setupMR(view, project, getFootprint) {
           segs.push({ ax: le.coord, ay: yLine, bx: marker.x, by: yLine, conflict, marker: true });
           segs.push({ ax: le.coord, ay: marker.y - tick, bx: le.coord, by: yLine + tick, conflict, marker: true });
           segs.push({ ax: marker.x, ay: marker.y - tick, bx: marker.x, by: yLine + tick, conflict, marker: true });
-          pushDim(makeDimLabel(text, color, (le.coord + marker.x) / 2, yLine), c);
+          pushDim(makeDimLabel(text, color, dimLabelCoord(c, le.coord, marker.x), yLine), c);
         } else {
           const xLine = c.offset != null ? c.offset : marker.x;
           segs.push({ ax: xLine, ay: le.coord, bx: xLine, by: marker.y, conflict, marker: true });
           segs.push({ ax: marker.x - tick, ay: le.coord, bx: xLine + tick, by: le.coord, conflict, marker: true });
           segs.push({ ax: marker.x - tick, ay: marker.y, bx: xLine + tick, by: marker.y, conflict, marker: true });
-          pushDim(makeDimLabel(text, color, xLine, (le.coord + marker.y) / 2), c);
+          pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, le.coord, marker.y)), c);
         }
         continue;
       }
@@ -861,12 +862,12 @@ export function setupMR(view, project, getFootprint) {
           const yLine = c.offset != null ? c.offset : (le.p0.y + le.p1.y) / 2; // grip-drag pins offset
           segs.push({ ax: 0, ay: yLine, bx: le.coord, by: yLine, conflict });            // origin -> edge line
           segs.push({ ax: le.coord, ay: le.p0.y, bx: le.coord, by: le.p1.y, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, le.coord / 2, yLine), c);
+          pushDim(makeDimLabel(text, color, dimLabelCoord(c, 0, le.coord), yLine), c);
         } else {
           const xLine = c.offset != null ? c.offset : (le.p0.x + le.p1.x) / 2;
           segs.push({ ax: xLine, ay: 0, bx: xLine, by: le.coord, conflict });            // origin -> edge line
           segs.push({ ax: le.p0.x, ay: le.coord, bx: le.p1.x, by: le.coord, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, xLine, le.coord / 2), c);
+          pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, 0, le.coord)), c);
         }
         continue;
       }
@@ -883,7 +884,7 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xa, ay: yLine, bx: xb, by: yLine, conflict });            // dim line
         segs.push({ ax: xa, ay: la.p1.y, bx: xa, by: yLine + DIM_EXT_OVER, conflict }); // ext a
         segs.push({ ax: xb, ay: lb.p1.y, bx: xb, by: yLine + DIM_EXT_OVER, conflict }); // ext b
-        pushDim(makeDimLabel(text, color, (xa + xb) / 2, yLine), c);
+        pushDim(makeDimLabel(text, color, dimLabelCoord(c, xa, xb), yLine), c);
       } else {
         const ya = la.coord, yb = lb.coord;
         const xBase = Math.max(la.p1.x, lb.p1.x);
@@ -891,7 +892,7 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xLine, ay: ya, bx: xLine, by: yb, conflict });            // dim line
         segs.push({ ax: la.p1.x, ay: ya, bx: xLine + DIM_EXT_OVER, by: ya, conflict }); // ext a
         segs.push({ ax: lb.p1.x, ay: yb, bx: xLine + DIM_EXT_OVER, by: yb, conflict }); // ext b
-        pushDim(makeDimLabel(text, color, xLine, (ya + yb) / 2), c);
+        pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, ya, yb)), c);
       }
     }
     // Build strips in separate plan/outlet/conflict batches so each domain keeps
@@ -1167,6 +1168,10 @@ export function setupMR(view, project, getFootprint) {
   let placed = false;
   const saved = {};
   const planPos = new THREE.Vector3(); // last placed reference point (world)
+  // Horizontal locomotion applied on top of the anchored survey frame. Moving the
+  // CAD world beneath the stationary headset is the AR equivalent of teleporting;
+  // the physical passthrough camera and the surveyed anchor remain untouched.
+  const navOffset = new THREE.Vector3();
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
   let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
@@ -1263,7 +1268,7 @@ export function setupMR(view, project, getFootprint) {
   // active floor's elevation lift. Drive position/quaternion (not .matrix) so
   // Three keeps matrixWorld in sync.
   function applyPlanMatrix() {
-    planGroup.position.set(planPos.x, overlayY(), planPos.z);
+    planGroup.position.set(planPos.x + navOffset.x, overlayY(), planPos.z + navOffset.z);
     planGroup.quaternion.setFromAxisAngle(UP, planYaw);
     originGizmo.position.copy(planGroup.position); // gizmo rides the lifted origin + yaw
     originGizmo.quaternion.copy(planGroup.quaternion);
@@ -1584,8 +1589,9 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Live update for an active grip-drag, from the reticle's floor point (px,py):
-  // in DIMS, slide the dim's perpendicular offset (akin to the desktop dim drag); in
-  // EDGE, move the grabbed edge to the touch coordinate. Rebuilt each frame while held.
+  // in DIMS, the perpendicular component places the line while the parallel component
+  // places the value box along that line; in EDGE, move the grabbed edge. Rebuilt each
+  // frame while held.
   // Place a dimension's perpendicular line marker at the plan floor point (px,py) —
   // the signed offset the dim line sits at. Origin dims store the absolute coord;
   // edge<->edge dims store it relative to the outer edge (the auto-stack baseline),
@@ -1605,12 +1611,27 @@ export function setupMR(view, project, getFootprint) {
     c.offset = c.axis === 'x' ? py - Math.max(la.p1.y, lb.p1.y) : px - Math.max(la.p1.x, lb.p1.x);
   }
 
+  // Persist the value box's parallel position as a normalized coordinate along the
+  // measured span. The normalized form survives endpoint swaps and later geometry edits.
+  function setDimLabelPosition(c, px, py) {
+    const endpointCoord = (ep) => {
+      if (ep.marker) return project.markers.find((m) => m.id === ep.marker)?.[c.axis];
+      if (ep.rect === ORIGIN_ID) return 0;
+      const rect = project.rectangles.find((r) => r.id === ep.rect);
+      return rect ? edgeCoord(rect, ep.edge) : null;
+    };
+    const a = endpointCoord(c.a), b = endpointCoord(c.b);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+    setDimLabelCoord(c, c.axis === 'x' ? px : py, a, b);
+  }
+
   function applyGripDrag(px, py) {
     if (!gripDrag) return;
     if (gripDrag.kind === 'dim') {
       const c = project.constraints.find((k) => k.id === gripDrag.cId);
       if (!c) return;
       setDimOffset(c, px, py);
+      setDimLabelPosition(c, px, py);
       buildPlan(); applyPlanMatrix(); // presentational; no re-solve needed
     } else if (gripDrag.kind === 'edge') {
       const rect = project.rectangles.find((r) => r.id === gripDrag.rectId);
@@ -2147,6 +2168,26 @@ export function setupMR(view, project, getFootprint) {
     return _rhit.copy(_ro).addScaledVector(_rd, t);
   }
 
+  // Put the plan point under the pointer reticle beneath the user's current X/Z.
+  // This shifts only the CAD navigation frame: passthrough cannot move, and planPos
+  // remains the physical survey registration maintained by its XR anchor.
+  function teleportToReticle(inputSource) {
+    if (!placed || !currentFrame || !localSpace) return;
+    const hit = rayFloorHit(inputSource);
+    const viewer = currentFrame.getViewerPose(localSpace);
+    if (!hit || !viewer) return;
+    const head = viewer.transform.position;
+    const { px, py } = worldToPlan(hit);
+    navOffset.x += head.x - hit.x;
+    navOffset.z += head.z - hit.z;
+    applyPlanMatrix();
+    reticle.visible = false;
+    rlog('teleport', {
+      px: +px.toFixed(3), py: +py.toFixed(3),
+      dx: +(head.x - hit.x).toFixed(3), dz: +(head.z - hit.z).toFixed(3),
+    });
+  }
+
   // MARKER · EDIT and DIMS both pick a marker only through its flat floor projection,
   // using the same reticle-radius gating as plan edges — a stable plan-space target,
   // and it disambiguates markers stacked at the same X/Y far better than the billboard.
@@ -2319,6 +2360,12 @@ export function setupMR(view, project, getFootprint) {
       // Per-storey height, entered by hand (Quest can't measure the vertical offset).
       // Trigger drives the numpad; B/Y cycles the active floor (see pollModeCycle).
       onTouch: onLevelTouch,
+    },
+    {
+      id: 'teleport', color: 0x38bdf8,
+      // Locomotion only: aim at the active floor and bring that virtual plan point
+      // beneath the headset. Does not mutate geometry, constraints, or registration.
+      onTouch: (_pos, inputSource) => teleportToReticle(inputSource),
     },
     {
       // REGISTER: a 3-point gesture that DERIVES the origin corner, so the corner
@@ -2522,12 +2569,12 @@ export function setupMR(view, project, getFootprint) {
   // Canonical controller-menu order. Keep the implementation blocks grouped by
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
-    'register', 'floor', 'recal', 'level',
+    'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
     'marker', 'outlet_dims', 'save', 'load', 'sheet', 'lang',
   ];
   const MODE_GROUP = {
-    register: 'setup', floor: 'setup', recal: 'setup', level: 'setup',
+    register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
     save: 'project', load: 'project', sheet: 'project', lang: 'project',
@@ -2664,6 +2711,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function placeAt(x, y, z) {
+    navOffset.set(0, 0, 0); // a fresh registration/recalibration exits virtual locomotion
     planPos.set(x, y, z);
     planGroup.visible = true; // may have no zones yet — the origin gizmo is the placeholder
     originGizmo.visible = true;
@@ -2706,6 +2754,7 @@ export function setupMR(view, project, getFootprint) {
     anchor = null;
     planYaw = 0;
     floorY = 0;
+    navOffset.set(0, 0, 0);
     refreshFloorEditState(); // seed EDGE target + undo stack from the active floor
     hoverEdge = null;
     edgeHi.visible = false;
@@ -3067,7 +3116,18 @@ export function setupMR(view, project, getFootprint) {
       if (visual.userData.markerRole.endsWith('-outline')) visual.visible = false;
     }
     const modeId = modes[currentMode].id;
-    if (modeId === 'edge') {
+    if (modeId === 'teleport') {
+      // Dedicated locomotion target. Trigger brings the pointed plan coordinate
+      // beneath the headset; no geometry or survey-registration state is edited.
+      const hit = placed ? rayFloorHit(pickSource(frame)) : null;
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+      } else {
+        reticle.visible = false;
+      }
+      edgeHi.visible = false;
+    } else if (modeId === 'edge') {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
       // ALL zones, ring the aim point. edgeAtPoint uses true segment distance + a
       // cap, so the highlight tracks the edge under your reticle (open floor = none).

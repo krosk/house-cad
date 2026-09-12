@@ -8,7 +8,7 @@
 
 import { Rectangle } from '../core/model.js';
 import { makeDistance, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
-import { edgeLineWorld } from '../core/dimline.js';
+import { dimLabelCoord, edgeLineWorld, setDimLabelCoord } from '../core/dimline.js';
 import { fmt, unitLabel, unitInfo } from '../core/units.js';
 
 const MIN_DRAW = 0.05; // ignore tiny accidental drags (meters)
@@ -303,10 +303,11 @@ export class Sketch2D {
       const la = this._edgeLineWorld(c.a);
       const lb = this._edgeLineWorld(c.b);
       if (!la || !lb) return;
-      // Perpendicular distance from the same anchor the renderer uses.
+      // Perpendicular motion places the line; parallel motion places the value box.
       c.offset = c.axis === 'x'
         ? world.y - Math.max(la.p1.y, lb.p1.y)
         : world.x - Math.max(la.p1.x, lb.p1.x);
+      setDimLabelCoord(c, c.axis === 'x' ? world.x : world.y, la.coord, lb.coord);
       this.project.touch();
     }
   }
@@ -636,7 +637,7 @@ export class Sketch2D {
         this._arrowH(sxa, sy, Math.sign(sxb - sxa) * arrow);
         this._arrowH(sxb, sy, Math.sign(sxa - sxb) * arrow);
         const above = sy <= Math.min(cya, cyb);
-        this._dimLabel(c, (sxa + sxb) / 2, above ? sy - 4 : sy + 16);
+        this._dimLabel(c, this.toScreen(dimLabelCoord(c, la.coord, lb.coord), 0).x, above ? sy - 4 : sy + 16);
       } else {
         const sya = this.toScreen(0, la.coord).y;
         const syb = this.toScreen(0, lb.coord).y;
@@ -662,7 +663,7 @@ export class Sketch2D {
         this._seg(sx, sya, sx, syb);
         this._arrowV(sx, sya, Math.sign(syb - sya) * arrow);
         this._arrowV(sx, syb, Math.sign(sya - syb) * arrow);
-        this._dimLabel(c, sx, (sya + syb) / 2);
+        this._dimLabel(c, sx, this.toScreen(0, dimLabelCoord(c, la.coord, lb.coord)).y);
       }
     }
   }

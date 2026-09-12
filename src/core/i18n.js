@@ -25,6 +25,7 @@ const STRINGS = {
   'mode.floor':    { en: 'FLOOR',  fr: 'SOL',      zh: '地面' },
   'mode.level':    { en: 'LEVEL',  fr: 'NIVEAU',   zh: '楼层' },
   'mode.register': { en: 'ORIGIN', fr: 'ORIGINE',  zh: '原点' },
+  'mode.teleport': { en: 'TELEPORT', fr: 'TÉLÉPORT.', zh: '传送' },
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
@@ -53,6 +54,11 @@ const STRINGS = {
     en: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',
     fr: 'Marquez l’origine. Touchez 2 points le long du mur 1, puis 1 point sur le mur 2. Le coin est calculé.',
     zh: '标记原点。沿墙1触碰2个点，再在墙2上触碰1个点。墙角会自动推算。',
+  },
+  'help.teleport': {
+    en: 'Aim the floor reticle and trigger to move your virtual position there. The surveyed origin stays unchanged.',
+    fr: 'Visez le sol avec le réticule et appuyez sur la gâchette pour y déplacer votre position virtuelle. L’origine relevée reste inchangée.',
+    zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
     en: 'Thumbstick up/down picks ROOM (add) or WALL (subtract). Trigger to drop that box where you stand; push its edges out to the walls in EDGE.',

@@ -16,7 +16,7 @@
 // stay legible at any scale, while the geometry obeys the chosen ratio.
 
 import { computeFootprint } from '../core/geometry2d.js';
-import { edgeLineWorld } from '../core/dimline.js';
+import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 
@@ -240,65 +240,6 @@ function drawTextChip(be, text, cx, cy, size = 1.9, color = C_MARK) {
   be.text(text, cx, cy + size * 0.05, { fill: color, size, align: 'center', baseline: 'middle' });
 }
 
-// The highest add-rect top that overlaps [x0,x1] on X — so an auto x-dimension can be
-// stacked above ANY room over its span (e.g. a disconnected room sitting above the
-// measured block), not merely above the measured edge. Returns -Infinity if nothing
-// overlaps. `clearanceRight` is the Y-span analogue for y-dimensions.
-function clearanceTop(rects, x0, x1) {
-  let y = -Infinity;
-  for (const r of rects) {
-    if (r.op !== 'add') continue; // subtracts don't add footprint to clear
-    const b = r.bounds;
-    if (b.x1 <= x0 + 1e-6 || b.x0 >= x1 - 1e-6) continue; // no x-overlap
-    if (b.y1 > y) y = b.y1;
-  }
-  return y;
-}
-function clearanceRight(rects, y0, y1) {
-  let x = -Infinity;
-  for (const r of rects) {
-    if (r.op !== 'add') continue;
-    const b = r.bounds;
-    if (b.y1 <= y0 + 1e-6 || b.y0 >= y1 - 1e-6) continue;
-    if (b.x1 > x) x = b.x1;
-  }
-  return x;
-}
-
-function pointInRoom(rects, x, y) {
-  for (const r of rects) {
-    if (r.op !== 'add') continue; // only add-rects are rooms; subtract holes count as clear
-    const b = r.bounds;
-    if (x > b.x0 + 1e-6 && x < b.x1 - 1e-6 && y > b.y0 + 1e-6 && y < b.y1 - 1e-6) return true;
-  }
-  return false;
-}
-
-// Slide a value box off its anchor, perpendicular to the dim line, to the nearest
-// position clear of EVERY room — including an unconnected room sitting between the
-// anchor and open space (the box never stops inside one). `axis` = the march axis;
-// `span` = the box's size along it (model units). Returns the box-center coordinate.
-function pushBoxOut(rects, bbox, ax, ay, axis, span) {
-  const half = span * 0.62; // half-window incl. margin, so the whole box clears
-  const clear = (v) => {
-    for (let i = -2; i <= 2; i++) {
-      const t = v + (half * i) / 2;
-      if (pointInRoom(rects, axis === 'x' ? t : ax, axis === 'x' ? ay : t)) return false;
-    }
-    return true;
-  };
-  const start = axis === 'x' ? ax : ay;
-  if (clear(start)) return start; // already out of every room — leave it on the line
-  const lo = axis === 'x' ? bbox.x0 : bbox.y0;
-  const hi = axis === 'x' ? bbox.x1 : bbox.y1;
-  const step = Math.max(0.03, span / 3);
-  for (let d = step; d <= hi - lo + span * 3; d += step) {
-    if (clear(start + d)) return start + d;
-    if (clear(start - d)) return start - d;
-  }
-  return start - lo <= hi - start ? lo - span : hi + span; // fallback: just outside the plan
-}
-
 function drawDimensions(be, L, floor) {
   const rects = floor.rectangles;
   let xTier = 0, yTier = 0;
@@ -314,13 +255,11 @@ function drawDimensions(be, L, floor) {
     if (c.axis === 'x') {
       const sxa = L.X(la.coord), sxb = L.X(lb.coord);
       const topModel = Math.max(la.p1.y, lb.p1.y);
-      // Pinned: keep the LINE where the user placed it; the value box slides along it to
-      // clear space (below). Auto (no user-defined line): stack above the highest footprint
-      // over the span — clears any room ABOVE it, not just the measured block.
-      const pinned = c.offset != null;
-      const dimY = pinned
-        ? L.Y(topModel + c.offset)
-        : L.Y(Math.max(topModel, clearanceTop(rects, Math.min(la.coord, lb.coord), Math.max(la.coord, lb.coord)))) - DIM_OFFSET - (xTier++) * DIM_TIER;
+      // A saved AR offset is authoritative. With no saved placement, use the same
+      // measured-edge baseline as AR and apply a paper-sized automatic gap.
+      const dimY = c.offset == null
+        ? L.Y(topModel) - DIM_OFFSET - (xTier++) * DIM_TIER
+        : L.Y(topModel + c.offset);
       for (const l of [la, lb]) {
         const cyTop = L.Y(l.p1.y), cyBot = L.Y(l.p0.y);
         const conn = Math.abs(dimY - cyTop) <= Math.abs(dimY - cyBot) ? cyTop : cyBot;
@@ -330,28 +269,13 @@ function drawDimensions(be, L, floor) {
       be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18 });
       drawArrow(be, sxa, dimY, Math.sign(sxb - sxa), 'x');
       drawArrow(be, sxb, dimY, Math.sign(sxa - sxb), 'x');
-      // Value box: for a pinned line inside a room, slide it ALONG the line (in X) until
-      // clear of every room, staying on the line; extend the line to reach it if it lands
-      // beyond the arrows. Auto lines are already out, so their box stays centred.
-      if (pinned) {
-        const labelXm = (la.coord + lb.coord) / 2;
-        const spanM = (be.measure(label, 2.6) + 3) / L.mmPerM; // box width in model units
-        const bx = L.X(pushBoxOut(rects, L.bbox, labelXm, topModel + c.offset, 'x', spanM));
-        const loX = Math.min(sxa, sxb), hiX = Math.max(sxa, sxb);
-        if (bx < loX - 0.3 || bx > hiX + 0.3) be.line(bx < loX ? loX : hiX, dimY, bx, dimY, { stroke: color, width: 0.1 });
-        drawDimLabel(be, label, bx, dimY, color);
-      } else {
-        drawDimLabel(be, label, (sxa + sxb) / 2, dimY, color);
-      }
+      drawDimLabel(be, label, L.X(dimLabelCoord(c, la.coord, lb.coord)), dimY, color);
     } else {
       const sya = L.Y(la.coord), syb = L.Y(lb.coord);
       const rightModel = Math.max(la.p1.x, lb.p1.x);
-      // As above: pinned keeps the line + pushes the box toward a wall; auto stacks past
-      // the rightmost footprint over the span (clears any room to its RIGHT).
-      const pinned = c.offset != null;
-      const dimX = pinned
-        ? L.X(rightModel + c.offset)
-        : L.X(Math.max(rightModel, clearanceRight(rects, Math.min(la.coord, lb.coord), Math.max(la.coord, lb.coord)))) + DIM_OFFSET + (yTier++) * DIM_TIER;
+      const dimX = c.offset == null
+        ? L.X(rightModel) + DIM_OFFSET + (yTier++) * DIM_TIER
+        : L.X(rightModel + c.offset);
       for (const l of [la, lb]) {
         const cxRight = L.X(l.p1.x), cxLeft = L.X(l.p0.x);
         const conn = Math.abs(dimX - cxRight) <= Math.abs(dimX - cxLeft) ? cxRight : cxLeft;
@@ -361,18 +285,7 @@ function drawDimensions(be, L, floor) {
       be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18 });
       drawArrow(be, dimX, sya, Math.sign(syb - sya), 'y');
       drawArrow(be, dimX, syb, Math.sign(sya - syb), 'y');
-      // Value box: slide a pinned in-room line's box ALONG the line (in Y) until clear,
-      // staying on the line; extend the line to it if it lands beyond the arrows.
-      if (pinned) {
-        const labelYm = (la.coord + lb.coord) / 2;
-        const spanM = 4.4 / L.mmPerM; // box height in model units (+ margin)
-        const by = L.Y(pushBoxOut(rects, L.bbox, rightModel + c.offset, labelYm, 'y', spanM));
-        const loY = Math.min(sya, syb), hiY = Math.max(sya, syb);
-        if (by < loY - 0.3 || by > hiY + 0.3) be.line(dimX, by < loY ? loY : hiY, dimX, by, { stroke: color, width: 0.1 });
-        drawDimLabel(be, label, dimX, by, color);
-      } else {
-        drawDimLabel(be, label, dimX, (sya + syb) / 2, color);
-      }
+      drawDimLabel(be, label, dimX, L.Y(dimLabelCoord(c, la.coord, lb.coord)), color);
     }
   }
 }
@@ -399,22 +312,18 @@ function drawMarkerPins(be, L, floor) {
       refCoord = edgeCoord(rr, refEnd.edge);
     }
     const label = fmt(Math.abs(c.value));
-    // Place the label near the WALL end, not the segment midpoint — the midpoint of a
-    // wall→fixture pin lands in the middle of the room where labels pile up. Biasing to
-    // the anchor spreads them along the perimeter and clears the room interior.
-    const PIN_T = 0.32; // fraction from the wall toward the marker
     if (c.axis === 'x') {
       const y = L.Y(m.y), xa = L.X(refCoord), xb = L.X(m.x);
       be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
-      drawDimLabel(be, label, xa + (xb - xa) * PIN_T, y, C_PIN);
+      drawDimLabel(be, label, L.X(dimLabelCoord(c, refCoord, m.x)), y, C_PIN);
     } else {
       const x = L.X(m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
       be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
-      drawDimLabel(be, label, x, ya + (yb - ya) * PIN_T, C_PIN);
+      drawDimLabel(be, label, x, L.Y(dimLabelCoord(c, refCoord, m.y)), C_PIN);
     }
   }
 }

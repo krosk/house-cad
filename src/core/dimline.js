@@ -15,6 +15,25 @@
 
 import { edgeCoord } from './constraints.js';
 
+// Dimension labels sit at a normalized position along their measured span.
+// Keeping this independent of endpoint order means swapping a constraint does
+// not move its label, while geometry edits preserve the user's relative choice.
+export function dimLabelCoord(constraint, coordA, coordB) {
+  const t = Number.isFinite(constraint?.labelT)
+    ? Math.max(0, Math.min(1, constraint.labelT))
+    : 0.5;
+  const lo = Math.min(coordA, coordB);
+  return lo + (Math.max(coordA, coordB) - lo) * t;
+}
+
+export function setDimLabelCoord(constraint, coord, coordA, coordB) {
+  const lo = Math.min(coordA, coordB);
+  const span = Math.abs(coordB - coordA);
+  constraint.labelT = span > 1e-9
+    ? Math.max(0, Math.min(1, (coord - lo) / span))
+    : 0.5;
+}
+
 /**
  * @param {{rect?: any, edge?: string, marker?: any}} ref  a constraint endpoint
  * @param {Array<{id: string, bounds: {x0,y0,x1,y1}}>} rectangles  the floor's rects

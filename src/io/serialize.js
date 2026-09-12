@@ -16,6 +16,7 @@ function serializeConstraint(c) {
     id: c.id, type: c.type, axis: c.axis,
     a: { ...c.a }, b: { ...c.b }, value: c.value,
     offset: c.offset ?? null,
+    labelT: Number.isFinite(c.labelT) ? c.labelT : 0.5,
   };
 }
 function serializeMarker(m) {
@@ -84,6 +85,7 @@ function makeConstraint(c) {
     b: { ...c.b },
     value: c.value,
     offset: typeof c.offset === 'number' ? c.offset : null,
+    labelT: Number.isFinite(c.labelT) ? Math.max(0, Math.min(1, c.labelT)) : 0.5,
     conflict: false,
   };
 }

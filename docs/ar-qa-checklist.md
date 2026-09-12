@@ -49,6 +49,14 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Editing the topmost floor's own height moves nothing (expected)
 - [ ] SWAP/DEL keys are inert here
 
+## SETUP · TELEPORT (`teleport`)  ⬜ NEW — build-verified only
+- [ ] Pointer reticle tracks the active floor
+- [ ] Trigger brings the reticle's plan coordinate beneath the headset without changing height
+- [ ] Repeated teleports accumulate correctly
+- [ ] Survey geometry, dimensions, yaw, and anchored `planPos` are unchanged
+- [ ] Switching modes keeps the teleported position; ORIGIN/FLOOR/RECAL clears it
+- [ ] Grip and thumbstick up/down are inert
+
 ## PLAN · DROP (`drop`)  ⬜ merged ROOM+WALL into one action in s15 — retest the picker
 - [ ] **Thumbstick up/down picks ROOM ↔ WALL**; label (ROOM/WALL) + accent (green/red) track it
 - [ ] Trigger with **ROOM** selected drops an **add** rectangle (roomspace) at your standing position
@@ -75,6 +83,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Conflicting size refused → `!CONFLICT`, pair stays
 - [x] DEL removes the constraint (or cancels an in-progress new pair) and closes the pad
 - [x] Grip-drag over the dim panel slides its perpendicular offset
+- [ ] Parallel grip movement slides the value box along the dimension line; SAVE/LOAD and SHEET preserve that position
 - [ ] Outlet floor icons + outlet pins are **inert** here *(needs an outlet placed to confirm)*
 
 ## MARKER · EDIT (`marker`)  ⬜ NOT covered on device (type picker + switch are new in session 15)
