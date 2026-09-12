@@ -5,13 +5,14 @@ architecture).** This is the design + resume doc for adding **vertical elements*
 tool. Nothing here is built yet — this captures the decided design so a fresh session can start.
 
 **Date:** 2026-09-11 (design session; updated through session 13)
-**Status:** OUTLET + SWITCH SHIPPED. Category-1 markers built end-to-end: outlet (s12), split into
-disjoint plan/marker editing + dimensioning domains with projected floor icons (s13), and a **switch
-type + MARKER · EDIT type picker** (s15; B/Y or thumbstick-y cycles the drop type, per-type glyph via
-`markerFace`). The mode group is now **MARKER** (was OUTLET). Remaining per this doc: light / ethernet
-types, then wires; openings (category 2) still deferred. See `.claude/handoff.md` → Next step B and
-`docs/ar-survey.md` for the current build. The design rationale below still governs; treat "we build
-first / not started" phrasing as historical.
+**Status:** OUTLET + SWITCH + LIGHT + ETHERNET SHIPPED. Category-1 markers built end-to-end: outlet
+(s12), split into disjoint plan/marker editing + dimensioning domains with projected floor icons
+(s13), a **switch type + MARKER · EDIT type picker** (s15; B/Y or thumbstick-y cycles the drop type,
+per-type glyph via `markerFace`), and **light + ethernet types** (`markerFace` bulb / RJ45 glyphs,
+`marker.<type>` i18n, sheet legend; lights drop with z = storey height). The mode group is now
+**MARKER** (was OUTLET). Remaining per this doc: **wires** (polyline); openings (category 2) still
+deferred. See `.claude/handoff.md` → Next step B and `docs/ar-survey.md` for the current build. The
+design rationale below still governs; treat "we build first / not started" phrasing as historical.
 
 ## Goal in one paragraph
 

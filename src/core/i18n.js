@@ -152,9 +152,11 @@ const STRINGS = {
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },
 
   // --- markers (wall-anchored annotations) ------------------------------------
-  'marker.outlet': { en: 'outlet', fr: 'prise',        zh: '插座' },
-  'marker.switch': { en: 'switch', fr: 'interrupteur', zh: '开关' },
-  'marker.height': { en: 'height', fr: 'hauteur',      zh: '高度' },
+  'marker.outlet':   { en: 'outlet',   fr: 'prise',        zh: '插座' },
+  'marker.switch':   { en: 'switch',   fr: 'interrupteur', zh: '开关' },
+  'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
+  'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
+  'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
 };
 
 let current = 'en';

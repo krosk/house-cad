@@ -1042,6 +1042,36 @@ export function setupMR(view, project, getFootprint) {
       ctx.lineWidth = 2; ctx.strokeStyle = '#64748b'; ctx.stroke();
       return;
     }
+    if (type === 'light') {
+      // Ceiling light: a filled bulb with radiating rays.
+      ctx.beginPath(); ctx.arc(64, 62, 17, 0, Math.PI * 2);
+      ctx.fillStyle = '#fde68a'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#eab308'; ctx.stroke();
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(64 + Math.cos(a) * 22, 62 + Math.sin(a) * 22);
+        ctx.lineTo(64 + Math.cos(a) * 30, 62 + Math.sin(a) * 30);
+        ctx.stroke();
+      }
+      return;
+    }
+    if (type === 'ethernet') {
+      // RJ45 jack: a port rectangle with a bottom tab notch and contact pins.
+      ctx.beginPath(); ctx.roundRect(42, 42, 44, 40, 5);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(56, 78, 16, 10, 3);
+      ctx.fillStyle = '#f8fafc'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+      ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const x = 50 + i * 6;
+        ctx.beginPath(); ctx.moveTo(x, 47); ctx.lineTo(x, 58); ctx.stroke();
+      }
+      return;
+    }
     // Default: outlet — Type E circular recessed well, upper earth pin, two contacts.
     ctx.beginPath(); ctx.arc(64, 67, 28, 0, Math.PI * 2);
     ctx.fillStyle = '#e5e7eb'; ctx.fill();
@@ -1146,9 +1176,9 @@ export function setupMR(view, project, getFootprint) {
   let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
   // MARKER · EDIT drop type. Cycled by B/Y (or thumbstick-y) while in the mode, like
   // LEVEL cycles floors. Session-level (persists across mode switches). Extend the list
-  // for new fixture types (light, ethernet, wire); each also needs a markerFace() branch,
-  // a marker.<type> i18n key, and serialize already round-trips the type.
-  const MARKER_TYPES = ['outlet', 'switch'];
+  // for new fixture types (wire next); each also needs a markerFace() branch, a
+  // marker.<type> i18n key, and serialize already round-trips the type.
+  const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
   // "add" action instead of separate ROOM/WALL modes. room = add roomspace, wall = subtract.
@@ -1598,11 +1628,16 @@ export function setupMR(view, project, getFootprint) {
     if (!marker) return;
     _dragPoint.copy(_ro).addScaledVector(_rd, gripDrag.distance);
     const { px, py } = worldToPlan(_dragPoint);
+    // Respect pins ("if its constraints allow"): a locked axis (solveMarkers sets
+    // marker._locked from the X/Y pins) does NOT move — only free axes + z follow the
+    // grab. A fully-pinned marker therefore becomes a pure vertical (z) slider.
+    const nx = marker._locked?.x ? marker.x : px;
+    const ny = marker._locked?.y ? marker.y : py;
     // Update marker coordinates + pin offsets without emitting the project's full
     // solve/listener cascade every XR frame. Release commits once via project.touch().
     project.moveMarker(
       marker.id,
-      { x: px, y: py, z: Math.max(0, _dragPoint.y - overlayY()) },
+      { x: nx, y: ny, z: Math.max(0, _dragPoint.y - overlayY()) },
       { emit: false },
     );
     // Move the existing visuals directly during the drag; on release, buildPlan
@@ -2112,33 +2147,9 @@ export function setupMR(view, project, getFootprint) {
     return _rhit.copy(_ro).addScaledVector(_rd, t);
   }
 
-  // The visible marker glyph nearest the controller ray. Markers sit at their real
-  // wall height, so testing only the ray's eventual floor intersection misses them
-  // whenever the user aims directly at the glyph. Use a small world-space radius
-  // around each sprite center instead; this works even when the ray never hits floor.
-  const MARKER_PICK_RADIUS = 0.065;
-  function pickMarker(inputSource) {
-    if (!markerGroup.children.length) return null;
-    if (!setControllerRay(inputSource)) return null;
-    markerGroup.updateWorldMatrix(true, true);
-    let best = null, bestD = MARKER_PICK_RADIUS;
-    for (const sprite of markerGroup.children) {
-      if (sprite.userData.markerRole !== 'wall') continue;
-      sprite.getWorldPosition(_dp);
-      _dv.copy(_dp).sub(_ro);
-      const along = _dv.dot(_rd);
-      if (along <= 0) continue;
-      const d = Math.sqrt(Math.max(0, _dv.lengthSq() - along * along));
-      if (d < bestD) {
-        bestD = d;
-        best = project.markers.find((m) => m.id === sprite.userData.markerId) ?? null;
-      }
-    }
-    return best;
-  }
-
-  // DIMS picks the marker only through its floor projection, using the same
-  // reticle-radius gating as plan edges.
+  // MARKER · EDIT and DIMS both pick a marker only through its flat floor projection,
+  // using the same reticle-radius gating as plan edges — a stable plan-space target,
+  // and it disambiguates markers stacked at the same X/Y far better than the billboard.
   function markerAtFloorPoint(px, py) {
     let best = null, bestD = RETICLE_OUTER;
     for (const marker of project.markers) {
@@ -2404,7 +2415,9 @@ export function setupMR(view, project, getFootprint) {
         // can be dropped, avoiding accidental duplicates while operating the pad.
         if (selectedMarker) { selectedMarker = null; deactivateNumpad(); return; }
         const { px, py } = worldToPlan(pos);
-        const z = Math.max(0, pos.y - overlayY());
+        // Lights live on the ceiling (unreachable to tip-capture), so default their z to
+        // the storey height; other fixtures capture z from the controller tip height.
+        const z = currentMarkerType === 'light' ? project.height : Math.max(0, pos.y - overlayY());
         const m = project.addMarker({ type: currentMarkerType, x: px, y: py, z });
         buildPlan(); applyPlanMatrix();
         rlog('marker drop', { id: m.id, type: m.type, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });
@@ -3254,9 +3267,12 @@ export function setupMR(view, project, getFootprint) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
       }
     } else if (modeId === 'marker') {
-      // OUTLET: existing glyphs are the only pointer targets. Trigger selects one
-      // for height entry; grip-drag moves it. With none selected/aimed, trigger drops
-      // a new outlet at the controller tip (handled by the mode's onTouch).
+      // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
+      // (markerAtFloorPoint), a stable plan-space target vs. the floating wall billboard —
+      // is the hover target. Trigger selects it for height entry; grip-drag grabs the
+      // HOVERED marker (no prior select) and moves it in 3D, with pinned axes locked.
+      // Empty-space trigger still drops a new marker at the TIP (z capture) via onTouch.
+      // While the height pad is open, the ray drives the numpad instead.
       hoverKey = null;
       numpadCursor.visible = false;
       const source = pickSource(frame);
@@ -3269,14 +3285,30 @@ export function setupMR(view, project, getFootprint) {
         }
       }
       if (gripDrag?.kind === 'marker') applyMarkerGripDrag(source);
-      hoverMarker = hoverKey ? null : pickMarker(source);
-      reticle.visible = false;
+      hoverMarker = null;
+      if (hoverKey) {
+        reticle.visible = false; // the pad owns the ray
+      } else {
+        const hit = rayFloorHit(source);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          hoverMarker = markerAtFloorPoint(px, py);
+        } else {
+          reticle.visible = false;
+        }
+      }
       if (selectedMarker && !project.markers.includes(selectedMarker)) {
         selectedMarker = null;
         deactivateNumpad();
       }
-      outlineMarker(selectedMarker, 'wall', 0xfbbf24);
+      // Outline BOTH the floor icon and the wall glyph so the icon↔fixture link reads
+      // clearly. Hover = yellow; selected = amber, drawn last so it wins when they coincide.
+      outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
+      outlineMarker(selectedMarker, 'floor', 0xfbbf24);
+      outlineMarker(selectedMarker, 'wall', 0xfbbf24);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim the ray at the slot menu; highlight the cell under the ray.

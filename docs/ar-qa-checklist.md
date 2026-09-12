@@ -78,17 +78,20 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Outlet floor icons + outlet pins are **inert** here *(needs an outlet placed to confirm)*
 
 ## MARKER · EDIT (`marker`)  ⬜ NOT covered on device (type picker + switch are new in session 15)
-- [ ] **Thumbstick up/down cycles the drop type** (outlet ↔ switch, wraps); label reads `MARKER · EDIT · <type>`
+- [ ] **Thumbstick up/down cycles the drop type** (outlet → switch → light → ethernet, wraps); label reads `MARKER · EDIT · <type>`
 - [ ] With a marker **selected**, thumbstick up/down **retypes that marker** in place (glyph swaps, pad title updates)
 - [ ] Empty-space trigger drops a marker **of the current type** at the tip; z = tip height above floor
-- [ ] **Switch** glyph renders as a rocker (distinct from the outlet's Type E socket)
+- [ ] Each type's glyph is distinct: outlet = Type E socket, switch = rocker, **light** = bulb + rays, **ethernet** = RJ45 jack
+- [ ] Dropping a **light** defaults its height to the storey height (ceiling); other types capture tip height
+- [ ] A **floor reticle** tracks the aimed floor point; the marker under it highlights (floor icon + wall glyph outlined, yellow hover / amber selected)
+- [ ] Hovering a marker's **floor icon** picks it (stable plan-space target, not the floating billboard)
 - [ ] Aiming at a marker + trigger opens its **height pad** (pad title shows the type); ENTER commits, closes, clears
-- [ ] Grip-drag moves the marker in 3D at its initial pointer depth; it does NOT snap back on release
-- [ ] Grip aimed away deletes the selected marker
+- [ ] **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D; it does NOT snap back on release
+- [ ] Dragging a marker with a **pinned X or Y leaves that axis fixed** (only free axes + z move); a fully-pinned marker acts as a **vertical z slider**
+- [ ] Grip aimed at empty space deletes the selected marker
 - [ ] Each marker shows a wall-height glyph AND a flat projected floor icon
-- [ ] `markerAtPoint`-first: a marker wins the pick over the wall it sits on
 - [ ] Plan zones are **inert** here
-- [ ] Depth-test-off glyphs/icons read clearly through walls
+- [ ] Depth-test-off glyphs/icons + the reticle read clearly through walls
 
 ## MARKER · DIMS (`outlet_dims`)  🟡 commit + render VERIFIED (session 16); rest untested
 > s16: a real bug was found + fixed here — the desktop `Sketch2D` (live on `onChange` during AR)

@@ -50,14 +50,22 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
-  type** (`MARKER_TYPES` = outlet, switch; extend for light/ethernet/wire) — or, if a marker is
-  selected, **retypes that marker in place** (`setMarkerType`). The label reads
-  `MARKER · EDIT · <type>` so a glance tells you what a trigger will place. Empty-space trigger places
-  a marker of the current type at the tip; pointing directly at a marker and triggering opens its
-  height pad; ENTER commits the height, closes the pad, and clears the selection. Grip-drag moves it
-  in 3D; grip away deletes the selected marker. Every marker also has a flat projected floor icon
-  showing its plan X/Y, and a per-type wall glyph (`markerFace`: outlet = Type E socket, switch =
-  rocker). Plan zones are inert.
+  type** (`MARKER_TYPES` = outlet, switch, light, ethernet; extend for wire) — or, if a marker is
+  selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
+  (outlet = Type E socket, switch = rocker, light = bulb + rays, ethernet = RJ45 jack) and a
+  `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
+  unreachable to tip-capture); other types capture z from the tip. The label reads
+  `MARKER · EDIT · <type>` so a glance tells you what a trigger will place. A **floor reticle**
+  tracks the aimed floor point and the marker under it is picked through its **flat floor icon**
+  (`markerAtFloorPoint`, reticle-radius gated) — a stable plan-space target, not the floating wall
+  billboard — with both its floor icon and wall glyph outlined (hover = yellow, selected = amber).
+  Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
+  hovered marker opens its height pad; ENTER commits the height, closes the pad, and clears the
+  selection. **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D, but a
+  **pinned axis stays locked** (`marker._locked` from its X/Y pins), so a fully-pinned marker becomes
+  a pure vertical (z) slider; **grip aimed at empty space deletes the selected marker**. Every marker
+  also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
+  (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
@@ -102,8 +110,10 @@ names, SAVE/LOAD slot menu, LEVEL pad title, LANG menu. HUD debug lines stay Eng
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
   reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = slide its offset; EDGE
-  over an edge = move it; MARKER aimed at a marker = move it in 3D at its initial pointer depth).
-  Marker drag adjusts existing X/Y pin values so the marker does not snap back on release. Its
+  over an edge = move it; MARKER with the floor reticle over a marker's floor icon = grab it and move
+  in 3D at its initial pointer depth).
+  Marker drag **locks any pinned axis** (`marker._locked`, from its X/Y pins) so a measured position
+  isn't dragged off — a fully-pinned marker moves in z only; free axes + z follow. Its
   per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
   `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
@@ -198,6 +208,19 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.
+- **Structural dim placement**:
+  - *Auto* (`offset == null`, the desktop default): the line stacks above/right of the highest/
+    rightmost footprint over its SPAN (`clearanceTop`/`clearanceRight`, add-rects only) — so a
+    disconnected room *above* a width dim (or *right* of a height dim) is cleared, not just the
+    measured block — with a centred label. (Witness lines may still cross an intervening room —
+    conventional; only the line + label are kept clear.)
+  - *Pinned* (`offset` set, e.g. an AR dim whose default offset was the tip position): the line is
+    kept WHERE THE USER PLACED IT, but the value box is slid perpendicular (`pushBoxOut`) until it
+    clears EVERY room — including an unconnected room between it and open space, where it stops in
+    the gap, never inside — with a short leader back to the line. The thin line may cross the room;
+    the number never sits in it. Auto lines are already outside, so their box stays centred.
+  Marker pin labels are biased toward their wall (not the segment midpoint) for the same reason,
+  and marker heights sit in white knockout chips.
 - Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →
   browser Save-as-PDF; or Download SVG (active floor). **Print at 100% for true scale.**
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend

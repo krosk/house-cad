@@ -134,9 +134,9 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
   round-trip in SAVE/LOAD**; cross-cutting HUD; accuracy. Debug via the plain Quest Browser (`?ar=1`)
   — the release TWA has no console.
 - **B — Markers: next increments** (`docs/markers-plan.md`). ~~switch + type picker~~ **DONE (s15).**
-  Remaining: **light / ethernet** types (add to `MARKER_TYPES` + a `markerFace()` branch +
-  `marker.<type>` i18n; light's z could default to ceiling = storey height). Then **wires**
-  (`THREE.Line` polyline). Keep each an increment.
+  ~~light / ethernet types~~ **DONE** (`markerFace` bulb / RJ45 glyphs, `marker.<type>` i18n, sheet
+  legend; lights drop with z = storey height). Remaining: **wires** (`THREE.Line` polyline). Keep
+  each an increment.
 - **C — Model transfer desktop→APK.** Desktop autosave (`house-cad:autosave:v1`) and AR slots
   (`house-cad:slot:<i>`) use different localStorage keys; verify the TWA sees Quest-Browser storage
   and decide if LOAD should surface the desktop autosave as a slot.
