@@ -80,7 +80,9 @@ const EDGE_SHORT = { left: 'L', right: 'R', top: 'T', bottom: 'B' };
 const cxCount = document.getElementById('cx-count');
 
 function renderConstraints() {
-  const cs = project.constraints;
+  // Marker pins (a/b endpoint is a marker, not a rect edge) are AR-only annotations;
+  // they don't belong in the 2D dimension list.
+  const cs = project.constraints.filter((c) => !(c.a.marker || c.b.marker));
   cxCount.textContent = cs.length ? String(cs.length) : '';
 
   // Remove rows for deleted constraints.

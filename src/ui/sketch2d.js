@@ -7,7 +7,7 @@
 //   screen = CSS pixels on the canvas, +y DOWN (canvas convention)
 
 import { Rectangle } from '../core/model.js';
-import { makeDistance, edgeCoord, EDGE_AXIS } from '../core/constraints.js';
+import { makeDistance, edgeCoord, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
 import { fmt, unitLabel, unitInfo } from '../core/units.js';
 
 const MIN_DRAW = 0.05; // ignore tiny accidental drags (meters)
@@ -556,6 +556,9 @@ export class Sketch2D {
 
   _edgeLineWorld(ref) {
     // Return the [{x,y},{x,y}] world endpoints of an edge, and its coordinate.
+    // A marker endpoint ({marker}) or the origin axis has no rect edge here — bail
+    // (guards against ref.rect being undefined, which crashed the whole change bus).
+    if (!ref || ref.rect == null) return null;
     const r = this.project.rectangles.find((x) => x.id === (ref.rect.id ?? ref.rect));
     if (!r) return null;
     const b = r.bounds;
@@ -597,6 +600,7 @@ export class Sketch2D {
 
     for (const c of constraints) {
       if (c.type !== 'distance') continue;
+      if (isMarkerConstraint(c)) continue; // marker pins are AR-only; the 2D editor doesn't draw them
       const la = this._edgeLineWorld(c.a);
       const lb = this._edgeLineWorld(c.b);
       if (!la || !lb) continue;
