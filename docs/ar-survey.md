@@ -149,7 +149,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
-  no-op where nothing applies: **LEVEL** = floor (`switchFloor`, up/down, no wrap); **UNIT** =
+  no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall/door/stairs/cabinet kind to add
@@ -203,14 +203,18 @@ basement negative). See `multi-floor-design` memory for the settled design.
 
 - Entering AR seeds **Basement · Ground · Upper** around Ground (`ensureFloors`; no-op if
   already multi-floor; default 2.8 m, persists via autosave).
-- **LEVEL mode**: **thumbstick up/down switches** the active floor (`switchFloor`, no wrap); the
-  DIMS numpad is reused to type a storey height, **ENTER** sets the active floor's height
-  (`project.setHeight`) and re-stacks elevations. Heights are entered **by hand** — Quest can't
-  measure the vertical offset. The pad's SWAP/DEL keys are inert here. Label reads
-  `LEVEL · <FloorName>`; pad title shows the floor's base elevation.
-- `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the
-  overlay at the new elevation and re-shows the LEVEL pad (which `refreshFloorEditState`'s
-  `resetDim` hides).
+- **LEVEL mode**: **thumbstick up/down switches** the active floor (`switchFloor`, no wrap), with
+  a read-only **ALL FLOORS** pseudo-level immediately above the top storey. Real floors reuse the
+  DIMS numpad for storey height; **ENTER** calls `project.setHeight` and re-stacks elevations.
+  Heights are entered **by hand** — Quest can't measure the vertical offset. The pad's SWAP/DEL
+  keys are inert. Labels read `LEVEL · <FloorName>` or `LEVEL · ALL FLOORS`.
+- **ALL FLOORS** renders every floor's footprint, edge state, dimensions, and markers at its
+  derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged, hides
+  the height pad, and skips the complete PLAN and MARKER groups during horizontal mode traversal.
+  Flick down in LEVEL to return to the top real floor and restore those editing groups.
+- `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the selected
+  single-floor or stacked overlay. It re-shows the LEVEL pad only for real floors (the
+  `refreshFloorEditState` reset hides it first).
 - **Stacking gotcha**: a storey's elevation is driven by the floor *below*. To lift the Upper
   overlay, edit the **Ground** height; to drop the Basement, edit the **Basement's** height.
   Editing the topmost floor's own height moves nothing.

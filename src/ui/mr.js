@@ -759,6 +759,10 @@ export function setupMR(view, project, getFootprint) {
   // The placed plan lives in this group; its position/rotation follow the anchor.
   const planGroup = new THREE.Group();
   planGroup.visible = false;
+  // LEVEL exposes one pseudo-selection above the highest real floor. It leaves
+  // activeFloorId untouched, renders the complete stack, and makes the authoring
+  // groups unavailable until a real floor is selected again.
+  let allFloorsView = false;
 
   // Marker glyphs (wall-anchored annotations) live in their own group under planGroup
   // so they ride the plan's yaw + per-floor elevation for free. buildPlan clears the
@@ -827,9 +831,9 @@ export function setupMR(view, project, getFootprint) {
   // Endpoints + coordinate of an edge in plan coords (mirror of sketch2d's
   // _edgeLineWorld). null for the origin ref, so origin-distance constraints are
   // skipped here — same as the desktop, which draws no line for __origin__.
-  function edgeLine(ref) {
+  function edgeLine(ref, rectangles = project.rectangles) {
     if (!ref || ref.rect === ORIGIN_ID) return null;
-    const r = project.rectangles.find((x) => x.id === (ref.rect.id ?? ref.rect));
+    const r = rectangles.find((x) => x.id === (ref.rect.id ?? ref.rect));
     if (!r) return null;
     const b = r.bounds;
     const coord = edgeCoord(r, ref.edge);
@@ -887,16 +891,14 @@ export function setupMR(view, project, getFootprint) {
     return sprite;
   }
 
-  // Draw every distance constraint of the active floor into planGroup: a dim line
-  // between the two edges (offset outward), extension lines, and the value label.
-  function buildDimensions() {
-    // Bound the label-texture cache. Safe here: buildPlan already tore down the old dim
-    // sprites (materials disposed), and the new ones aren't built yet, so nothing
-    // references these textures right now. Distinct value strings accrue slowly; cap to
-    // avoid an unbounded session leak. The drag case stays a hit (one key, size 1).
-    if (dimTexCache.size > 64) { for (const t of dimTexCache.values()) t.dispose(); dimTexCache.clear(); }
+  // Draw every distance constraint of one floor into planGroup: a dim line between
+  // the two edges (offset outward), extension lines, and the value label. `elevation`
+  // is zero for the editable active-floor view and the floor's stacked elevation in
+  // the read-only ALL FLOORS view. Only the active view publishes pickable labels.
+  function buildDimensions(floor = project.activeFloor, elevation = 0, selectable = true) {
     const segs = [];        // {ax,ay,bx,by,conflict,marker?} strips to build
-    dimSprites = [];        // value labels, for hover pick
+    const floorDimSprites = [];
+    if (selectable) dimSprites = []; // value labels, for hover pick in edit modes
     // A dim value label carries its constraint id + both refs, so ray-hovering it can
     // highlight that constraint's edges and selecting it loads the constraint to edit.
     const endpointToRef = (ep) => ep.marker
@@ -908,10 +910,11 @@ export function setupMR(view, project, getFootprint) {
       sprite.userData.cId = c.id;
       sprite.userData.refA = endpointToRef(c.a);
       sprite.userData.refB = endpointToRef(c.b);
-      dimSprites.push(sprite);
+      floorDimSprites.push(sprite);
+      if (selectable) dimSprites.push(sprite);
     };
     let xTier = 0, yTier = 0;
-    for (const c of (project.constraints || [])) {
+    for (const c of (floor.constraints || [])) {
       if (c.type !== 'distance') continue;
       if (isMarkerConstraint(c)) {
         // Outlet pin: draw directly from its wall edge to its projected floor
@@ -919,8 +922,8 @@ export function setupMR(view, project, getFootprint) {
         // moves it while the wall stays fixed.
         const markerEnd = c.a.marker ? c.a : c.b;
         const edgeEnd = c.a.marker ? c.b : c.a;
-        const marker = project.markers.find((m) => m.id === markerEnd.marker);
-        const le = edgeLine(edgeEnd);
+        const marker = floor.markers.find((m) => m.id === markerEnd.marker);
+        const le = edgeLine(edgeEnd, floor.rectangles);
         if (!marker || !le) continue;
         const conflict = !!c.conflict;
         const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
@@ -946,7 +949,7 @@ export function setupMR(view, project, getFootprint) {
       // edge, so the lock is visible (desktop skips it; the AR survey needs to see it).
       if (aOrigin || bOrigin) {
         const eref = aOrigin ? c.b : c.a;
-        const le = edgeLine(eref);
+        const le = edgeLine(eref, floor.rectangles);
         if (!le) continue;
         const conflict = !!c.conflict;
         const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
@@ -964,7 +967,7 @@ export function setupMR(view, project, getFootprint) {
         }
         continue;
       }
-      const la = edgeLine(c.a), lb = edgeLine(c.b);
+      const la = edgeLine(c.a, floor.rectangles), lb = edgeLine(c.b, floor.rectangles);
       if (!la || !lb) continue;
       const conflict = !!c.conflict;
       const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
@@ -1016,18 +1019,21 @@ export function setupMR(view, project, getFootprint) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
       const material = style === 'conflict' ? dimConflictMat : style === 'marker' ? markerDimMat : dimMat;
       const m = new THREE.Mesh(geo, material);
-      m.position.y = 0.008; // above the edge strips
+      m.position.y = elevation + 0.008; // above this floor's edge strips
       m.renderOrder = 12;
       planGroup.add(m);
     }
-    for (const s of dimSprites) planGroup.add(s);
+    for (const s of floorDimSprites) {
+      s.position.y += elevation;
+      planGroup.add(s);
+    }
   }
 
   // Edges whose axis is FULLY pinned — both edges on that axis connect to the plan
   // ORIGIN through the constraint graph (so position is tied to the datum AND the
   // size between them is fixed). Returned as a Set of `${rectId}:${edge}`; these
   // render white. Computed per axis via union-find over edge-coordinate nodes.
-  function lockedEdges() {
+  function lockedEdges(floor = project.activeFloor) {
     const parent = new Map();
     const find = (k) => {
       if (!parent.has(k)) parent.set(k, k);
@@ -1038,7 +1044,7 @@ export function setupMR(view, project, getFootprint) {
     };
     const union = (a, b) => { parent.set(find(a), find(b)); };
     const axisOf = (edge) => (edge === 'left' || edge === 'right' ? 'x' : 'y');
-    for (const c of project.constraints) {
+    for (const c of floor.constraints) {
       if (c.type !== 'distance') continue;
       const aOrigin = c.a.rect === ORIGIN_ID, bOrigin = c.b.rect === ORIGIN_ID;
       const ax = axisOf(aOrigin ? c.b.edge : c.a.edge); // axis from the non-origin endpoint
@@ -1047,7 +1053,7 @@ export function setupMR(view, project, getFootprint) {
     }
     const white = new Set();
     const pinned = (rid, e, ax) => parent.has(`${rid}:${e}`) && find(`${rid}:${e}`) === find(`O:${ax}`);
-    for (const r of project.rectangles) {
+    for (const r of floor.rectangles) {
       if (pinned(r.id, 'left', 'x') && pinned(r.id, 'right', 'x')) { white.add(`${r.id}:left`); white.add(`${r.id}:right`); }
       if (pinned(r.id, 'bottom', 'y') && pinned(r.id, 'top', 'y')) { white.add(`${r.id}:bottom`); white.add(`${r.id}:top`); }
     }
@@ -1058,7 +1064,7 @@ export function setupMR(view, project, getFootprint) {
   // a CanvasTexture per label, which is the dominant cost. During a live edge drag we
   // pass false (edge strip + fill still update for feedback); a full rebuild on the
   // drag release (onSqueezeEnd) brings the dims back correct.
-  function buildPlan(withDims = true) {
+  function clearPlanGeometry() {
     // Clear any previous geometry. Dispose per-rebuild materials; do NOT dispose the
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
@@ -1068,32 +1074,48 @@ export function setupMR(view, project, getFootprint) {
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
     }
-    const footprint = getFootprint?.() ?? [];
+    dimSprites = [];
+    // Safe only after every old label has been removed. In ALL FLOORS,
+    // buildDimensions runs once per storey, so evicting inside that function could
+    // dispose a texture already attached to an earlier floor in the same rebuild.
+    if (dimTexCache.size > 64) {
+      for (const texture of dimTexCache.values()) texture.dispose();
+      dimTexCache.clear();
+    }
+  }
+
+  const addFloorStrips = (floor, elevation, active = null) => {
+    const pushStrips = (rects, mat, y, wantEdge) => {
+      const geo = rectStripGeo(rects, EDGE_HALF, wantEdge);
+      if (!geo) return;
+      const o = new THREE.Mesh(geo, mat);
+      o.position.y = elevation + y;
+      planGroup.add(o);
+    };
+    const locked = lockedEdges(floor);
+    const isLocked = (r, e) => locked.has(`${r.id}:${e}`);
+    const notLocked = (r, e) => !isLocked(r, e);
+    const others = floor.rectangles.filter((r) => r !== active);
+    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004, notLocked);
+    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004, notLocked);
+    pushStrips(others, lockedMat, 0.005, isLocked);
+    if (active) {
+      pushStrips([active], active.op === 'subtract' ? activeSubMat : activeMat, 0.006, notLocked);
+      pushStrips([active], lockedMat, 0.007, isLocked);
+    }
+  };
+
+  function buildActivePlan(withDims = true) {
+    clearPlanGeometry();
+    const floor = project.activeFloor;
+    const footprint = getFootprint?.(floor.rectangles) ?? [];
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = total free space
     if (fillGeo) planGroup.add(new THREE.Mesh(fillGeo, fillMat));
     // Per-rectangle edge strips. Non-active zones sit lower; the active zone is
     // brighter and on top. ROOM (add) zones are purple, WALL (subtract) zones red —
     // so you can tell roomspace from wall at a glance.
-    const pushStrips = (rects, mat, y, wantEdge) => {
-      const geo = rectStripGeo(rects, EDGE_HALF, wantEdge);
-      if (!geo) return;
-      const o = new THREE.Mesh(geo, mat);
-      o.position.y = y; // lift above the fill
-      planGroup.add(o);
-    };
-    // Fully-pinned (position+size) edges render WHITE; the rest keep their op color.
-    const locked = lockedEdges();
-    const isLocked = (r, e) => locked.has(`${r.id}:${e}`);
-    const notLocked = (r, e) => !isLocked(r, e);
-    const others = project.rectangles.filter((r) => r !== activeRect);
-    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004, notLocked);
-    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004, notLocked);
-    pushStrips(others, lockedMat, 0.005, isLocked); // white locked edges, just above resting
-    if (activeRect) {
-      pushStrips([activeRect], activeRect.op === 'subtract' ? activeSubMat : activeMat, 0.006, notLocked);
-      pushStrips([activeRect], lockedMat, 0.007, isLocked); // white locked edges of the active zone
-    }
-    if (withDims) buildDimensions(); // constraint dimension lines + value labels
+    addFloorStrips(floor, 0, activeRect);
+    if (withDims) buildDimensions(floor); // constraint dimension lines + value labels
     if (withDims) buildMarkers();    // wall-anchored annotation glyphs (own group, not cleared above)
     return planGroup.children.length > 0;
   }
@@ -1233,26 +1255,65 @@ export function setupMR(view, project, getFootprint) {
     return visual;
   }
 
-  // Rebuild the marker glyphs into markerGroup (planGroup-local), placing each at
-  // (x, z, -y): plan (x,y) maps to local (x,0,-y) and z lifts it above the floor
-  // overlay (local y=0 = world overlayY()), so it sits at its real height.
-  function buildMarkers() {
+  function clearMarkers() {
     for (const child of [...markerGroup.children]) {
       markerGroup.remove(child);
       child.material?.map?.dispose();
       child.material?.dispose();
     }
-    for (const m of project.markers) {
+  }
+
+  // Add one floor's marker glyphs in planGroup-local coordinates. The editable
+  // active floor gets selection outlines; stacked overview markers are deliberately
+  // inert and therefore omit them.
+  function addFloorMarkers(floor, elevation = 0, withOutlines = true) {
+    for (const m of floor.markers) {
       const spr = makeMarkerSprite(m);
-      spr.position.set(m.x, m.z, -m.y);
+      spr.position.set(m.x, elevation + m.z, -m.y);
       const floorIcon = makeMarkerFloorIcon(m);
-      floorIcon.position.set(m.x, 0.016, -m.y);
+      floorIcon.position.set(m.x, elevation + 0.016, -m.y);
+      markerGroup.add(spr, floorIcon);
+      if (!withOutlines) continue;
       const wallOutline = makeMarkerOutline(m, 'wall');
       wallOutline.position.copy(spr.position);
       const floorOutline = makeMarkerOutline(m, 'floor');
-      floorOutline.position.set(m.x, 0.018, -m.y);
-      markerGroup.add(spr, floorIcon, wallOutline, floorOutline);
+      floorOutline.position.set(m.x, elevation + 0.018, -m.y);
+      markerGroup.add(wallOutline, floorOutline);
     }
+  }
+
+  // Rebuild the editable active floor's marker layer.
+  function buildMarkers() {
+    clearMarkers();
+    addFloorMarkers(project.activeFloor);
+  }
+
+  // Read-only building overview: every independent plan stays aligned to the shared
+  // origin and is lifted by its derived elevation. Dimensions and both marker glyphs
+  // remain visible for reference, but none are published to the edit pickers.
+  function buildAllFloors(withDims = true) {
+    clearPlanGeometry();
+    clearMarkers();
+    for (const floor of project.floors) {
+      const elevation = floor.elevation;
+      const footprint = getFootprint?.(floor.rectangles) ?? [];
+      const fillGeo = footprintFloorGeometry(footprint);
+      if (fillGeo) {
+        const fill = new THREE.Mesh(fillGeo, fillMat);
+        fill.position.y = elevation;
+        planGroup.add(fill);
+      }
+      addFloorStrips(floor, elevation);
+      if (withDims) buildDimensions(floor, elevation, false);
+      if (withDims) addFloorMarkers(floor, elevation, false);
+    }
+    return planGroup.children.length > 0;
+  }
+
+  // All existing model-changing call sites rebuild through this dispatcher, so a
+  // LOAD/unit change made while overviewing cannot silently fall back to one floor.
+  function buildPlan(withDims = true) {
+    return allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
   }
 
   let localSpace = null;
@@ -1360,15 +1421,15 @@ export function setupMR(view, project, getFootprint) {
   // establishes the ground origin; each storey's overlay lifts by this so it
   // renders at its real height above that origin (see Project._recomputeElevations).
   const activeElevation = () => project.activeFloor?.elevation ?? 0;
-  // World Y of the active floor's overlay plane = registered ground level +
-  // elevation. EDGE/DIMS ray hits and reticles use this so you edit at the floor
-  // you're standing on, not the ground. A pure Y lift, so worldToPlan (which
-  // reads x/z only) is unaffected — plan coords stay correct on every storey.
-  const overlayY = () => planPos.y + activeElevation();
+  // A normal view is seated on the active storey. ALL FLOORS instead seats the
+  // parent group on the registered ground datum because each child is already
+  // lifted by its own elevation.
+  const displayElevation = () => (allFloorsView ? 0 : activeElevation());
+  const overlayY = () => planPos.y + displayElevation();
 
   // Rebuild the plan's transform from its origin (planPos), yaw (planYaw), and the
-  // active floor's elevation lift. Drive position/quaternion (not .matrix) so
-  // Three keeps matrixWorld in sync.
+  // selected display's elevation lift. Drive position/quaternion (not .matrix)
+  // so Three keeps matrixWorld in sync.
   function applyPlanMatrix() {
     planGroup.position.set(planPos.x + navOffset.x, overlayY(), planPos.z + navOffset.z);
     planGroup.quaternion.setFromAxisAngle(UP, planYaw);
@@ -1816,9 +1877,10 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- LEVEL: per-storey height, entered by hand (Quest can't measure the vertical
   // offset between floors). Reuses the DIMS numpad; the SWAP/DEL keys have no role here.
-  // B/Y cycles the active floor (see pollModeCycle); a floor's height re-stacks every
-  // floor's elevation above it (Project._recomputeElevations).
+  // Thumbstick-y cycles real floors plus the read-only overview (see pollModeCycle);
+  // a real floor's height re-stacks every floor above it.
   const levelTitle = () => {
+    if (allFloorsView) return t('mode.all_floors');
     const f = project.activeFloor;
     return `${f.name}  ${t('level.base')} ${fmt(f.elevation)} ${unitLabel()}  ·  ${t('level.storeyHeight')}`;
   };
@@ -1833,12 +1895,14 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function activateLevelPad() {
+    if (allFloorsView) { deactivateNumpad(); return; }
     placePanel(numpad.group);
     numpad.group.visible = true;
     refreshLevelPad();
   }
 
   function commitLevelHeight() {
+    if (allFloorsView) return;
     const val = parseFloat(levelBuffer);
     if (!Number.isFinite(val) || val <= 0) return; // a storey must have positive height
     project.setHeight(toMeters(val)); // sets the active floor's height, re-solves + re-stacks elevations
@@ -1848,6 +1912,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function pressLevelKey(k) {
+    if (allFloorsView) return;
     if (k === 'enter') { commitLevelHeight(); return; }
     if (k === 'swap' || k === 'del') return; // not used when entering a height
     if (levelPristine && k !== 'back') levelBuffer = '';
@@ -1860,6 +1925,7 @@ export function setupMR(view, project, getFootprint) {
 
   // LEVEL trigger: drive the numpad key under the ray.
   function onLevelTouch() {
+    if (allFloorsView) return;
     if (hoverKey) pressLevelKey(hoverKey);
   }
 
@@ -2611,7 +2677,7 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'level', color: C_LEVEL, // label/help via i18n: mode.level / help.level
       // Per-storey height, entered by hand (Quest can't measure the vertical offset).
-      // Trigger drives the numpad; B/Y cycles the active floor (see pollModeCycle).
+      // Trigger drives the numpad; thumbstick-y cycles the floor/view.
       onTouch: onLevelTouch,
     },
     {
@@ -2879,6 +2945,7 @@ export function setupMR(view, project, getFootprint) {
     id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
     : id === 'drop' ? t(`mode.${zoneModeId(currentZoneKind)}`)
     : id === 'edit' && selectedRect ? `${t('mode.edit')} · ${t(`mode.${zoneModeId(zoneKindOf(selectedRect))}`)}`
+    : id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
     : id === 'sheet' ? `${t('mode.sheet')} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
@@ -2921,7 +2988,7 @@ export function setupMR(view, project, getFootprint) {
     const m = modes[currentMode];
     setModeInfo(); // label chip + help box (carries MARKER/DROP picked kind + color)
     if (isDimMode(m.id)) activateNumpad(); // start the selected domain in ref-pick phase
-    else if (m.id === 'level') activateLevelPad(); // park the numpad for height entry
+    else if (m.id === 'level' && !allFloorsView) activateLevelPad(); // real floors expose height entry
     else deactivateNumpad();
     if (m.id === 'save' || m.id === 'load') showSlotMenu(); // park the slot menu in front of you
     else deactivateSlotMenu();
@@ -2931,6 +2998,20 @@ export function setupMR(view, project, getFootprint) {
     else hideUnitMenu();
     if (m.id === 'sheet') showSheet(); // park the plan-sheet preview in front of you
     else hideSheet();
+  }
+
+  // In the read-only building overview, mode traversal jumps across both editing
+  // categories as a unit. SETUP and PROJECT remain available (including LEVEL,
+  // which is how the user returns to a real floor).
+  const modeAvailable = (index) => {
+    const group = MODE_GROUP[modes[index].id];
+    return !allFloorsView || (group !== 'plan' && group !== 'marker');
+  };
+  function stepMode(direction) {
+    let index = currentMode;
+    do index = (index + direction + modes.length) % modes.length;
+    while (!modeAvailable(index) && index !== currentMode);
+    setMode(index);
   }
 
   // Re-render every localized on-screen string when the UI language changes. This
@@ -2994,22 +3075,35 @@ export function setupMR(view, project, getFootprint) {
   function afterFloorChange() {
     refreshFloorEditState();
     buildPlan();
-    applyPlanMatrix(); // overlay lifts to the new floor's elevation
+    applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
     if (modes[currentMode].id === 'level') {
-      applyModeVisual(t('mode.level'), C_LEVEL); // floor name shows in the info HUD, not the label
-      numpad.group.visible = true; // refreshFloorEditState hid it; LEVEL keeps it up
-      refreshLevelPad();
+      setModeInfo();
+      if (allFloorsView) deactivateNumpad();
+      else activateLevelPad();
     }
   }
 
-  // Switch the active storey up (+1) / down (-1) in the stack. Register-once
-  // means the frame is shared; only the overlay's elevation changes. No wrap —
-  // you can't step past the top or bottom floor.
+  // Switch the active storey up (+1) / down (-1). One extra read-only pseudo-level
+  // sits above the top floor and shows the whole stack. It never replaces
+  // activeFloorId, so flicking down returns to the same top storey. No wrap.
   function switchFloor(delta) {
     const floors = project.floors;
+    if (allFloorsView) {
+      if (delta >= 0) return;
+      allFloorsView = false;
+      afterFloorChange();
+      rlog('floor switch', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
+      return;
+    }
     const i = floors.findIndex((f) => f.id === project.activeFloorId);
     const j = i + delta;
-    if (j < 0 || j >= floors.length) return;
+    if (j === floors.length) {
+      allFloorsView = true;
+      afterFloorChange();
+      rlog('floor switch', { name: 'all floors', count: floors.length });
+      return;
+    }
+    if (j < 0 || j > floors.length) return;
     project.setActiveFloor(floors[j].id);
     afterFloorChange();
     rlog('floor switch', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
@@ -3052,6 +3146,7 @@ export function setupMR(view, project, getFootprint) {
     view.controls.enabled = false;
 
     ensureFloors(); // seed Basement + Upper around Ground on first AR entry
+    allFloorsView = false; // every new session starts on the persisted active floor
     buildPlan();
     scene.add(planGroup);
     planGroup.visible = false;
@@ -3318,13 +3413,13 @@ export function setupMR(view, project, getFootprint) {
     if (next && !btn.next) {
       if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
     }
-    if (prev && !btn.prev) setMode(currentMode - 1);
+    if (prev && !btn.prev) stepMode(-1);
     btn.next = next;
     btn.prev = prev;
     // Thumbstick flick, dead-zoned, one step per flick. The dominant axis wins so
     // a diagonal doesn't cycle a mode AND change floor at once.
     if (!btn.stick && Math.abs(stickX) > 0.7 && Math.abs(stickX) >= Math.abs(stickY)) {
-      setMode(currentMode + (stickX > 0 ? 1 : -1));
+      stepMode(stickX > 0 ? 1 : -1);
       btn.stick = true;
     } else if (Math.abs(stickX) < 0.3) {
       btn.stick = false;
@@ -3364,6 +3459,7 @@ export function setupMR(view, project, getFootprint) {
   if (navigator.getBattery) navigator.getBattery().then((b) => { battery = b; }).catch(() => {});
   // Active floor as "Name i/N" for the HUD.
   const floorLabel = () => {
+    if (allFloorsView) return t('mode.all_floors');
     const fl = project.floors;
     const i = fl.findIndex((f) => f.id === project.activeFloorId);
     return `${project.activeFloor?.name ?? '-'} ${i + 1}/${fl.length}`;

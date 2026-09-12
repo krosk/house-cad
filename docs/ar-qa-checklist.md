@@ -42,6 +42,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## SETUP · LEVEL (`level`) — multi-floor  ⬜ NOT covered in session 14
 - [ ] AR entry seeds **Basement · Ground · Upper**
 - [ ] **Thumbstick up/down switches** the active floor (no wrap)
+- [ ] Flicking up from the top floor enters **ALL FLOORS**; flicking down returns to that top floor
+- [ ] ALL FLOORS shows every footprint, edge state, dimension, wall marker, and floor icon at the correct stacked elevation
+- [ ] ALL FLOORS hides the height numpad and trigger cannot change a storey height
+- [ ] While ALL FLOORS is selected, horizontal navigation skips every PLAN and MARKER mode in both directions
+- [ ] Returning to a real floor restores PLAN/MARKER traversal and editing
 - [ ] Thumbstick-y changes floor **only in LEVEL** (no-op in modes without a cycle action)
 - [ ] Numpad types a storey height; **ENTER** sets the active floor's height and re-stacks elevations
 - [ ] Label reads `LEVEL · <FloorName>`; pad title shows the floor's base elevation

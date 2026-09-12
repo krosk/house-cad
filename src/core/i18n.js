@@ -24,6 +24,7 @@ const STRINGS = {
   // --- mode labels (key = mode.<id>) ------------------------------------------
   'mode.floor':    { en: 'FLOOR',  fr: 'SOL',      zh: '地面' },
   'mode.level':    { en: 'LEVEL',  fr: 'NIVEAU',   zh: '楼层' },
+  'mode.all_floors': { en: 'ALL FLOORS', fr: 'TOUS LES ÉTAGES', zh: '所有楼层' },
   'mode.register': { en: 'ORIGIN', fr: 'ORIGINE',  zh: '原点' },
   'mode.teleport': { en: 'TELEPORT', fr: 'TÉLÉPORT.', zh: '传送' },
   'mode.drop':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
@@ -54,9 +55,9 @@ const STRINGS = {
     zh: '用笔尖触碰真实地面以设定基准标高。仅在首层重新校平。',
   },
   'help.level': {
-    en: 'Thumbstick up/down: previous/next floor. Type a storey height and ENTER to set the active floor.',
-    fr: 'Joystick haut/bas : étage précédent/suivant. Tapez une hauteur d’étage et VALIDER pour la définir.',
-    zh: '摇杆上/下：上一/下一楼层。输入层高并按确定以设定当前楼层。',
+    en: 'Up/down: choose a floor or ALL FLOORS above the top. On a floor, type storey height + ENTER. ALL FLOORS is read-only; PLAN/MARKER are skipped.',
+    fr: 'Haut/bas : choisissez un étage ou TOUS LES ÉTAGES au-dessus. Sur un étage, tapez sa hauteur + VALIDER. La vue globale est en lecture seule ; PLAN/MARQUEUR sont ignorés.',
+    zh: '上/下：选择楼层或最上方的“所有楼层”。在单层中输入层高并确定。“所有楼层”为只读，并跳过平面/标记工具。',
   },
   'help.register': {
     en: 'Mark the origin. Touch 2 points along wall 1, then 1 point on wall 2. The corner is derived for you.',
