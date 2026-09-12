@@ -202,6 +202,14 @@ world overlays. Per controller, stacked above the tip: mode **label**, hover **r
   `'#a78bfa'`) are canvas-`ctx` strings for the RECAL badges; passing one to `setHex` gives `NaN` →
   the mesh renders **black**. Highlight/strip colors must be numeric hex (`0x…`). (This bug made the
   RECAL wall strip black; fixed to the numeric `C_RECAL` accent.)
+- **The desktop `Sketch2D` stays LIVE during the AR session and re-renders on every
+  `project.onChange`.** So any code that consumes `project.constraints` — including the 2D editor —
+  must tolerate **marker** endpoints (`{marker}`, no `.rect`) and the **origin** (`rect === ORIGIN_ID`,
+  no real edge). A throw in ANY `onChange` listener propagates out of `_emit` and aborts the AR
+  caller mid-commit (this silently killed marker-dim commits: `Sketch2D._edgeLineWorld` did
+  `ref.rect.id` on a marker endpoint → `undefined.id` → `commitEntry` never reached `buildPlan`, so
+  the numpad stayed open and no floor dim drew). Guard edge lookups; skip marker pins where the 2D
+  view doesn't draw them.
 - **`View3D.setGeometry` rebuilds meshes every change** — MR uses `hideMesh` + `view.house` (the
   floor Group), not `view.mesh`. `mr.js` does NOT subscribe to `project.onChange`; it rebuilds
   overlays manually via `buildPlan()`/`applyPlanMatrix()`, so any model-changing action (incl.
