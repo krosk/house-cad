@@ -292,7 +292,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   neighbors form a horizontal box with one height label; different-height neighbors form a vertical
   box with one label per glyph. Height groups farther apart remain separate boxes on the same bracket
   (for example, 1.00 m + 0.96 m switches together and a 0.30 m outlet below them). Every type keeps
-  its own glyph, and boxes/rows are ordered by physical height;
+  its own glyph, and boxes/rows are ordered by physical height. The complete callout evaluates
+  left/right/above/below placements against the printable footprint and chooses the side inside the
+  room; page fit is the fallback for markers without a containing room;
   and a **scale bar + `1:N · unit` caption + floor name + local `YYYY-MM-DD HH:mm` generation
   timestamp**. A shared print set captures the generation time once, so every page agrees.
   Marker/legend names come from

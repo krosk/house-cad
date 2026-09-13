@@ -224,6 +224,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Example: switches at 1.00 m and 0.96 m share one vertical white box, while a co-located outlet
       at 0.30 m occupies its own box below them
 - [ ] Markers more than 80 mm apart in plan remain independent glyphs
+- [ ] A stack on each of a room's four walls places its callout inward (right/left/below/above respectively), not always to the page right
+- [ ] Equal-height fixtures display horizontally; fixtures at differing heights display vertically
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors

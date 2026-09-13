@@ -125,6 +125,10 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     and only a separate EXPORT button downloads. The optional LEFT sheet previews these choices
     immediately. Preferences use `house-cad:output:v1` and never enter project saves. Furniture
     constraints remain excluded even when furniture geometry is enabled in SVG/DXF.
+23. **(s18, pending commit) room-aware fixture callouts.** Sheet stacks retain horizontal layout
+    for equal-height fixtures and vertical layout for differing heights, but their complete callout
+    now evaluates left/right/above/below against the printable footprint and chooses the room side.
+    Page containment remains the fallback for isolated markers.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 

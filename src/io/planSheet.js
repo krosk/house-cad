@@ -713,7 +713,94 @@ function drawFixtureBox(be, box, metrics, x, y) {
   });
 }
 
-function drawFixtureStack(be, L, stack) {
+function pointOnRingSegment(x, y, a, b, epsilon = 1e-7) {
+  const cross = (x - a[0]) * (b[1] - a[1]) - (y - a[1]) * (b[0] - a[0]);
+  if (Math.abs(cross) > epsilon) return false;
+  return x >= Math.min(a[0], b[0]) - epsilon && x <= Math.max(a[0], b[0]) + epsilon
+    && y >= Math.min(a[1], b[1]) - epsilon && y <= Math.max(a[1], b[1]) + epsilon;
+}
+
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[j], b = ring[i];
+    if (pointOnRingSegment(x, y, a, b)) return true;
+    const crosses = ((a[1] > y) !== (b[1] > y))
+      && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0];
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInFootprint(x, y, footprint) {
+  for (const polygon of footprint || []) {
+    if (!polygon.length || !pointInRing(x, y, polygon[0])) continue;
+    if (!polygon.slice(1).some((hole) => pointInRing(x, y, hole))) return true;
+  }
+  return false;
+}
+
+const clamp = (value, min, max) => min <= max ? Math.max(min, Math.min(max, value)) : value;
+
+// Build one of four upright callout arrangements. Left/right arrangements line
+// boxes vertically; above/below arrangements line them horizontally. Individual
+// fixture boxes still express the physical disposition: equal-height fixtures
+// read horizontally, while differing heights read vertically.
+function fixtureStackCandidate(side, ax, ay, metrics, L) {
+  const gap = MARKER_STACK_BOX_GAP;
+  const horizontalSide = side === 'left' || side === 'right';
+  const placements = [];
+  if (horizontalSide) {
+    const dir = side === 'right' ? 1 : -1;
+    const totalHeight = metrics.reduce((sum, item) => sum + item.height, 0) + (metrics.length - 1) * gap;
+    const centerY = clamp(ay, MARGIN + totalHeight / 2, L.page.h - MARGIN - STRIP - totalHeight / 2);
+    const spine = ax + dir * 3.2;
+    let y = centerY - totalHeight / 2;
+    for (const item of metrics) {
+      const x = dir > 0 ? spine + 1.2 : spine - 1.2 - item.width;
+      placements.push({ x, y, cx: x + item.width / 2, cy: y + item.height / 2, item });
+      y += item.height + gap;
+    }
+    return { side, placements, spine, anchorAlong: ay };
+  }
+
+  const dir = side === 'below' ? 1 : -1;
+  const totalWidth = metrics.reduce((sum, item) => sum + item.width, 0) + (metrics.length - 1) * gap;
+  const centerX = clamp(ax, MARGIN + totalWidth / 2, L.page.w - MARGIN - totalWidth / 2);
+  const spine = ay + dir * 3.2;
+  let x = centerX - totalWidth / 2;
+  for (const item of metrics) {
+    const y = dir > 0 ? spine + 1.2 : spine - 1.2 - item.height;
+    placements.push({ x, y, cx: x + item.width / 2, cy: y + item.height / 2, item });
+    x += item.width + gap;
+  }
+  return { side, placements, spine, anchorAlong: ax };
+}
+
+function fixtureCandidateScore(candidate, stack, L, footprint) {
+  let inside = 0;
+  let samples = 0;
+  let onPage = 0;
+  for (const p of candidate.placements) {
+    for (const [px, py] of [
+      [p.x, p.y], [p.x + p.item.width, p.y],
+      [p.x, p.y + p.item.height], [p.x + p.item.width, p.y + p.item.height],
+      [p.cx, p.cy],
+    ]) {
+      samples++;
+      if (px >= MARGIN && px <= L.page.w - MARGIN
+          && py >= MARGIN && py <= L.page.h - MARGIN - STRIP) onPage++;
+      const mx = stack.x + (px - L.X(stack.x)) / L.mmPerM;
+      const my = stack.y - (py - L.Y(stack.y)) / L.mmPerM;
+      if (pointInFootprint(mx, my, footprint)) inside++;
+    }
+  }
+  // Room containment dominates; page fit breaks ties and remains the fallback for
+  // isolated markers whose four candidate boxes are all outside the footprint.
+  return inside * 100 + onPage / Math.max(samples, 1);
+}
+
+function drawFixtureStack(be, L, stack, footprint) {
   const ax = L.X(stack.x), ay = L.Y(stack.y);
   const count = stack.markers.length;
   if (count === 1) {
@@ -727,51 +814,47 @@ function drawFixtureStack(be, L, stack) {
 
   const boxes = stack.boxes;
   const metrics = boxes.map((box) => fixtureBoxMetrics(be, box));
-  const totalHeight = metrics.reduce((sum, item) => sum + item.height, 0)
-    + (metrics.length - 1) * MARKER_STACK_BOX_GAP;
-  const maxBoxWidth = Math.max(...metrics.map((item) => item.width));
-  const requiredWidth = 4.4 + maxBoxWidth;
-  const leftRoom = ax - MARGIN;
-  const rightRoom = L.page.w - MARGIN - ax;
-  const dir = rightRoom >= requiredWidth || rightRoom >= leftRoom ? 1 : -1;
-  const spineX = ax + dir * 3.2;
-
-  // Keep even a tall callout inside the drawing field. If the anchor is near a
-  // page edge, the leader bends along the spine without moving the true point.
-  const halfSpan = totalHeight / 2;
-  const minCenterY = MARGIN + halfSpan;
-  const maxCenterY = L.page.h - MARGIN - STRIP - halfSpan;
-  const centerY = minCenterY <= maxCenterY
-    ? Math.max(minCenterY, Math.min(maxCenterY, ay))
-    : ay;
-  let boxY = centerY - totalHeight / 2;
-  const boxCenters = metrics.map((item) => {
-    const cy = boxY + item.height / 2;
-    boxY += item.height + MARKER_STACK_BOX_GAP;
-    return cy;
-  });
+  // Evaluate all four sides against the actual printable room footprint. This
+  // naturally sends a right-wall marker left, a top-wall marker downward, etc.
+  // The stable order preserves a predictable fallback when no room contains it.
+  const candidates = ['right', 'left', 'below', 'above']
+    .map((side) => fixtureStackCandidate(side, ax, ay, metrics, L));
+  const candidate = candidates.reduce((best, item) =>
+    fixtureCandidateScore(item, stack, L, footprint) > fixtureCandidateScore(best, stack, L, footprint)
+      ? item : best);
 
   // The bracket joins each distinct physical fixture box back to the compact
   // installation's shared plan anchor.
   be.circle(ax, ay, 0.45, { fill: '#fff', stroke: C_MARK, width: 0.2 });
-  be.line(ax + dir * 0.45, ay, spineX, ay, { stroke: C_MARK, width: 0.16 });
-  be.line(spineX, Math.min(boxCenters[0], ay), spineX, Math.max(boxCenters.at(-1), ay), {
-    stroke: C_MARK, width: 0.16,
-  });
-
-  boxY = centerY - totalHeight / 2;
-  boxes.forEach((box, i) => {
-    const item = metrics[i];
-    const x = dir > 0 ? spineX + 1.2 : spineX - 1.2 - item.width;
-    const nearX = dir > 0 ? x : x + item.width;
-    be.line(spineX, boxCenters[i], nearX, boxCenters[i], { stroke: C_MARK, width: 0.16 });
-    drawFixtureBox(be, box, item, x, boxY);
-    boxY += item.height + MARKER_STACK_BOX_GAP;
-  });
+  if (candidate.side === 'left' || candidate.side === 'right') {
+    const dir = candidate.side === 'right' ? 1 : -1;
+    const centers = candidate.placements.map((p) => p.cy);
+    be.line(ax + dir * 0.45, ay, candidate.spine, ay, { stroke: C_MARK, width: 0.16 });
+    be.line(candidate.spine, Math.min(...centers, ay), candidate.spine, Math.max(...centers, ay), {
+      stroke: C_MARK, width: 0.16,
+    });
+    candidate.placements.forEach((p, i) => {
+      const nearX = dir > 0 ? p.x : p.x + p.item.width;
+      be.line(candidate.spine, p.cy, nearX, p.cy, { stroke: C_MARK, width: 0.16 });
+      drawFixtureBox(be, boxes[i], p.item, p.x, p.y);
+    });
+  } else {
+    const dir = candidate.side === 'below' ? 1 : -1;
+    const centers = candidate.placements.map((p) => p.cx);
+    be.line(ax, ay + dir * 0.45, ax, candidate.spine, { stroke: C_MARK, width: 0.16 });
+    be.line(Math.min(...centers, ax), candidate.spine, Math.max(...centers, ax), candidate.spine, {
+      stroke: C_MARK, width: 0.16,
+    });
+    candidate.placements.forEach((p, i) => {
+      const nearY = dir > 0 ? p.y : p.y + p.item.height;
+      be.line(p.cx, candidate.spine, p.cx, nearY, { stroke: C_MARK, width: 0.16 });
+      drawFixtureBox(be, boxes[i], p.item, p.x, p.y);
+    });
+  }
 }
 
-function drawMarkers(be, L, floor) {
-  for (const stack of groupFixtureStacks(floor.markers)) drawFixtureStack(be, L, stack);
+function drawMarkers(be, L, floor, footprint) {
+  for (const stack of groupFixtureStacks(floor.markers)) drawFixtureStack(be, L, stack, footprint);
 }
 
 // A ceiling-routed switch leg projects to its switch-to-light span in plan view;
@@ -909,7 +992,7 @@ function renderFloor(be, floor, opts = {}) {
   if (layers.planDims) drawDimensions(be, L, floor);
   if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);
-  if (layers.markerIcons) drawMarkers(be, L, floor); // glyphs/fixture-stack callouts stay foremost
+  if (layers.markerIcons) drawMarkers(be, L, floor, footprint); // contextual room-side callouts stay foremost
   drawStrip(be, L, floor, opts);
   return L;
 }

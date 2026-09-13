@@ -70,6 +70,8 @@ hidden; AR's device-local output profile can show it in SVG/DXF. Constraints inv
 remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
 still do. Markers within 80 mm inclusive in plan use a bracketed callout; markers also within 80 mm in full 3D
 share a white box—horizontal with one height when level, vertical with per-glyph heights otherwise.
+Stack callouts test all four sides against the printable footprint and prefer the placement inside
+the room, falling back to page fit when no containing-room direction exists.
 Whole-number dimension labels omit an all-zero fractional part, and displayed zero dimensions are
 omitted. Desktop Print creates one page per floor; print at 100% for true scale. Full AR details are in
 `docs/ar-survey.md`.
