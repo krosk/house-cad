@@ -56,6 +56,10 @@ const ARROW = 2.2;       // arrowhead length
 const ARROW_H = 1;       // arrowhead half-width
 const DIM_DASH = [1.4, 1];     // measured span
 const LEADER_DOT = [0.1, 0.8]; // endpoint -> outside value panel
+const MARKER_STACK_TOLERANCE = 0.04; // model m: half a typical 8 cm fixture face
+const MARKER_SAME_HEIGHT_EPS = 0.001; // model m: equal-height fixtures share one printed height
+const MARKER_STACK_ROW = 3.8;         // paper mm between rows inside a vertical fixture box
+const MARKER_STACK_BOX_GAP = 1.4;     // paper mm between distinct height groups
 
 // print palette
 const C_LINE = '#111';       // footprint outline
@@ -565,13 +569,174 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
   }
 }
 
-function drawMarkers(be, L, floor) {
-  for (const m of floor.markers || []) {
-    drawMarkerGlyph(be, L.X(m.x), L.Y(m.y), m.type, 2.8);
-    if (typeof m.z === 'number') {
-      drawTextChip(be, fmt(m.z), L.X(m.x), L.Y(m.y) + 3.9, 1.9); // height, in a white box
-    }
+function pairwiseCluster(items, within) {
+  const groups = [];
+  for (const item of items) {
+    const group = groups.find((candidate) => candidate.every((other) => within(item, other)));
+    if (group) group.push(item);
+    else groups.push([item]);
   }
+  return groups;
+}
+
+const markerHeight = (marker) => (Number.isFinite(marker.z) ? marker.z : 0);
+
+// One plan-position callout may contain several separate white boxes. Markers
+// share a box only when their complete 3D positions are within 4 cm: horizontal
+// neighbors at one height produce a horizontal box, while vertical neighbors at
+// different heights produce a vertical box with one height per row.
+function groupFixtureBoxes(markers, tolerance) {
+  const boxes = pairwiseCluster(markers, (a, b) => Math.hypot(
+    a.x - b.x, a.y - b.y, markerHeight(a) - markerHeight(b),
+  ) <= tolerance + 1e-9).map((members) => {
+    const minZ = Math.min(...members.map(markerHeight));
+    const maxZ = Math.max(...members.map(markerHeight));
+    const horizontal = maxZ - minZ <= MARKER_SAME_HEIGHT_EPS;
+    const ordered = [...members];
+    if (horizontal) {
+      const xs = ordered.map((m) => m.x), ys = ordered.map((m) => m.y);
+      const along = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys) ? 'x' : 'y';
+      ordered.sort((a, b) => a[along] - b[along]);
+    } else {
+      ordered.sort((a, b) => markerHeight(b) - markerHeight(a));
+    }
+    return { orientation: horizontal ? 'horizontal' : 'vertical', markers: ordered, maxZ };
+  });
+  return boxes.sort((a, b) => b.maxZ - a.maxZ);
+}
+
+// Markers within 4 cm in plan share one leader so their projected glyphs cannot
+// obscure each other. Their authored points remain untouched. Requiring every
+// member to be within tolerance avoids merging a long chain of nearby fixtures.
+export function groupFixtureStacks(markers, tolerance = MARKER_STACK_TOLERANCE) {
+  const groups = pairwiseCluster(markers || [], (a, b) =>
+    Math.hypot(a.x - b.x, a.y - b.y) <= tolerance + 1e-9);
+  return groups.map((members) => {
+    const markersByHeight = [...members].sort((a, b) =>
+      (Number.isFinite(b.z) ? b.z : -Infinity) - (Number.isFinite(a.z) ? a.z : -Infinity));
+    return {
+      x: members.reduce((sum, marker) => sum + marker.x, 0) / members.length,
+      y: members.reduce((sum, marker) => sum + marker.y, 0) / members.length,
+      markers: markersByHeight,
+      boxes: groupFixtureBoxes(markersByHeight, tolerance),
+    };
+  });
+}
+
+function fixtureBoxMetrics(be, box) {
+  const glyphSize = 2.8;
+  const padding = 0.8;
+  const labelGap = 1;
+  const textSize = 1.9;
+  const labels = box.markers.map((marker) => Number.isFinite(marker.z) ? fmt(marker.z) : '');
+  const labelWidths = labels.map((label) => label ? be.measure(label, textSize) : 0);
+  if (box.orientation === 'horizontal') {
+    const glyphGap = 0.8;
+    const glyphsWidth = box.markers.length * glyphSize + (box.markers.length - 1) * glyphGap;
+    const labelWidth = Math.max(0, ...labelWidths);
+    return {
+      width: padding * 2 + glyphsWidth + (labelWidth ? labelGap + labelWidth : 0),
+      height: padding * 2 + glyphSize,
+      glyphSize, padding, labelGap, textSize, labels, labelWidths, glyphGap,
+    };
+  }
+  return {
+    width: padding * 2 + glyphSize + labelGap + Math.max(0, ...labelWidths),
+    height: padding * 2 + glyphSize + (box.markers.length - 1) * MARKER_STACK_ROW,
+    glyphSize, padding, labelGap, textSize, labels, labelWidths,
+  };
+}
+
+function drawFixtureBox(be, box, metrics, x, y) {
+  const { glyphSize, padding, labelGap, textSize, labels } = metrics;
+  const glyphR = glyphSize / 2;
+  be.rect(x, y, metrics.width, metrics.height, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+  if (box.orientation === 'horizontal') {
+    let glyphX = x + padding + glyphR;
+    const glyphY = y + metrics.height / 2;
+    for (const marker of box.markers) {
+      drawMarkerGlyph(be, glyphX, glyphY, marker.type, glyphSize);
+      glyphX += glyphSize + metrics.glyphGap;
+    }
+    if (labels[0]) {
+      be.text(labels[0], glyphX - metrics.glyphGap + labelGap, glyphY, {
+        fill: C_MARK, size: textSize, align: 'left', baseline: 'middle',
+      });
+    }
+    return;
+  }
+
+  box.markers.forEach((marker, i) => {
+    const rowY = y + padding + glyphR + i * MARKER_STACK_ROW;
+    const glyphX = x + padding + glyphR;
+    drawMarkerGlyph(be, glyphX, rowY, marker.type, glyphSize);
+    if (labels[i]) {
+      be.text(labels[i], glyphX + glyphR + labelGap, rowY, {
+        fill: C_MARK, size: textSize, align: 'left', baseline: 'middle',
+      });
+    }
+  });
+}
+
+function drawFixtureStack(be, L, stack) {
+  const ax = L.X(stack.x), ay = L.Y(stack.y);
+  const count = stack.markers.length;
+  if (count === 1) {
+    const marker = stack.markers[0];
+    drawMarkerGlyph(be, L.X(marker.x), L.Y(marker.y), marker.type, 2.8);
+    if (Number.isFinite(marker.z)) {
+      drawTextChip(be, fmt(marker.z), L.X(marker.x), L.Y(marker.y) + 3.9, 1.9);
+    }
+    return;
+  }
+
+  const boxes = stack.boxes;
+  const metrics = boxes.map((box) => fixtureBoxMetrics(be, box));
+  const totalHeight = metrics.reduce((sum, item) => sum + item.height, 0)
+    + (metrics.length - 1) * MARKER_STACK_BOX_GAP;
+  const maxBoxWidth = Math.max(...metrics.map((item) => item.width));
+  const requiredWidth = 4.4 + maxBoxWidth;
+  const leftRoom = ax - MARGIN;
+  const rightRoom = L.page.w - MARGIN - ax;
+  const dir = rightRoom >= requiredWidth || rightRoom >= leftRoom ? 1 : -1;
+  const spineX = ax + dir * 3.2;
+
+  // Keep even a tall callout inside the drawing field. If the anchor is near a
+  // page edge, the leader bends along the spine without moving the true point.
+  const halfSpan = totalHeight / 2;
+  const minCenterY = MARGIN + halfSpan;
+  const maxCenterY = L.page.h - MARGIN - STRIP - halfSpan;
+  const centerY = minCenterY <= maxCenterY
+    ? Math.max(minCenterY, Math.min(maxCenterY, ay))
+    : ay;
+  let boxY = centerY - totalHeight / 2;
+  const boxCenters = metrics.map((item) => {
+    const cy = boxY + item.height / 2;
+    boxY += item.height + MARKER_STACK_BOX_GAP;
+    return cy;
+  });
+
+  // The bracket joins each distinct physical fixture box back to the compact
+  // installation's shared plan anchor.
+  be.circle(ax, ay, 0.45, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+  be.line(ax + dir * 0.45, ay, spineX, ay, { stroke: C_MARK, width: 0.16 });
+  be.line(spineX, Math.min(boxCenters[0], ay), spineX, Math.max(boxCenters.at(-1), ay), {
+    stroke: C_MARK, width: 0.16,
+  });
+
+  boxY = centerY - totalHeight / 2;
+  boxes.forEach((box, i) => {
+    const item = metrics[i];
+    const x = dir > 0 ? spineX + 1.2 : spineX - 1.2 - item.width;
+    const nearX = dir > 0 ? x : x + item.width;
+    be.line(spineX, boxCenters[i], nearX, boxCenters[i], { stroke: C_MARK, width: 0.16 });
+    drawFixtureBox(be, box, item, x, boxY);
+    boxY += item.height + MARKER_STACK_BOX_GAP;
+  });
+}
+
+function drawMarkers(be, L, floor) {
+  for (const stack of groupFixtureStacks(floor.markers)) drawFixtureStack(be, L, stack);
 }
 
 // A ceiling-routed switch leg projects to its switch-to-light span in plan view;
@@ -704,8 +869,8 @@ function renderFloor(be, floor, opts = {}) {
   drawElectricalLinks(be, L, floor); // dotted switch-to-light ceiling-route projection
   drawDimensions(be, L, floor);
   drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
-  drawMarkers(be, L, floor);
-  drawRoomAreas(be, L, floor); // area chips stay legible above linework + markers
+  drawRoomAreas(be, L, floor);
+  drawMarkers(be, L, floor); // individual glyphs or height-ordered fixture-stack callouts stay foremost
   drawStrip(be, L, floor, opts);
   return L;
 }

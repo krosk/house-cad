@@ -174,6 +174,12 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 HEAD moves with each push; `git log` has the full list.
 
+- (s18, pending commit) FLOOR calibration now works from any selected real storey by deriving the
+  shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
+- (s18, pending commit) plan-sheet fixture stacks group markers within 40 mm in plan under one
+  bracket. Within it, full-3D 40 mm neighbors share an outlined white box: horizontal + one height
+  when level, vertical + per-glyph heights when not. Distant height groups keep separate boxes on
+  the same leader. Shared by print/SVG and the live LEFT-controller canvas preview.
 - (s17) zone area readout: `connectedRoomComponents` (geometry2d) now deducts subtract cutouts
   (net area, not gross union) — flows to the AR EDIT info-panel `area:` line AND the plan sheet.
   mr.js `selectedZoneArea` broadens the readout to ANY selected zone (room = net connected-room
@@ -228,7 +234,7 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
   — the release TWA has no console.
 - **B — Markers: next increments** (`docs/markers-plan.md`). ~~switch + type picker~~ **DONE (s15).**
   ~~light / ethernet types~~ **DONE**. ~~logical switch-to-light links + automatic ceiling routes~~
-  **DONE (s18, pending commit)**. Remaining: manual surface-anchored wall/floor/ceiling waypoints.
+  **DONE (s18, `38f03d5`)**. Remaining: manual surface-anchored wall/floor/ceiling waypoints.
 - **C — Model transfer desktop→APK.** `15dc9c0` added copy-floors-between-saved-projects; still
   open: desktop autosave (`house-cad:autosave:v1`) vs AR slots (`house-cad:slot:<i>`) use different
   localStorage keys — verify the TWA sees Quest-Browser storage and decide if LOAD should surface the

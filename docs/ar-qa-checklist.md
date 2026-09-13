@@ -28,9 +28,12 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Grip undoes one point
 - [x] Origin gizmo appears at the derived corner
 
-## SETUP · FLOOR (`floor`)  ✅ session 14
-- [x] Touching the real ground sets the base level (`floorY`)
-- [x] Guarded to the ground floor (a touch on an upper floor does NOT double-count)
+## SETUP · FLOOR (`floor`)  ◐ ground verified; any-storey calibration needs Quest verification
+- [x] On Ground, touching the real floor sets the shared ground datum (`floorY`)
+- [ ] On Upper, touching its real floor sets `floorY = touchY - activeElevation`; the overlay lands
+      on the touched surface rather than being lifted twice
+- [ ] On Basement, the same calculation recovers the shared ground datum from its negative elevation
+- [ ] Recalibrating from different floors preserves their modeled vertical separation
 
 ## SETUP · RECAL (`recal`)  ✅ session 14 — the reticle you asked about
 - [x] SELECT phase: reticle rides the **pointer/ray floor point** (not the tip)
@@ -201,6 +204,15 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
+- [ ] Markers no more than 40 mm apart in plan form one bracketed fixture callout so projected glyphs
+      cannot obscure one another
+- [ ] Markers within 40 mm in full 3D share one outlined white box; farther-apart heights remain
+      separate white boxes on the same plan-position bracket
+- [ ] Same-height neighbors use a horizontal box with one shared height; different-height neighbors
+      use a vertical box with one height per glyph
+- [ ] Example: switches at 1.00 m and 0.96 m share one vertical white box, while a co-located outlet
+      at 0.30 m occupies its own box below them
+- [ ] Markers more than 40 mm apart in plan remain independent glyphs
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors

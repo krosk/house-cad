@@ -1526,7 +1526,7 @@ export function setupMR(view, project, getFootprint) {
   // the physical passthrough camera and the surveyed anchor remain untouched.
   const navOffset = new THREE.Vector3();
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
-  let floorY = 0;                      // floor height; 0 = local-floor, overridable by FLOOR
+  let floorY = 0;                      // shared ground datum; derived from any storey's real floor in FLOOR
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
   let recalPts = [];                   // RECAL wall touches (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
   let recalCorner = null;              // {cx, cy, a, b} selected corner; after lock a=wall 1 end, b=wall 2 end
@@ -2957,15 +2957,19 @@ export function setupMR(view, project, getFootprint) {
   const modes = [
     {
       id: 'floor', color: 0x51d88a, // label/help via i18n: mode.floor / help.floor
-      // Calibrate the GROUND base level (the datum every storey's overlay lifts
-      // off). A touch on an upper floor is at that floor's height, which would
-      // double-count against its elevation — so only re-level on the ground floor.
+      // Calibrate the shared GROUND datum from whichever storey is active. The
+      // touched surface is that storey's real floor, so subtract its model
+      // elevation before lifting the active overlay by the same amount.
       onTouch: (pos) => {
-        if (placed && project.activeFloorId !== project.groundFloorId) {
-          rlog('floor: switch to ground floor to re-level'); return;
-        }
-        floorY = pos.y;
+        const elevation = activeElevation();
+        floorY = pos.y - elevation;
         if (placed) placeAt(planPos.x, floorY, planPos.z);
+        rlog('floor calibrated', {
+          floor: project.activeFloor?.name,
+          touchY: +pos.y.toFixed(3),
+          elevation: +elevation.toFixed(3),
+          groundY: +floorY.toFixed(3),
+        });
       },
     },
     {

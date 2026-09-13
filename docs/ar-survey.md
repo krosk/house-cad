@@ -33,8 +33,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 (both DIMS modes + LEVEL) or slot menu (SAVE/LOAD). No code hardcodes a mode *index* beyond `setMode(0)`
 (= ORIGIN at session start); everything else is keyed by `id` or `currentMode ± 1`.
 
-- **FLOOR** — calibrate the ground base level `floorY` by touching the real ground. Guarded to
-  the ground floor (a touch on an upper floor would double-count against its elevation).
+- **FLOOR** — calibrate the shared ground datum `floorY` by touching the real floor of whichever
+  storey is active. The active floor's derived elevation is subtracted from the touch, so an upper
+  floor or basement calibrates the same datum without double-counting its vertical offset.
 - **LEVEL** — per-storey height + floor switch (see Multi-floor below).
 - **SETUP · TELEPORT** (`id: teleport`) — aim the pointer reticle at the active floor and trigger
   to bring that plan coordinate beneath the headset. WebXR cannot move the physical passthrough
@@ -287,7 +288,13 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   edge↔origin refs have no drawable edge and are skipped, matching the 2D editor); the
   **marker floor-pin dimensions** (`drawMarkerPins`, a distinct amber) — the surveyed
   distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
-  the glyph; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend);
+  the glyph; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend). Markers
+  within 40 mm in plan become one bracketed **fixture stack** instead of obscuring each other.
+  Inside that callout, markers within 40 mm in full 3D share an outlined white box: same-height
+  neighbors form a horizontal box with one height label; different-height neighbors form a vertical
+  box with one label per glyph. Height groups farther apart remain separate boxes on the same bracket
+  (for example, 1.00 m + 0.96 m switches together and a 0.30 m outlet below them). Every type keeps
+  its own glyph, and boxes/rows are ordered by physical height;
   and a **scale bar + `1:N · unit` caption + floor name + local `YYYY-MM-DD HH:mm` generation
   timestamp**. A shared print set captures the generation time once, so every page agrees.
   Marker/legend names come from
@@ -303,7 +310,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   endpoints and values outside that interval are valid). The affine position survives endpoint
   swaps and later geometry edits. Printing uses those same
   values and does not independently push labels or lines around rooms. Constraints without saved
-  placement use the normal auto gap and midpoint. Marker heights sit in white knockout chips.
+  placement use the normal auto gap and midpoint. Standalone marker heights sit in white knockout
+  chips; grouped marker glyphs and their height labels sit inside the fixture stack's white boxes.
 - Desktop: `main.js` Print menu → `printSheets()` (hidden iframe, one `@page` per floor) →
   browser Save-as-PDF. Multi-floor print unions every floor's content bounds, chooses one shared
   portrait/landscape orientation, and uses the largest exact scale that fits that complete stack

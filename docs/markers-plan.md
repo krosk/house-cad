@@ -11,7 +11,10 @@ relationships. The status below separates shipped work from the remaining route 
 per-type glyph via `markerFace`), and **light + ethernet types** (`markerFace` bulb / RJ45 glyphs,
 `marker.<type>` i18n, sheet legend; lights drop with z = storey height), plus persistent
 **switch-to-light links and automatic ceiling routes** (`MARKER · LINK`, s18). The mode group is now
-**MARKER** (was OUTLET). Remaining: manual wall/floor/ceiling route waypoints; openings (category 2) still
+**MARKER** (was OUTLET). The printable/SVG/AR-preview sheet also groups co-located markers into
+height-ordered fixture-stack callouts: 4 cm 3D neighbors share horizontal/vertical white boxes,
+while more distant height groups keep separate boxes on the shared leader. Remaining: manual
+wall/floor/ceiling route waypoints; openings (category 2) still
 deferred. See `.claude/handoff.md` → Next step B and `docs/ar-survey.md` for the current build. The
 design rationale below still governs; treat "we build first / not started" phrasing as historical.
 

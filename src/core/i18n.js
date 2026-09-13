@@ -57,9 +57,9 @@ const STRINGS = {
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
   'help.floor': {
-    en: 'Touch the tip to the real ground to set the base level. Re-level only on the ground floor.',
-    fr: 'Touchez le sol réel avec la pointe pour définir le niveau de base. Ne recalez qu’au rez-de-chaussée.',
-    zh: '用笔尖触碰真实地面以设定基准标高。仅在首层重新校平。',
+    en: 'Touch the tip to the real floor of the selected storey. Its elevation is deducted automatically to set the shared ground datum.',
+    fr: 'Touchez avec la pointe le sol réel de l’étage sélectionné. Son élévation est soustraite automatiquement pour définir le niveau de base commun.',
+    zh: '用笔尖触碰所选楼层的真实地面。系统会自动减去该楼层标高，以设定共用的地面基准。',
   },
   'help.level': {
     en: 'Up/down: choose a floor or ALL FLOORS above the top. On a floor, type storey height + ENTER. ALL FLOORS is read-only; PLAN/MARKER are skipped.',
