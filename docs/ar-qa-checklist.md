@@ -131,6 +131,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## MARKER · LINK (`marker_link`)  ⬜ NEW — build-verified only
 - [ ] The mode starts with a fixed `MARKER · LINK` breadcrumb and separate `PICK SWITCH` readout
 - [ ] Triggering a switch selects it in amber and changes the readout to `PICK LIGHT`
+- [ ] For switches at the exact same X/Y, repeated triggers cycle highest-to-lowest: the current
+      source stays amber and the next switch previews yellow before aiming at a light
 - [ ] Triggering a light creates a dotted route: switch rise → ceiling run → optional light drop
 - [ ] Triggering the same light again removes only that switch-to-light link
 - [ ] One switch can link to multiple lights, and one light can link to multiple switches

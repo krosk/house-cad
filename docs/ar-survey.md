@@ -84,11 +84,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Aim at a switch's
-  floor icon and trigger to select it; then trigger one or more light icons to toggle each control
-  link. Pairwise links allow one switch to control many lights and a light to be controlled by
-  multiple switches. Grip clears the source selection without deleting data. The selected switch
-  is amber, its linked lights are cyan, the hovered marker is yellow, and the separate readout
-  advances from `PICK SWITCH` to `PICK LIGHT`. Linked routes are derived live as dotted 3D switch
+  floor icon and trigger to select it; when switches share the exact same X/Y, repeated triggers
+  cycle them from highest to lowest (amber = current source, yellow = next), then aiming at and
+  triggering one or more light icons toggles each control link. Pairwise links allow one switch to
+  control many lights and a light to be controlled by multiple switches. Grip clears the source
+  selection without deleting data. The selected switch is amber, its linked lights are cyan, the
+  hovered marker is yellow, and the separate readout advances from `PICK SWITCH` to `PICK LIGHT`.
+  Linked routes are derived live as dotted 3D switch
   legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
   light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted
   plan projection and DXF writes their true 3D segments on `ELECTRICAL_ROUTE`.

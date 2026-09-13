@@ -2912,6 +2912,25 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // LINK must disambiguate switches that share one floor projection. Keep the
+  // shared marker picker unchanged for EDIT/DIMS, but make LINK preview the next
+  // switch in top-to-bottom order after each trigger. The amber source remains
+  // selected while the yellow reticle advances; aiming at a light exits the
+  // stack naturally and makes that light the link target.
+  function linkMarkerAtFloorPoint(px, py) {
+    const marker = markerAtFloorPoint(px, py);
+    if (!marker) return null;
+    const stackedSwitches = project.markers
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => candidate.type === 'switch'
+        && candidate.x === marker.x && candidate.y === marker.y)
+      .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
+      .map(({ candidate }) => candidate);
+    if (stackedSwitches.length < 2) return marker;
+    const selectedIndex = stackedSwitches.findIndex((candidate) => candidate.id === selectedLinkSwitch?.id);
+    return stackedSwitches[selectedIndex < 0 ? 0 : (selectedIndex + 1) % stackedSwitches.length];
+  }
+
   function outlineMarker(marker, role = 'wall', color = 0xffe14d) {
     if (!marker) return;
     const visual = markerGroup.children.find(
@@ -3202,8 +3221,10 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'marker_link', color: 0x38bdf8, // logical electrical control + auto ceiling route
       // Trigger a switch to make it the source, then trigger lights to toggle
-      // independent control links. Multiple lights per switch and multiple switches
-      // per light emerge naturally from pairwise links.
+      // independent control links. Repeated triggers over an exact-X/Y vertical
+      // switch stack cycle its members from highest to lowest before light picking.
+      // Multiple lights per switch and multiple switches per light emerge naturally
+      // from pairwise links.
       onTouch: () => {
         if (!placed || !hoverMarker) return;
         if (hoverMarker.type === 'switch') {
@@ -4254,7 +4275,7 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        hoverMarker = markerAtFloorPoint(px, py);
+        hoverMarker = linkMarkerAtFloorPoint(px, py);
       } else {
         reticle.visible = false;
       }
