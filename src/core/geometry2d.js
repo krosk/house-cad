@@ -100,10 +100,14 @@ export function connectedRoomComponents(rectangles, epsilon = 1e-6) {
         queue.push(candidate);
       }
     }
+    // Net area: the connected rooms' union MINUS every subtract zone (walls, doors,
+    // …) carved out of them. Adds must precede subtracts so computeFootprint unions
+    // the rooms first, then differences the cutouts.
+    const subtracts = (rectangles || []).filter((r) => r?.op === 'subtract');
     components.push({
       rectangles: connected,
       ids,
-      area: multiPolygonArea(computeFootprint(connected)),
+      area: multiPolygonArea(computeFootprint([...connected, ...subtracts])),
     });
   }
   return components;

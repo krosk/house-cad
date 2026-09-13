@@ -116,6 +116,13 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 HEAD moves with each push; `git log` has the full list.
 
+- (s17) zone area readout: `connectedRoomComponents` (geometry2d) now deducts subtract cutouts
+  (net area, not gross union) — flows to the AR EDIT info-panel `area:` line AND the plan sheet.
+  mr.js `selectedZoneArea` broadens the readout to ANY selected zone (room = net connected-room
+  area; other = own footprint), relabeled `room:` → `area:`. NOTE: user reported not seeing the
+  area on device; no code bug found for a selected room (compute + display condition both correct,
+  multiPolygonArea always finite) — suspected stale device build (check the `build:` HUD stamp). If
+  a fresh build still shows nothing, add rlog to the EDIT selection path (only way to debug XR here).
 - (s17) zone color coding: new shared palette `src/core/zoneColors.js` (room=blue, wall=red,
   door=green, window=cyan, stairs=yellow, cabinet=purple; kind encodes op, blue=only add). Desktop
   sketch2d `_drawRect` = faint kind fill + kind outline (red subtract-hatch removed). AR mr.js =

@@ -1616,9 +1616,19 @@ export function setupMR(view, project, getFootprint) {
     return roomComponentCache;
   }
 
+  // Area of the selected zone for the info panel: a ROOM shows its connected-room
+  // component net area (cutouts deducted); any other kind shows its own rectangle
+  // footprint. null when nothing is selected.
+  function selectedZoneArea() {
+    if (!selectedRect) return null;
+    if (zoneKindOf(selectedRect) === 'room') return selectedRoomComponent()?.area ?? null;
+    const b = selectedRect.bounds;
+    const a = (b.x1 - b.x0) * (b.y1 - b.y0);
+    return a > 0 ? a : null;
+  }
+
   function updateRoomAreaHud() {
-    const component = selectedRoomComponent();
-    const next = component?.area ?? null;
+    const next = selectedZoneArea();
     if (next === roomAreaHud) return;
     roomAreaHud = next;
     lastHudAt = -Infinity; // redraw next frame instead of waiting for the 2 Hz diagnostic cadence
@@ -3660,7 +3670,7 @@ export function setupMR(view, project, getFootprint) {
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
-        ...(modeId === 'edit' && roomAreaHud != null ? [`room:   ${roomAreaHud.toFixed(2)} m²`] : []),
+        ...(modeId === 'edit' && roomAreaHud != null ? [`area:   ${roomAreaHud.toFixed(2)} m²`] : []),
         ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
