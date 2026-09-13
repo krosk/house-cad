@@ -72,6 +72,8 @@ still do. Markers within 80 mm inclusive in plan use a bracketed callout; marker
 share a white box—horizontal with one height when level, vertical with per-glyph heights otherwise.
 Stack callouts test all four sides against the printable footprint and prefer the placement inside
 the room, falling back to page fit when no containing-room direction exists.
+The height chip of an isolated marker constrained at distance zero to a real edge uses that same
+room-aware four-side placement; unconstrained isolated markers keep the chip below the glyph.
 Whole-number dimension labels omit an all-zero fractional part, and displayed zero dimensions are
 omitted. Desktop Print creates one page per floor; print at 100% for true scale. Full AR details are in
 `docs/ar-survey.md`.

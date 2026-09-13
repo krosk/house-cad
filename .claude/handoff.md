@@ -129,6 +129,9 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     for equal-height fixtures and vertical layout for differing heights, but their complete callout
     now evaluates left/right/above/below against the printable footprint and chooses the room side.
     Page containment remains the fallback for isolated markers.
+24. **(s18, pending commit) room-aware isolated-marker heights.** A single marker with a zero-distance
+    constraint to a real edge now places its height chip on the room side using the same four-way
+    footprint scoring. Unconstrained singles retain the conventional chip below the glyph.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 

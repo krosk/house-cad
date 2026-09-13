@@ -295,6 +295,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   its own glyph, and boxes/rows are ordered by physical height. The complete callout evaluates
   left/right/above/below placements against the printable footprint and chooses the side inside the
   room; page fit is the fallback for markers without a containing room;
+  an isolated marker with a zero-distance constraint to a real edge applies the same four-side room
+  test to its height chip. Unconstrained isolated markers retain the conventional chip below.
   and a **scale bar + `1:N · unit` caption + floor name + local `YYYY-MM-DD HH:mm` generation
   timestamp**. A shared print set captures the generation time once, so every page agrees.
   Marker/legend names come from

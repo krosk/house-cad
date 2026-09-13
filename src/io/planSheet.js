@@ -800,14 +800,58 @@ function fixtureCandidateScore(candidate, stack, L, footprint) {
   return inside * 100 + onPage / Math.max(samples, 1);
 }
 
-function drawFixtureStack(be, L, stack, footprint) {
+function markerHasZeroEdgeConstraint(floor, marker) {
+  return (floor.constraints || []).some((constraint) => {
+    if (constraint.type !== 'distance' || !isMarkerConstraint(constraint)
+        || Math.abs(constraint.value) > 5e-7) return false;
+    const markerEnd = constraint.a?.marker ? constraint.a : constraint.b;
+    const refEnd = constraint.a?.marker ? constraint.b : constraint.a;
+    return markerEnd?.marker === marker.id && refEnd?.rect && refEnd.rect !== ORIGIN_ID;
+  });
+}
+
+function contextualHeightChip(be, L, marker, footprint) {
+  const text = fmt(marker.z);
+  const size = 1.9;
+  const width = be.measure(text, size) + 1.4;
+  const height = size + 1.2;
+  const ax = L.X(marker.x), ay = L.Y(marker.y);
+  const glyphRadius = 1.4, gap = 0.8;
+  const distanceX = glyphRadius + gap + width / 2;
+  const distanceY = glyphRadius + gap + height / 2;
+  const centers = {
+    below: [ax, ay + distanceY],
+    right: [ax + distanceX, ay],
+    left: [ax - distanceX, ay],
+    above: [ax, ay - distanceY],
+  };
+  const candidates = ['below', 'right', 'left', 'above'].map((side) => {
+    const [cx, cy] = centers[side];
+    return {
+      side,
+      placements: [{ x: cx - width / 2, y: cy - height / 2, cx, cy, item: { width, height } }],
+    };
+  });
+  const anchor = { x: marker.x, y: marker.y };
+  const candidate = candidates.reduce((best, item) =>
+    fixtureCandidateScore(item, anchor, L, footprint) > fixtureCandidateScore(best, anchor, L, footprint)
+      ? item : best);
+  return { text, cx: candidate.placements[0].cx, cy: candidate.placements[0].cy };
+}
+
+function drawFixtureStack(be, L, stack, footprint, floor) {
   const ax = L.X(stack.x), ay = L.Y(stack.y);
   const count = stack.markers.length;
   if (count === 1) {
     const marker = stack.markers[0];
     drawMarkerGlyph(be, L.X(marker.x), L.Y(marker.y), marker.type, 2.8);
     if (Number.isFinite(marker.z)) {
-      drawTextChip(be, fmt(marker.z), L.X(marker.x), L.Y(marker.y) + 3.9, 1.9);
+      if (markerHasZeroEdgeConstraint(floor, marker)) {
+        const chip = contextualHeightChip(be, L, marker, footprint);
+        drawTextChip(be, chip.text, chip.cx, chip.cy, 1.9);
+      } else {
+        drawTextChip(be, fmt(marker.z), L.X(marker.x), L.Y(marker.y) + 3.9, 1.9);
+      }
     }
     return;
   }
@@ -854,7 +898,7 @@ function drawFixtureStack(be, L, stack, footprint) {
 }
 
 function drawMarkers(be, L, floor, footprint) {
-  for (const stack of groupFixtureStacks(floor.markers)) drawFixtureStack(be, L, stack, footprint);
+  for (const stack of groupFixtureStacks(floor.markers)) drawFixtureStack(be, L, stack, footprint, floor);
 }
 
 // A ceiling-routed switch leg projects to its switch-to-light span in plan view;

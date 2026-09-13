@@ -226,6 +226,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Markers more than 80 mm apart in plan remain independent glyphs
 - [ ] A stack on each of a room's four walls places its callout inward (right/left/below/above respectively), not always to the page right
 - [ ] Equal-height fixtures display horizontally; fixtures at differing heights display vertically
+- [ ] An isolated marker constrained at distance 0 on each of a room's four walls places its height chip inward
+- [ ] An unconstrained isolated marker retains its conventional height chip below the glyph
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
