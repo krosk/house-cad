@@ -130,7 +130,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 
 ## MARKER · LINK (`marker_link`)  ⬜ NEW — build-verified only
 - [ ] The mode starts with a fixed `MARKER · LINK` breadcrumb and separate `PICK SWITCH` readout
+- [ ] Outlets, ethernet ports, and other non-switch/non-light markers never highlight in LINK
 - [ ] Triggering a switch selects it in amber and changes the readout to `PICK LIGHT`
+- [ ] A switch sharing its X/Y with an outlet remains selectable
 - [ ] For switches at the exact same X/Y, repeated triggers cycle highest-to-lowest: the current
       source stays amber and the next switch previews yellow before aiming at a light
 - [ ] Triggering a light creates a dotted route: switch rise → ceiling run → optional light drop

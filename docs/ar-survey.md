@@ -89,7 +89,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   triggering one or more light icons toggles each control link. Pairwise links allow one switch to
   control many lights and a light to be controlled by multiple switches. Grip clears the source
   selection without deleting data. The selected switch is amber, its linked lights are cyan, the
-  hovered marker is yellow, and the separate readout advances from `PICK SWITCH` to `PICK LIGHT`.
+  hovered switch/light is yellow (other marker types are never LINK targets), and the separate
+  readout advances from `PICK SWITCH` to `PICK LIGHT`.
   Linked routes are derived live as dotted 3D switch
   legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
   light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted

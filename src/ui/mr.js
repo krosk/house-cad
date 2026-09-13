@@ -2913,12 +2913,19 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // LINK must disambiguate switches that share one floor projection. Keep the
-  // shared marker picker unchanged for EDIT/DIMS, but make LINK preview the next
-  // switch in top-to-bottom order after each trigger. The amber source remains
-  // selected while the yellow reticle advances; aiming at a light exits the
-  // stack naturally and makes that light the link target.
+  // shared marker picker unchanged for EDIT/DIMS. LINK ignores unrelated marker
+  // types entirely, then previews the next switch in top-to-bottom order after
+  // each trigger. The amber source remains selected while the yellow reticle
+  // advances; aiming at a light exits the stack naturally and makes that light
+  // the link target.
   function linkMarkerAtFloorPoint(px, py) {
-    const marker = markerAtFloorPoint(px, py);
+    let marker = null;
+    let bestD = RETICLE_OUTER;
+    for (const candidate of project.markers) {
+      if (candidate.type !== 'switch' && candidate.type !== 'light') continue;
+      const d = Math.hypot(px - candidate.x, py - candidate.y);
+      if (d < bestD) { bestD = d; marker = candidate; }
+    }
     if (!marker) return null;
     const stackedSwitches = project.markers
       .map((candidate, index) => ({ candidate, index }))
