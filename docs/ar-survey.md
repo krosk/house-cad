@@ -15,7 +15,7 @@ editor (`ar-2d-parity` memory).
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · ADD → EDGE → EDIT → DIMS
-MARKER   · EDIT → DIMS
+MARKER   · EDIT → LINK → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → DXF → UNIT → LANG
 ```
 
@@ -23,7 +23,7 @@ The headset label and help header show the localized `GROUP · TOOL` breadcrumb.
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `plan_dims`, `marker`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`edit`, `plan_dims`, `marker`, `marker_link`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
 `move_down`, `save`, `load`, `sheet`, `dxf`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -65,7 +65,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   position locks. The origin target is tested in plan space, so it remains aligned with the visible
   origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
-  type** (`MARKER_TYPES` = outlet, switch, light, ethernet; extend for wire) — or, if a marker is
+  type** (`MARKER_TYPES` = outlet, switch, light, ethernet; extend for more fixtures) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
   (outlet = Type E socket, switch = rocker, light = bulb + rays, ethernet = RJ45 jack) and a
   `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
@@ -82,6 +82,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   a pure vertical (z) slider; **grip aimed at empty space deletes the selected marker**. Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
+- **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Aim at a switch's
+  floor icon and trigger to select it; then trigger one or more light icons to toggle each control
+  link. Pairwise links allow one switch to control many lights and a light to be controlled by
+  multiple switches. Grip clears the source selection without deleting data. The selected switch
+  is amber, its linked lights are cyan, the hovered marker is yellow, and the separate readout
+  advances from `PICK SWITCH` to `PICK LIGHT`. Linked routes are derived live as dotted 3D switch
+  legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
+  light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted
+  plan projection and DXF writes their true 3D segments on `ELECTRICAL_ROUTE`.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
@@ -95,14 +104,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   longer a trigger target. Only the confirmation button writes. Changing mode or pressing grip also
   cancels the pending overwrite.
 - **PROJECT · COPY FLOOR / PASTE FLOOR** (`id: copy_floor` / `paste_floor`) — COPY snapshots the
-  complete active floor (name, storey height, rectangles, dimensions and markers) to a separate
+  complete active floor (name, storey height, rectangles, dimensions, markers, and electrical links) to a separate
   persistent clipboard. It survives LOAD and an APK relaunch. PASTE **replaces the currently active
-  floor's authored plan** (rectangles, dimensions and markers), using collision-free ids and remapping
+  floor's authored plan** (rectangles, dimensions, markers, and electrical links), using collision-free ids and remapping
   every internal reference. The destination level keeps its id, name, storey height, elevation and
   ground designation. An empty target pastes immediately; an occupied target requires a second
   trigger, and grip/mode change cancels confirmation. Desktop uses a native confirmation dialog.
 - **PROJECT · MOVE UP / MOVE DOWN** (`id: move_up` / `move_down`) — trigger transfers the active
-  floor's complete authored contents (rectangles, constraints, and markers) to the immediately
+  floor's complete authored contents (rectangles, constraints, markers, and electrical links) to the immediately
   higher/lower floor and makes it active. The source becomes empty. The operation refuses an absent
   or occupied destination, so it
   never overwrites or implicitly merges data; floor names, heights, elevations, and the ground datum
@@ -176,7 +185,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
 - RIGHT **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
-  language; **MARKER** = retype the selected marker, or the drop type if none selected
+  language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/door/window/stairs/cabinet kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
@@ -378,8 +387,9 @@ teleport reticle; no last-active routing remains.
 | `src/ui/mr.js` | The whole MR session: modes, HUD, numpad, slot menu, grip-drag, multi-floor/LEVEL, RECAL, `?ar=1` auto-AR, thumbstick-hold exit |
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
-| `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints incl. `offset` + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
-| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET/DXF floor preview) |
-| `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, shared by desktop and AR |
+| `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints + markers + electrical links + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
+| `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
+| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET/DXF floor preview) |
+| `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

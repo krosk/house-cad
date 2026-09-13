@@ -1,16 +1,17 @@
 # Vertical elements (markers) — plan & handoff
 
 **Read this, then `docs/ar-survey.md` (how the AR tool is built) and `CLAUDE.md` (core
-architecture).** This is the design + resume doc for adding **vertical elements** to the survey
-tool. Nothing here is built yet — this captures the decided design so a fresh session can start.
+architecture).** This is the design + resume doc for **vertical elements** and their electrical
+relationships. The status below separates shipped work from the remaining route editor.
 
-**Date:** 2026-09-11 (design session; updated through session 13)
+**Date:** 2026-09-11 (design session; updated through session 18)
 **Status:** OUTLET + SWITCH + LIGHT + ETHERNET SHIPPED. Category-1 markers built end-to-end: outlet
 (s12), split into disjoint plan/marker editing + dimensioning domains with projected floor icons
 (s13), a **switch type + MARKER · EDIT type picker** (s15; B/Y or thumbstick-y cycles the drop type,
 per-type glyph via `markerFace`), and **light + ethernet types** (`markerFace` bulb / RJ45 glyphs,
-`marker.<type>` i18n, sheet legend; lights drop with z = storey height). The mode group is now
-**MARKER** (was OUTLET). Remaining per this doc: **wires** (polyline); openings (category 2) still
+`marker.<type>` i18n, sheet legend; lights drop with z = storey height), plus persistent
+**switch-to-light links and automatic ceiling routes** (`MARKER · LINK`, s18). The mode group is now
+**MARKER** (was OUTLET). Remaining: manual wall/floor/ceiling route waypoints; openings (category 2) still
 deferred. See `.claude/handoff.md` → Next step B and `docs/ar-survey.md` for the current build. The
 design rationale below still governs; treat "we build first / not started" phrasing as historical.
 
@@ -28,7 +29,7 @@ solver pipeline** — not to make the solver 3-D.
 The four examples split into two fundamentally different things. **Do not build them as one
 feature.**
 
-1. **Wall-anchored MARKERS — outlets, switches, lights, wires.** These are *survey annotations*,
+1. **Wall-anchored MARKERS — outlets, switches, lights, and network ports.** These are *survey annotations*,
    not massing. They do not cut geometry, do not participate in booleans, do not need the solver.
    **This is what we build first**, and it is where AR is uniquely strong: you walk to the wall,
    point the tip at the real fixture, and trigger — a better capture than any 2D tool.
@@ -44,13 +45,14 @@ feature.**
 - A new **parallel array on `Floor`** (like `rectangles`), e.g. `markers`. NOT part of
   `computeFootprint` / `extrudeFootprint`.
 - A marker is roughly `{ id, type, x, y, z }`:
-  - `type`: `outlet` | `switch` | `light` | `wire` (extend later).
+  - `type`: `outlet` | `switch` | `light` | `ethernet` (extend later).
   - `x, y`: **plan coordinates** (meters, same frame as rectangles — relative to the registered
     origin), so it lives in the same space as everything else and survives RECAL/anchor drift.
   - `z`: **height above the floor** (meters). This is the new third scalar. Enter it numerically
     (reuse the SIZE numpad) or capture it from the tip height at drop time.
-- **Wires** are a polyline: an ordered list of points (each a marker-like `{x,y,z}`), drawn as a
-  connected line between fixtures. Model as its own type carrying a `points[]`.
+- **Electrical controls** are separate per-floor `electricalLinks`, not marker types. Each stores
+  switch/light ids and a route mode. V1 derives a switch→ceiling→light polyline from live marker
+  positions; future manual routing can add surface-anchored waypoints without changing link identity.
 - `z` is an **independent scalar** — keep the constraint solver 2-axis. If constrained placement is
   ever wanted, add a trivial 1-D pin later; do NOT fold z into the X/Y solver.
 
@@ -62,7 +64,7 @@ feature.**
 - Reuse the existing sprite/badge helpers (`makeBadge`, the label/CanvasTexture pattern) for
   per-type glyphs; keep them on `renderOrder` above the floor overlays, `frustumCulled=false` if
   their vertices are rewritten per frame (see the edge-highlight trap in `docs/ar-survey.md`).
-- Wires: a `THREE.Line` through the polyline points in world space.
+- Routes: a dotted `THREE.Line` through shared `electricalRoutePoints()` output.
 - **`mr.js` does NOT subscribe to `project.onChange`** — it rebuilds overlays manually via
   `buildPlan()` / `applyPlanMatrix()`. Any marker add/delete/edit must call the rebuild itself
   (durable trap, see `docs/ar-survey.md`).
@@ -97,10 +99,11 @@ feature.**
 ## The artifacts and what each is for
 | Path | Role for this effort |
 |---|---|
-| `src/core/model.js` | Add `markers` to `Floor`; facade + any per-floor recompute. Do NOT route through footprint/extrude. |
-| `src/ui/mr.js` | New capture mode(s), glyph rendering, delete, type picker. The whole AR surface. |
+| `src/core/model.js` | Per-floor `markers` + `electricalLinks`; facade and lifecycle cleanup. Do NOT route through footprint/extrude. |
+| `src/core/electrical.js` | Shared derived switch→ceiling→light route geometry. |
+| `src/ui/mr.js` | Capture/edit/link modes, glyph and dotted 3D route rendering. The whole AR surface. |
 | `src/core/i18n.js` | Add EN/FR/ZH for every new mode label + help + any marker-type name. |
-| `src/io/serialize.js` | Round-trip `markers` per floor. |
+| `src/io/serialize.js` | Round-trip markers and links per floor; remap both during floor paste. |
 | `docs/ar-survey.md` | How modes/HUD/coordinate-mapping/rebuild work — read before editing `mr.js`. |
 
 ## Next step
@@ -109,9 +112,8 @@ feature.**
   a marker-capture surface stacks *more* unverified surface on an unverified base. Do at least a
   rough REGISTER→ROOM→EDGE→SIZE→LEVEL→LANG pass on device before/while building markers, so two
   unknowns aren't debugged at once. See `.claude/handoff.md` → Next step A.
-- **B — Markers vertical slice (the actual work).** Build ONE type (outlet) end-to-end: model
-  array → capture mode → glyph render at `(x, overlayY()+z, y)` → serialize round-trip. Then add
-  switch/light (glyph + type picker), then wires (polyline). Ship increments.
+- **B — Markers vertical slice.** Outlet/switch/light/ethernet and automatic switch-to-light
+  ceiling routes are implemented. Next increment is manual surface-anchored route waypoints.
 - **C — Openings (windows/doors): DEFERRED, separate effort.** Needs its own design pass on
   whether to give up single-extrusion or do face-level cuts. Not part of the markers slice —
   keep it out so the markers lane stays clean.
@@ -121,7 +123,8 @@ feature.**
   path? Untested; decide on device (holding a controller at outlet height vs typing 0.3 m).
 - **Type picker UX** — cycle types within one mode (B/Y, like LEVEL floors) vs one mode per type.
   Unresolved; lean on what feels right on device.
-- **Wire authoring** — how to start/end a polyline and pick intermediate points in AR. Undesigned.
+- **Manual route authoring** — automatic ceiling paths are implemented; wall/floor/ceiling waypoint
+  placement and editing still need an AR interaction design.
 - **Desktop parity** — markers are AR-first, but the desktop 2D editor exists. Whether/how markers
   render/edit in 2D is open (memory `ar-2d-parity`). Not required for the AR slice.
 - **Do markers belong to a floor or span floors?** Assumed per-floor (like rectangles). A wire

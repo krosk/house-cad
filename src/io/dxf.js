@@ -8,6 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
+import { electricalRoutePoints } from '../core/electrical.js';
 
 const MM = 1000;
 const AUTO_DIM_OFFSET = 0.35; // model meters when an AR placement has not been authored
@@ -33,6 +34,7 @@ const LAYERS = [
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_WIRE', 7, 'CONTINUOUS'],
+  ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
 ];
 
 const cleanNumber = (value) => {
@@ -53,9 +55,12 @@ class DxfWriter {
     this.pair(100, subclass);
   }
   line(layer, ax, ay, bx, by, linetype = null) {
+    this.line3d(layer, ax, ay, 0, bx, by, 0, linetype);
+  }
+  line3d(layer, ax, ay, az, bx, by, bz, linetype = null) {
     this.entity('LINE', layer, 'AcDbLine', linetype);
-    this.pair(10, mm(ax)); this.pair(20, mm(ay)); this.pair(30, 0);
-    this.pair(11, mm(bx)); this.pair(21, mm(by)); this.pair(31, 0);
+    this.pair(10, mm(ax)); this.pair(20, mm(ay)); this.pair(30, mm(az));
+    this.pair(11, mm(bx)); this.pair(21, mm(by)); this.pair(31, mm(bz));
   }
   point(layer, x, y) {
     this.entity('POINT', layer, 'AcDbPoint');
@@ -302,6 +307,18 @@ function writeMarker(w, marker) {
   }
 }
 
+function writeElectricalLinks(w, floor) {
+  for (const link of floor.electricalLinks || []) {
+    const route = electricalRoutePoints(floor, link);
+    // Three true-3D LINE entities retain the vertical switch rise, ceiling run,
+    // and optional drop to the luminaire. A top view naturally shows the run.
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i];
+      w.line3d('ELECTRICAL_ROUTE', a.x, a.y, a.z, b.x, b.y, b.z, 'DOTTED');
+    }
+  }
+}
+
 /**
  * Export one floor as an ASCII AutoCAD 2000 DXF in millimeters.
  * Geometry is full-size (1 model meter = 1000 DXF units), never paper-scaled.
@@ -326,6 +343,7 @@ export function floorToDxf(floor) {
   writeDimensions(w, floor);
   writeMarkerDimensions(w, floor);
   for (const marker of floor.markers || []) writeMarker(w, marker);
+  writeElectricalLinks(w, floor);
 
   for (const component of connectedRoomComponents(floor.rectangles)) {
     const anchor = component.rectangles.reduce((largest, rect) => {

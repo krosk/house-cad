@@ -326,7 +326,7 @@ document.getElementById('fc-paste').addEventListener('click', () => {
     } catch { /* keep the in-memory clipboard */ }
     if (!desktopFloorClipboard) { sketch.onStatus?.('Nothing copied yet.'); return; }
     const target = project.activeFloor;
-    const occupied = target.rectangles.length || target.constraints.length || target.markers.length;
+    const occupied = target.rectangles.length || target.constraints.length || target.markers.length || target.electricalLinks.length;
     if (occupied && !confirm(`Replace all plan content on "${target.name}" with the copied floor?`)) return;
     const floor = pasteFloorClipboard(project, desktopFloorClipboard, { targetId: target.id });
     sketch.clearSelection();
@@ -339,8 +339,10 @@ document.getElementById('fc-paste').addEventListener('click', () => {
 
 document.getElementById('delete').addEventListener('click', () => sketch.deleteSelected());
 document.getElementById('clear').addEventListener('click', () => {
-  if (project.rectangles.length
-    && confirm(`Remove all rectangles on "${project.activeFloor.name}"?`)) project.clear();
+  const hasContent = project.rectangles.length || project.constraints.length
+    || project.markers.length || project.electricalLinks.length;
+  if (hasContent
+    && confirm(`Remove all authored content on "${project.activeFloor.name}"?`)) project.clear();
 });
 
 // ---- collapsible dimensions panel ----

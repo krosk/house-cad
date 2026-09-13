@@ -34,6 +34,17 @@ export function syncMarkerIdCounter(ids) {
   }
 }
 
+let _elid = 0;
+export const nextElectricalLinkId = () => `el${++_elid}`;
+
+// Advance the electrical-link id counter past ids restored from saves/clipboard.
+export function syncElectricalLinkIdCounter(ids) {
+  for (const id of ids) {
+    const m = /^el(\d+)$/.exec(id);
+    if (m) _elid = Math.max(_elid, Number(m[1]));
+  }
+}
+
 let _fid = 0;
 const nextFloorId = () => `f${++_fid}`;
 
@@ -81,7 +92,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], height = 2.8, elevation = 0 } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -91,6 +102,10 @@ export class Floor {
     // the footprint/extrude pipeline. X/Y can be pinned by marker distance constraints
     // (resolved one-way in solveMarkers); z is inherent, edited by hand.
     this.markers = markers;
+    // Logical switch-to-light controls. V1 routes are derived automatically via
+    // the ceiling, so moving either marker keeps the displayed wire attached.
+    // {id, kind:'control', fromMarkerId, toMarkerId, route:{mode:'ceiling'}}
+    this.electricalLinks = electricalLinks;
     this.height = height; // storey height, meters
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
   }
@@ -118,6 +133,8 @@ export class Project {
   set constraints(v) { this.activeFloor.constraints = v; }
   get markers() { return this.activeFloor.markers; }
   set markers(v) { this.activeFloor.markers = v; }
+  get electricalLinks() { return this.activeFloor.electricalLinks; }
+  set electricalLinks(v) { this.activeFloor.electricalLinks = v; }
   get height() { return this.activeFloor.height; }
   set height(v) { this.activeFloor.height = v; }
 
@@ -196,23 +213,25 @@ export class Project {
   }
 
   // Move one floor's complete authored plan into another EMPTY floor. Rectangle,
-  // constraint, and marker objects move together so every id/reference remains valid;
+  // constraint, marker, and electrical-link objects move together so every reference remains valid;
   // storey metadata (name, height, elevation, ground designation) stays with its floor.
   // Returns a result instead of overwriting or merging destination data implicitly.
   moveFloorContents(sourceId, targetId) {
     const source = this.floors.find((f) => f.id === sourceId);
     const target = this.floors.find((f) => f.id === targetId);
     if (!source || !target || source === target) return { ok: false, reason: 'invalid' };
-    const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length;
+    const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length || f.electricalLinks.length;
     if (!hasContent(source)) return { ok: false, reason: 'empty' };
     if (hasContent(target)) return { ok: false, reason: 'occupied' };
 
     target.rectangles = source.rectangles;
     target.constraints = source.constraints;
     target.markers = source.markers;
+    target.electricalLinks = source.electricalLinks;
     source.rectangles = [];
     source.constraints = [];
     source.markers = [];
+    source.electricalLinks = [];
     this.activeFloorId = target.id;
     this._emit();
     return { ok: true, source, target };
@@ -240,6 +259,7 @@ export class Project {
     this.rectangles = [];
     this.constraints = [];
     this.markers = [];
+    this.electricalLinks = [];
     this._emit();
   }
 
@@ -262,6 +282,10 @@ export class Project {
       this.constraints = this.constraints.filter(
         (c) => c.a.marker !== id && c.b.marker !== id,
       );
+      // Logical controls cannot survive without either endpoint.
+      this.electricalLinks = this.electricalLinks.filter(
+        (link) => link.fromMarkerId !== id && link.toMarkerId !== id,
+      );
       this._emit();
     }
   }
@@ -275,13 +299,45 @@ export class Project {
     this._emit();
   }
 
-  // Change a marker's kind in place (outlet/switch/…). Type is pure annotation —
-  // it doesn't touch geometry or pins — so this only swaps the field and notifies.
+  // Change a marker's kind in place (outlet/switch/…). It does not touch geometry
+  // or pins, but any now-incompatible electrical control links are removed.
   setMarkerType(id, type) {
     const m = this.markers.find((m) => m.id === id);
     if (!m) return;
     m.type = type;
+    // Retyping an endpoint to an incompatible fixture removes its controls rather
+    // than retaining hidden/dangling electrical data.
+    this.electricalLinks = this.electricalLinks.filter((link) =>
+      (link.fromMarkerId !== id || type === 'switch') &&
+      (link.toMarkerId !== id || type === 'light'));
     this._emit();
+  }
+
+  // Toggle one logical switch-to-light control. The physical V1 wire route is
+  // derived via the ceiling at render time and therefore needs no stale XYZ copy.
+  toggleElectricalLink(fromMarkerId, toMarkerId) {
+    const from = this.markers.find((m) => m.id === fromMarkerId);
+    const to = this.markers.find((m) => m.id === toMarkerId);
+    if (!from || !to || from.type !== 'switch' || to.type !== 'light') {
+      return { ok: false, reason: 'incompatible' };
+    }
+    const i = this.electricalLinks.findIndex((link) =>
+      link.kind === 'control' && link.fromMarkerId === fromMarkerId && link.toMarkerId === toMarkerId);
+    if (i >= 0) {
+      const [link] = this.electricalLinks.splice(i, 1);
+      this._emit();
+      return { ok: true, linked: false, link };
+    }
+    const link = {
+      id: nextElectricalLinkId(),
+      kind: 'control',
+      fromMarkerId,
+      toMarkerId,
+      route: { mode: 'ceiling' },
+    };
+    this.electricalLinks.push(link);
+    this._emit();
+    return { ok: true, linked: true, link };
   }
 
   // Move a marker while preserving its pin relationships. A pin's signed value

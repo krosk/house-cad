@@ -124,6 +124,22 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Plan zones are **inert** here
 - [ ] Depth-test-off glyphs/icons + the reticle read clearly through walls
 
+## MARKER · LINK (`marker_link`)  ⬜ NEW — build-verified only
+- [ ] The mode starts with a fixed `MARKER · LINK` breadcrumb and separate `PICK SWITCH` readout
+- [ ] Triggering a switch selects it in amber and changes the readout to `PICK LIGHT`
+- [ ] Triggering a light creates a dotted route: switch rise → ceiling run → optional light drop
+- [ ] Triggering the same light again removes only that switch-to-light link
+- [ ] One switch can link to multiple lights, and one light can link to multiple switches
+- [ ] Linked lights outline cyan; hover remains yellow; the selected switch remains amber
+- [ ] Grip clears the selected switch but does not remove existing links
+- [ ] Leaving LINK hides AR wires; returning shows all persisted links
+- [ ] Moving either marker or changing storey height keeps the derived route attached
+- [ ] Retyping/deleting an endpoint removes incompatible links without dangling routes
+- [ ] SAVE/LOAD, floor COPY/PASTE, and MOVE UP/DOWN preserve links with valid remapped ids
+- [ ] Older saves without `electricalLinks` load normally with an empty link list
+- [ ] SHEET/SVG shows the dotted plan projection below marker glyphs
+- [ ] DXF contains true 3D rise/run/drop entities on `ELECTRICAL_ROUTE`
+
 ## MARKER · DIMS (`outlet_dims`)  🟡 commit + render VERIFIED (session 16); rest untested
 > s16: a real bug was found + fixed here — the desktop `Sketch2D` (live on `onChange` during AR)
 > threw on the marker `{marker}` endpoint, aborting `commitEntry` before `buildPlan`, so pins never

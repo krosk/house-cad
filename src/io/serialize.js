@@ -1,9 +1,12 @@
 // Serialize / deserialize a Project to plain JSON. This is the persistent,
 // parametric definition of the house: floors (each = rectangles + constraints +
-// height) plus which floor is ground/active. The downstream footprint/extrusion
+// markers + electrical links + height) plus which floor is ground/active. The downstream footprint/extrusion
 // and each floor's derived elevation are always recomputed, never stored.
 
-import { Floor, Rectangle, nextMarkerId, syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter } from '../core/model.js';
+import {
+  Floor, Rectangle, nextMarkerId, nextElectricalLinkId,
+  syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter, syncElectricalLinkIdCounter,
+} from '../core/model.js';
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
 export const FILE_VERSION = 2;
@@ -24,6 +27,15 @@ function serializeConstraint(c) {
 function serializeMarker(m) {
   return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
 }
+function serializeElectricalLink(link) {
+  return {
+    id: link.id,
+    kind: link.kind || 'control',
+    fromMarkerId: link.fromMarkerId,
+    toMarkerId: link.toMarkerId,
+    route: { mode: link.route?.mode || 'ceiling' },
+  };
+}
 
 export function serializeFloor(f) {
   return {
@@ -33,6 +45,7 @@ export function serializeFloor(f) {
     rectangles: f.rectangles.map(serializeRect),
     constraints: f.constraints.map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
+    electricalLinks: (f.electricalLinks || []).map(serializeElectricalLink),
   };
 }
 
@@ -76,6 +89,11 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       throw new Error('A copied dimension is incomplete.');
     }
   }
+  for (const link of (source.electricalLinks || [])) {
+    if (typeof link.fromMarkerId !== 'string' || typeof link.toMarkerId !== 'string') {
+      throw new Error('A copied electrical link is missing its marker endpoints.');
+    }
+  }
   const target = project.floors.find((f) => f.id === targetId);
   if (!target) throw new Error('Selected destination floor no longer exists.');
 
@@ -116,10 +134,23 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       conflict: false,
     }];
   });
+  const electricalLinks = (source.electricalLinks || []).flatMap((link) => {
+    const fromMarkerId = markerIds.get(link.fromMarkerId);
+    const toMarkerId = markerIds.get(link.toMarkerId);
+    if (!fromMarkerId || !toMarkerId) return [];
+    return [{
+      id: nextElectricalLinkId(),
+      kind: link.kind || 'control',
+      fromMarkerId,
+      toMarkerId,
+      route: { mode: link.route?.mode || 'ceiling' },
+    }];
+  });
 
   target.rectangles = rectangles;
   target.constraints = constraints;
   target.markers = markers;
+  target.electricalLinks = electricalLinks;
   project.activeFloorId = target.id;
   project._emit();
   return target;
@@ -157,6 +188,12 @@ export function validateProjectData(data) {
     }
     if (f.constraints && !Array.isArray(f.constraints)) return '"constraints" must be an array.';
     if (f.markers && !Array.isArray(f.markers)) return '"markers" must be an array.';
+    if (f.electricalLinks && !Array.isArray(f.electricalLinks)) return '"electricalLinks" must be an array.';
+    for (const link of (f.electricalLinks || [])) {
+      if (typeof link.fromMarkerId !== 'string' || typeof link.toMarkerId !== 'string') {
+        return 'An electrical link is missing marker endpoint ids.';
+      }
+    }
   }
   return null; // ok
 }
@@ -181,6 +218,10 @@ export function deserializeInto(project, data) {
   if (err) throw new Error(err);
 
   const descriptors = floorDescriptors(data);
+  // Reserve every authored link id before minting a fallback for hand-edited data,
+  // preventing a missing id from colliding with a later `elN` in the same file.
+  syncElectricalLinkIdCounter(descriptors.flatMap((f) =>
+    (f.electricalLinks || []).map((link) => link.id).filter(Boolean)));
   const floors = descriptors.map((f) => new Floor({
     id: f.id, // undefined for legacy → Floor mints one
     name: f.name || 'Floor',
@@ -192,6 +233,13 @@ export function deserializeInto(project, data) {
     markers: (f.markers || []).map((m) => ({
       id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
       _locked: { x: false, y: false },
+    })),
+    electricalLinks: (f.electricalLinks || []).map((link) => ({
+      id: link.id || nextElectricalLinkId(),
+      kind: link.kind || 'control',
+      fromMarkerId: link.fromMarkerId,
+      toMarkerId: link.toMarkerId,
+      route: { mode: link.route?.mode || 'ceiling' },
     })),
   }));
 
@@ -206,6 +254,7 @@ export function deserializeInto(project, data) {
   syncRectIdCounter(floors.flatMap((f) => f.rectangles.map((r) => r.id)));
   syncConstraintIdCounter(floors.flatMap((f) => f.constraints.map((c) => c.id)));
   syncMarkerIdCounter(floors.flatMap((f) => f.markers.map((m) => m.id)));
+  syncElectricalLinkIdCounter(floors.flatMap((f) => f.electricalLinks.map((link) => link.id)));
 
   project._emit();
 }

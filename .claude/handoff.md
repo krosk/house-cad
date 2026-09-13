@@ -11,12 +11,12 @@
 - Claude memory (auto-loads): `phase5-xr-intent`, `multi-floor-design`, `ar-2d-parity`,
   `quest-guardian-limitation` — Phase-5 rationale and XR gotchas. Don't duplicate them here.
 
-**Date:** 2026-09-13 (session 17)
+**Date:** 2026-09-13 (session 18)
 **Status:** Quest APK path WORKING. On-device QA: SETUP + PLAN + PROJECT(save/load/lang) passed
 (s14); MARKER · DIMS commit + floor dim-line render verified on device (s16). **The repo was 12
 commits ahead of where the s16 handoff was frozen** — sessions after s16 shipped a lot without
 updating this file, so those commits are reconstructed from `git log` below, not from live session
-notes. **s17 then added the RJ45 glyph redraw + the dimension-leader fix (see below).**
+notes. **Sessions 17–18 then added the refinements and electrical-link work below.**
 
 ## Where things stand in one paragraph
 
@@ -27,7 +27,8 @@ on-site MR survey tool** (read `phase5-xr-intent` before planning), multi-storey
 in AR. **Proven on device:** APK installs/verifies/enters AR; SETUP + PLAN + PROJECT save/load/lang
 (s14); and **MARKER · DIMS pinning an outlet to an edge → the orange dashed floor dim commits and
 renders** (s16, both X and Y pins). **Build-verified only (never walked):** LEVEL (multi-floor); the
-rest of the MARKER lane (EDIT drop/height/drag/delete/retype, the s15 switch glyph, DIMS
+rest of the MARKER lane (EDIT drop/height/drag/delete/retype, the s15 switch glyph, LINK
+switch-to-light controls/automatic ceiling routes, DIMS
 white-when-pinned / hover-outline / one-way-pin); cross-cutting HUD/input; accuracy — the checklist
 is the only record. Markers are a **parallel annotation lane**: wall-anchored points that never touch
 the footprint/boolean/extrude pipeline; the solver stays 2-axis. Before planning marker or dimension
@@ -91,18 +92,24 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 13. **(s18, `492da88`) AR DXF action.** `PROJECT · DXF` reuses the optional left-controller
     floor preview. RIGHT thumbstick up/down selects any floor without changing the active floor;
     RIGHT trigger downloads that floor as the same layered 1:1 millimeter DXF used on desktop.
-14. **(s18, pending commit) fixed PLAN EDIT label.** The controller mode breadcrumb stays
+14. **(s18, `e2459fd`) fixed PLAN EDIT label.** The controller mode breadcrumb stays
     `PLAN · EDIT` when a zone is selected or retyped. Only the separate prominent
     `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout changes with thumbstick up/down.
-15. **(s18, pending commit) fixed MARKER EDIT label.** The same UI separation now applies to
+15. **(s18, `e2459fd`) fixed MARKER EDIT label.** The same UI separation now applies to
     markers: the breadcrumb stays `MARKER · EDIT`, while a persistent separate
     `TYPE · OUTLET/SWITCH/LIGHT/ETHERNET` readout shows the selected marker type or next drop type.
-16. **(s18, pending commit) PLAN ADD + separate type.** The former contextual `PLAN · ROOM/WALL/...`
+16. **(s18, `e2459fd`) PLAN ADD + separate type.** The former contextual `PLAN · ROOM/WALL/...`
     label is now the fixed `PLAN · ADD` action. Its separate persistent
     `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout alone changes with thumbstick up/down.
-17. **(s18, pending commit) origin DIMS after teleport.** PLAN DIMS now hit-tests the origin at
+17. **(s18, `e2459fd`) origin DIMS after teleport.** PLAN DIMS now hit-tests the origin at
     plan-space `(0,0)` instead of raw `planPos`. The selectable target therefore follows the visible
     origin gizmo when `navOffset` moves the whole plan through TELEPORT.
+18. **(s18, pending commit) electrical switch-to-light links.** New `MARKER · LINK`: trigger a
+    switch source, then trigger lights to toggle pairwise control links; grip clears the source.
+    AR shows derived dotted switch→ceiling→light routes only in LINK, with source/target outlines.
+    Per-floor `electricalLinks` persist through old-save-compatible load, copy/paste id remapping,
+    marker cleanup, and floor moves. SHEET/SVG draws the dotted plan projection; DXF emits true 3D
+    route segments on `ELECTRICAL_ROUTE`. Manual wall/floor/ceiling waypoints remain future work.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -220,9 +227,8 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
   round-trip in SAVE/LOAD**; cross-cutting HUD; accuracy. Debug via the plain Quest Browser (`?ar=1`)
   — the release TWA has no console.
 - **B — Markers: next increments** (`docs/markers-plan.md`). ~~switch + type picker~~ **DONE (s15).**
-  ~~light / ethernet types~~ **DONE** (`markerFace` bulb / RJ45 glyphs, `marker.<type>` i18n, sheet
-  legend; lights drop with z = storey height). Remaining: **wires** (`THREE.Line` polyline). Keep
-  each an increment.
+  ~~light / ethernet types~~ **DONE**. ~~logical switch-to-light links + automatic ceiling routes~~
+  **DONE (s18, pending commit)**. Remaining: manual surface-anchored wall/floor/ceiling waypoints.
 - **C — Model transfer desktop→APK.** `15dc9c0` added copy-floors-between-saved-projects; still
   open: desktop autosave (`house-cad:autosave:v1`) vs AR slots (`house-cad:slot:<i>`) use different
   localStorage keys — verify the TWA sees Quest-Browser storage and decide if LOAD should surface the

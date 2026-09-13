@@ -26,6 +26,7 @@ import {
 import { floorToSvg, floorToCanvas, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { floorToDxf } from '../io/dxf.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
+import { electricalRoutePoints } from '../core/electrical.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
 
@@ -817,6 +818,11 @@ export function setupMR(view, project, getFootprint) {
   // rest of planGroup every rebuild but SKIPS this group; buildMarkers repopulates it.
   const markerGroup = new THREE.Group();
   planGroup.add(markerGroup);
+  // Derived switch-leg routes share the plan transform but are rebuilt separately
+  // from massing geometry and shown only while MARKER · LINK is active.
+  const electricalGroup = new THREE.Group();
+  electricalGroup.visible = false;
+  planGroup.add(electricalGroup);
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1172,7 +1178,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup) continue; // markers are rebuilt separately (buildMarkers)
+      if (child === markerGroup || child === electricalGroup) continue; // rebuilt separately below
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -1258,8 +1264,11 @@ export function setupMR(view, project, getFootprint) {
     // Per-rectangle edge strips, colored per kind (see edgeMat / zoneColors.js).
     // Non-active zones sit lower; the active zone is a lightened tint and on top.
     addFloorStrips(floor, 0, activeRect);
-    if (withDims) buildDimensions(floor); // constraint dimension lines + value labels
-    if (withDims) buildMarkers();    // wall-anchored annotation glyphs (own group, not cleared above)
+    if (withDims) {
+      buildDimensions(floor);       // constraint dimension lines + value labels
+      buildMarkers();               // wall-anchored glyphs (own group, not cleared above)
+      buildElectricalLinks(floor);  // derived switch-to-light ceiling routes
+    }
     return planGroup.children.length > 0;
   }
 
@@ -1441,12 +1450,45 @@ export function setupMR(view, project, getFootprint) {
     addFloorMarkers(project.activeFloor);
   }
 
+  function clearElectricalLinks() {
+    for (const child of [...electricalGroup.children]) {
+      electricalGroup.remove(child);
+      child.geometry?.dispose();
+      child.material?.dispose();
+    }
+  }
+
+  // V1 physical routing: rise vertically from the switch to the storey ceiling,
+  // cross the ceiling directly, then drop to the light if it is below that plane.
+  // The path is derived from live marker positions so edits never detach its ends.
+  function buildElectricalLinks(floor = project.activeFloor) {
+    clearElectricalLinks();
+    for (const link of floor.electricalLinks || []) {
+      const route = electricalRoutePoints(floor, link);
+      if (!route.length) continue;
+      const geometry = new THREE.BufferGeometry().setFromPoints(route.map((p, i) =>
+        new THREE.Vector3(p.x, p.z + (i === 1 || i === 2 ? 0.012 : 0), -p.y)));
+      const material = new THREE.LineDashedMaterial({
+        color: 0x38bdf8, dashSize: 0.035, gapSize: 0.035,
+        transparent: true, opacity: 0.92, depthTest: false, depthWrite: false,
+      });
+      const line = new THREE.Line(geometry, material);
+      line.computeLineDistances();
+      line.renderOrder = 14;
+      line.userData.electricalLinkId = link.id;
+      line.userData.fromMarkerId = link.fromMarkerId;
+      line.userData.toMarkerId = link.toMarkerId;
+      electricalGroup.add(line);
+    }
+  }
+
   // Read-only building overview: every independent plan stays aligned to the shared
   // origin and is lifted by its derived elevation. Dimensions and both marker glyphs
   // remain visible for reference, but none are published to the edit pickers.
   function buildAllFloors(withDims = true) {
     clearPlanGeometry();
     clearMarkers();
+    clearElectricalLinks();
     for (const floor of project.floors) {
       const elevation = floor.elevation;
       const footprint = getFootprint?.(floor.rectangles) ?? [];
@@ -1492,7 +1534,7 @@ export function setupMR(view, project, getFootprint) {
   let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
   // MARKER · EDIT drop type. Cycled by B/Y (or thumbstick-y) while in the mode, like
   // LEVEL cycles floors. Session-level (persists across mode switches). Extend the list
-  // for new fixture types (wire next); each also needs a markerFace() branch, a
+  // for new fixture types; each also needs a markerFace() branch, a
   // marker.<type> i18n key, and serialize already round-trips the type.
   const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
   let currentMarkerType = MARKER_TYPES[0];
@@ -1519,6 +1561,7 @@ export function setupMR(view, project, getFootprint) {
   let roomAreaHud = null;   // m² shown in the info panel for the selected room component
   let selectedMarker = null; // OUTLET mode: marker being height-edited
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
+  let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
 
@@ -2480,8 +2523,8 @@ export function setupMR(view, project, getFootprint) {
     try { localStorage.setItem(FLOOR_CLIPBOARD_KEY, JSON.stringify(floorClipboard)); } catch { /* memory copy still works */ }
     projectFlash(`${t('floorCopy.copied')} ${project.activeFloor.name}`);
     rlog('floor copied', {
-      name: project.activeFloor.name,
-      rects: project.rectangles.length, constraints: project.constraints.length, markers: project.markers.length,
+      name: project.activeFloor.name, rects: project.rectangles.length,
+      constraints: project.constraints.length, markers: project.markers.length, links: project.electricalLinks.length,
     });
   }
 
@@ -2497,7 +2540,7 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     const target = project.activeFloor;
-    const occupied = target.rectangles.length || target.constraints.length || target.markers.length;
+    const occupied = target.rectangles.length || target.constraints.length || target.markers.length || target.electricalLinks.length;
     if (occupied && pasteConfirmFloorId !== target.id) {
       pasteConfirmFloorId = target.id;
       projectFlash(`${t('floorCopy.replace')} ${target.name}? ${t('slot.triggerAgain')}`, true);
@@ -2511,7 +2554,7 @@ export function setupMR(view, project, getFootprint) {
       projectFlash(`${t('floorCopy.pasted')} ${floor.name}`);
       rlog('floor pasted', {
         name: floor.name, rects: floor.rectangles.length,
-        constraints: floor.constraints.length, markers: floor.markers.length,
+        constraints: floor.constraints.length, markers: floor.markers.length, links: floor.electricalLinks.length,
       });
     } catch (e) {
       pasteConfirmFloorId = null;
@@ -2541,7 +2584,8 @@ export function setupMR(view, project, getFootprint) {
     projectFlash(`${t('moveFloor.moved')} ${target.name}`);
     rlog(delta > 0 ? 'move floor up' : 'move floor down', {
       source: source.name, target: target.name,
-      rects: target.rectangles.length, constraints: target.constraints.length, markers: target.markers.length,
+      rects: target.rectangles.length, constraints: target.constraints.length,
+      markers: target.markers.length, links: target.electricalLinks.length,
     });
   }
 
@@ -2749,7 +2793,7 @@ export function setupMR(view, project, getFootprint) {
     });
   }
 
-  // MARKER · EDIT and DIMS both pick a marker only through its flat floor projection,
+  // MARKER · EDIT, LINK, and DIMS pick markers only through their flat floor projection,
   // using the same reticle-radius gating as plan edges — a stable plan-space target,
   // and it disambiguates markers stacked at the same X/Y far better than the billboard.
   function markerAtFloorPoint(px, py) {
@@ -3044,6 +3088,28 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'marker_link', color: 0x38bdf8, // logical electrical control + auto ceiling route
+      // Trigger a switch to make it the source, then trigger lights to toggle
+      // independent control links. Multiple lights per switch and multiple switches
+      // per light emerge naturally from pairwise links.
+      onTouch: () => {
+        if (!placed || !hoverMarker) return;
+        if (hoverMarker.type === 'switch') {
+          selectedLinkSwitch = hoverMarker;
+          rlog('link switch selected', { id: hoverMarker.id });
+          return;
+        }
+        if (!selectedLinkSwitch || hoverMarker.type !== 'light') return;
+        const result = project.toggleElectricalLink(selectedLinkSwitch.id, hoverMarker.id);
+        if (!result.ok) return;
+        buildPlan();
+        applyPlanMatrix();
+        rlog(result.linked ? 'light linked' : 'light unlinked', {
+          switchId: selectedLinkSwitch.id, lightId: hoverMarker.id, linkId: result.link?.id,
+        });
+      },
+    },
+    {
       id: 'recal', color: C_RECAL, // label/help via i18n: mode.recal / help.recal
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
       // corner apex needn't be reachable. First SELECT a corner — point so the reticle
@@ -3177,12 +3243,12 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'dxf', 'unit', 'lang',
+    'marker', 'marker_link', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'dxf', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
-    marker: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     save: 'project', load: 'project', sheet: 'project', dxf: 'project', unit: 'project', lang: 'project',
   };
@@ -3235,6 +3301,7 @@ export function setupMR(view, project, getFootprint) {
     roomAreaHud = null;
     lastHudAt = -Infinity;
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
+    selectedLinkSwitch = null; // ...and any electrical-link source switch
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     clearTimeout(projectFlashTimer);
     pasteConfirmFloorId = null;
@@ -3310,6 +3377,7 @@ export function setupMR(view, project, getFootprint) {
     roomComponentCache = null;
     roomAreaHud = null;
     selectedMarker = null; // ...and any marker being height-edited
+    selectedLinkSwitch = null; // LINK source selection is scoped to one floor
     resetDim();
   }
 
@@ -3540,7 +3608,8 @@ export function setupMR(view, project, getFootprint) {
   // Grip button: context-sensitive deletion belongs to the active editing domain;
   // other modes only cancel an in-progress gesture (or do nothing).
   //  - PLAN: delete the selected zone.
-  //  - OUTLET: delete the selected outlet (an aimed grip starts a drag instead).
+  //  - MARKER EDIT: delete the selected marker (an aimed grip starts a drag instead).
+  //  - MARKER LINK: clear the selected source switch without deleting links.
   //  - PLAN DIMS / OUTLET DIMS: cancel the last dimension pick, step by step.
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
@@ -3582,6 +3651,11 @@ export function setupMR(view, project, getFootprint) {
       buildPlan();
       applyPlanMatrix();
       rlog('edit delete', { id });
+      return;
+    }
+    if (mode.id === 'marker_link') {
+      if (selectedLinkSwitch) rlog('link switch cleared', { id: selectedLinkSwitch.id });
+      selectedLinkSwitch = null;
       return;
     }
     if (mode.id === 'marker' && selectedMarker) {
@@ -3773,9 +3847,11 @@ export function setupMR(view, project, getFootprint) {
     const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
+    const linkStatus = modes[currentMode].id === 'marker_link'
+      ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : hovDim;
-    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER : 0x79c0ff;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : linkStatus || hovDim;
+    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER : 0x38bdf8;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
@@ -3830,6 +3906,7 @@ export function setupMR(view, project, getFootprint) {
       if (visual.userData.markerRole.endsWith('-outline')) visual.visible = false;
     }
     const modeId = modes[currentMode].id;
+    electricalGroup.visible = modeId === 'marker_link';
     if (modeId === 'teleport') {
       // Dedicated locomotion target. Trigger brings the pointed plan coordinate
       // beneath the headset; no geometry or survey-registration state is edited.
@@ -4044,6 +4121,41 @@ export function setupMR(view, project, getFootprint) {
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected
       }
+    } else if (modeId === 'marker_link') {
+      // LINK uses the same stable floor-icon targeting as marker editing. A switch
+      // is the persistent source; each light trigger toggles one logical control.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const hit = rayFloorHit(editCtl);
+      hoverMarker = null;
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        hoverMarker = markerAtFloorPoint(px, py);
+      } else {
+        reticle.visible = false;
+      }
+      if (selectedLinkSwitch && (!project.markers.includes(selectedLinkSwitch) || selectedLinkSwitch.type !== 'switch')) {
+        selectedLinkSwitch = null;
+      }
+      const linkedLightIds = new Set((project.electricalLinks || [])
+        .filter((link) => link.fromMarkerId === selectedLinkSwitch?.id)
+        .map((link) => link.toMarkerId));
+      for (const lightId of linkedLightIds) {
+        const light = project.markers.find((m) => m.id === lightId);
+        outlineMarker(light, 'floor', 0x22d3ee);
+        outlineMarker(light, 'wall', 0x22d3ee);
+      }
+      // All routes remain visible in cyan; the selected switch's routes brighten
+      // amber so the one-to-many control set is immediately readable.
+      for (const line of electricalGroup.children) {
+        line.material.color.setHex(line.userData.fromMarkerId === selectedLinkSwitch?.id ? 0xfbbf24 : 0x38bdf8);
+      }
+      outlineMarker(hoverMarker, 'floor', 0xffe14d);
+      outlineMarker(hoverMarker, 'wall', 0xffe14d);
+      outlineMarker(selectedLinkSwitch, 'floor', 0xfbbf24);
+      outlineMarker(selectedLinkSwitch, 'wall', 0xfbbf24);
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
       // (markerAtFloorPoint), a stable plan-space target vs. the floating wall billboard —

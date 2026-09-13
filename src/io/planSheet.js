@@ -20,6 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
+import { electricalRoutePoints } from '../core/electrical.js';
 
 // True when a distance rounds to zero AT THE CURRENT DISPLAY PRECISION — such
 // dimensions (coincident edges, a marker sitting on its wall) read as "0.00" and
@@ -63,6 +64,7 @@ const C_DIM = '#333';        // dimension lines + text
 const C_DIM_BAD = '#c02626'; // conflicting dimension
 const C_MARK = '#111';       // marker glyphs
 const C_PIN = '#b45309';     // marker floor-pin dimension (fixture placement), distinct from structural dims
+const C_ELECTRICAL = '#0284c7'; // switch-to-light control / automatic ceiling route
 const C_ZONE = '#111';       // architectural zone symbols (door/window/stairs/cabinet)
 
 const MARKER_LABELS = {
@@ -572,6 +574,22 @@ function drawMarkers(be, L, floor) {
   }
 }
 
+// A ceiling-routed switch leg projects to its switch-to-light span in plan view;
+// vertical rise/drop segments collapse onto the endpoint glyphs. Keep it dotted so
+// electrical control never reads as wall or structural dimension geometry.
+function drawElectricalLinks(be, L, floor) {
+  for (const link of floor.electricalLinks || []) {
+    const route = electricalRoutePoints(floor, link);
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i];
+      if (a.x === b.x && a.y === b.y) continue; // vertical rise/drop collapses in plan
+      be.line(L.X(a.x), L.Y(a.y), L.X(b.x), L.Y(b.y), {
+        stroke: C_ELECTRICAL, width: 0.28, dash: [0.35, 0.9], cap: 'round',
+      });
+    }
+  }
+}
+
 // One conventional floor-area chip per semantic ROOM component. Use the center
 // of its largest source rectangle as a stable point inside the union; this avoids
 // polygon-centroid labels falling outside an L-shaped room.
@@ -683,6 +701,7 @@ function renderFloor(be, floor, opts = {}) {
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
   drawZones(be, L, floor); // semantic door/window/stair/cabinet symbols over footprint cutouts
+  drawElectricalLinks(be, L, floor); // dotted switch-to-light ceiling-route projection
   drawDimensions(be, L, floor);
   drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   drawMarkers(be, L, floor);

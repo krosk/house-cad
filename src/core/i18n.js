@@ -37,6 +37,7 @@ const STRINGS = {
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
+  'mode.marker_link': { en: 'LINK', fr: 'LIER',     zh: '连接' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -94,6 +95,11 @@ const STRINGS = {
     en: 'Edit markers only. Thumbstick up/down picks the drop type — or retypes the selected marker. Trigger empty space to place at the tip. Aim a marker + trigger to edit height; ENTER saves. Grip-drag moves one, grip away deletes.',
     fr: 'Modifiez seulement les marqueurs. Joystick haut/bas : choisit le type à poser, ou change le type du marqueur sélectionné. Gâchette dans le vide : poser à la pointe. Visez un marqueur + gâchette : hauteur ; VALIDER enregistre. Poignée-glisser : déplacer ; poignée ailleurs : supprimer.',
     zh: '仅编辑标记。摇杆上/下：选择放置类型，或更改所选标记的类型。对空处扣动扳机在笔尖处放置。瞄准标记并扣动扳机编辑高度；按确定保存。按住握把拖动，移开后按握把删除。',
+  },
+  'help.marker_link': {
+    en: 'Link electrical controls. Trigger a switch, then trigger lights to add or remove their connection. Grip clears the selected switch. Routes rise to the ceiling automatically.',
+    fr: 'Reliez les commandes électriques. Gâchette sur un interrupteur, puis sur les luminaires pour ajouter ou retirer leur liaison. La poignée efface l’interrupteur choisi. Le chemin monte automatiquement au plafond.',
+    zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
@@ -230,6 +236,8 @@ const STRINGS = {
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
   'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
+  'link.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
+  'link.pickLight':  { en: 'PICK LIGHT',  fr: 'CHOISIR LUMINAIRE',    zh: '选择灯具' },
 };
 
 let current = 'en';
