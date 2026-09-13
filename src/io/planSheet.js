@@ -62,14 +62,15 @@ const MARKER_SAME_HEIGHT_EPS = 0.001; // model m: equal-height fixtures share on
 const MARKER_STACK_ROW = 3.8;         // paper mm between rows inside a vertical fixture box
 const MARKER_STACK_BOX_GAP = 1.4;     // paper mm between distinct height groups
 
-// print palette
+// Monochrome print palette. Annotation domains remain distinguishable through
+// line weight and dash patterns, never hue, so SVG/PDF output is printer-neutral.
 const C_LINE = '#111';       // footprint outline
 const C_FILL = '#ededed';    // footprint fill (rooms/solid)
 const C_DIM = '#333';        // dimension lines + text
-const C_DIM_BAD = '#c02626'; // conflicting dimension
+const C_DIM_BAD = '#111';    // conflicting dimension (stronger black, no color)
 const C_MARK = '#111';       // marker glyphs
-const C_PIN = '#b45309';     // marker floor-pin dimension (fixture placement), distinct from structural dims
-const C_ELECTRICAL = '#0284c7'; // switch-to-light control / automatic ceiling route
+const C_PIN = '#111';        // marker floor-pin dimension; dashed pattern identifies the domain
+const C_ELECTRICAL = '#555'; // dotted switch-to-light route
 const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
@@ -604,7 +605,33 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
   }
 }
 
-function pairwiseCluster(items, within) {
+// Connected-component clustering: an item joins a group when it is within the
+// threshold of any member, including transitively. Thus heights 117, 109, 101 cm
+// form one box through two inclusive 8 cm neighbor links, even though the two
+// endpoints are 16 cm apart.
+function connectedClusters(items, within) {
+  const groups = [];
+  const assigned = new Set();
+  for (let seed = 0; seed < items.length; seed++) {
+    if (assigned.has(seed)) continue;
+    const indices = [seed];
+    const group = [];
+    assigned.add(seed);
+    while (indices.length) {
+      const index = indices.shift();
+      group.push(items[index]);
+      for (let candidate = 0; candidate < items.length; candidate++) {
+        if (assigned.has(candidate) || !within(items[index], items[candidate])) continue;
+        assigned.add(candidate);
+        indices.push(candidate);
+      }
+    }
+    groups.push(group);
+  }
+  return groups;
+}
+
+function completeClusters(items, within) {
   const groups = [];
   for (const item of items) {
     const group = groups.find((candidate) => candidate.every((other) => within(item, other)));
@@ -621,7 +648,7 @@ const markerHeight = (marker) => (Number.isFinite(marker.z) ? marker.z : 0);
 // neighbors at one height produce a horizontal box, while vertical neighbors at
 // different heights produce a vertical box with one height per row.
 function groupFixtureBoxes(markers, tolerance) {
-  const boxes = pairwiseCluster(markers, (a, b) => Math.hypot(
+  const boxes = connectedClusters(markers, (a, b) => Math.hypot(
     a.x - b.x, a.y - b.y, markerHeight(a) - markerHeight(b),
   ) <= tolerance + 1e-9).map((members) => {
     const minZ = Math.min(...members.map(markerHeight));
@@ -640,11 +667,11 @@ function groupFixtureBoxes(markers, tolerance) {
   return boxes.sort((a, b) => b.maxZ - a.maxZ);
 }
 
-// Markers within 8 cm inclusive in plan share one leader so their projected glyphs cannot
-// obscure each other. Their authored points remain untouched. Requiring every
-// member to be within tolerance avoids merging a long chain of nearby fixtures.
+// Markers within 8 cm inclusive in plan share one leader so their projected glyphs
+// cannot obscure each other. Requiring every pair to qualify prevents a long row
+// of adjacent fixtures from collapsing into one distant callout.
 export function groupFixtureStacks(markers, tolerance = MARKER_STACK_TOLERANCE) {
-  const groups = pairwiseCluster(markers || [], (a, b) =>
+  const groups = completeClusters(markers || [], (a, b) =>
     Math.hypot(a.x - b.x, a.y - b.y) <= tolerance + 1e-9);
   return groups.map((members) => {
     const markersByHeight = [...members].sort((a, b) =>

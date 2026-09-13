@@ -61,6 +61,8 @@ A rectangle's exact size is authored **only** through dimension constraints. The
 (recomputed, never stored — like the mesh). One set of draw calls feeds SVG and canvas backends, so
 desktop Print/Download and the in-AR preview cannot diverge. Layout is in page millimeters;
 annotations remain fixed paper sizes while geometry follows the selected ratio.
+All sheet output is monochrome; dash patterns and line weights distinguish structural dimensions,
+marker pins, and electrical routes without relying on color. AR interaction overlays remain colored.
 `sharedScaleSheetOptions()` chooses orientation from authored geometry, fits geometry plus annotations,
 and rounds the ratio denominator upward (`1:56.7` → `1:57`). It shares scale, orientation, origin, and
 generation time across Print, SVG, and AR previews so pages can be superposed. Sheets include the
@@ -68,8 +70,10 @@ footprint, structural and marker-pin dimensions, dotted electrical routes, fixtu
 door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. FURNITURE defaults to
 hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
 remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
-still do. Markers within 80 mm inclusive in plan use a bracketed callout; markers also within 80 mm in full 3D
-share a white box—horizontal with one height when level, vertical with per-glyph heights otherwise.
+still do. Markers mutually within 80 mm inclusive in plan use a bracketed callout; markers connected
+by 80 mm-inclusive full-3D neighbor links share a white box—horizontal with one height
+when level, vertical with per-glyph heights otherwise. Clustering is transitive, so 117→109→101 cm
+is one box even though the endpoints are 16 cm apart.
 Stack callouts test all four sides against the printable footprint and prefer the placement inside
 the room, falling back to page fit when no containing-room direction exists.
 The height chip of an isolated marker constrained at distance zero to a real edge uses that same

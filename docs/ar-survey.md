@@ -283,15 +283,16 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   a separate per-floor zone legend row; the
   **edge↔edge structural dimensions** (via the shared `edgeLineWorld`, `src/core/dimline.js` —
   edge↔origin refs have no drawable edge and are skipped, matching the 2D editor); the
-  **marker floor-pin dimensions** (`drawMarkerPins`, a distinct amber) — the surveyed
+  **marker floor-pin dimensions** (`drawMarkerPins`, black dashed linework) — the surveyed
   distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
-  the glyph. Their line and value-box border stay amber, while the printed value itself is black for
-  maximum contrast; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend). Markers
+  the glyph. Their line, value-box border, and value are black; **markers + a legend**
+  (`drawMarkerGlyph` per type, shared by plan and legend). Markers
   within 80 mm inclusive in plan become one bracketed **fixture stack** instead of obscuring each other.
-  Inside that callout, markers within 80 mm inclusive in full 3D share an outlined white box: same-height
+  Inside that callout, markers connected by 80 mm-inclusive full-3D neighbor links share an outlined white box: same-height
   neighbors form a horizontal box with one height label; different-height neighbors form a vertical
   box with one label per glyph. Height groups farther apart remain separate boxes on the same bracket
-  (for example, 1.00 m + 0.96 m switches together and a 0.30 m outlet below them). Every type keeps
+  (for example, 1.17 m → 1.09 m → 1.01 m forms one transitive vertical box, while a 0.24 m outlet
+  remains separate). Every type keeps
   its own glyph, and boxes/rows are ordered by physical height. The complete callout evaluates
   left/right/above/below placements against the printable footprint and chooses the side inside the
   room; page fit is the fallback for markers without a containing room;
@@ -301,6 +302,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   timestamp**. A shared print set captures the generation time once, so every page agrees.
   Marker/legend names come from
   `opts.markerLabel` (desktop = English; AR passes `t('marker.<type>')`).
+- **Sheets are fully monochrome**: footprint, dimensions, marker pins, conflict dimensions,
+  electrical routes, glyphs, and legends use only black/gray/white. Dash patterns and line weights,
+  rather than hue, distinguish annotation domains. AR overlays retain their interaction colors.
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.

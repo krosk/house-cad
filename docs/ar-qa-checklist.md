@@ -213,16 +213,18 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Both hidden furniture constraints remain stored and continue driving geometry in AR
 - [ ] FURNITURE does not reduce a connected ROOM component's reported/printed area; every other
       subtract kind still does
-- [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
-- [ ] Marker-pin value text is black while its dimension line and value-box border remain amber
+- [ ] Marker floor-pin dimensions (black dashed, wall→fixture) show where to place each marker
+- [ ] The complete sheet/SVG uses only black, gray, and white; marker pins and electrical routes contain no hue
 - [ ] Markers no more than 80 mm apart in plan form one bracketed fixture callout so projected glyphs
       cannot obscure one another
-- [ ] Markers within 80 mm inclusive in full 3D share one outlined white box; farther-apart heights remain
+- [ ] Markers connected by 80 mm-inclusive full-3D neighbor links share one outlined white box; farther-apart heights remain
       separate white boxes on the same plan-position bracket
 - [ ] Same-height neighbors use a horizontal box with one shared height; different-height neighbors
       use a vertical box with one height per glyph
 - [ ] Example: switches at 1.00 m and 0.96 m share one vertical white box, while a co-located outlet
       at 0.30 m occupies its own box below them
+- [ ] Transitive example: 1.17 m, 1.09 m, and 1.01 m share one box through adjacent 80 mm links;
+      a co-located marker at 0.24 m remains separate
 - [ ] Markers more than 80 mm apart in plan remain independent glyphs
 - [ ] A stack on each of a room's four walls places its callout inward (right/left/below/above respectively), not always to the page right
 - [ ] Equal-height fixtures display horizontally; fixtures at differing heights display vertically

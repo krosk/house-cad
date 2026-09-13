@@ -117,8 +117,8 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     persistence, orange semantic color, and output support. Furniture and its constraints remain active in the
     model but are omitted by default from sheet footprint/legend/scale/drawing. Furniture subtracts
     also do not reduce the connected-room area; fixed subtract kinds still do.
-21. **(s18, pending commit) marker-dimension sheet values are black.** Marker-pin lines and label
-    borders remain amber for domain identity; only the value text changes to high-contrast black.
+21. **(s18, pending commit) marker-dimension sheet values are black.** Superseded by item 26:
+    the complete printed marker dimension and all other sheet content are now monochrome.
 22. **(s18, pending commit) unified AR output panel.** `PROJECT · EXPORT` replaces separate SHEET
     and DXF modes. It always targets the active LEVEL floor; thumbstick up/down switches SVG/DXF.
     Ray-triggered device-local toggles control plan dims, marker dims, marker icons, furniture, and area,
@@ -132,6 +132,14 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 24. **(s18, pending commit) room-aware isolated-marker heights.** A single marker with a zero-distance
     constraint to a real edge now places its height chip on the room side using the same four-way
     footprint scoring. Unconstrained singles retain the conventional chip below the glyph.
+25. **(s18, pending commit) transitive fixture-box grouping.** Full-3D white boxes now use
+    connected-neighbor clustering rather than requiring every pair to be within 80 mm. Therefore
+    117/109/101 cm is one vertical box via two inclusive 80 mm links, while 24 cm remains separate.
+    Plan-position callouts retain mutual-distance grouping to avoid long horizontal chains.
+26. **(s18, pending commit) monochrome sheets.** Removed the remaining amber marker-pin, cyan
+    electrical-route, and red conflict colors from SVG/print/LEFT preview output. Black/gray/white
+    linework now relies on dashed/dotted patterns and weight for domain distinction; AR interaction
+    overlays keep their colors.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
