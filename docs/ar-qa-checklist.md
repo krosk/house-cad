@@ -66,8 +66,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Grip and thumbstick up/down are inert
 - [ ] LEFT has its own cyan teleport reticle in every mode; LEFT trigger teleports without invoking RIGHT's active tool
 
-## PLAN · DROP (`drop`)  ⬜ five-kind picker needs Quest verification
-- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → STAIRS → CABINET** and wraps; label tracks the selected kind
+## PLAN · ADD (`drop`)  ⬜ type picker needs Quest verification
+- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → WINDOW → STAIRS → CABINET** and wraps
+- [ ] The mode breadcrumb remains exactly `PLAN · ADD` while cycling
+- [ ] Only the separate prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout changes label/color
 - [ ] Trigger with **ROOM** selected drops an **add** rectangle (roomspace) at your standing position
 - [ ] Trigger with **WALL** selected drops a **subtract** rectangle (solid wall)
 - [ ] Trigger with **DOOR** selected also drops a subtract rectangle, but saves `kind: "door"`
@@ -83,8 +85,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PLAN · EDIT (`edit`)  ✅ session 14
 - [x] Trigger selects a zone; pressing again cycles DOWN through overlapping zones
 - [x] Grip deletes the selected zone
-- [ ] Thumbstick up/down cycles all six zone kinds; breadcrumb shows the selected kind and preserves it
-- [ ] A selected zone continuously shows a prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` controller readout
+- [ ] Thumbstick up/down cycles all six zone kinds and preserves the selected kind
+- [ ] The mode breadcrumb remains exactly `PLAN · EDIT` while cycling
+- [ ] Only the separate, prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` controller readout changes label/color
 - [ ] Selecting a ROOM continuously shows its connected component's union area in m² in the info panel, independent of reticle position
 - [ ] Overlap and positive-length shared edges connect ROOM rectangles; corner-only contact does not
 - [ ] The area disappears when the selection is cleared or changed to a non-ROOM zone
@@ -94,6 +97,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14
 - [x] edge↔edge size: pick two edges → numpad → size applied
 - [x] edge↔origin position lock (**0 m valid**)
+- [ ] After TELEPORT, the visible origin ring remains selectable as a PLAN DIMS reference
 - [x] Numpad **SWAP | DEL | ENTER** shown in the edit phase; field prefills current value
 - [x] B/Y = **FLIP** side (flips the dimension, keeps order); negatives rejected
 - [x] Conflicting size refused → `!CONFLICT`, pair stays
@@ -103,7 +107,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Outlet floor icons + outlet pins are **inert** here *(needs an outlet placed to confirm)*
 
 ## MARKER · EDIT (`marker`)  ⬜ NOT covered on device (type picker + switch are new in session 15)
-- [ ] **Thumbstick up/down cycles the drop type** (outlet → switch → light → ethernet, wraps); label reads `MARKER · EDIT · <type>`
+- [ ] **Thumbstick up/down cycles the drop type** (outlet → switch → light → ethernet, wraps)
+- [ ] The mode breadcrumb remains exactly `MARKER · EDIT` while cycling
+- [ ] Only the separate prominent `TYPE · OUTLET/SWITCH/LIGHT/ETHERNET` readout changes, and it remains visible as the current placement type when no marker is selected
 - [ ] With a marker **selected**, thumbstick up/down **retypes that marker** in place (glyph swaps, pad title updates)
 - [ ] Empty-space trigger drops a marker **of the current type** at the tip; z = tip height above floor
 - [ ] Each type's glyph is distinct: outlet = Type E socket, switch = rocker, **light** = bulb + rays, **ethernet** = RJ45 jack

@@ -14,7 +14,7 @@ editor (`ar-2d-parity` memory).
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
-PLAN     · DROP (room/wall/door/window/stairs/cabinet) → EDGE → EDIT → DIMS
+PLAN     · ADD → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → DXF → UNIT → LANG
 ```
@@ -43,32 +43,35 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
-- **DROP** (`id: drop`) — one action: drop a starter rectangle at the standing position.
+- **ADD** (`id: drop`) — one action: add a starter rectangle at the standing position.
   **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL, DOOR, WINDOW,
   STAIRS, and CABINET = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
-  preserving semantic identity for later type-specific behavior. The label shows the current kind;
-  ROOM is green and all subtract kinds are red. Edges get pushed to real walls in EDGE.
+  preserving semantic identity for later type-specific behavior. The breadcrumb remains
+  `PLAN · ADD`; the separate `TYPE · <kind>` readout is the only label that changes with
+  thumbstick up/down. ROOM is green and subtract types use their type color. Edges get pushed to real walls in EDGE.
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), grip deletes it, and thumbstick up/down cycles
   room→wall→door→window→stairs→cabinet. Marker
-  glyphs are inert. Once selected, the breadcrumb includes the kind (`PLAN · EDIT · DOOR`, etc.)
-  and a larger controller readout continuously shows `TYPE · <kind>` because all subtract kinds
-  deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
+  glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
+  readout continuously shows `TYPE · <kind>` and is the only label that changes while cycling.
+  All subtract kinds deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
   `room: <area> m²` to the info panel, independent of reticle position. Positive-length shared edges and
   overlaps connect rectangles; corner-only contact does not, and overlapping area is counted once. The
   plan sheet prints the same union area once inside every distinct ROOM component.
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
-  position locks. Marker floor icons and marker pins are inert.
+  position locks. The origin target is tested in plan space, so it remains aligned with the visible
+  origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
   type** (`MARKER_TYPES` = outlet, switch, light, ethernet; extend for wire) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
   (outlet = Type E socket, switch = rocker, light = bulb + rays, ethernet = RJ45 jack) and a
   `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
-  unreachable to tip-capture); other types capture z from the tip. The label reads
-  `MARKER · EDIT · <type>` so a glance tells you what a trigger will place. A **floor reticle**
+  unreachable to tip-capture); other types capture z from the tip. The mode breadcrumb remains
+  `MARKER · EDIT`; the separate prominent readout shows `TYPE · <type>` and is the only label
+  that changes while cycling. A **floor reticle**
   tracks the aimed floor point and the marker under it is picked through its **flat floor icon**
   (`markerAtFloorPoint`, reticle-radius gated) — a stable plan-space target, not the floating wall
   billboard — with both its floor icon and wall glyph outlined (hover = yellow, selected = amber).
@@ -174,7 +177,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · DROP** = the room/wall/door/window/stairs/cabinet kind to add
+  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/door/window/stairs/cabinet kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.

@@ -1496,13 +1496,12 @@ export function setupMR(view, project, getFootprint) {
   // marker.<type> i18n key, and serialize already round-trips the type.
   const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
   let currentMarkerType = MARKER_TYPES[0];
-  // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
-  // One DROP action instead of separate zone modes. ROOM adds; every other semantic
+  // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
+  // ADD action instead of separate zone modes. ROOM adds; every other semantic
   // zone currently subtracts while keeping its distinct saved kind.
   let currentZoneKind = ZONE_KINDS[0]; // ZONE_KINDS + zoneKind imported from zoneColors.js
   const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
   const zoneKindOf = (r) => zoneKind(r);
-  const zoneModeId = (k) => (k === 'room' ? 'drop' : k);
   const zoneColor = (k) => zoneColorHex(k); // shared per-kind palette (mode chip + HUD readouts)
   const UP = new THREE.Vector3(0, 1, 0);
 
@@ -2178,8 +2177,8 @@ export function setupMR(view, project, getFootprint) {
     redrawMarkerPad();
   }
 
-  // MARKER · EDIT thumbstick-y: if a marker is selected, RETYPE it in place (outlet
-  // <-> switch); otherwise cycle the DROP type used for the next placement. One control,
+  // MARKER · EDIT thumbstick-y: if a marker is selected, RETYPE it in place;
+  // otherwise cycle the DROP type used for the next placement. One control,
   // context-dependent — matches LEVEL/LANG where thumbstick-y cycles the current thing.
   // Extends trivially as MARKER_TYPES grows.
   function cycleMarkerType(dir = 1) {
@@ -2192,16 +2191,18 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     currentMarkerType = step(currentMarkerType);
-    setModeInfo(); // label shows MARKER · EDIT · <type>; help box stays in sync
+    // The mode breadcrumb deliberately stays MARKER · EDIT. The dedicated TYPE
+    // readout is the sole UI label that changes with the marker type.
     rlog('marker type', { type: currentMarkerType });
   }
 
-  // PLAN · DROP thumbstick-y: pick which kind the next drop places. All non-room
+  // PLAN · ADD thumbstick-y: pick which kind the next trigger places. All non-room
   // kinds currently share subtract geometry, but the rectangle keeps its identity.
   function cycleZoneKind(dir = 1) {
     const i = ZONE_KINDS.indexOf(currentZoneKind);
     currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
-    setModeInfo(); // update label chip + help/info box together
+    // The mode breadcrumb deliberately stays PLAN · ADD. The dedicated TYPE
+    // readout is the sole UI label that changes with the zone type.
     rlog('zone kind', { kind: currentZoneKind });
   }
 
@@ -2867,7 +2868,8 @@ export function setupMR(view, project, getFootprint) {
     buildPlan();
     applyPlanMatrix();
     updateRoomAreaHud();
-    setModeInfo(); // the PLAN · EDIT breadcrumb makes the persisted kind visible
+    // The mode breadcrumb deliberately stays PLAN · EDIT. The dedicated TYPE
+    // readout is the sole UI element whose label/color changes with the zone kind.
     rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
   }
 
@@ -2966,10 +2968,10 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'drop', color: zoneColorHex('room'), // fallback; live color = zoneColor(currentZoneKind), see modeColor
+      id: 'drop', color: zoneColorHex('room'), // stable PLAN · ADD accent
       // One action: drop a rectangle of the current zone kind (ROOM = add roomspace;
       // every other kind = subtract solid for now) at your standing position. Thumbstick up/down picks the kind
-      // (label + accent track it); push the edges to the real walls in EDGE.
+      // (the separate TYPE readout tracks it); push the edges to the real walls in EDGE.
       onTouch: () => dropRect(currentZoneKind),
     },
     {
@@ -3016,7 +3018,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
-      // MARKER editing domain. B/Y (or thumbstick-y) picks the drop type (currentMarkerType).
+      // MARKER editing domain. Thumbstick-y picks the drop type (currentMarkerType).
       // Aim at an existing marker to edit its height; grip-drag moves it and grip away deletes
       // the selection. Trigger on empty space drops a new marker of the current type at the
       // tip. MARKER DIMS owns its wall-pin constraints.
@@ -3192,21 +3194,15 @@ export function setupMR(view, project, getFootprint) {
   // GROUP · TOOL so the growing tool list has an explicit, localized hierarchy.
   const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
 
-  // The tool portion of a mode's label. MARKER · EDIT appends the marker type,
-  // PLAN · DROP shows the current zone kind, UNIT shows the current unit, and both
+  // The tool portion of a mode's label. UNIT shows the current unit, and both
   // export modes name the previewed floor; the remaining modes use only their tool name.
-  const markerTypeName = () => t(`marker.${currentMarkerType}`);
   const modeChildLabel = (id) =>
-    id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
-    : id === 'drop' ? t(`mode.${zoneModeId(currentZoneKind)}`)
-    : id === 'edit' && selectedRect ? `${t('mode.edit')} · ${t(`mode.${zoneModeId(zoneKindOf(selectedRect))}`)}`
-    : id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
+    id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
     : isSheetExportMode(id) ? `${t(`mode.${id}`)} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
-  // PLAN · DROP's accent follows boolean behavior (green ROOM; red subtract kinds);
-  // every other mode uses its static color.
-  const modeColor = (m) => (m.id === 'drop' ? zoneColor(currentZoneKind) : m.color);
+  // Mode accents stay fixed; contextual type colors belong to the separate TYPE readout.
+  const modeColor = (m) => m.color;
 
   // Recolor the tip + reticle and set the floating label — used both by setMode
   // and by REGISTER to flip ORIGIN<->ALIGN mid-gesture.
@@ -3219,7 +3215,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Refresh EVERY per-mode panel (label chip + help/info box) to the current mode's tool
-  // label and color — including any thumbstick-picked kind (DROP zone kind, MARKER type).
+  // label and color. Contextual ADD/EDIT types live in the separate TYPE readout.
   // Shared by setMode, the language switch, and the kind pickers so the help box never goes
   // stale behind the label (e.g. switching ROOM->WALL must update both, not just the chip).
   function setModeInfo() {
@@ -3245,7 +3241,7 @@ export function setupMR(view, project, getFootprint) {
     rectHi.visible = false;
     zebra.visible = false;
     const m = modes[currentMode];
-    setModeInfo(); // label chip + help box (carries MARKER/DROP picked kind + color)
+    setModeInfo(); // fixed mode label chip + help box
     if (isDimMode(m.id)) activateNumpad(); // start the selected domain in ref-pick phase
     else if (m.id === 'level' && !allFloorsView) activateLevelPad(); // real floors expose height entry
     else deactivateNumpad();
@@ -3701,7 +3697,7 @@ export function setupMR(view, project, getFootprint) {
     }
     // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
     // UNIT = display/input unit, LANG = language, MARKER = retype the selected marker (or the drop type if none
-    // selected), PLAN·DROP = zone kind to add, PLAN·EDIT = selected zone kind.
+    // selected), PLAN·ADD = zone kind to add, PLAN·EDIT = selected zone kind.
     // Inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
       const modeId = modes[currentMode].id;
@@ -3769,17 +3765,21 @@ export function setupMR(view, project, getFootprint) {
     } else {
       leftTeleportReticle.visible = false;
     }
-    // Echo the pointed-at constraint's value on the RIGHT editor. PLAN ·
-    // EDIT instead owns this prominent pill for the selected zone kind; the small
-    // breadcrumb alone proved too easy to miss on-device.
+    // Echo the pointed-at constraint's value on the RIGHT editor. PLAN · ADD,
+    // PLAN · EDIT, and MARKER · EDIT instead own this pill for their current TYPE; their
+    // mode breadcrumbs remain fixed while thumbstick-y changes this separate label.
     const hovSprite = pickDimLabel(editCtl);
     const hovDim = hovSprite?.userData.dimText ?? null;
+    const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
-    const readoutText = editKind ? `${t('zone.type')} · ${t(`mode.${zoneModeId(editKind)}`)}` : hovDim;
+    const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
+    const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : hovDim;
+    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER : 0x79c0ff;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
-      if (on) readouts[i].setText(readoutText, editKind ? zoneColor(editKind) : 0x79c0ff);
+      if (on) readouts[i].setText(readoutText, readoutColor);
     });
     // Minimal HUD: build stamp + the controller pointer and the reticle's floor
     // point, BOTH in plan coordinates (relative to the registered origin, yaw-
@@ -3966,7 +3966,10 @@ export function setupMR(view, project, getFootprint) {
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py, modeId === 'outlet_dims');
           if (!hoverDim) {
             if (modeId === 'plan_dims') {
-              if (Math.hypot(hit.x - planPos.x, hit.z - planPos.z) < 0.12) hoverRef = { kind: 'origin' };
+              // Pick the origin in PLAN space, not against the raw registered world
+              // position. TELEPORT shifts planGroup with navOffset, so comparing to
+              // planPos left the visible origin ring behind its stale hit target.
+              if (Math.hypot(px, py) < 0.12) hoverRef = { kind: 'origin' };
               else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
             } else if (!dimRefA) {
               const floorMarker = markerAtFloorPoint(px, py);

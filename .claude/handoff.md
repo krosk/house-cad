@@ -88,9 +88,21 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     ASCII AutoCAD 2000 DXF in millimeters at 1:1 model scale. `src/io/dxf.js` preserves computed
     footprint, authored room/wall/door/window/stairs/cabinet rectangles and symbols, structural and
     marker dimensions, room areas, origin, marker glyphs/heights, and semantic layers for Coohom.
-13. **(s18, pending commit) AR DXF action.** `PROJECT · DXF` reuses the optional left-controller
+13. **(s18, `492da88`) AR DXF action.** `PROJECT · DXF` reuses the optional left-controller
     floor preview. RIGHT thumbstick up/down selects any floor without changing the active floor;
     RIGHT trigger downloads that floor as the same layered 1:1 millimeter DXF used on desktop.
+14. **(s18, pending commit) fixed PLAN EDIT label.** The controller mode breadcrumb stays
+    `PLAN · EDIT` when a zone is selected or retyped. Only the separate prominent
+    `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout changes with thumbstick up/down.
+15. **(s18, pending commit) fixed MARKER EDIT label.** The same UI separation now applies to
+    markers: the breadcrumb stays `MARKER · EDIT`, while a persistent separate
+    `TYPE · OUTLET/SWITCH/LIGHT/ETHERNET` readout shows the selected marker type or next drop type.
+16. **(s18, pending commit) PLAN ADD + separate type.** The former contextual `PLAN · ROOM/WALL/...`
+    label is now the fixed `PLAN · ADD` action. Its separate persistent
+    `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout alone changes with thumbstick up/down.
+17. **(s18, pending commit) origin DIMS after teleport.** PLAN DIMS now hit-tests the origin at
+    plan-space `(0,0)` instead of raw `planPos`. The selectable target therefore follows the visible
+    origin gizmo when `navOffset` moves the whole plan through TELEPORT.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
