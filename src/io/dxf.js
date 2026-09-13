@@ -9,6 +9,7 @@ import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
 import { electricalRoutePoints } from '../core/electrical.js';
+import { resolveOutputLayers } from './outputOptions.js';
 
 const MM = 1000;
 const AUTO_DIM_OFFSET = 0.35; // model meters when an AR placement has not been authored
@@ -24,6 +25,7 @@ const LAYERS = [
   ['WINDOW', 4, 'CONTINUOUS'],
   ['STAIRS', 2, 'CONTINUOUS'],
   ['CABINET', 6, 'CONTINUOUS'],
+  ['FURNITURE', 30, 'CONTINUOUS'],
   ['DIMS', 8, 'DASHED'],
   ['DIMS_EXT', 8, 'DOTTED'],
   ['MARKER_DIMS', 30, 'DASHED'],
@@ -172,6 +174,14 @@ function writeZoneSymbol(w, rect, kind) {
   } else if (kind === 'cabinet') {
     w.line('CABINET', b.x0, b.y0, b.x1, b.y1);
     w.line('CABINET', b.x0, b.y1, b.x1, b.y0);
+  } else if (kind === 'furniture') {
+    const ix = width * 0.18, iy = height * 0.18;
+    if (width > ix * 2 && height > iy * 2) {
+      w.polyline('FURNITURE', [
+        [b.x0 + ix, b.y0 + iy], [b.x1 - ix, b.y0 + iy],
+        [b.x1 - ix, b.y1 - iy], [b.x0 + ix, b.y1 - iy],
+      ]);
+    }
   }
 }
 
@@ -187,6 +197,16 @@ function endpointCoord(floor, endpoint, axis) {
   const id = endpoint?.rect?.id ?? endpoint?.rect;
   const rect = floor.rectangles.find((r) => r.id === id);
   return rect ? edgeCoord(rect, endpoint.edge) : null;
+}
+
+function constraintInvolvesFurniture(constraint, rectangles) {
+  const furnitureIds = new Set((rectangles || [])
+    .filter((rect) => zoneKind(rect) === 'furniture')
+    .map((rect) => rect.id));
+  return [constraint?.a, constraint?.b].some((endpoint) => {
+    const id = endpoint?.rect?.id ?? endpoint?.rect;
+    return furnitureIds.has(id);
+  });
 }
 
 function writeTick(w, layer, x, y) {
@@ -206,6 +226,7 @@ function writeDimensions(w, floor) {
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || isMarkerConstraint(c) || Math.abs(c.value) < 5e-7) continue;
+    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
     const la = edgeLineWorld(c.a, floor.rectangles), lb = edgeLineWorld(c.b, floor.rectangles);
     const aOrigin = c.a?.rect === ORIGIN_ID, bOrigin = c.b?.rect === ORIGIN_ID;
     if ((!la && !aOrigin) || (!lb && !bOrigin)) continue;
@@ -244,6 +265,7 @@ function writeDimensions(w, floor) {
 function writeMarkerDimensions(w, floor) {
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || !isMarkerConstraint(c) || Math.abs(c.value) < 5e-7) continue;
+    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
     const markerEnd = c.a?.marker ? c.a : c.b;
     const refEnd = c.a?.marker ? c.b : c.a;
     const marker = (floor.markers || []).find((m) => m.id === markerEnd?.marker);
@@ -323,26 +345,28 @@ function writeElectricalLinks(w, floor) {
  * Export one floor as an ASCII AutoCAD 2000 DXF in millimeters.
  * Geometry is full-size (1 model meter = 1000 DXF units), never paper-scaled.
  */
-export function floorToDxf(floor) {
+export function floorToDxf(floor, opts = {}) {
+  const layers = resolveOutputLayers(opts);
+  const rectangles = floor.rectangles.filter((rect) => layers.furniture || zoneKind(rect) !== 'furniture');
   const w = new DxfWriter();
   writeHeader(w);
   writeTables(w);
   w.pair(0, 'SECTION'); w.pair(2, 'ENTITIES');
 
   w.point('ORIGIN', 0, 0);
-  const footprint = computeFootprint(floor.rectangles);
+  const footprint = computeFootprint(rectangles);
   for (const polygon of footprint) for (const ring of polygon) w.polyline('FOOTPRINT', ring);
 
-  for (const rect of floor.rectangles) {
+  for (const rect of rectangles) {
     const kind = zoneKind(rect);
     const layer = kind.toUpperCase();
     w.polyline(layer, rectPoints(rect));
     writeZoneSymbol(w, rect, kind);
   }
 
-  writeDimensions(w, floor);
-  writeMarkerDimensions(w, floor);
-  for (const marker of floor.markers || []) writeMarker(w, marker);
+  if (layers.planDims) writeDimensions(w, floor);
+  if (layers.markerDims) writeMarkerDimensions(w, floor);
+  if (layers.markerIcons) for (const marker of floor.markers || []) writeMarker(w, marker);
   writeElectricalLinks(w, floor);
 
   for (const component of connectedRoomComponents(floor.rectangles)) {

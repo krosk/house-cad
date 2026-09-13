@@ -70,13 +70,14 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] LEFT has its own cyan teleport reticle in every mode; LEFT trigger teleports without invoking RIGHT's active tool
 
 ## PLAN · ADD (`drop`)  ⬜ type picker needs Quest verification
-- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → WINDOW → STAIRS → CABINET** and wraps
+- [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → WINDOW → STAIRS → CABINET → FURNITURE** and wraps
 - [ ] The mode breadcrumb remains exactly `PLAN · ADD` while cycling
-- [ ] Only the separate prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout changes label/color
+- [ ] Only the separate prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET/FURNITURE` readout changes label/color
 - [ ] Trigger with **ROOM** selected drops an **add** rectangle (roomspace) at your standing position
 - [ ] Trigger with **WALL** selected drops a **subtract** rectangle (solid wall)
 - [ ] Trigger with **DOOR** selected also drops a subtract rectangle, but saves `kind: "door"`
 - [ ] **STAIRS** and **CABINET** also subtract for now while saving their distinct kinds
+- [ ] **FURNITURE** subtracts for now, saves `kind: "furniture"`, and uses its orange type tint
 - [ ] 3D extrusion updates live *(drop-of-a-box itself was verified s14; the kind picker is new)*
 
 ## PLAN · EDGE (`edge`)  ✅ session 14
@@ -90,7 +91,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Grip deletes the selected zone
 - [ ] Thumbstick up/down cycles all six zone kinds and preserves the selected kind
 - [ ] The mode breadcrumb remains exactly `PLAN · EDIT` while cycling
-- [ ] Only the separate, prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` controller readout changes label/color
+- [ ] Only the separate, prominent `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET/FURNITURE` controller readout changes label/color
 - [ ] Selecting a ROOM continuously shows its connected component's union area in m² in the info panel, independent of reticle position
 - [ ] Overlap and positive-length shared edges connect ROOM rectangles; corner-only contact does not
 - [ ] The area disappears when the selection is cleared or changed to a non-ROOM zone
@@ -173,7 +174,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] COPY snapshots the active floor and flashes its name without changing the project
 - [ ] After loading a different save, PASTE replaces the currently active floor's plan
 - [ ] The destination floor keeps its id, name, height, elevation, and ground designation
-- [ ] The pasted plan preserves room/wall/door/window/stairs/cabinet kinds, dimensions, marker types and positions
+- [ ] The pasted plan preserves room/wall/door/window/stairs/cabinet/furniture kinds, dimensions, marker types and positions
 - [ ] Pasted rectangle, constraint and marker ids are fresh; every constraint points to pasted objects
 - [ ] The clipboard survives an APK relaunch and can be pasted repeatedly
 - [ ] An occupied target requires a second trigger; grip or changing mode cancels confirmation
@@ -190,20 +191,29 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] SAVE/LOAD round-trips the moved plan on its new floor
 - [ ] Grip and thumbstick up/down are inert
 
-## PROJECT · SHEET (`sheet`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
-> Preview + download a to-scale plan sheet. The SVG path is desktop-verified (rendered + eyeballed);
+## PROJECT · EXPORT (`export`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
+> Configure + download the active floor as SVG/DXF. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
 - [ ] The sheet faces 45° inward and tilts 45° upward toward the user; it reads comfortably with a leftward head turn
 - [ ] Room tint, dimensions, markers, and edit/numpad panels never paint over the solid-white sheet
-- [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET/DXF export modes
+- [ ] The companion sheet reads clearly through passthrough and always shows the active LEVEL floor
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
 - [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
+- [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, and MARKER ICONS checked; FURNITURE unchecked
+- [ ] Triggering each row toggles it and immediately refreshes the companion sheet
+- [ ] FURNITURE off excludes it from footprint, symbols, legend, and scale; on restores those in SVG and DXF
+- [ ] A structural dimension with either endpoint on FURNITURE remains absent from SVG/DXF and does not reduce sheet scale
+- [ ] A marker-pin dimension anchored to a FURNITURE edge is likewise always absent from SVG/DXF
+- [ ] Both hidden furniture constraints remain stored and continue driving geometry in AR
+- [ ] FURNITURE does not reduce a connected ROOM component's reported/printed area; every other
+      subtract kind still does
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
+- [ ] Marker-pin value text is black while its dimension line and value-box border remain amber
 - [ ] Markers no more than 40 mm apart in plan form one bracketed fixture callout so projected glyphs
       cannot obscure one another
 - [ ] Markers within 40 mm in full 3D share one outlined white box; farther-apart heights remain
@@ -222,23 +232,17 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] A legitimate portrait/landscape change refreshes the left sheet immediately without stale or squeezed texture content
 - [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
 - [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
-- [ ] **Thumbstick up/down** cycles the previewed floor (wraps); label reads `SHEET · <FloorName>`
-- [ ] The previewed floor's geometry matches that floor (not the active one) after cycling
-- [ ] **Trigger** downloads the SVG; the label flashes `⬇ plan-<floor>.svg` (or `download blocked`)
+- [ ] **Thumbstick up/down** switches only `SVG` / `DXF`; it never changes the active floor
+- [ ] Changing floor in LEVEL changes the panel's `Active · <FloorName>` and companion preview
+- [ ] Triggering blank panel space does nothing; only the separate EXPORT button downloads
+- [ ] With SVG selected, EXPORT downloads `plan-<active-floor>.svg`; with DXF it downloads `.dxf`
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
-- [ ] Grip is inert here (no delete/undo); leaving the export modes keeps the companion visible and returns it to the active floor
+- [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors
+- [ ] Grip is inert here (no delete/undo); leaving EXPORT keeps the active-floor companion visible
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 - [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
 - [ ] Coohom recognizes the DXF wall/door/window geometry; annotation layers can be hidden if needed
-
-## PROJECT · DXF (`dxf`)  ⬜ NEW — build-verified only
-- [ ] Entering DXF shows the active floor in the optional left-controller sheet and labels it `DXF · <FloorName>`
-- [ ] **Thumbstick up/down** cycles floors (wraps), updates the label, and does not change the active floor
-- [ ] **Trigger** downloads that selected floor as `plan-<floor>.dxf`; the label flashes the filename
-- [ ] The downloaded DXF lands in the headset's Download folder and opens as AC1015 at 1:1 millimeter scale
-- [ ] The DXF floor selection remains stable while the mode is active; leaving returns the companion sheet to the active floor
-- [ ] Grip is inert; the optional left controller still only teleports and never invokes the export
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted

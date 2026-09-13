@@ -104,12 +104,27 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 17. **(s18, `e2459fd`) origin DIMS after teleport.** PLAN DIMS now hit-tests the origin at
     plan-space `(0,0)` instead of raw `planPos`. The selectable target therefore follows the visible
     origin gizmo when `navOffset` moves the whole plan through TELEPORT.
-18. **(s18, pending commit) electrical switch-to-light links.** New `MARKER · LINK`: trigger a
+18. **(s18, `38f03d5`) electrical switch-to-light links.** New `MARKER · LINK`: trigger a
     switch source, then trigger lights to toggle pairwise control links; grip clears the source.
     AR shows derived dotted switch→ceiling→light routes only in LINK, with source/target outlines.
     Per-floor `electricalLinks` persist through old-save-compatible load, copy/paste id remapping,
     marker cleanup, and floor moves. SHEET/SVG draws the dotted plan projection; DXF emits true 3D
     route segments on `ELECTRICAL_ROUTE`. Manual wall/floor/ceiling waypoints remain future work.
+19. **(s18, `26564d1`) any-storey FLOOR calibration + fixture-stack sheets.** FLOOR derives the
+    shared ground datum from the selected storey's touch and modeled elevation. Co-located markers
+    print in bracketed, height-aware white boxes shared by SVG and the LEFT-controller preview.
+20. **(s18, pending commit) FURNITURE plan type.** Added to desktop and AR ADD/EDIT cycling,
+    persistence, orange semantic color, and output support. Furniture and its constraints remain active in the
+    model but are omitted by default from sheet footprint/legend/scale/drawing. Furniture subtracts
+    also do not reduce the connected-room area; fixed subtract kinds still do.
+21. **(s18, pending commit) marker-dimension sheet values are black.** Marker-pin lines and label
+    borders remain amber for domain identity; only the value text changes to high-contrast black.
+22. **(s18, pending commit) unified AR output panel.** `PROJECT · EXPORT` replaces separate SHEET
+    and DXF modes. It always targets the active LEVEL floor; thumbstick up/down switches SVG/DXF.
+    Ray-triggered device-local toggles control plan dims, marker dims, marker icons, and furniture,
+    and only a separate EXPORT button downloads. The optional LEFT sheet previews these choices
+    immediately. Preferences use `house-cad:output:v1` and never enter project saves. Furniture
+    constraints remain excluded even when furniture geometry is enabled in SVG/DXF.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -124,8 +139,8 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
   overlay/panel (≤33) and below the fixed right-controller HUD (100), so plan tint/dim labels cannot
   paint across the paper.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
-  cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
-  room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
+  cycles the contextual attribute per mode (LEVEL floor, EXPORT SVG/DXF, UNIT, LANG, MARKER type/retype,
+  PLAN·ADD kind, PLAN·EDIT kind). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
   pair. **Label chip + help box must stay in sync** — change both via `setModeInfo`, never
   `applyModeVisual` alone, or the info panel goes stale.
 - **Plan and marker are disjoint editing/dimensioning domains.** EDIT and DIMS each exist twice — a
@@ -174,9 +189,9 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 HEAD moves with each push; `git log` has the full list.
 
-- (s18, pending commit) FLOOR calibration now works from any selected real storey by deriving the
+- `26564d1` (s18) FLOOR calibration works from any selected real storey by deriving the
   shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
-- (s18, pending commit) plan-sheet fixture stacks group markers within 40 mm in plan under one
+- `26564d1` (s18) plan-sheet fixture stacks group markers within 40 mm in plan under one
   bracket. Within it, full-3D 40 mm neighbors share an outlined white box: horizontal + one height
   when level, vertical + per-glyph heights when not. Distant height groups keep separate boxes on
   the same leader. Shared by print/SVG and the live LEFT-controller canvas preview.
@@ -188,7 +203,8 @@ HEAD moves with each push; `git log` has the full list.
   multiPolygonArea always finite) — suspected stale device build (check the `build:` HUD stamp). If
   a fresh build still shows nothing, add rlog to the EDIT selection path (only way to debug XR here).
 - (s17) zone color coding: new shared palette `src/core/zoneColors.js` (room=blue, wall=red,
-  door=green, window=cyan, stairs=yellow, cabinet=purple; kind encodes op, blue=only add). Desktop
+  door=green, window=cyan, stairs=yellow, cabinet=purple, furniture=orange; kind encodes op,
+  blue=only add). Desktop
   sketch2d `_drawRect` = faint kind fill + kind outline (red subtract-hatch removed). AR mr.js =
   per-kind edge outlines + zebra + faint per-subtract-zone fills over the room footprint fill, plus
   DROP chip / HUD readouts / selected-outline. Build-clean + palette swatch verified; **AR visuals
@@ -244,7 +260,7 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
   could be hidden.
 - **E — On-device QA of the s16→s17 features.** Plan sheets (including the persistent enlarged
   LEFT-controller live preview) + SVG download while immersive, the new zone types
-  (door/window/stairs/cabinet), teleport, move-plans-between-
+  (door/window/stairs/cabinet/furniture), teleport, move-plans-between-
   storeys, all-floors AR view, AR unit selector — all **build-verified only**. The committed Ethernet
   glyph still needs a visual check on both surfaces.
 - ~~marker-DIMS commit/render bug~~ — FIXED (`0e98d02`, s16). ~~RECAL corner-select reticle~~ — DONE

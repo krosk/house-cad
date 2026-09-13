@@ -16,7 +16,7 @@ editor (`ar-2d-parity` memory).
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · ADD → EDGE → EDIT → DIMS
 MARKER   · EDIT → LINK → DIMS
-PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → DXF → UNIT → LANG
+PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
@@ -24,7 +24,7 @@ navigation remains one fast linear cycle across the rows above (A/B or thumbstic
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
 `edit`, `plan_dims`, `marker`, `marker_link`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
-`move_down`, `save`, `load`, `sheet`, `dxf`, `unit`, `lang`.
+`move_down`, `save`, `load`, `export`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -46,7 +46,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
 - **ADD** (`id: drop`) — one action: add a starter rectangle at the standing position.
   **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL, DOOR, WINDOW,
-  STAIRS, and CABINET = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
+  STAIRS, CABINET, and FURNITURE = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
   preserving semantic identity for later type-specific behavior. The breadcrumb remains
   `PLAN · ADD`; the separate `TYPE · <kind>` readout is the only label that changes with
   thumbstick up/down. ROOM is green and subtract types use their type color. Edges get pushed to real walls in EDGE.
@@ -55,7 +55,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), grip deletes it, and thumbstick up/down cycles
-  room→wall→door→window→stairs→cabinet. Marker
+  room→wall→door→window→stairs→cabinet→furniture. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
   readout continuously shows `TYPE · <kind>` and is the only label that changes while cycling.
   All subtract kinds deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
@@ -117,23 +117,20 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   or occupied destination, so it
   never overwrites or implicitly merges data; floor names, heights, elevations, and the ground datum
   stay attached to their existing storeys.
-- **SHEET** (`id: sheet`) — preview + download the to-scale plan sheet, ONE floor at a time.
+- **EXPORT** (`id: export`) — preview + download the active LEVEL floor as SVG or DXF.
   When the optional LEFT controller is detected, an enlarged panel (`makeSheetPanel`) follows it
   in every mode and shows the active floor rasterized by `floorToCanvas`
   (`src/io/planSheet.js`) — the SAME renderer that produces the printable/downloadable SVG,
   so preview == print. Model rebuilds dirty this live sheet; the frame loop redraws it at up to
-  8 fps during continuous dimension/edge drags. In SHEET mode, RIGHT **thumbstick up/down** cycles
-  the previewed floor (`cycleSheetFloor`, wraps; the label TOOL part shows the floor name) and
-  RIGHT **trigger** downloads that floor's SVG
-  (`floorToSvg` → blob → the headset's Download folder; the label flashes the filename).
-  Outside the SHEET and DXF export modes the companion automatically returns to the active floor. The panel is absent
+  8 fps during continuous dimension/edge drags. The preview/export floor is always the active
+  real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
+  `SVG` / `DXF`. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, and FURNITURE;
+  a separate **EXPORT** button downloads the selected format to the headset. These choices persist
+  locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
+  The panel is absent
   when no LEFT controller is connected. Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
   immersive session has no print dialog; the SVG blob is the off-headset deliverable
   (retrieve by cable). Desktop is where you actually print (Print menu → Save-as-PDF).
-- **DXF** (`id: dxf`) — uses the same left-controller floor preview and right thumbstick
-  up/down floor selection as SHEET. RIGHT trigger downloads the selected floor as a 1:1
-  millimeter DXF to the headset's Download folder. It is read-only and does not change the
-  active floor or project geometry.
 - **UNIT** (`id: unit`) — display/input unit switch. Thumbstick up/down cycles `m` / `cm` / `mm`;
   trigger picks the ray-aimed row, or advances one if the ray is off the panel. Dimension labels,
   numeric entry pads, sheets, and the desktop selector update immediately. This is a persisted UI
@@ -187,7 +184,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/door/window/stairs/cabinet kind to add
+  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/door/window/stairs/cabinet/furniture kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.
@@ -268,7 +265,7 @@ basement negative). See `multi-floor-design` memory for the settled design.
 A to-scale floor-plan sheet, one per floor, drawn from the parametric model (never stored;
 recomputed like the mesh). **One set of draw calls feeds two backends** so the preview can
 never diverge from the print: `svgBackend()` emits a self-contained SVG string (desktop
-print + download, AR blob download); `canvasBackend()` draws to a 2D canvas (the in-AR SHEET
+print + download, AR blob download); `canvasBackend()` draws to a 2D canvas (the in-AR live
 preview, `floorToCanvas`). Everything is computed in **page millimeters** (SVG viewBox is mm;
 the canvas backend multiplies by a px-per-mm factor) — so annotation sizes (text, dim offsets,
 arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obeys the ratio.
@@ -288,7 +285,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   edge↔origin refs have no drawable edge and are skipped, matching the 2D editor); the
   **marker floor-pin dimensions** (`drawMarkerPins`, a distinct amber) — the surveyed
   distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
-  the glyph; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend). Markers
+  the glyph. Their line and value-box border stay amber, while the printed value itself is black for
+  maximum contrast; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend). Markers
   within 40 mm in plan become one bracketed **fixture stack** instead of obscuring each other.
   Inside that callout, markers within 40 mm in full 3D share an outlined white box: same-height
   neighbors form a horizontal box with one height label; different-height neighbors form a vertical
@@ -305,6 +303,11 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Whole-number dimension labels are compacted on the sheet** (`fmtSheetDim`): an all-zero
   fractional part is omitted (`3.00` → `3`, `300.0` → `300`), while non-integers retain the
   configured display precision. This applies to structural and marker-pin dimensions only.
+- **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, and FURNITURE
+  default to on/on/on/off. The first three independently control drawing, legend, and scale-fitting
+  participation; FURNITURE controls its footprint/symbol/legend in both SVG and DXF. Furniture
+  constraints remain authoring-only and are excluded from both formats even when furniture is shown.
+  The model geometry and constraints remain stored and solved.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
   perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
   endpoints and values outside that interval are valid). The affine position survives endpoint
@@ -321,8 +324,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
   (AR preview) is build-verified only** — no browser/Quest raster test in CI.
 
-Desktop offers **Download DXF (this floor)** via `src/io/dxf.js`; AR exposes the same exporter as
-**PROJECT · DXF**, with floor selection independent of the active floor. DXF is model space rather
+Desktop offers **Download DXF (this floor)** via `src/io/dxf.js`; AR exposes the same exporter in
+**PROJECT · EXPORT**, always targeting the active LEVEL floor. DXF is model space rather
 than a paper rendition: ASCII AutoCAD 2000, millimeter units, 1:1 geometry, and separate semantic
 layers for footprint/zones/dimensions/markers/areas/origin. It targets CAD floor-plan importers such
 as Coohom and does not alter or replace the shared SVG/canvas sheet renderer.
@@ -397,7 +400,8 @@ teleport reticle; no last-active routing remains.
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
 | `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints + markers + electrical links + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
-| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET/DXF floor preview) |
+| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
+| `src/io/outputOptions.js` | Device-local SVG/DXF format and plan-dims/marker-dims/marker-icons/furniture output profile |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

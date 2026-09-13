@@ -8,6 +8,7 @@
 // directly onto Three.js Shape + holes for extrusion.
 
 import polygonClipping from 'polygon-clipping';
+import { zoneKind } from './zoneColors.js';
 
 function ringOf(rect) {
   const { x0, y0, x1, y1 } = rect.bounds;
@@ -100,10 +101,12 @@ export function connectedRoomComponents(rectangles, epsilon = 1e-6) {
         queue.push(candidate);
       }
     }
-    // Net area: the connected rooms' union MINUS every subtract zone (walls, doors,
-    // …) carved out of them. Adds must precede subtracts so computeFootprint unions
-    // the rooms first, then differences the cutouts.
-    const subtracts = (rectangles || []).filter((r) => r?.op === 'subtract');
+    // Net architectural area: connected-room union MINUS fixed subtract zones
+    // (walls, doors, windows, stairs, cabinets, …). Furniture remains authored as
+    // a subtract zone for editing/visualization, but movable furniture does not
+    // reduce the room's reported floor area.
+    const subtracts = (rectangles || []).filter((r) =>
+      r?.op === 'subtract' && zoneKind(r) !== 'furniture');
     components.push({
       rectangles: connected,
       ids,

@@ -57,18 +57,35 @@ A rectangle's exact size is authored **only** through dimension constraints. The
 
 ### Plan sheets (printing / SVG export)
 
-`src/io/planSheet.js` renders a **to-scale floor-plan sheet, one per floor**, from the model (recomputed, never stored — like the mesh). One set of draw calls feeds two backends — an **SVG** string and a **canvas** — so the desktop Print/Download output and the in-AR preview can't diverge. All layout is in **page millimeters**; annotation sizes are fixed paper sizes. `sharedScaleSheetOptions()` chooses orientation from authored geometry only, then fits the complete geometry-plus-annotation bounds and rounds the ratio denominator upward to a whole number (`1:56.7` → `1:57`). Moving a dimension label can reduce the common scale but cannot rotate the paper. It supplies the same scale, page orientation, origin, and captured generation timestamp to multi-floor printing, single-floor SVG downloads, and the AR preview/download, so any pages can be superposed without rescaling. It draws the computed footprint, edge↔edge structural dimensions (via the shared `src/core/dimline.js` `edgeLineWorld`, which skips edge↔origin refs), marker floor-pin dimensions (where to place each fixture, in a distinct color), dotted switch-to-light route projections, markers + a legend, architectural symbols + a separate legend for door/window/stairs/cabinet zones, a local `YYYY-MM-DD HH:mm` generation timestamp, and a scale bar. Markers within 40 mm in plan render as a bracketed fixture callout. Within it, markers within 40 mm in full 3D share a white box: horizontal with one shared height when level, or vertical with one height per glyph when their elevations differ. Whole-number dimension labels omit an all-zero fractional part to save paper space; other values keep the configured unit precision. Dimensions that round to `0.00` at the display unit are omitted. Desktop UI: the toolbar **Print** menu (`printSheets()` → hidden iframe, one `@page` per floor → Save-as-PDF; **print at 100% for true scale**) and Download SVG. This shows dimension *values*, which is consistent with the constraint-first rule (they're the pinned constraints, not a re-added on-canvas size editor). Full AR side (the `sheet` mode) is in `docs/ar-survey.md`.
+`src/io/planSheet.js` renders a **to-scale floor-plan sheet, one per floor**, from the model
+(recomputed, never stored — like the mesh). One set of draw calls feeds SVG and canvas backends, so
+desktop Print/Download and the in-AR preview cannot diverge. Layout is in page millimeters;
+annotations remain fixed paper sizes while geometry follows the selected ratio.
+`sharedScaleSheetOptions()` chooses orientation from authored geometry, fits geometry plus annotations,
+and rounds the ratio denominator upward (`1:56.7` → `1:57`). It shares scale, orientation, origin, and
+generation time across Print, SVG, and AR previews so pages can be superposed. Sheets include the
+footprint, structural and marker-pin dimensions, dotted electrical routes, fixture stacks, semantic
+door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. FURNITURE defaults to
+hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
+remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
+still do. Markers within 40 mm in plan use a bracketed callout; markers also within 40 mm in full 3D
+share a white box—horizontal with one height when level, vertical with per-glyph heights otherwise.
+Whole-number dimension labels omit an all-zero fractional part, and displayed zero dimensions are
+omitted. Desktop Print creates one page per floor; print at 100% for true scale. Full AR details are in
+`docs/ar-survey.md`.
 
 ### DXF export
 
 `src/io/dxf.js` exports the active floor as ASCII AutoCAD 2000 DXF (`AC1015`) for CAD/floor-plan
 importers such as Coohom. It is model-space CAD, not a paper sheet: one meter becomes 1000 DXF
-units and `$INSUNITS=4` declares millimeters. Separate layers retain `FOOTPRINT`, every semantic
-zone kind, structural and marker-pin dimensions, room areas, marker heights/types, true 3D
+units and `$INSUNITS=4` declares millimeters. Separate layers retain `FOOTPRINT`, enabled semantic
+zone kinds, enabled structural and marker-pin dimensions/markers, room areas, true 3D
 `ELECTRICAL_ROUTE` switch legs, and `ORIGIN`.
 The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
-**PROJECT · DXF** shows the same optional left-controller floor preview used by SHEET; right
-thumbstick up/down selects a floor and right trigger downloads its DXF to the headset.
+**PROJECT · EXPORT** always targets the active LEVEL floor. Right thumbstick up/down switches SVG/DXF;
+a ray-picked panel toggles plan dims, marker dims, marker icons, and furniture, while a separate
+EXPORT button downloads. The profile persists locally (`house-cad:output:v1`), outside project saves,
+and the optional left-controller preview updates immediately.
 
 ## Conventions
 

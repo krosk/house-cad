@@ -25,6 +25,9 @@ import {
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { floorToDxf } from '../io/dxf.js';
+import {
+  getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
+} from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
@@ -432,6 +435,7 @@ export function setupMR(view, project, getFootprint) {
       const sheetOpts = sharedScaleSheetOptions(project.floors, {
         page: 'a4',
         targetPx: 2048,
+        layers: getOutputSettings(),
         markerLabel: (ty) => t(`marker.${ty}`),
         zoneLabel: (kind) => t(`mode.${kind}`),
         generatedLabel: t('sheet.generated'),
@@ -554,6 +558,85 @@ export function setupMR(view, project, getFootprint) {
       tex.needsUpdate = true;
     }
     return { group, mesh, unitAt, draw };
+  }
+
+  // Unified output panel. Floor selection deliberately does not live here: every
+  // preview/export targets the active LEVEL floor. Thumbstick-y switches format;
+  // trigger toggles a row or presses the explicit EXPORT button.
+  function makeExportMenu() {
+    const W = 512, H = 640;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.32, 0.40),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = 20;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+
+    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'furniture'];
+    const TOGGLE_Y = 196, ROW_H = 70, BUTTON_Y = 506, BUTTON_H = 104;
+    function actionAt(u, v) {
+      const cy = (1 - v) * H;
+      if (cy >= TOGGLE_Y && cy < TOGGLE_Y + TOGGLES.length * ROW_H) {
+        return TOGGLES[Math.floor((cy - TOGGLE_Y) / ROW_H)] || null;
+      }
+      if (cy >= BUTTON_Y && cy <= BUTTON_Y + BUTTON_H) return 'export';
+      return null;
+    }
+    function draw(accent, hoverAction, settings, floorName) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.96)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 24); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.font = 'bold 38px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${t('group.project')} · ${t('mode.export')}`, 28, 43);
+      ctx.fillStyle = '#aab4c0';
+      ctx.font = '25px sans-serif';
+      ctx.fillText(`${t('export.active')} · ${floorName}`, 28, 99);
+      ctx.fillStyle = '#e6edf3';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText(`${t('export.format')} · ${settings.format.toUpperCase()}`, 28, 152);
+      ctx.fillStyle = '#768390';
+      ctx.font = '21px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('↑ / ↓', W - 28, 152);
+
+      TOGGLES.forEach((key, i) => {
+        const y = TOGGLE_Y + i * ROW_H + 5, h = ROW_H - 10;
+        const hot = hoverAction === key;
+        ctx.fillStyle = hot ? 'rgba(72,79,88,0.98)' : 'rgba(38,44,52,0.96)';
+        ctx.beginPath(); ctx.roundRect(18, y, W - 36, h, 14); ctx.fill();
+        ctx.strokeStyle = settings[key] ? accent : '#768390';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(37, y + 15, 28, 28);
+        if (settings[key]) {
+          ctx.fillStyle = accent;
+          ctx.font = 'bold 29px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('✓', 51, y + 29);
+        }
+        ctx.fillStyle = '#e6edf3';
+        ctx.font = 'bold 27px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(t(`export.${key}`), 88, y + h / 2 + 1);
+      });
+
+      const hot = hoverAction === 'export';
+      ctx.fillStyle = hot ? '#f8d76a' : accent;
+      ctx.beginPath(); ctx.roundRect(18, BUTTON_Y, W - 36, BUTTON_H, 18); ctx.fill();
+      ctx.fillStyle = '#111820';
+      ctx.font = 'bold 37px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t('export.action'), W / 2, BUTTON_Y + BUTTON_H / 2 + 2);
+      tex.needsUpdate = true;
+    }
+    return { group, mesh, actionAt, draw };
   }
 
   // The marker sits ahead of the controller's tracked origin, along the pointing
@@ -782,6 +865,10 @@ export function setupMR(view, project, getFootprint) {
   // UNIT display/input-unit panel (shares numpadCursor as its ray-hit dot).
   const unitMenu = makeUnitMenu();
   scene.add(unitMenu.group);
+
+  // Unified SVG/DXF options + explicit export action.
+  const exportMenu = makeExportMenu();
+  scene.add(exportMenu.group);
 
   // SHEET plan-preview panel (a rasterized to-scale sheet; read-only).
   const sheetPanel = makeSheetPanel();
@@ -1588,6 +1675,8 @@ export function setupMR(view, project, getFootprint) {
   let prevHoverLang = null; // last drawn lang hover
   let hoverUnit = null;     // UNIT menu row under the ray this frame (unit id)
   let prevHoverUnit = null; // last drawn unit hover
+  let hoverExportAction = null;     // output toggle or explicit export button under the ray
+  let prevHoverExportAction = null;
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
   let overwriteSlot = null; // occupied SAVE slot armed for a required second trigger
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
@@ -2380,11 +2469,11 @@ export function setupMR(view, project, getFootprint) {
     overwriteSlot = null;
   }
 
-  // ---- SHEET / DXF: preview + download one selected floor at a time ----
-  // The preview is persistently mounted on the optional LEFT controller. In SHEET
-  // or DXF mode, RIGHT thumbstick-y cycles the preview and RIGHT trigger downloads
-  // the selected format; in every other mode it follows the active floor.
-  let sheetFloorIdx = 0;      // index into project.floors for the preview
+  // ---- EXPORT: live preview + SVG/DXF download of the active LEVEL floor ----
+  // The preview is persistently mounted on the optional LEFT controller and always
+  // follows the active floor. PROJECT · EXPORT only changes output format/layers;
+  // floor selection remains owned by SETUP · LEVEL.
+  let sheetFloorId = null;
   let sheetFlashTimer = null;
   let sheetDirty = true;
   let lastSheetRedrawAt = -Infinity;
@@ -2398,16 +2487,14 @@ export function setupMR(view, project, getFootprint) {
   const LEFT_SHEET_YAW = Math.PI / 4;
   const LEFT_SHEET_PITCH = -Math.PI / 4;
 
-  function currentSheetFloor() {
-    sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
-    return project.floors[sheetFloorIdx];
-  }
+  const currentSheetFloor = () => project.activeFloor;
   const redrawSheet = () => {
     sheetPanel.redraw(currentSheetFloor());
+    sheetFloorId = currentSheetFloor().id;
     sheetDirty = false;
     lastSheetRedrawAt = performance.now();
   };
-  const isSheetExportMode = (id) => id === 'sheet' || id === 'dxf';
+  const isSheetExportMode = (id) => id === 'export';
 
   // Reparenting to the detected left controller makes the sheet follow its tracked
   // pose exactly like the controller HUD. The panel + dedicated teleport reticle are
@@ -2422,32 +2509,18 @@ export function setupMR(view, project, getFootprint) {
       sheetPanel.group.position.copy(LEFT_SHEET_POS);
       sheetPanel.group.rotation.set(LEFT_SHEET_PITCH, LEFT_SHEET_YAW, 0);
     }
-    if (!isSheetExportMode(modes[currentMode].id)) {
-      const activeIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
-      if (sheetFloorIdx !== activeIdx) { sheetFloorIdx = activeIdx; sheetDirty = true; }
-    }
+    if (sheetFloorId !== project.activeFloorId) sheetDirty = true;
     if (sheetDirty && time - lastSheetRedrawAt >= SHEET_REFRESH_MS) redrawSheet();
     sheetPanel.group.visible = true;
   }
 
   function showSheet() {
-    sheetFloorIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
     sheetDirty = true;
     redrawSheet();
   }
 
   function hideSheet() {
     clearTimeout(sheetFlashTimer);
-  }
-
-  // Thumbstick-y in SHEET/DXF previews the previous/next floor (wraps). The label's
-  // TOOL part shows the floor name so a glance says which export you're acting on.
-  function cycleSheetFloor(dir) {
-    const n = project.floors.length;
-    if (n < 1) return;
-    sheetFloorIdx = (sheetFloorIdx + dir + n) % n;
-    redrawSheet();
-    setModeInfo(); // label -> "SHEET/DXF · <FloorName>"
   }
 
   // Fire-and-forget blob download. In the immersive TWA the download UI isn't visible,
@@ -2475,26 +2548,39 @@ export function setupMR(view, project, getFootprint) {
     sheetFlashTimer = setTimeout(() => { if (isSheetExportMode(modes[currentMode].id)) setModeInfo(); }, 1600);
   }
 
-  function onSheetTouch() {
+  function performExport() {
     const f = currentSheetFloor();
-    const name = exportFileName(f, 'svg');
-    const sheetOpts = sharedScaleSheetOptions(project.floors, {
-      page: 'a4',
-      markerLabel: (ty) => t(`marker.${ty}`),
-      zoneLabel: (kind) => t(`mode.${kind}`),
-      generatedLabel: t('sheet.generated'),
-    });
-    const ok = downloadBlob(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
-    rlog('sheet download', { floor: f.name, name, ok });
+    const settings = getOutputSettings();
+    const extension = settings.format;
+    const name = exportFileName(f, extension);
+    let text;
+    let mime;
+    if (extension === 'dxf') {
+      text = floorToDxf(f, { layers: settings });
+      mime = 'application/dxf';
+    } else {
+      const sheetOpts = sharedScaleSheetOptions(project.floors, {
+        page: 'a4',
+        layers: settings,
+        markerLabel: (ty) => t(`marker.${ty}`),
+        zoneLabel: (kind) => t(`mode.${kind}`),
+        generatedLabel: t('sheet.generated'),
+      });
+      text = floorToSvg(f, sheetOpts);
+      mime = 'image/svg+xml';
+    }
+    const ok = downloadBlob(name, text, mime);
+    rlog('output download', { floor: f.name, format: extension, name, ok, layers: settings });
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
 
-  function onDxfTouch() {
-    const f = currentSheetFloor();
-    const name = exportFileName(f, 'dxf');
-    const ok = downloadBlob(name, floorToDxf(f), 'application/dxf');
-    rlog('dxf download', { floor: f.name, name, ok });
-    sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
+  function onExportTouch() {
+    if (!hoverExportAction) return;
+    if (hoverExportAction === 'export') {
+      performExport();
+      return;
+    }
+    toggleOutputLayer(hoverExportAction);
   }
 
   // ---- PROJECT one-shot actions: floor clipboard + whole-plan movement ----
@@ -2619,6 +2705,27 @@ export function setupMR(view, project, getFootprint) {
     unitMenu.group.visible = false;
     numpadCursor.visible = false;
     hoverUnit = prevHoverUnit = null;
+  }
+
+  // ---- EXPORT: persistent layer profile + explicit active-floor download ----
+  const redrawExportMenu = () => exportMenu.draw(
+    '#' + C_EXPORT.toString(16).padStart(6, '0'),
+    hoverExportAction,
+    getOutputSettings(),
+    project.activeFloor.name,
+  );
+
+  function showExportMenu() {
+    placePanel(exportMenu.group, 0.62, 0.10);
+    hoverExportAction = prevHoverExportAction = null;
+    exportMenu.group.visible = true;
+    redrawExportMenu();
+  }
+
+  function hideExportMenu() {
+    exportMenu.group.visible = false;
+    numpadCursor.visible = false;
+    hoverExportAction = prevHoverExportAction = null;
   }
 
   // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes an empty slot
@@ -2879,6 +2986,7 @@ export function setupMR(view, project, getFootprint) {
   const C_LEVEL = 0x38bdf8; // LEVEL (storey height / floor switch) accent
   const C_UNIT = 0xa78bfa; // UNIT (display/input units) accent
   const C_LANG = 0x94a3b8; // LANG (UI language switch) accent — neutral slate
+  const C_EXPORT = 0xe0b341; // unified sheet/CAD output accent
 
   // Drop a throwaway starter rectangle (ROOM = add; every other kind = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
@@ -3195,17 +3303,10 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onSlotTouch,
     },
     {
-      id: 'sheet', color: 0xe0b341, // label/help via i18n: mode.sheet / help.sheet
-      // Preview the to-scale plan sheet (same renderer as the print/SVG output).
-      // Thumbstick-y cycles the previewed floor (see pollModeCycle); trigger downloads
-      // that floor's SVG to the headset. Read-only — no massing/pin edits here.
-      onTouch: onSheetTouch,
-    },
-    {
-      id: 'dxf', color: 0x22c55e, // label/help via i18n: mode.dxf / help.dxf
-      // Reuse the floor preview/cycling UI, but export true-scale millimeter CAD
-      // model space rather than the laid-out SVG sheet.
-      onTouch: onDxfTouch,
+      id: 'export', color: C_EXPORT, // label/help via i18n: mode.export / help.export
+      // Active LEVEL floor only. Thumbstick-y switches SVG/DXF; ray+trigger toggles
+      // the output profile or presses the separate EXPORT button.
+      onTouch: onExportTouch,
     },
     {
       id: 'copy_floor', color: 0x34d399,
@@ -3247,14 +3348,14 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'marker_link', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'dxf', 'unit', 'lang',
+    'marker', 'marker_link', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
-    save: 'project', load: 'project', sheet: 'project', dxf: 'project', unit: 'project', lang: 'project',
+    save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -3264,11 +3365,10 @@ export function setupMR(view, project, getFootprint) {
   // GROUP · TOOL so the growing tool list has an explicit, localized hierarchy.
   const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
 
-  // The tool portion of a mode's label. UNIT shows the current unit, and both
-  // export modes name the previewed floor; the remaining modes use only their tool name.
+  // The tool portion of a mode's label. Floor targeting remains visible only in
+  // LEVEL; EXPORT's format is shown as a separate controller readout and panel row.
   const modeChildLabel = (id) =>
     id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
-    : isSheetExportMode(id) ? `${t(`mode.${id}`)} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
   // Mode accents stay fixed; contextual type colors belong to the separate TYPE readout.
@@ -3322,7 +3422,9 @@ export function setupMR(view, project, getFootprint) {
     else hideLangMenu();
     if (m.id === 'unit') showUnitMenu(); // park the unit menu in front of you
     else hideUnitMenu();
-    if (isSheetExportMode(m.id)) showSheet(); // select the active floor for SHEET/DXF
+    if (m.id === 'export') showExportMenu();
+    else hideExportMenu();
+    if (isSheetExportMode(m.id)) showSheet(); // refresh active-floor preview on entry
     else hideSheet();
   }
 
@@ -3350,6 +3452,7 @@ export function setupMR(view, project, getFootprint) {
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
     if (unitMenu.group.visible) redrawUnitMenu(); // title follows the current language
+    if (exportMenu.group.visible) redrawExportMenu();
     if (sheetPanel.group.visible) redrawSheet(); // legend/marker names are localized
   });
 
@@ -3365,6 +3468,14 @@ export function setupMR(view, project, getFootprint) {
       else redrawNumpad();
     }
     if (unitMenu.group.visible) redrawUnitMenu();
+    if (sheetPanel.group.visible) redrawSheet();
+  });
+
+  // Output preferences are device-local. Every change repaints the options panel
+  // and the left-controller sheet immediately; the authored project is untouched.
+  onOutputSettingsChange(() => {
+    sheetDirty = true;
+    if (exportMenu.group.visible) redrawExportMenu();
     if (sheetPanel.group.visible) redrawSheet();
   });
 
@@ -3406,6 +3517,8 @@ export function setupMR(view, project, getFootprint) {
     refreshFloorEditState();
     buildPlan();
     applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
+    sheetDirty = true;
+    if (exportMenu.group.visible) redrawExportMenu();
     if (modes[currentMode].id === 'level') {
       setModeInfo();
       if (allFloorsView) deactivateNumpad();
@@ -3513,6 +3626,7 @@ export function setupMR(view, project, getFootprint) {
     reticle.visible = false;
     leftTeleportReticle.visible = false;
     sheetPanel.group.visible = false;
+    exportMenu.group.visible = false;
     edgeHi.visible = false;
     edgeHi2.visible = false;
     cornerHi.visible = false;
@@ -3774,7 +3888,8 @@ export function setupMR(view, project, getFootprint) {
       btn.stick = false;
     }
     // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
-    // UNIT = display/input unit, LANG = language, MARKER = retype the selected marker (or the drop type if none
+    // UNIT = display/input unit, LANG = language, EXPORT = SVG/DXF format,
+    // MARKER = retype the selected marker (or the drop type if none
     // selected), PLAN·ADD = zone kind to add, PLAN·EDIT = selected zone kind.
     // Inert in every other mode.
     if (!btn.stickY && Math.abs(stickY) > 0.7 && Math.abs(stickY) > Math.abs(stickX)) {
@@ -3785,7 +3900,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
-      else if (isSheetExportMode(modeId)) cycleSheetFloor(stickY < 0 ? 1 : -1); // export prev / next floor
+      else if (modeId === 'export') cycleOutputFormat(stickY < 0 ? -1 : 1);
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;
@@ -3853,9 +3968,12 @@ export function setupMR(view, project, getFootprint) {
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
       ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
+    const exportStatus = modes[currentMode].id === 'export'
+      ? `${t('export.format')} · ${getOutputSettings().format.toUpperCase()}` : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : linkStatus || hovDim;
-    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER : 0x38bdf8;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : linkStatus || exportStatus || hovDim;
+    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
+      : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
@@ -4226,6 +4344,23 @@ export function setupMR(view, project, getFootprint) {
         if (hoverSlot !== null) slotFlash = null;
         redrawSlotMenu();
         prevHoverSlot = hoverSlot;
+      }
+    } else if (modeId === 'export') {
+      // EXPORT: the right-controller ray owns four checkboxes and the explicit
+      // action button. Thumbstick-y changes format without changing floors.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverExportAction = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(editCtl, exportMenu.mesh);
+      if (exportMenu.group.visible && panelHit) {
+        hoverExportAction = exportMenu.actionAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      if (hoverExportAction !== prevHoverExportAction) {
+        redrawExportMenu();
+        prevHoverExportAction = hoverExportAction;
       }
     } else if (modeId === 'lang') {
       // LANG: thumbstick up/down is the primary selector, but also let the ray hover a

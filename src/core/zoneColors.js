@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'];
+export const ZONE_KINDS = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -15,6 +15,7 @@ export const ZONE_COLORS = {
   window:  0x22d3ee, // cyan
   stairs:  0xfbbf24, // yellow
   cabinet: 0xa78bfa, // purple
+  furniture: 0xfb923c, // orange
 };
 
 const FALLBACK = ZONE_COLORS.room;

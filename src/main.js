@@ -16,6 +16,7 @@ import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { floorToDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
+import { ZONE_KINDS } from './core/zoneColors.js';
 
 const project = new Project();
 
@@ -194,7 +195,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet',
+    room: '➕ Room', wall: '➖ Wall', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
@@ -211,10 +212,9 @@ pX.addEventListener('input', () => { const v = parseFloat(pX.value); if (selecte
 pY.addEventListener('input', () => { const v = parseFloat(pY.value); if (selectedRect && !Number.isNaN(v)) { selectedRect.y = toMeters(v); project.touch(); } });
 pOp.addEventListener('click', () => {
   if (!selectedRect) return;
-  const kinds = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'];
-  const current = kinds.includes(selectedRect.kind)
+  const current = ZONE_KINDS.includes(selectedRect.kind)
     ? selectedRect.kind : (selectedRect.op === 'subtract' ? 'wall' : 'room');
-  selectedRect.kind = kinds[(kinds.indexOf(current) + 1) % kinds.length];
+  selectedRect.kind = ZONE_KINDS[(ZONE_KINDS.indexOf(current) + 1) % ZONE_KINDS.length];
   selectedRect.op = selectedRect.kind === 'room' ? 'add' : 'subtract';
   project.touch();
 });

@@ -34,6 +34,7 @@ const STRINGS = {
   'mode.window':   { en: 'WINDOW', fr: 'FENÊTRE',  zh: '窗' },
   'mode.stairs':   { en: 'STAIRS', fr: 'ESCALIER', zh: '楼梯' },
   'mode.cabinet':  { en: 'CABINET', fr: 'PLACARD', zh: '柜子' },
+  'mode.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
@@ -43,8 +44,7 @@ const STRINGS = {
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
-  'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
-  'mode.dxf':      { en: 'DXF',    fr: 'DXF',       zh: 'DXF' },
+  'mode.export':   { en: 'EXPORT', fr: 'EXPORT',    zh: '导出' },
   'mode.copy_floor': { en: 'COPY FLOOR', fr: 'COPIER ÉTAGE', zh: '复制楼层' },
   'mode.paste_floor': { en: 'PASTE FLOOR', fr: 'COLLER ÉTAGE', zh: '粘贴楼层' },
   'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
@@ -54,6 +54,13 @@ const STRINGS = {
 
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
+  'export.active': { en: 'Active', fr: 'Actif', zh: '当前楼层' },
+  'export.format': { en: 'FORMAT', fr: 'FORMAT', zh: '格式' },
+  'export.planDims': { en: 'PLAN DIMS', fr: 'COTES PLAN', zh: '平面尺寸' },
+  'export.markerDims': { en: 'MARKER DIMS', fr: 'COTES MARQUEURS', zh: '标记尺寸' },
+  'export.markerIcons': { en: 'MARKER ICONS', fr: 'ICÔNES MARQUEURS', zh: '标记图标' },
+  'export.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
+  'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
   'help.floor': {
@@ -77,9 +84,9 @@ const STRINGS = {
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
-    en: 'Thumbstick up/down picks ROOM, WALL, DOOR, WINDOW, STAIRS, or CABINET. All except ROOM subtract for now. Trigger drops the box where you stand.',
-    fr: 'Joystick haut/bas : PIÈCE, MUR, PORTE, FENÊTRE, ESCALIER ou PLACARD. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
-    zh: '摇杆上/下：选择房间、墙、门、窗、楼梯或柜子。除房间外目前均执行减去。扣动扳机放置该盒。',
+    en: 'Thumbstick up/down picks ROOM, WALL, DOOR, WINDOW, STAIRS, CABINET, or FURNITURE. All except ROOM subtract for now. Trigger drops the box where you stand.',
+    fr: 'Joystick haut/bas : PIÈCE, MUR, PORTE, FENÊTRE, ESCALIER, PLACARD ou MOBILIER. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
+    zh: '摇杆上/下：选择房间、墙、门、窗、楼梯、柜子或家具。除房间外目前均执行减去。扣动扳机放置该盒。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
@@ -126,15 +133,10 @@ const STRINGS = {
     fr: 'Visez un emplacement occupé et gâchette pour le charger dans le repère déjà enregistré. Les emplacements vides ne font rien.',
     zh: '瞄准一个已占用的槽位并扣动扳机，将其加载到已注册的坐标系中。空槽位无效。',
   },
-  'help.sheet': {
-    en: 'Preview the to-scale plan sheet. Thumbstick up/down: previous/next floor. Trigger downloads this floor as an SVG (saved to the headset).',
-    fr: 'Aperçu de la planche à l’échelle. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en SVG (enregistré sur le casque).',
-    zh: '预览按比例的平面图纸。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为 SVG（保存到头显）。',
-  },
-  'help.dxf': {
-    en: 'Preview the selected floor. Thumbstick up/down: previous/next floor. Trigger downloads this floor as a 1:1 millimeter DXF (saved to the headset).',
-    fr: 'Aperçu de l’étage sélectionné. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en DXF à l’échelle 1:1 en millimètres (enregistré sur le casque).',
-    zh: '预览所选楼层。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为毫米单位、1:1 比例的 DXF（保存到头显）。',
+  'help.export': {
+    en: 'Exports the active LEVEL floor. Thumbstick up/down switches SVG or DXF. Trigger toggles output rows; use the separate EXPORT button to download.',
+    fr: 'Exporte l’étage actif dans NIVEAU. Joystick haut/bas : SVG ou DXF. La gâchette active les options ; utilisez le bouton EXPORTER pour télécharger.',
+    zh: '导出“楼层”模式中的当前楼层。摇杆上/下切换 SVG 或 DXF。扣动扳机切换输出项；选择单独的“导出”按钮下载。',
   },
   'help.copy_floor': {
     en: 'Trigger to copy the active floor, including its dimensions and markers. It remains available after loading another save.',

@@ -21,6 +21,7 @@ import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
 import { electricalRoutePoints } from '../core/electrical.js';
+import { resolveOutputLayers } from './outputOptions.js';
 
 // True when a distance rounds to zero AT THE CURRENT DISPLAY PRECISION — such
 // dimensions (coincident edges, a marker sitting on its wall) read as "0.00" and
@@ -69,13 +70,31 @@ const C_DIM_BAD = '#c02626'; // conflicting dimension
 const C_MARK = '#111';       // marker glyphs
 const C_PIN = '#b45309';     // marker floor-pin dimension (fixture placement), distinct from structural dims
 const C_ELECTRICAL = '#0284c7'; // switch-to-light control / automatic ceiling route
-const C_ZONE = '#111';       // architectural zone symbols (door/window/stairs/cabinet)
+const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
   outlet: 'Outlet', switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
 };
-const ZONE_LABELS = { door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet' };
+const ZONE_LABELS = {
+  door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+};
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
+const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
+  .filter((rect) => layers.furniture || zoneKind(rect) !== 'furniture');
+
+// Furniture constraints still drive the authored geometry, but they are working
+// dimensions rather than construction dimensions and must not appear on paper.
+// This applies both to structural edge pairs and marker pins anchored to a
+// furniture edge. Origin/marker endpoints have no zone kind of their own.
+export function constraintInvolvesFurniture(constraint, rectangles) {
+  const furnitureIds = new Set((rectangles || [])
+    .filter((rect) => zoneKind(rect) === 'furniture')
+    .map((rect) => rect.id));
+  return [constraint?.a, constraint?.b].some((endpoint) => {
+    const id = endpoint?.rect?.id ?? endpoint?.rect;
+    return furnitureIds.has(id);
+  });
+}
 
 function localGenerationTime(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -191,13 +210,17 @@ function canvasBackend(ctx, k) {
 // Layout: content bbox -> chosen scale -> model->page transform.
 // ---------------------------------------------------------------------------
 
-function contentBBox(floor, footprint) {
+function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const add = (x, y) => { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; };
   for (const poly of footprint) for (const ring of poly) for (const [x, y] of ring) add(x, y);
   // Raw rect bounds too, so an all-subtract or otherwise empty footprint still frames.
-  for (const r of floor.rectangles) { const b = r.bounds; add(b.x0, b.y0); add(b.x1, b.y1); }
-  for (const m of floor.markers || []) add(m.x, m.y);
+  for (const r of printableRectangles(floor, layers)) { const b = r.bounds; add(b.x0, b.y0); add(b.x1, b.y1); }
+  // Marker positions affect fit when their glyphs or dimensions are visible. Keep
+  // linked endpoints too because electrical routes remain an independent layer.
+  if (layers.markerIcons || layers.markerDims || (floor.electricalLinks || []).length) {
+    for (const m of floor.markers || []) add(m.x, m.y);
+  }
   // Saved dimension placement is authoritative, including a label dragged beyond
   // its two endpoints. Include those model-space locations when choosing the print
   // scale so an intentional outside label/line is not clipped off the sheet.
@@ -210,6 +233,8 @@ function contentBBox(floor, footprint) {
   };
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance') continue;
+    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
+    if (isMarkerConstraint(c) ? !layers.markerDims : !layers.planDims) continue;
     const a = endpointCoord(c.a, c.axis), b = endpointCoord(c.b, c.axis);
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
     const label = dimLabelCoord(c, a, b);
@@ -241,7 +266,7 @@ function contentBBox(floor, footprint) {
 // Orientation follows authored plan geometry, not movable annotation positions.
 // A dragged dimension may enlarge the scale-fitting bbox, but must never rotate
 // every page—and the controller panel—between portrait and landscape.
-function geometryBBox(floor, footprint) {
+function geometryBBox(floor, footprint, layers = resolveOutputLayers()) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const add = (x, y) => {
     if (x < x0) x0 = x;
@@ -250,11 +275,13 @@ function geometryBBox(floor, footprint) {
     if (y > y1) y1 = y;
   };
   for (const poly of footprint) for (const ring of poly) for (const [x, y] of ring) add(x, y);
-  for (const r of floor.rectangles) {
+  for (const r of printableRectangles(floor, layers)) {
     const b = r.bounds;
     add(b.x0, b.y0); add(b.x1, b.y1);
   }
-  for (const m of floor.markers || []) add(m.x, m.y);
+  if (layers.markerIcons || (floor.electricalLinks || []).length) {
+    for (const m of floor.markers || []) add(m.x, m.y);
+  }
   return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
 }
 
@@ -374,13 +401,19 @@ function drawZoneGlyph(be, x, y, w, h, kind) {
     // Cabinet carcass/front: crossed diagonals distinguish it from openings.
     line(x, y, x1, y1);
     line(x, y1, x1, y);
+  } else if (kind === 'furniture') {
+    // Loose furniture: a simple inset footprint, distinct from fixed cabinetry.
+    const ix = Math.min(w * 0.18, 1.2), iy = Math.min(h * 0.18, 1.2);
+    if (w > ix * 2 && h > iy * 2) be.rect(x + ix, y + iy, w - ix * 2, h - iy * 2,
+      { fill: 'none', stroke: C_ZONE, width: 0.16 });
   }
 }
 
-function drawZones(be, L, floor) {
+function drawZones(be, L, floor, layers) {
   for (const rect of floor.rectangles) {
     const kind = zoneKind(rect);
     if (!PRINT_ZONE_KINDS.includes(kind)) continue;
+    if (kind === 'furniture' && !layers.furniture) continue;
     const b = rect.bounds;
     const sx0 = L.X(b.x0), sx1 = L.X(b.x1);
     const sy0 = L.Y(b.y0), sy1 = L.Y(b.y1);
@@ -400,12 +433,12 @@ function drawArrow(be, x, y, dir, axis) {
   be.poly(pts, { fill: C_DIM });
 }
 
-function drawDimLabel(be, text, cx, cy, color) {
+function drawDimLabel(be, text, cx, cy, color, textColor = color) {
   const size = 2.6;
   const w = be.measure(text, size) + 2.4;
   const h = 3.8;
   be.rect(cx - w / 2, cy - h / 2, w, h, { fill: '#fff', stroke: color, width: 0.12 });
-  be.text(text, cx, cy + 0.15, { fill: color, size, align: 'center', baseline: 'middle' });
+  be.text(text, cx, cy + 0.15, { fill: textColor, size, align: 'center', baseline: 'middle' });
 }
 
 // When a value box is dragged beyond the measured endpoints (labelT outside 0..1),
@@ -439,6 +472,7 @@ function drawDimensions(be, L, floor) {
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || isMarkerConstraint(c)) continue;
+    if (constraintInvolvesFurniture(c, rects)) continue;
     if (displaysZero(c.value)) continue; // a 0.00 dimension is clutter
     const la = edgeLineWorld(c.a, rects);
     const lb = edgeLineWorld(c.b, rects);
@@ -496,6 +530,7 @@ function drawMarkerPins(be, L, floor) {
   const markers = floor.markers || [];
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || !isMarkerConstraint(c)) continue;
+    if (constraintInvolvesFurniture(c, rects)) continue;
     if (displaysZero(c.value)) continue; // marker sits on the wall — nothing to place-measure
     const markerEnd = c.b?.marker ? c.b : c.a;
     const refEnd = c.b?.marker ? c.a : c.b;
@@ -517,7 +552,7 @@ function drawMarkerPins(be, L, floor) {
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
       drawLabelLeader(be, xa, xb, lx, y, 'x', { stroke: C_PIN, width: 0.15 });
-      drawDimLabel(be, label, lx, y, C_PIN);
+      drawDimLabel(be, label, lx, y, C_PIN, C_MARK);
     } else {
       const x = L.X(c.offset != null ? c.offset : m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
       const ly = L.Y(dimLabelCoord(c, refCoord, m.y));
@@ -525,7 +560,7 @@ function drawMarkerPins(be, L, floor) {
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
       drawLabelLeader(be, ya, yb, ly, x, 'y', { stroke: C_PIN, width: 0.15 });
-      drawDimLabel(be, label, x, ly, C_PIN);
+      drawDimLabel(be, label, x, ly, C_PIN, C_MARK);
     }
   }
 }
@@ -805,9 +840,12 @@ function drawStrip(be, L, floor, opts) {
 
   // Legends (right): semantic plan zones and fixture markers have independent
   // rows. Entries are included only when that type occurs on this floor.
-  const markerTypes = [...new Set((floor.markers || []).map((m) => m.type))];
+  const layers = resolveOutputLayers(opts);
+  const markerTypes = layers.markerIcons
+    ? [...new Set((floor.markers || []).map((m) => m.type))] : [];
   const zoneTypes = PRINT_ZONE_KINDS.filter((kind) =>
-    floor.rectangles.some((rect) => zoneKind(rect) === kind));
+    (kind !== 'furniture' || layers.furniture)
+    && floor.rectangles.some((rect) => zoneKind(rect) === kind));
   const markerName = opts.markerLabel || ((t) => MARKER_LABELS[t] || t);
   const zoneName = opts.zoneLabel || ((t) => ZONE_LABELS[t] || t);
 
@@ -847,8 +885,9 @@ function drawStrip(be, L, floor, opts) {
  * Returns the layout (page size + chosen scale) so callers can size the output.
  */
 function renderFloor(be, floor, opts = {}) {
-  const footprint = computeFootprint(floor.rectangles);
-  const bbox = contentBBox(floor, footprint);
+  const layers = resolveOutputLayers(opts);
+  const footprint = computeFootprint(printableRectangles(floor, layers));
+  const bbox = contentBBox(floor, footprint, layers);
   if (!bbox) {
     // In a shared print set, even an empty floor uses the common page orientation
     // and scale so its paper edges still align with every other storey.
@@ -865,12 +904,12 @@ function renderFloor(be, floor, opts = {}) {
   }
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
-  drawZones(be, L, floor); // semantic door/window/stair/cabinet symbols over footprint cutouts
+  drawZones(be, L, floor, layers); // semantic fixed-zone/furniture symbols over the footprint
   drawElectricalLinks(be, L, floor); // dotted switch-to-light ceiling-route projection
-  drawDimensions(be, L, floor);
-  drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
+  if (layers.planDims) drawDimensions(be, L, floor);
+  if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   drawRoomAreas(be, L, floor);
-  drawMarkers(be, L, floor); // individual glyphs or height-ordered fixture-stack callouts stay foremost
+  if (layers.markerIcons) drawMarkers(be, L, floor); // glyphs/fixture-stack callouts stay foremost
   drawStrip(be, L, floor, opts);
   return L;
 }
@@ -895,13 +934,17 @@ export function floorToSvg(floor, opts = {}) {
 export function sharedScaleSheetOptions(floors, opts = {}) {
   // Capture generation time once for the complete rendition so every page in a
   // print set—and any single-floor view made from these options—shows one date.
-  const sharedOpts = { ...opts, generatedAt: opts.generatedAt ?? new Date() };
+  const sharedOpts = {
+    ...opts,
+    layers: resolveOutputLayers(opts),
+    generatedAt: opts.generatedAt ?? new Date(),
+  };
   const page = PAGES[sharedOpts.page] || PAGES.a4;
   const floorBoxes = floors.map((floor) => {
-    const footprint = computeFootprint(floor.rectangles);
+    const footprint = computeFootprint(printableRectangles(floor, sharedOpts.layers));
     return {
-      content: contentBBox(floor, footprint),
-      geometry: geometryBBox(floor, footprint),
+      content: contentBBox(floor, footprint, sharedOpts.layers),
+      geometry: geometryBBox(floor, footprint, sharedOpts.layers),
     };
   }).filter(({ content }) => content);
   if (!floorBoxes.length) return sharedOpts;
@@ -949,8 +992,9 @@ export function floorsToSharedScaleSvgs(floors, opts = {}) {
  */
 export function floorToCanvas(floor, canvas, opts = {}) {
   // First lay out to know the page size (needs the bbox), then size the canvas.
-  const footprint = computeFootprint(floor.rectangles);
-  const bbox = contentBBox(floor, footprint);
+  const layers = resolveOutputLayers(opts);
+  const footprint = computeFootprint(printableRectangles(floor, layers));
+  const bbox = contentBBox(floor, footprint, layers);
   const sheetBBox = opts.layoutBBox || bbox;
   const page = sheetBBox ? layoutSheet(sheetBBox, opts).page : (PAGES[opts.page] || PAGES.a4);
   const targetLong = opts.targetPx || 2048;
