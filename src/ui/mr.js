@@ -25,6 +25,7 @@ import {
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -668,9 +669,8 @@ export function setupMR(view, project, getFootprint) {
   // is set per-frame from the zone's dimensions), so stripes stay the same width
   // whatever the zone's size.
   const ZEBRA_PERIOD = 0.6; // m of plan covered by one texture tile (4 stripe pairs)
-  // Zebra tints (white texture is multiplied by these): blue for ROOM (add),
-  // red for WALL (subtract) — matches the desktop add=blue / subtract=red convention.
-  const ZEBRA_ADD = 0x60a5fa, ZEBRA_SUB = 0xff6b6b;
+  // The white stripe texture is multiplied by the selected zone's kind color per
+  // frame (see showZebra), matching the shared palette in zoneColors.js.
   function makeZebraTexture() {
     const N = 64, P = 16; // tile px, stripe period px (P divides N -> seamless)
     const canvas = document.createElement('canvas');
@@ -773,21 +773,47 @@ export function setupMR(view, project, getFootprint) {
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
+  // Merged room free-space fill (the boolean footprint). Tinted the room-blue from
+  // the shared palette; subtract zones carve holes here and get their own kind-color
+  // fill drawn on top (see addZoneFills).
   const fillMat = new THREE.MeshBasicMaterial({
-    color: ACCENT, transparent: true, opacity: 0.22,
+    color: zoneColorHex('room'), transparent: true, opacity: 0.22,
     side: THREE.DoubleSide, depthWrite: false,
   });
+  // Per-kind edge (outline) + zone-fill materials, cached so a rebuild reuses them
+  // (bounded to the six kinds x rest/active). Resting = the kind's palette color;
+  // active (the zone EDGE mode edits) = a lightened tint, brighter and on top.
+  const edgeMatCache = new Map();
+  const edgeMat = (kind, active) => {
+    const key = `${kind}:${active ? 1 : 0}`;
+    let m = edgeMatCache.get(key);
+    if (!m) {
+      const c = active ? lightenHex(zoneColorHex(kind)) : zoneColorHex(kind);
+      m = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, depthWrite: false });
+      edgeMatCache.set(key, m);
+    }
+    return m;
+  };
+  const zoneFillMatCache = new Map();
+  const zoneFillMat = (kind) => {
+    let m = zoneFillMatCache.get(kind);
+    if (!m) {
+      m = new THREE.MeshBasicMaterial({
+        color: zoneColorHex(kind), transparent: true, opacity: 0.18,
+        side: THREE.DoubleSide, depthWrite: false,
+      });
+      zoneFillMatCache.set(kind, m);
+    }
+    return m;
+  };
   // Edges are drawn as thin FLOOR STRIPS (flat quads) rather than 1px GL lines, so
   // they read bold at 1:1. Materials are MeshBasic; DoubleSide so they show from
   // any angle. depthWrite off so stacked strips/fill don't z-fight.
   const EDGE_HALF = 0.005;   // strip half-width -> 1 cm resting edge
   const EDGE_HI_HALF = 0.01; // half-width for hover/lock highlights -> 2 cm, bolder than rest
-  const restMat = new THREE.MeshBasicMaterial({ color: 0x9b6dff, side: THREE.DoubleSide, depthWrite: false });   // resting ROOM (add) edges
-  const activeMat = new THREE.MeshBasicMaterial({ color: 0xd8b4fe, side: THREE.DoubleSide, depthWrite: false }); // active ROOM (add) edges
-  // WALL (subtract) zones get a red hue so "wall" reads distinctly from "roomspace"
-  // (add), matching the desktop add=blue / subtract=red convention.
-  const restSubMat = new THREE.MeshBasicMaterial({ color: 0xff6b6b, side: THREE.DoubleSide, depthWrite: false });   // resting WALL (subtract) edges
-  const activeSubMat = new THREE.MeshBasicMaterial({ color: 0xffb4b4, side: THREE.DoubleSide, depthWrite: false }); // active WALL (subtract) edges
+  // Zone edges are colored per kind via edgeMat() above (room=blue, wall=red, …),
+  // so you can tell zone types apart at a glance; the active zone uses a lightened
+  // tint. lockedMat is the one exception: WHITE marks a fully-pinned edge.
   const lockedMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false });    // WHITE: an edge whose axis is fully pinned (position+size)
   // Dimension (constraint) annotations: thin blue floor strips for the dim/extension
   // lines, orange for outlet-to-wall pins, and red when a constraint conflicts.
@@ -1109,6 +1135,41 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
+  // Two-triangle fill quad for the full extent of each rectangle, in planGroup-local
+  // coords (plan (x,y) -> (x,0,-y)). Used for the faint per-kind zone tint.
+  function rectFillGeo(rects) {
+    const arr = [];
+    const tri = (x, y) => arr.push(x, 0, -y);
+    for (const r of rects) {
+      const b = r.bounds;
+      tri(b.x0, b.y0); tri(b.x1, b.y0); tri(b.x1, b.y1);
+      tri(b.x0, b.y0); tri(b.x1, b.y1); tri(b.x0, b.y1);
+    }
+    if (!arr.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+    return geo;
+  }
+
+  // Faint per-kind tint under every SUBTRACT zone (room free-space is already tinted
+  // by the merged footprint fill). Each kind sits on its own paper-thin y-tier so the
+  // coplanar translucent quads don't z-fight, all below the 0.004 edge strips.
+  const addZoneFills = (floor, elevation) => {
+    const byKind = new Map();
+    for (const r of floor.rectangles) {
+      if (r.op !== 'subtract') continue; // rooms come from the footprint fill
+      const k = zoneKind(r);
+      (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
+    }
+    for (const [k, rects] of byKind) {
+      const geo = rectFillGeo(rects);
+      if (!geo) continue;
+      const mesh = new THREE.Mesh(geo, zoneFillMat(k));
+      mesh.position.y = elevation + 0.001 + ZONE_KINDS.indexOf(k) * 0.0003;
+      planGroup.add(mesh);
+    }
+  };
+
   const addFloorStrips = (floor, elevation, active = null) => {
     const pushStrips = (rects, mat, y, wantEdge) => {
       const geo = rectStripGeo(rects, EDGE_HALF, wantEdge);
@@ -1121,11 +1182,16 @@ export function setupMR(view, project, getFootprint) {
     const isLocked = (r, e) => locked.has(`${r.id}:${e}`);
     const notLocked = (r, e) => !isLocked(r, e);
     const others = floor.rectangles.filter((r) => r !== active);
-    pushStrips(others.filter((r) => r.op !== 'subtract'), restMat, 0.004, notLocked);
-    pushStrips(others.filter((r) => r.op === 'subtract'), restSubMat, 0.004, notLocked);
+    // Group resting zones by kind so each type keeps its palette outline color.
+    const byKind = new Map();
+    for (const r of others) {
+      const k = zoneKind(r);
+      (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
+    }
+    for (const [k, rects] of byKind) pushStrips(rects, edgeMat(k, false), 0.004, notLocked);
     pushStrips(others, lockedMat, 0.005, isLocked);
     if (active) {
-      pushStrips([active], active.op === 'subtract' ? activeSubMat : activeMat, 0.006, notLocked);
+      pushStrips([active], edgeMat(zoneKind(active), true), 0.006, notLocked);
       pushStrips([active], lockedMat, 0.007, isLocked);
     }
   };
@@ -1134,11 +1200,11 @@ export function setupMR(view, project, getFootprint) {
     clearPlanGeometry();
     const floor = project.activeFloor;
     const footprint = getFootprint?.(floor.rectangles) ?? [];
-    const fillGeo = footprintFloorGeometry(footprint); // merged fill = total free space
+    const fillGeo = footprintFloorGeometry(footprint); // merged fill = room free space
     if (fillGeo) planGroup.add(new THREE.Mesh(fillGeo, fillMat));
-    // Per-rectangle edge strips. Non-active zones sit lower; the active zone is
-    // brighter and on top. ROOM (add) zones are purple, WALL (subtract) zones red —
-    // so you can tell roomspace from wall at a glance.
+    addZoneFills(floor, 0); // faint per-kind tint for the subtract zones on top
+    // Per-rectangle edge strips, colored per kind (see edgeMat / zoneColors.js).
+    // Non-active zones sit lower; the active zone is a lightened tint and on top.
     addFloorStrips(floor, 0, activeRect);
     if (withDims) buildDimensions(floor); // constraint dimension lines + value labels
     if (withDims) buildMarkers();    // wall-anchored annotation glyphs (own group, not cleared above)
@@ -1338,6 +1404,7 @@ export function setupMR(view, project, getFootprint) {
         fill.position.y = elevation;
         planGroup.add(fill);
       }
+      addZoneFills(floor, elevation); // faint per-kind tint for subtract zones
       addFloorStrips(floor, elevation);
       if (withDims) buildDimensions(floor, elevation, false);
       if (withDims) addFloorMarkers(floor, elevation, false);
@@ -1377,13 +1444,11 @@ export function setupMR(view, project, getFootprint) {
   // PLAN · DROP kind, picked by thumbstick-y (same UX as the marker type picker) — one
   // One DROP action instead of separate zone modes. ROOM adds; every other semantic
   // zone currently subtracts while keeping its distinct saved kind.
-  const ZONE_KINDS = ['room', 'wall', 'door', 'window', 'stairs', 'cabinet'];
-  let currentZoneKind = ZONE_KINDS[0];
+  let currentZoneKind = ZONE_KINDS[0]; // ZONE_KINDS + zoneKind imported from zoneColors.js
   const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
-  const zoneKindOf = (r) => ZONE_KINDS.includes(r?.kind)
-    ? r.kind : (r?.op === 'subtract' ? 'wall' : 'room');
+  const zoneKindOf = (r) => zoneKind(r);
   const zoneModeId = (k) => (k === 'room' ? 'drop' : k);
-  const zoneColor = (k) => (k === 'room' ? 0x2dd4bf : 0xff6b6b); // all subtract kinds share visuals for now
+  const zoneColor = (k) => zoneColorHex(k); // shared per-kind palette (mode chip + HUD readouts)
   const UP = new THREE.Vector3(0, 1, 0);
 
   // SURVEY state. We author free-space rectangles and refine their edges by
@@ -2520,7 +2585,7 @@ export function setupMR(view, project, getFootprint) {
     zebra.quaternion.copy(planGroup.quaternion);          // plan yaw (stays flat)
     zebra.scale.set(w, 1, h);
     zebra.material.map.repeat.set(w / ZEBRA_PERIOD, h / ZEBRA_PERIOD);
-    zebra.material.color.setHex(rect.op === 'subtract' ? ZEBRA_SUB : ZEBRA_ADD); // blue add / red wall
+    zebra.material.color.setHex(zoneColorHex(zoneKind(rect))); // per-kind palette tint
     zebra.visible = true;
   }
 
@@ -2786,7 +2851,7 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'drop', color: 0x2dd4bf, // fallback; live color = zoneColor(currentZoneKind), see modeColor
+      id: 'drop', color: zoneColorHex('room'), // fallback; live color = zoneColor(currentZoneKind), see modeColor
       // One action: drop a rectangle of the current zone kind (ROOM = add roomspace;
       // every other kind = subtract solid for now) at your standing position. Thumbstick up/down picks the kind
       // (label + accent track it); push the edges to the real walls in EDGE.
@@ -3819,7 +3884,7 @@ export function setupMR(view, project, getFootprint) {
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
       updateRoomAreaHud();
       if (selectedRect) {
-        showRectOutline(selectedRect, selectedRect.op === 'subtract' ? 0xff6b6b : 0x51d88a);
+        showRectOutline(selectedRect, lightenHex(zoneColorHex(zoneKind(selectedRect))));
         showZebra(selectedRect);
       } else if (hoverStack.length) {
         showRectOutline(hoverStack[0], 0xffe14d); // preview the topmost, not yet selected

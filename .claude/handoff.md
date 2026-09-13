@@ -114,8 +114,15 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 ## Commits (substantive only; doc-only omitted — `git log` has all)
 
-HEAD = `1b49b36` — pushed, clean tree; `git log` has the full list.
+HEAD moves with each push; `git log` has the full list.
 
+- (s17) zone color coding: new shared palette `src/core/zoneColors.js` (room=blue, wall=red,
+  door=green, window=cyan, stairs=yellow, cabinet=purple; kind encodes op, blue=only add). Desktop
+  sketch2d `_drawRect` = faint kind fill + kind outline (red subtract-hatch removed). AR mr.js =
+  per-kind edge outlines + zebra + faint per-subtract-zone fills over the room footprint fill, plus
+  DROP chip / HUD readouts / selected-outline. Build-clean + palette swatch verified; **AR visuals
+  build-verified only (not walked on device).**
+- `fad10a2` (s17) extend dimension line to labels dragged past endpoints (sheet + AR).
 - `1b49b36` (s17) redraw ethernet marker as RJ45 jack (sheet + AR in sync).
 - `28a9868` align floor print sheets · `d56f688` dim labels beyond endpoints · `991c3cf` connected
   room areas · `cff5dbb` window zone · `44b5ada` stairs+cabinet zones · `1334f20` all-floors AR view ·

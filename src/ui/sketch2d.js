@@ -10,6 +10,7 @@ import { Rectangle } from '../core/model.js';
 import { makeDistance, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld, setDimLabelCoord } from '../core/dimline.js';
 import { fmt, unitLabel, unitInfo } from '../core/units.js';
+import { zoneKind, zoneColorCss, zoneColorRgb } from '../core/zoneColors.js';
 
 const MIN_DRAW = 0.05; // ignore tiny accidental drags (meters)
 const EDGE_PICK_PX = 8; // edge hit-test threshold (screen px)
@@ -788,8 +789,8 @@ export class Sketch2D {
       const b = rect.bounds;
       const p0 = this.toScreen(b.x0, b.y1);
       const p1 = this.toScreen(b.x1, b.y0);
-      ctx.strokeStyle = rect.op === 'add'
-        ? 'rgba(120,140,170,0.38)' : 'rgba(255,107,107,0.30)';
+      const [gr, gg, gb] = zoneColorRgb(zoneKind(rect));
+      ctx.strokeStyle = `rgba(${gr},${gg},${gb},0.38)`;
       ctx.strokeRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
     }
     ctx.setLineDash([]);
@@ -825,15 +826,14 @@ export class Sketch2D {
     const w = p1.x - p0.x;
     const h = p1.y - p0.y;
 
-    const add = rect.op === 'add';
-    const color = add ? '#4a9eff' : '#ff6b6b';
-
-    if (add) {
-      ctx.fillStyle = 'rgba(74,158,255,0.16)';
-      ctx.fillRect(x, y, w, h);
-    } else {
-      this._hatch(x, y, w, h, 'rgba(255,107,107,0.5)');
-    }
+    // Color-coded by zone kind (see src/core/zoneColors.js): every zone gets a
+    // faint fill in its kind color plus a matching outline. Kind encodes op, so
+    // blue = room = add and any other color = a subtract zone.
+    const kind = zoneKind(rect);
+    const color = zoneColorCss(kind);
+    const [cr, cg, cb] = zoneColorRgb(kind);
+    ctx.fillStyle = `rgba(${cr},${cg},${cb},0.16)`;
+    ctx.fillRect(x, y, w, h);
 
     ctx.strokeStyle = color;
     ctx.lineWidth = selected ? 2.5 : 1.5;
@@ -854,24 +854,6 @@ export class Sketch2D {
     }
   }
 
-  _hatch(x, y, w, h, color) {
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    const step = 8;
-    for (let i = -h; i < w; i += step) {
-      ctx.beginPath();
-      ctx.moveTo(x + i, y);
-      ctx.lineTo(x + i + h, y + h);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   _drawDraft() {
     const ctx = this.ctx;
     const d = this.draft;
@@ -881,7 +863,7 @@ export class Sketch2D {
     const y = p0.y;
     const w = p1.x - p0.x;
     const h = p1.y - p0.y;
-    const color = this.tool === 'subtract' ? '#ff6b6b' : '#4a9eff';
+    const color = zoneColorCss(this.tool === 'subtract' ? 'wall' : 'room');
     ctx.setLineDash([5, 4]);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
