@@ -145,6 +145,10 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     a 70 mm wall therefore remain separate. Horizontal fixtures require strict height equality and
     now follow connected 80 mm-inclusive plan-neighbor links; exact-position height chains retain
     connected-neighbor box grouping.
+28. **(s18, pending commit) vertical box columns + compact heights.** Separate boxes within one
+    fixture callout are now always arranged in a high-to-low vertical column, including when the
+    room-aware side is above/below the marker. Round marker heights use the same compact formatter
+    as dimensions (`107.0` → `107`, `24.0` → `24`).
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 

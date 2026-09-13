@@ -224,6 +224,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
       use a vertical box with one height per glyph
 - [ ] Example: switches at 1.00 m and 0.96 m share one vertical white box, while a co-located outlet
       at 0.30 m occupies its own box below them
+- [ ] Separate height boxes at one plan point form a vertical column in height order; 1.07 m is above 0.24 m
 - [ ] Transitive example: 1.17 m, 1.09 m, and 1.01 m share one box through adjacent 80 mm links;
       a co-located marker at 0.24 m remains separate
 - [ ] Equal-height markers with no connected 80 mm plan-neighbor path remain independent glyphs
@@ -233,6 +234,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] An unconstrained isolated marker retains its conventional height chip below the glyph
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
+- [ ] Round marker heights also omit `.0`/`.00` (`107.0 cm` → `107`, `24.0 cm` → `24`)
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
 - [ ] Active-floor SVG and left-controller sheet use the identical scale/origin as that floor's Print All page
 - [ ] All printed pages share one orientation and page size; the complete stacked extent fills the available drawing area

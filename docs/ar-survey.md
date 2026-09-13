@@ -294,7 +294,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   neighbors form a horizontal box with one height label; different-height neighbors form a vertical
   box with one label per glyph. Height groups farther apart remain separate boxes on the same bracket
   (for example, 1.17 m → 1.09 m → 1.01 m forms one transitive vertical box, while a 0.24 m outlet
-  remains separate). Every type keeps
+  remains separate). Distinct height-group boxes always form one vertical column, highest above
+  lowest, even when room-aware placement sends the callout above or below its anchor. Every type keeps
   its own glyph, and boxes/rows are ordered by physical height. The complete callout evaluates
   left/right/above/below placements against the printable footprint and chooses the side inside the
   room; page fit is the fallback for markers without a containing room;
@@ -310,9 +311,10 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.
-- **Whole-number dimension labels are compacted on the sheet** (`fmtSheetDim`): an all-zero
+- **Whole-number dimension and marker-height labels are compacted on the sheet** (`fmtSheetDim`): an all-zero
   fractional part is omitted (`3.00` → `3`, `300.0` → `300`), while non-integers retain the
-  configured display precision. This applies to structural and marker-pin dimensions only.
+  configured display precision. For example, centimeter heights `107.0` and `24.0` print as
+  `107` and `24`.
 - **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA
   default to on/on/on/off/on. The first three independently control drawing, legend, and scale-fitting
   participation; FURNITURE controls its footprint/symbol/legend in both SVG and DXF. Furniture

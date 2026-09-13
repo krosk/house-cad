@@ -683,7 +683,7 @@ function fixtureBoxMetrics(be, box) {
   const padding = 0.8;
   const labelGap = 1;
   const textSize = 1.9;
-  const labels = box.markers.map((marker) => Number.isFinite(marker.z) ? fmt(marker.z) : '');
+  const labels = box.markers.map((marker) => Number.isFinite(marker.z) ? fmtSheetDim(marker.z) : '');
   const labelWidths = labels.map((label) => label ? be.measure(label, textSize) : 0);
   if (box.orientation === 'horizontal') {
     const glyphGap = 0.8;
@@ -762,17 +762,19 @@ function pointInFootprint(x, y, footprint) {
 
 const clamp = (value, min, max) => min <= max ? Math.max(min, Math.min(max, value)) : value;
 
-// Build one of four upright callout arrangements. Left/right arrangements line
-// boxes vertically; above/below arrangements line them horizontally. Individual
-// fixture boxes still express the physical disposition: equal-height fixtures
-// read horizontally, while differing heights read vertically.
+// Build one of four upright callout arrangements. Distinct height-group boxes are
+// ALWAYS ordered vertically, highest to lowest, even when the room-aware placement
+// sends the whole callout above or below its anchor. Individual boxes still express
+// physical disposition: equal-height fixtures read horizontally, while differing
+// heights read vertically.
 function fixtureStackCandidate(side, ax, ay, metrics, L) {
   const gap = MARKER_STACK_BOX_GAP;
   const horizontalSide = side === 'left' || side === 'right';
   const placements = [];
+  const totalHeight = metrics.reduce((sum, item) => sum + item.height, 0) + (metrics.length - 1) * gap;
+  const maxWidth = Math.max(...metrics.map((item) => item.width));
   if (horizontalSide) {
     const dir = side === 'right' ? 1 : -1;
-    const totalHeight = metrics.reduce((sum, item) => sum + item.height, 0) + (metrics.length - 1) * gap;
     const centerY = clamp(ay, MARGIN + totalHeight / 2, L.page.h - MARGIN - STRIP - totalHeight / 2);
     const spine = ax + dir * 3.2;
     let y = centerY - totalHeight / 2;
@@ -785,16 +787,19 @@ function fixtureStackCandidate(side, ax, ay, metrics, L) {
   }
 
   const dir = side === 'below' ? 1 : -1;
-  const totalWidth = metrics.reduce((sum, item) => sum + item.width, 0) + (metrics.length - 1) * gap;
-  const centerX = clamp(ax, MARGIN + totalWidth / 2, L.page.w - MARGIN - totalWidth / 2);
+  const centerX = clamp(ax, MARGIN + maxWidth / 2, L.page.w - MARGIN - maxWidth / 2);
   const spine = ay + dir * 3.2;
-  let x = centerX - totalWidth / 2;
+  let y = dir > 0 ? spine + 1.2 : spine - 1.2 - totalHeight;
   for (const item of metrics) {
-    const y = dir > 0 ? spine + 1.2 : spine - 1.2 - item.height;
+    const x = centerX - item.width / 2;
     placements.push({ x, y, cx: x + item.width / 2, cy: y + item.height / 2, item });
-    x += item.width + gap;
+    y += item.height + gap;
   }
-  return { side, placements, spine, anchorAlong: ax };
+  const leftEdge = Math.min(...placements.map((p) => p.x));
+  const rightEdge = Math.max(...placements.map((p) => p.x + p.item.width));
+  const branchSide = leftEdge - 1.2 >= MARGIN ? 'left' : 'right';
+  const branchSpine = branchSide === 'left' ? leftEdge - 1.2 : rightEdge + 1.2;
+  return { side, placements, spine, branchSide, branchSpine };
 }
 
 function fixtureCandidateScore(candidate, stack, L, footprint) {
@@ -831,7 +836,7 @@ function markerHasZeroEdgeConstraint(floor, marker) {
 }
 
 function contextualHeightChip(be, L, marker, footprint) {
-  const text = fmt(marker.z);
+  const text = fmtSheetDim(marker.z);
   const size = 1.9;
   const width = be.measure(text, size) + 1.4;
   const height = size + 1.2;
@@ -870,7 +875,7 @@ function drawFixtureStack(be, L, stack, footprint, floor) {
         const chip = contextualHeightChip(be, L, marker, footprint);
         drawTextChip(be, chip.text, chip.cx, chip.cy, 1.9);
       } else {
-        drawTextChip(be, fmt(marker.z), L.X(marker.x), L.Y(marker.y) + 3.9, 1.9);
+        drawTextChip(be, fmtSheetDim(marker.z), L.X(marker.x), L.Y(marker.y) + 3.9, 1.9);
       }
     }
     return;
@@ -904,14 +909,19 @@ function drawFixtureStack(be, L, stack, footprint, floor) {
     });
   } else {
     const dir = candidate.side === 'below' ? 1 : -1;
-    const centers = candidate.placements.map((p) => p.cx);
     be.line(ax, ay + dir * 0.45, ax, candidate.spine, { stroke: C_MARK, width: 0.16 });
-    be.line(Math.min(...centers, ax), candidate.spine, Math.max(...centers, ax), candidate.spine, {
+    be.line(Math.min(ax, candidate.branchSpine), candidate.spine,
+      Math.max(ax, candidate.branchSpine), candidate.spine, {
       stroke: C_MARK, width: 0.16,
     });
+    const centers = candidate.placements.map((p) => p.cy);
+    be.line(candidate.branchSpine, Math.min(...centers, candidate.spine),
+      candidate.branchSpine, Math.max(...centers, candidate.spine), {
+        stroke: C_MARK, width: 0.16,
+      });
     candidate.placements.forEach((p, i) => {
-      const nearY = dir > 0 ? p.y : p.y + p.item.height;
-      be.line(p.cx, candidate.spine, p.cx, nearY, { stroke: C_MARK, width: 0.16 });
+      const nearX = candidate.branchSide === 'left' ? p.x : p.x + p.item.width;
+      be.line(candidate.branchSpine, p.cy, nearX, p.cy, { stroke: C_MARK, width: 0.16 });
       drawFixtureBox(be, boxes[i], p.item, p.x, p.y);
     });
   }
