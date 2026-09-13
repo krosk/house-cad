@@ -170,7 +170,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
-- [ ] The sheet faces 45° inward and is comfortably readable by turning the head left
+- [ ] The sheet faces 45° inward and tilts 45° upward toward the user; it reads comfortably with a leftward head turn
 - [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
@@ -182,6 +182,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
 - [ ] Active-floor SVG and left-controller sheet use the identical scale/origin as that floor's Print All page
 - [ ] All printed pages share one orientation and page size; the complete stacked extent fills the available drawing area
+- [ ] Dragging a dimension line/label far outside the plan may reduce scale but never changes page orientation
+- [ ] A legitimate portrait/landscape change refreshes the left sheet immediately without stale or squeezed texture content
 - [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
 - [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
 - [ ] **Thumbstick up/down** cycles the previewed floor (wraps); label reads `SHEET · <FloorName>`

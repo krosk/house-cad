@@ -224,6 +224,26 @@ function contentBBox(floor, footprint) {
   return { x0, y0, x1, y1 };
 }
 
+// Orientation follows authored plan geometry, not movable annotation positions.
+// A dragged dimension may enlarge the scale-fitting bbox, but must never rotate
+// every page—and the controller panel—between portrait and landscape.
+function geometryBBox(floor, footprint) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x, y) => {
+    if (x < x0) x0 = x;
+    if (y < y0) y0 = y;
+    if (x > x1) x1 = x;
+    if (y > y1) y1 = y;
+  };
+  for (const poly of footprint) for (const ring of poly) for (const [x, y] of ring) add(x, y);
+  for (const r of floor.rectangles) {
+    const b = r.bounds;
+    add(b.x0, b.y0); add(b.x1, b.y1);
+  }
+  for (const m of floor.markers || []) add(m.x, m.y);
+  return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
+}
+
 function pageDimensions(page, orientation) {
   return orientation === 'landscape'
     ? { w: Math.max(page.w, page.h), h: Math.min(page.w, page.h) }
@@ -685,16 +705,22 @@ export function sharedScaleSheetOptions(floors, opts = {}) {
   // print set—and any single-floor view made from these options—shows one date.
   const sharedOpts = { ...opts, generatedAt: opts.generatedAt ?? new Date() };
   const page = PAGES[sharedOpts.page] || PAGES.a4;
-  const boxes = floors.map((floor) => {
+  const floorBoxes = floors.map((floor) => {
     const footprint = computeFootprint(floor.rectangles);
-    return contentBBox(floor, footprint);
-  }).filter(Boolean);
-  if (!boxes.length) return sharedOpts;
-  const layoutBBox = boxes.reduce((all, bbox) => ({
+    return {
+      content: contentBBox(floor, footprint),
+      geometry: geometryBBox(floor, footprint),
+    };
+  }).filter(({ content }) => content);
+  if (!floorBoxes.length) return sharedOpts;
+  const unionBoxes = (boxes) => boxes.reduce((all, bbox) => ({
     x0: Math.min(all.x0, bbox.x0), y0: Math.min(all.y0, bbox.y0),
     x1: Math.max(all.x1, bbox.x1), y1: Math.max(all.y1, bbox.y1),
   }), { ...boxes[0] });
-  const orientation = sharedOpts.orientation || bestOrientation(layoutBBox, page);
+  const layoutBBox = unionBoxes(floorBoxes.map(({ content }) => content));
+  const geometryBoxes = floorBoxes.map(({ geometry }) => geometry).filter(Boolean);
+  const orientationBBox = geometryBoxes.length ? unionBoxes(geometryBoxes) : layoutBBox;
+  const orientation = sharedOpts.orientation || bestOrientation(orientationBBox, page);
   let mmPerM;
   if (Number.isFinite(sharedOpts.mmPerM) && sharedOpts.mmPerM > 0) {
     mmPerM = sharedOpts.mmPerM;
@@ -737,8 +763,11 @@ export function floorToCanvas(floor, canvas, opts = {}) {
   const page = sheetBBox ? layoutSheet(sheetBBox, opts).page : (PAGES[opts.page] || PAGES.a4);
   const targetLong = opts.targetPx || 2048;
   const k = targetLong / Math.max(page.w, page.h); // px per mm
-  canvas.width = Math.round(page.w * k);
-  canvas.height = Math.round(page.h * k);
+  const width = Math.round(page.w * k), height = Math.round(page.h * k);
+  // Preserve the backing store when orientation/aspect did not change. Assigning
+  // either canvas dimension clears it and forces a texture reallocation.
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   const ctx = canvas.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#fff';

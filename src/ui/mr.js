@@ -398,9 +398,13 @@ export function setupMR(view, project, getFootprint) {
   function makeSheetPanel() {
     const canvas = document.createElement('canvas');
     canvas.width = 1448; canvas.height = 2048; // A4 portrait; resized per render by floorToCanvas
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter; // NPOT canvas — no mipmaps
-    tex.generateMipmaps = false;
+    const makeTexture = () => {
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter; // NPOT canvas — no mipmaps
+      texture.generateMipmaps = false;
+      return texture;
+    };
+    let tex = makeTexture();
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
@@ -412,6 +416,7 @@ export function setupMR(view, project, getFootprint) {
     const SIZE = 0.78; // meters on the long edge; large enough to inspect while editing
 
     function redraw(floor) {
+      const oldWidth = canvas.width, oldHeight = canvas.height;
       const sheetOpts = sharedScaleSheetOptions(project.floors, {
         page: 'a4',
         targetPx: 2048,
@@ -420,13 +425,24 @@ export function setupMR(view, project, getFootprint) {
         generatedLabel: t('sheet.generated'),
       });
       floorToCanvas(floor, canvas, sheetOpts);
-      tex.needsUpdate = true;
+      if (canvas.width !== oldWidth || canvas.height !== oldHeight) {
+        // Quest Chromium/Three may retain the GPU allocation of a resized canvas,
+        // leaving the old page visible or sampled at its former aspect. Replace
+        // the CanvasTexture explicitly whenever portrait/landscape dimensions swap.
+        const staleTexture = tex;
+        tex = makeTexture();
+        mesh.material.map = tex;
+        mesh.material.needsUpdate = true;
+        staleTexture.dispose();
+      } else {
+        tex.needsUpdate = true;
+      }
       const aspect = canvas.width / canvas.height;
       if (aspect >= 1) mesh.scale.set(SIZE, SIZE / aspect, 1);
       else mesh.scale.set(SIZE * aspect, SIZE, 1);
     }
 
-    return { group, mesh, canvas, tex, redraw };
+    return { group, mesh, canvas, get tex() { return tex; }, redraw };
   }
 
   // LANG menu: a small ray-aimed panel listing the languages with the active one
@@ -2321,9 +2337,11 @@ export function setupMR(view, project, getFootprint) {
   // Keep the large sheet on the OUTSIDE of the left controller. In controller-local
   // coordinates -X is left/outward, leaving a clear corridor around the -Z aim ray
   // and its cyan floor reticle. Yaw its front normal inward (+X/+Z) so the sheet
-  // faces the headset and reads naturally with a simple look to the left.
+  // faces the headset and reads naturally with a simple look to the left; pitch
+  // it upward toward the user's head like a clipboard held below eye level.
   const LEFT_SHEET_POS = new THREE.Vector3(-0.42, 0.22, -0.32);
   const LEFT_SHEET_YAW = Math.PI / 4;
+  const LEFT_SHEET_PITCH = -Math.PI / 4;
 
   function currentSheetFloor() {
     sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
@@ -2346,7 +2364,7 @@ export function setupMR(view, project, getFootprint) {
     if (sheetPanel.group.parent !== leftController) {
       leftController.add(sheetPanel.group);
       sheetPanel.group.position.copy(LEFT_SHEET_POS);
-      sheetPanel.group.rotation.set(0, LEFT_SHEET_YAW, 0);
+      sheetPanel.group.rotation.set(LEFT_SHEET_PITCH, LEFT_SHEET_YAW, 0);
     }
     if (modes[currentMode].id !== 'sheet') {
       const activeIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));

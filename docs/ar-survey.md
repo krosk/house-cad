@@ -148,7 +148,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   physical controller input source (`gamepad` present, `hand` absent): tracked-hand select/pinch
   events are ignored. The sheet is offset along the left controller's outside (-X) so it does not
   cover that controller's pointing ray or teleport reticle, then yawed 45° inward toward the
-  headset for comfortable reading with a leftward head turn.
+  headset and pitched 45° upward toward the user for comfortable reading with a leftward head turn.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
 - RIGHT **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
   MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
@@ -253,9 +253,11 @@ preview, `floorToCanvas`). Everything is computed in **page millimeters** (SVG v
 the canvas backend multiplies by a px-per-mm factor) — so annotation sizes (text, dim offsets,
 arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obeys the ratio.
 
-- Scale starts from the largest exact fit for the union of every floor's content, then rounds the
-  ratio denominator upward to a whole number (`1:56.7` → `1:57`) so it remains inside the default
-  A4 page (orientation auto). `sharedScaleSheetOptions` supplies that same project-wide transform to
+- Orientation is chosen from the union of authored rectangles/markers only; movable dimension-line
+  and label positions cannot flip the complete set between portrait and landscape. Scale then fits
+  the full geometry-plus-annotation bounds and rounds the ratio denominator upward to a whole number
+  (`1:56.7` → `1:57`) so it remains inside the default A4 page. `sharedScaleSheetOptions` supplies
+  that same project-wide transform to
   multi-floor printing, single-floor SVG download, and the AR preview/download. Every rendition
   therefore has identical scale, orientation, and origin for physical superposition. Content =
   footprint bbox ∪ rect bounds ∪ markers; a fixed margin reserves room for dims/legend/scale bar.

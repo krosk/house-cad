@@ -76,6 +76,11 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 9. **(s18, pending commit) sheet generation timestamp.** The title strip includes an unambiguous
    local `YYYY-MM-DD HH:mm`. Shared sheet options capture the time once so every floor page in a
    print run agrees; the AR canvas label follows LANG.
+10. **(s18, pending commit) stable sheet orientation + Quest texture refresh.** Shared orientation
+    is selected from authored rectangles/markers, excluding movable dimension annotations; dragging
+    a label can reduce scale but cannot rotate the pages. If a legitimate geometry edit does change
+    orientation, the left-panel CanvasTexture is recreated after the canvas dimensions swap, avoiding
+    Quest's stale/squeezed prior texture and ensuring right-controller sheet changes appear.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -85,7 +90,7 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
   invoke editor actions. With no LEFT source, its sheet/reticle are absent and RIGHT works alone.
   Only physical-controller input sources (`gamepad` and no `hand`) qualify; hand pinch/select is
   ignored. The sheet is positioned 0.42 m on the controller's outside (-X), clear of the aim ray,
-  and yawed 45° inward (+X/+Z normal) toward the headset for a natural leftward glance.
+  yawed 45° inward, and pitched 45° upward toward the headset for a natural leftward glance.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
   cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
   room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
