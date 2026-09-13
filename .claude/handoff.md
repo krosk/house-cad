@@ -191,8 +191,8 @@ HEAD moves with each push; `git log` has the full list.
 
 - `26564d1` (s18) FLOOR calibration works from any selected real storey by deriving the
   shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
-- `26564d1` (s18) plan-sheet fixture stacks group markers within 40 mm in plan under one
-  bracket. Within it, full-3D 40 mm neighbors share an outlined white box: horizontal + one height
+- `26564d1` (s18) plan-sheet fixture stacks now group markers within 80 mm inclusive in plan under one
+  bracket. Within it, full-3D 80 mm-inclusive neighbors share an outlined white box: horizontal + one height
   when level, vertical + per-glyph heights when not. Distant height groups keep separate boxes on
   the same leader. Shared by print/SVG and the live LEFT-controller canvas preview.
 - (s17) zone area readout: `connectedRoomComponents` (geometry2d) now deducts subtract cutouts

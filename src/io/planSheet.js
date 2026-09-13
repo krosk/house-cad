@@ -57,7 +57,7 @@ const ARROW = 2.2;       // arrowhead length
 const ARROW_H = 1;       // arrowhead half-width
 const DIM_DASH = [1.4, 1];     // measured span
 const LEADER_DOT = [0.1, 0.8]; // endpoint -> outside value panel
-const MARKER_STACK_TOLERANCE = 0.04; // model m: half a typical 8 cm fixture face
+const MARKER_STACK_TOLERANCE = 0.08; // model m: one typical 8 cm fixture face, inclusive
 const MARKER_SAME_HEIGHT_EPS = 0.001; // model m: equal-height fixtures share one printed height
 const MARKER_STACK_ROW = 3.8;         // paper mm between rows inside a vertical fixture box
 const MARKER_STACK_BOX_GAP = 1.4;     // paper mm between distinct height groups
@@ -617,7 +617,7 @@ function pairwiseCluster(items, within) {
 const markerHeight = (marker) => (Number.isFinite(marker.z) ? marker.z : 0);
 
 // One plan-position callout may contain several separate white boxes. Markers
-// share a box only when their complete 3D positions are within 4 cm: horizontal
+// share a box only when their complete 3D positions are within 8 cm inclusive: horizontal
 // neighbors at one height produce a horizontal box, while vertical neighbors at
 // different heights produce a vertical box with one height per row.
 function groupFixtureBoxes(markers, tolerance) {
@@ -640,7 +640,7 @@ function groupFixtureBoxes(markers, tolerance) {
   return boxes.sort((a, b) => b.maxZ - a.maxZ);
 }
 
-// Markers within 4 cm in plan share one leader so their projected glyphs cannot
+// Markers within 8 cm inclusive in plan share one leader so their projected glyphs cannot
 // obscure each other. Their authored points remain untouched. Requiring every
 // member to be within tolerance avoids merging a long chain of nearby fixtures.
 export function groupFixtureStacks(markers, tolerance = MARKER_STACK_TOLERANCE) {

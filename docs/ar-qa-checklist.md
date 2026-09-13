@@ -214,15 +214,15 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
       subtract kind still does
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
 - [ ] Marker-pin value text is black while its dimension line and value-box border remain amber
-- [ ] Markers no more than 40 mm apart in plan form one bracketed fixture callout so projected glyphs
+- [ ] Markers no more than 80 mm apart in plan form one bracketed fixture callout so projected glyphs
       cannot obscure one another
-- [ ] Markers within 40 mm in full 3D share one outlined white box; farther-apart heights remain
+- [ ] Markers within 80 mm inclusive in full 3D share one outlined white box; farther-apart heights remain
       separate white boxes on the same plan-position bracket
 - [ ] Same-height neighbors use a horizontal box with one shared height; different-height neighbors
       use a vertical box with one height per glyph
 - [ ] Example: switches at 1.00 m and 0.96 m share one vertical white box, while a co-located outlet
       at 0.30 m occupies its own box below them
-- [ ] Markers more than 40 mm apart in plan remain independent glyphs
+- [ ] Markers more than 80 mm apart in plan remain independent glyphs
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors

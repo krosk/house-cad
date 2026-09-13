@@ -287,8 +287,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
   the glyph. Their line and value-box border stay amber, while the printed value itself is black for
   maximum contrast; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend). Markers
-  within 40 mm in plan become one bracketed **fixture stack** instead of obscuring each other.
-  Inside that callout, markers within 40 mm in full 3D share an outlined white box: same-height
+  within 80 mm inclusive in plan become one bracketed **fixture stack** instead of obscuring each other.
+  Inside that callout, markers within 80 mm inclusive in full 3D share an outlined white box: same-height
   neighbors form a horizontal box with one height label; different-height neighbors form a vertical
   box with one label per glyph. Height groups farther apart remain separate boxes on the same bracket
   (for example, 1.00 m + 0.96 m switches together and a 0.30 m outlet below them). Every type keeps
