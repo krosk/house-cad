@@ -26,6 +26,14 @@ import { zoneKind } from '../core/zoneColors.js';
 // are pure clutter, so they are not drawn.
 const displaysZero = (meters) => parseFloat(fmt(Math.abs(meters))) === 0;
 
+// Dimension boxes are tight paper annotations. Keep the configured precision
+// for fractional values, but do not spend width on a fractional part made only
+// of zeros (3.00 m / 300.0 cm -> 3 / 300). Other readouts retain normal fmt().
+const fmtSheetDim = (meters) => {
+  const text = fmt(Math.abs(meters));
+  return /^\d+\.0+$/.test(text) ? text.slice(0, text.indexOf('.')) : text;
+};
+
 // ---- page + layout constants (all mm) ----
 export const PAGES = {
   a4: { w: 210, h: 297 },
@@ -430,7 +438,7 @@ function drawDimensions(be, L, floor) {
     const lb = edgeLineWorld(c.b, rects);
     if (!la || !lb) continue; // origin/marker refs have no drawable edge (matches the 2D editor)
     const color = c.conflict ? C_DIM_BAD : C_DIM;
-    const label = fmt(Math.abs(c.value));
+    const label = fmtSheetDim(c.value);
 
     if (c.axis === 'x') {
       const sxa = L.X(la.coord), sxb = L.X(lb.coord);
@@ -495,7 +503,7 @@ function drawMarkerPins(be, L, floor) {
       if (!rr) continue; // dangling ref
       refCoord = edgeCoord(rr, refEnd.edge);
     }
-    const label = fmt(Math.abs(c.value));
+    const label = fmtSheetDim(c.value);
     if (c.axis === 'x') {
       const y = L.Y(c.offset != null ? c.offset : m.y), xa = L.X(refCoord), xb = L.X(m.x);
       const lx = L.X(dimLabelCoord(c, refCoord, m.x));

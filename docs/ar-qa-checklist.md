@@ -180,6 +180,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
+- [ ] Whole dimensions omit `.0`/`.00` on the sheet; fractional dimensions retain normal precision
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
 - [ ] Active-floor SVG and left-controller sheet use the identical scale/origin as that floor's Print All page
 - [ ] All printed pages share one orientation and page size; the complete stacked extent fills the available drawing area
@@ -194,6 +195,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Grip is inert here (no delete/undo); leaving SHEET mode keeps the companion visible and returns it to the active floor
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 - [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
+- [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
+- [ ] Coohom recognizes the DXF wall/door/window geometry; annotation layers can be hidden if needed
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted

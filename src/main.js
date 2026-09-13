@@ -14,6 +14,7 @@ import {
 } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
+import { floorToDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
@@ -474,8 +475,9 @@ fileInput.addEventListener('change', async () => {
 // A to-scale floor-plan sheet per floor, drawn from the model (src/io/planSheet.js).
 // "Print all floors" opens a hidden iframe holding every floor's SVG (one per page)
 // at a shared, maximized scale, then invokes the browser print dialog → Save as PDF.
-// "Download SVG" saves the active floor as a vector file. Sheets are in real mm;
-// print at 100% for true scale.
+// "Download SVG" saves the active floor as a vector sheet. "Download DXF" saves
+// its authored CAD geometry at 1:1 in millimeters. Sheets are in real mm; print
+// at 100% for true scale.
 function safeName(s) {
   return (s || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor';
 }
@@ -531,6 +533,10 @@ function printSheets(svgs) {
           const sheetOpts = sharedScaleSheetOptions(project.floors);
           download(`plan-${safeName(f.name)}.svg`, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
+        } else if (b.dataset.print === 'dxf') {
+          const f = project.activeFloor;
+          download(`plan-${safeName(f.name)}.dxf`, floorToDxf(f), 'application/dxf');
+          sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.dxf — millimeters, 1:1 CAD scale.`);
         } else {
           printSheets(floorsToSharedScaleSvgs(project.floors));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');

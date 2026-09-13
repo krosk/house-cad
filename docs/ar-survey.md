@@ -278,6 +278,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)
   is clutter and isn't drawn.
+- **Whole-number dimension labels are compacted on the sheet** (`fmtSheetDim`): an all-zero
+  fractional part is omitted (`3.00` → `3`, `300.0` → `300`), while non-integers retain the
+  configured display precision. This applies to structural and marker-pin dimensions only.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
   perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
   endpoints and values outside that interval are valid). The affine position survives endpoint
@@ -289,9 +292,14 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   portrait/landscape orientation, and uses the largest exact scale that fits that complete stack
   (`floorsToSharedScaleSvgs`). Every page therefore has the same paper size, scale, and transform:
   model origin `(0,0)` lands at the same paper point, so printed floors can be superposed to inspect
-  overlap. Download SVG still optimizes the active floor alone. **Print at 100% for true scale.**
+  overlap. Download SVG uses that same project-wide transform. **Print at 100% for true scale.**
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
   (AR preview) is build-verified only** — no browser/Quest raster test in CI.
+
+Desktop also offers **Download DXF (this floor)** via `src/io/dxf.js`. DXF is model space rather
+than a paper rendition: ASCII AutoCAD 2000, millimeter units, 1:1 geometry, and separate semantic
+layers for footprint/zones/dimensions/markers/areas/origin. It targets CAD floor-plan importers such
+as Coohom and does not alter or replace the shared SVG/canvas sheet renderer.
 
 ## Coordinate mapping
 

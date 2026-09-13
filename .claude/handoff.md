@@ -62,25 +62,32 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
    Added `drawLabelLeader` (planSheet, all 4 draw spots) + `pushLeader` (mr.js, all 6) to continue
    the line from the nearer endpoint out to the label. planSheet verified by rsvg render of a
    labelT=1.5 dim (leader draws to the outside box); mr.js build-verified only.
-7. **(s18, pending commit) semantic plan-sheet symbols.** Door, window, stairs, and cabinet
+7. **(s18, `7e4d43c`) semantic plan-sheet symbols.** Door, window, stairs, and cabinet
    rectangles now retain their identity on SVG/print and the live left-controller sheet instead of
    reading as anonymous footprint cutouts. Each uses distinct black-and-white linework and appears
    in its own per-floor zone legend row; AR preview labels follow LANG. Production build clean;
    focused SVG check confirms all 4 symbols + labels with finite geometry. Paper/Quest visual QA
    remains.
-8. **(s18, pending commit) one shared sheet transform everywhere.** `sharedScaleSheetOptions`
+8. **(s18, `7e4d43c`) one shared sheet transform everywhere.** `sharedScaleSheetOptions`
    computes the maximized project-wide scale/orientation/origin once per rendition, rounding the
    fitted ratio denominator upward to a whole number (`1:56.7` → `1:57`) so content still fits. Print All,
    active-floor desktop SVG, AR preview, and AR SVG download now all use it, so a single-floor sheet
    exactly matches its page in the multi-floor set and can be physically superposed without scaling.
-9. **(s18, pending commit) sheet generation timestamp.** The title strip includes an unambiguous
+9. **(s18, `57d4848`) sheet generation timestamp.** The title strip includes an unambiguous
    local `YYYY-MM-DD HH:mm`. Shared sheet options capture the time once so every floor page in a
    print run agrees; the AR canvas label follows LANG.
-10. **(s18, pending commit) stable sheet orientation + Quest texture refresh.** Shared orientation
+10. **(s18, `ee3b628`) stable sheet orientation + Quest texture refresh.** Shared orientation
     is selected from authored rectangles/markers, excluding movable dimension annotations; dragging
     a label can reduce scale but cannot rotate the pages. If a legitimate geometry edit does change
     orientation, the left-panel CanvasTexture is recreated after the canvas dimensions swap, avoiding
     Quest's stale/squeezed prior texture and ensuring right-controller sheet changes appear.
+11. **(s18, pending commit) compact whole dimensions.** Structural and marker-pin values whose
+    formatted fractional part is all zeros print as integers (`3.00` → `3`, `300.0` → `300`) to
+    narrow their white value boxes; fractional values keep normal unit precision.
+12. **(s18, pending commit) active-floor DXF export.** The desktop Print menu now downloads an
+    ASCII AutoCAD 2000 DXF in millimeters at 1:1 model scale. `src/io/dxf.js` preserves computed
+    footprint, authored room/wall/door/window/stairs/cabinet rectangles and symbols, structural and
+    marker dimensions, room areas, origin, marker glyphs/heights, and semantic layers for Coohom.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
