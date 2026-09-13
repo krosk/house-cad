@@ -19,6 +19,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] RIGHT remains the editor regardless of which hand moved last; LEFT activity never steals its modes
 - [ ] With LEFT absent, RIGHT works normally and no companion sheet/teleport reticle is shown
 - [ ] With LEFT detected, both tracked controllers remain visible
+- [ ] Tracked hands never receive controller roles or trigger edit/teleport actions
 
 ## SETUP · ORIGIN (`register`)  ✅ session 14
 - [x] 3-point origin: P1,P2 along one wall (sets +X down it), P3 on the perpendicular wall
@@ -168,12 +169,16 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 > Preview + download a to-scale plan sheet. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
+- [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
 - [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
+- [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
+- [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
 - [ ] Desktop Print emits one floor per page at one identical scale across all non-empty floors
+- [ ] Active-floor SVG and left-controller sheet use the identical scale/origin as that floor's Print All page
 - [ ] All printed pages share one orientation and page size; the complete stacked extent fills the available drawing area
 - [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
 - [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
@@ -183,6 +188,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
 - [ ] Grip is inert here (no delete/undo); leaving SHEET mode keeps the companion visible and returns it to the active floor
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
+- [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted

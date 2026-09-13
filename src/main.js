@@ -13,7 +13,7 @@ import {
   serializeProject, deserializeInto,
 } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
-import { floorToSvg, floorsToSharedScaleSvgs } from './io/planSheet.js';
+import { floorToSvg, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 
 const project = new Project();
@@ -526,7 +526,10 @@ function printSheets(svgs) {
       try {
         if (b.dataset.print === 'svg') {
           const f = project.activeFloor;
-          download(`plan-${safeName(f.name)}.svg`, floorToSvg(f), 'image/svg+xml');
+          // A single-floor export uses the exact project-wide print transform so
+          // it can be superposed with a page from Print All without rescaling.
+          const sheetOpts = sharedScaleSheetOptions(project.floors);
+          download(`plan-${safeName(f.name)}.svg`, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
         } else {
           printSheets(floorsToSharedScaleSvgs(project.floors));

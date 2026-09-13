@@ -19,6 +19,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
+import { zoneKind } from '../core/zoneColors.js';
 
 // True when a distance rounds to zero AT THE CURRENT DISPLAY PRECISION — such
 // dimensions (coincident edges, a marker sitting on its wall) read as "0.00" and
@@ -54,10 +55,13 @@ const C_DIM = '#333';        // dimension lines + text
 const C_DIM_BAD = '#c02626'; // conflicting dimension
 const C_MARK = '#111';       // marker glyphs
 const C_PIN = '#b45309';     // marker floor-pin dimension (fixture placement), distinct from structural dims
+const C_ZONE = '#111';       // architectural zone symbols (door/window/stairs/cabinet)
 
 const MARKER_LABELS = {
   outlet: 'Outlet', switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
 };
+const ZONE_LABELS = { door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet' };
+const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 
 // ---------------------------------------------------------------------------
 // Drawing backends — both consume PAGE MILLIMETERS.
@@ -280,6 +284,71 @@ function drawFootprint(be, L, footprint) {
   const rings = [];
   for (const poly of footprint) for (const ring of poly) rings.push(ring.map(([x, y]) => [L.X(x), L.Y(y)]));
   be.region(rings, { fill: C_FILL, stroke: C_LINE, width: 0.5 });
+}
+
+// Black-and-white architectural symbols for the semantic subtract zones. These
+// sit over the corresponding cutouts in the computed footprint so a door,
+// window, stair or cabinet no longer prints as an anonymous rectangular hole.
+// The same function draws the compact legend samples below.
+function drawZoneGlyph(be, x, y, w, h, kind) {
+  if (!(w > 0 && h > 0)) return;
+  const x1 = x + w, y1 = y + h;
+  const horizontal = w >= h;
+  const line = (ax, ay, bx, by, width = 0.18) =>
+    be.line(ax, ay, bx, by, { stroke: C_ZONE, width });
+
+  be.rect(x, y, w, h, { fill: '#fff', stroke: C_ZONE, width: 0.25 });
+
+  if (kind === 'door') {
+    // Door leaf: one unmistakable diagonal across the authored opening.
+    line(x, y1, x1, y, 0.28);
+  } else if (kind === 'window') {
+    // Glazing: two parallel panes along the wall/opening's long axis.
+    if (horizontal) {
+      line(x, y + h * 0.35, x1, y + h * 0.35);
+      line(x, y + h * 0.65, x1, y + h * 0.65);
+    } else {
+      line(x + w * 0.35, y, x + w * 0.35, y1);
+      line(x + w * 0.65, y, x + w * 0.65, y1);
+    }
+  } else if (kind === 'stairs') {
+    // Five tread divisions plus an arrow showing the run direction.
+    for (let i = 1; i < 6; i++) {
+      if (horizontal) line(x + (w * i) / 6, y, x + (w * i) / 6, y1, 0.13);
+      else line(x, y + (h * i) / 6, x1, y + (h * i) / 6, 0.13);
+    }
+    if (horizontal) {
+      const cy = y + h / 2, tip = x + w * 0.82;
+      line(x + w * 0.18, cy, tip, cy, 0.25);
+      line(tip, cy, x + w * 0.68, y + h * 0.25, 0.25);
+      line(tip, cy, x + w * 0.68, y + h * 0.75, 0.25);
+    } else {
+      const cx = x + w / 2, tip = y + h * 0.18;
+      line(cx, y + h * 0.82, cx, tip, 0.25);
+      line(cx, tip, x + w * 0.25, y + h * 0.32, 0.25);
+      line(cx, tip, x + w * 0.75, y + h * 0.32, 0.25);
+    }
+  } else if (kind === 'cabinet') {
+    // Cabinet carcass/front: crossed diagonals distinguish it from openings.
+    line(x, y, x1, y1);
+    line(x, y1, x1, y);
+  }
+}
+
+function drawZones(be, L, floor) {
+  for (const rect of floor.rectangles) {
+    const kind = zoneKind(rect);
+    if (!PRINT_ZONE_KINDS.includes(kind)) continue;
+    const b = rect.bounds;
+    const sx0 = L.X(b.x0), sx1 = L.X(b.x1);
+    const sy0 = L.Y(b.y0), sy1 = L.Y(b.y1);
+    drawZoneGlyph(
+      be,
+      Math.min(sx0, sx1), Math.min(sy0, sy1),
+      Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
+      kind,
+    );
+  }
 }
 
 function drawArrow(be, x, y, dir, axis) {
@@ -512,17 +581,36 @@ function drawStrip(be, L, floor, opts) {
   be.text(`1:${ratioText}  ·  ${unitLabel()}`, page.w / 2, rowY,
     { fill: '#000', size: 3, align: 'center', baseline: 'middle' });
 
-  // Legend (right): one entry per marker type present on this floor.
-  const types = [...new Set((floor.markers || []).map((m) => m.type))];
-  const nameOf = opts.markerLabel || ((t) => MARKER_LABELS[t] || t);
-  if (types.length) {
-    // Lay entries left-to-right, right-aligned to the right margin.
-    const entries = types.map((t) => ({ t, label: nameOf(t) }));
+  // Legends (right): semantic plan zones and fixture markers have independent
+  // rows. Entries are included only when that type occurs on this floor.
+  const markerTypes = [...new Set((floor.markers || []).map((m) => m.type))];
+  const zoneTypes = PRINT_ZONE_KINDS.filter((kind) =>
+    floor.rectangles.some((rect) => zoneKind(rect) === kind));
+  const markerName = opts.markerLabel || ((t) => MARKER_LABELS[t] || t);
+  const zoneName = opts.zoneLabel || ((t) => ZONE_LABELS[t] || t);
+
+  if (zoneTypes.length) {
+    const entries = zoneTypes.map((t) => ({ t, label: zoneName(t) }));
+    const widths = entries.map((e) => 7.4 + be.measure(e.label, 2.2) + 2.2);
+    let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);
+    const y = markerTypes.length ? yBase + 4.5 : rowY;
+    for (let i = 0; i < entries.length; i++) {
+      drawZoneGlyph(be, x, y - 1.6, 6, 3.2, entries[i].t);
+      be.text(entries[i].label, x + 7.4, y,
+        { fill: '#000', size: 2.2, align: 'left', baseline: 'middle' });
+      x += widths[i];
+    }
+  }
+
+  if (markerTypes.length) {
+    const entries = markerTypes.map((t) => ({ t, label: markerName(t) }));
     const widths = entries.map((e) => 4.4 + be.measure(e.label, 2.4) + 3);
     let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);
+    const y = zoneTypes.length ? yBase + 11.5 : rowY;
     for (let i = 0; i < entries.length; i++) {
-      drawMarkerGlyph(be, x + 2, rowY, entries[i].t, 2.6);
-      be.text(entries[i].label, x + 4.4, rowY, { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
+      drawMarkerGlyph(be, x + 2, y, entries[i].t, 2.6);
+      be.text(entries[i].label, x + 4.4, y,
+        { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
       x += widths[i];
     }
   }
@@ -555,6 +643,7 @@ function renderFloor(be, floor, opts = {}) {
   }
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
+  drawZones(be, L, floor); // semantic door/window/stair/cabinet symbols over footprint cutouts
   drawDimensions(be, L, floor);
   drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   drawMarkers(be, L, floor);
@@ -576,29 +665,49 @@ export function floorToSvg(floor, opts = {}) {
 }
 
 /**
- * Render one SVG per floor through one common paper transform. A union bounding
- * box selects one orientation and the largest exact scale that fits the complete
- * stack; therefore model origin (0,0) maps to the same paper point on every page.
+ * Build the common paper transform for a project. Pass the result to ANY
+ * single-floor SVG/canvas render to make it exactly match that floor's page in
+ * the multi-floor print set: same page, orientation, scale, and origin.
  */
-export function floorsToSharedScaleSvgs(floors, opts = {}) {
+export function sharedScaleSheetOptions(floors, opts = {}) {
   const page = PAGES[opts.page] || PAGES.a4;
   const boxes = floors.map((floor) => {
     const footprint = computeFootprint(floor.rectangles);
     return contentBBox(floor, footprint);
   }).filter(Boolean);
-  if (!boxes.length) return floors.map((floor) => floorToSvg(floor, opts));
+  if (!boxes.length) return { ...opts };
   const layoutBBox = boxes.reduce((all, bbox) => ({
     x0: Math.min(all.x0, bbox.x0), y0: Math.min(all.y0, bbox.y0),
     x1: Math.max(all.x1, bbox.x1), y1: Math.max(all.y1, bbox.y1),
   }), { ...boxes[0] });
   const orientation = opts.orientation || bestOrientation(layoutBBox, page);
-  const mmPerM = orientationCapacity(layoutBBox, page, orientation);
-  return floors.map((floor) => floorToSvg(floor, {
+  let mmPerM;
+  if (Number.isFinite(opts.mmPerM) && opts.mmPerM > 0) {
+    mmPerM = opts.mmPerM;
+  } else {
+    // Maximize the drawing, then round the scale denominator UP to a whole
+    // number. Upward is deliberate: 1:56.7 -> 1:57 gets fractionally smaller
+    // and remains inside the page; rounding down could clip the fitted extent.
+    const fittedMmPerM = orientationCapacity(layoutBBox, page, orientation);
+    const integerRatio = Math.max(1, Math.ceil(1000 / fittedMmPerM - 1e-9));
+    mmPerM = 1000 / integerRatio;
+  }
+  return {
     ...opts,
     layoutBBox,
     orientation,
     mmPerM,
-  }));
+  };
+}
+
+/**
+ * Render one SVG per floor through one common paper transform. A union bounding
+ * box selects one orientation and the largest exact scale that fits the complete
+ * stack; therefore model origin (0,0) maps to the same paper point on every page.
+ */
+export function floorsToSharedScaleSvgs(floors, opts = {}) {
+  const sharedOpts = sharedScaleSheetOptions(floors, opts);
+  return floors.map((floor) => floorToSvg(floor, sharedOpts));
 }
 
 /**

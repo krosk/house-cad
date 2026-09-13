@@ -23,7 +23,7 @@ import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
-import { floorToSvg, floorToCanvas } from '../io/planSheet.js';
+import { floorToSvg, floorToCanvas, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
@@ -412,7 +412,13 @@ export function setupMR(view, project, getFootprint) {
     const SIZE = 0.78; // meters on the long edge; large enough to inspect while editing
 
     function redraw(floor) {
-      floorToCanvas(floor, canvas, { page: 'a4', targetPx: 2048, markerLabel: (ty) => t(`marker.${ty}`) });
+      const sheetOpts = sharedScaleSheetOptions(project.floors, {
+        page: 'a4',
+        targetPx: 2048,
+        markerLabel: (ty) => t(`marker.${ty}`),
+        zoneLabel: (kind) => t(`mode.${kind}`),
+      });
+      floorToCanvas(floor, canvas, sheetOpts);
       tex.needsUpdate = true;
       const aspect = canvas.width / canvas.height;
       if (aspect >= 1) mesh.scale.set(SIZE, SIZE / aspect, 1);
@@ -2311,7 +2317,10 @@ export function setupMR(view, project, getFootprint) {
   let sheetDirty = true;
   let lastSheetRedrawAt = -Infinity;
   const SHEET_REFRESH_MS = 125; // at most 8 fps while a dim/edge is being dragged
-  const LEFT_SHEET_POS = new THREE.Vector3(0.30, 0.22, -0.32); // inward, up, and ahead of the left hand
+  // Keep the large sheet on the OUTSIDE of the left controller. In controller-local
+  // coordinates -X is left/outward, leaving a clear corridor around the -Z aim ray
+  // and its cyan floor reticle.
+  const LEFT_SHEET_POS = new THREE.Vector3(-0.42, 0.22, -0.32);
 
   function currentSheetFloor() {
     sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
@@ -2392,7 +2401,8 @@ export function setupMR(view, project, getFootprint) {
   function onSheetTouch() {
     const f = currentSheetFloor();
     const name = sheetFileName(f);
-    const ok = downloadBlob(name, floorToSvg(f, { page: 'a4' }), 'image/svg+xml');
+    const sheetOpts = sharedScaleSheetOptions(project.floors, { page: 'a4' });
+    const ok = downloadBlob(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
     rlog('sheet download', { floor: f.name, name, ok });
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
@@ -3419,9 +3429,10 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function onSelect(event) {
+    if (!isControllerSource(event.data)) return; // hand pinch/select never edits or teleports
     // LEFT trigger is permanently teleport, independent of RIGHT's current mode.
     if (event.data?.handedness === 'left') {
-      if (event.data.gamepad) teleportToReticle(event.data);
+      teleportToReticle(event.data);
       return;
     }
     const pos = tipPosition(event.data);
@@ -3446,6 +3457,7 @@ export function setupMR(view, project, getFootprint) {
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
   // of an undo — a domain-matched dim value panel, an edge, or an outlet.
   function onSqueezeStart(event) {
+    if (!isControllerSource(event?.data)) return;
     if (event?.data?.handedness === 'left') return; // companion grip has no editing role
     const id = modes[currentMode].id;
     if (isDimMode(id) && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
@@ -3465,6 +3477,7 @@ export function setupMR(view, project, getFootprint) {
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
   function onSqueezeEnd(event) {
+    if (!isControllerSource(event?.data)) return;
     if (event?.data?.handedness === 'left') return;
     if (gripDrag) {
       const rebuild = gripDrag.kind === 'edge' || gripDrag.kind === 'marker';
@@ -3484,6 +3497,7 @@ export function setupMR(view, project, getFootprint) {
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
+    if (!isControllerSource(event?.data)) return;
     if (event?.data?.handedness === 'left') return;
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
@@ -3568,15 +3582,22 @@ export function setupMR(view, project, getFootprint) {
   // editing modes/HUD; optional LEFT owns only its live sheet and teleport trigger.
   // An unhanded source is accepted as the editor only when no right/left-labelled
   // editor exists, preserving support for runtimes that omit handedness metadata.
+  // A physical motion controller has a gamepad and no XRHand. Test both so a
+  // runtime exposing synthesized hand buttons cannot accidentally promote a hand
+  // pinch to the fixed RIGHT editor or LEFT companion role.
+  function isControllerSource(source) {
+    return !!source?.gamepad && !source?.hand;
+  }
   function sourceForHand(frame, handedness) {
     const list = [...frame.session.inputSources];
-    return list.find((s) => s.handedness === handedness && s.gamepad) ?? null;
+    return list.find((s) => s.handedness === handedness && isControllerSource(s)) ?? null;
   }
   const leftSource = (frame) => sourceForHand(frame, 'left');
   function editorSource(frame) {
     const right = sourceForHand(frame, 'right');
     if (right) return right;
-    return [...frame.session.inputSources].find((s) => s.handedness !== 'left' && s.gamepad) ?? null;
+    return [...frame.session.inputSources].find((s) =>
+      s.handedness !== 'left' && isControllerSource(s)) ?? null;
   }
   const controllerForSource = (source) => controllers.find((c) => c.userData.inputSource === source) ?? null;
 

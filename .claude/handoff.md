@@ -62,6 +62,17 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
    Added `drawLabelLeader` (planSheet, all 4 draw spots) + `pushLeader` (mr.js, all 6) to continue
    the line from the nearer endpoint out to the label. planSheet verified by rsvg render of a
    labelT=1.5 dim (leader draws to the outside box); mr.js build-verified only.
+7. **(s18, pending commit) semantic plan-sheet symbols.** Door, window, stairs, and cabinet
+   rectangles now retain their identity on SVG/print and the live left-controller sheet instead of
+   reading as anonymous footprint cutouts. Each uses distinct black-and-white linework and appears
+   in its own per-floor zone legend row; AR preview labels follow LANG. Production build clean;
+   focused SVG check confirms all 4 symbols + labels with finite geometry. Paper/Quest visual QA
+   remains.
+8. **(s18, pending commit) one shared sheet transform everywhere.** `sharedScaleSheetOptions`
+   computes the maximized project-wide scale/orientation/origin once per rendition, rounding the
+   fitted ratio denominator upward to a whole number (`1:56.7` → `1:57`) so content still fits. Print All,
+   active-floor desktop SVG, AR preview, and AR SVG download now all use it, so a single-floor sheet
+   exactly matches its page in the multi-floor set and can be physically superposed without scaling.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -69,6 +80,8 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
   Optional LEFT is an independent companion: an enlarged, live active-floor print sheet follows the
   controller in every mode, and its cyan reticle + trigger always teleport. LEFT grip/sticks do not
   invoke editor actions. With no LEFT source, its sheet/reticle are absent and RIGHT works alone.
+  Only physical-controller input sources (`gamepad` and no `hand`) qualify; hand pinch/select is
+  ignored. The sheet is positioned 0.42 m on the controller's outside (-X), clear of the aim ray.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
   cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
   room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
