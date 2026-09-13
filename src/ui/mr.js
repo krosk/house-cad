@@ -914,6 +914,18 @@ export function setupMR(view, project, getFootprint) {
       floorDimSprites.push(sprite);
       if (selectable) dimSprites.push(sprite);
     };
+    // When a value box is dragged beyond the measured span (labelT outside 0..1),
+    // continue the dim line from the nearer endpoint out to the label so it never
+    // floats disconnected. Mirrors the plan sheet's drawLabelLeader.
+    const pushLeader = (a0, a1, aLabel, perp, axis, flags) => {
+      const lo = Math.min(a0, a1), hi = Math.max(a0, a1);
+      let from;
+      if (aLabel < lo) from = lo;
+      else if (aLabel > hi) from = hi;
+      else return;
+      if (axis === 'x') segs.push({ ax: from, ay: perp, bx: aLabel, by: perp, ...flags });
+      else segs.push({ ax: perp, ay: from, bx: perp, by: aLabel, ...flags });
+    };
     let xTier = 0, yTier = 0;
     for (const c of (floor.constraints || [])) {
       if (c.type !== 'distance') continue;
@@ -935,13 +947,17 @@ export function setupMR(view, project, getFootprint) {
           segs.push({ ax: le.coord, ay: yLine, bx: marker.x, by: yLine, conflict, marker: true });
           segs.push({ ax: le.coord, ay: marker.y - tick, bx: le.coord, by: yLine + tick, conflict, marker: true });
           segs.push({ ax: marker.x, ay: marker.y - tick, bx: marker.x, by: yLine + tick, conflict, marker: true });
-          pushDim(makeDimLabel(text, color, dimLabelCoord(c, le.coord, marker.x), yLine), c);
+          const lx = dimLabelCoord(c, le.coord, marker.x);
+          pushLeader(le.coord, marker.x, lx, yLine, 'x', { conflict, marker: true });
+          pushDim(makeDimLabel(text, color, lx, yLine), c);
         } else {
           const xLine = c.offset != null ? c.offset : marker.x;
           segs.push({ ax: xLine, ay: le.coord, bx: xLine, by: marker.y, conflict, marker: true });
           segs.push({ ax: marker.x - tick, ay: le.coord, bx: xLine + tick, by: le.coord, conflict, marker: true });
           segs.push({ ax: marker.x - tick, ay: marker.y, bx: xLine + tick, by: marker.y, conflict, marker: true });
-          pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, le.coord, marker.y)), c);
+          const ly = dimLabelCoord(c, le.coord, marker.y);
+          pushLeader(le.coord, marker.y, ly, xLine, 'y', { conflict, marker: true });
+          pushDim(makeDimLabel(text, color, xLine, ly), c);
         }
         continue;
       }
@@ -959,12 +975,16 @@ export function setupMR(view, project, getFootprint) {
           const yLine = c.offset != null ? c.offset : (le.p0.y + le.p1.y) / 2; // grip-drag pins offset
           segs.push({ ax: 0, ay: yLine, bx: le.coord, by: yLine, conflict });            // origin -> edge line
           segs.push({ ax: le.coord, ay: le.p0.y, bx: le.coord, by: le.p1.y, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, dimLabelCoord(c, 0, le.coord), yLine), c);
+          const lx = dimLabelCoord(c, 0, le.coord);
+          pushLeader(0, le.coord, lx, yLine, 'x', { conflict });
+          pushDim(makeDimLabel(text, color, lx, yLine), c);
         } else {
           const xLine = c.offset != null ? c.offset : (le.p0.x + le.p1.x) / 2;
           segs.push({ ax: xLine, ay: 0, bx: xLine, by: le.coord, conflict });            // origin -> edge line
           segs.push({ ax: le.p0.x, ay: le.coord, bx: le.p1.x, by: le.coord, conflict }); // tick along the edge
-          pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, 0, le.coord)), c);
+          const ly = dimLabelCoord(c, 0, le.coord);
+          pushLeader(0, le.coord, ly, xLine, 'y', { conflict });
+          pushDim(makeDimLabel(text, color, xLine, ly), c);
         }
         continue;
       }
@@ -981,7 +1001,9 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xa, ay: yLine, bx: xb, by: yLine, conflict });            // dim line
         segs.push({ ax: xa, ay: la.p1.y, bx: xa, by: yLine + DIM_EXT_OVER, conflict }); // ext a
         segs.push({ ax: xb, ay: lb.p1.y, bx: xb, by: yLine + DIM_EXT_OVER, conflict }); // ext b
-        pushDim(makeDimLabel(text, color, dimLabelCoord(c, xa, xb), yLine), c);
+        const lx = dimLabelCoord(c, xa, xb);
+        pushLeader(xa, xb, lx, yLine, 'x', { conflict });
+        pushDim(makeDimLabel(text, color, lx, yLine), c);
       } else {
         const ya = la.coord, yb = lb.coord;
         const xBase = Math.max(la.p1.x, lb.p1.x);
@@ -989,7 +1011,9 @@ export function setupMR(view, project, getFootprint) {
         segs.push({ ax: xLine, ay: ya, bx: xLine, by: yb, conflict });            // dim line
         segs.push({ ax: la.p1.x, ay: ya, bx: xLine + DIM_EXT_OVER, by: ya, conflict }); // ext a
         segs.push({ ax: lb.p1.x, ay: yb, bx: xLine + DIM_EXT_OVER, by: yb, conflict }); // ext b
-        pushDim(makeDimLabel(text, color, xLine, dimLabelCoord(c, ya, yb)), c);
+        const ly = dimLabelCoord(c, ya, yb);
+        pushLeader(ya, yb, ly, xLine, 'y', { conflict });
+        pushDim(makeDimLabel(text, color, xLine, ly), c);
       }
     }
     // Build strips in separate plan/outlet/conflict batches so each domain keeps

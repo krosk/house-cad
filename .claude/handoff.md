@@ -11,10 +11,12 @@
 - Claude memory (auto-loads): `phase5-xr-intent`, `multi-floor-design`, `ar-2d-parity`,
   `quest-guardian-limitation` — Phase-5 rationale and XR gotchas. Don't duplicate them here.
 
-**Date:** 2026-09-12 (session 16)
+**Date:** 2026-09-13 (session 17)
 **Status:** Quest APK path WORKING. On-device QA: SETUP + PLAN + PROJECT(save/load/lang) passed
-(s14); **MARKER · DIMS commit + floor dim-line render now verified on device (s16)** — a real bug
-was found and fixed. `main` = `origin/main` at `0d13f0c`; **clean tree, everything pushed.**
+(s14); MARKER · DIMS commit + floor dim-line render verified on device (s16). **The repo was 12
+commits ahead of where the s16 handoff was frozen** — sessions after s16 shipped a lot without
+updating this file, so those commits are reconstructed from `git log` below, not from live session
+notes. **s17 then added the RJ45 glyph redraw + the dimension-leader fix (see below).**
 
 ## Where things stand in one paragraph
 
@@ -31,22 +33,35 @@ is the only record. Markers are a **parallel annotation lane**: wall-anchored po
 the footprint/boolean/extrude pipeline; the solver stays 2-axis. Before planning marker or dimension
 work, read `docs/ar-survey.md`.
 
-## What changed in session 16
-> Next agent: when you add your section, fold anything still a live constraint into
-> `docs/ar-survey.md` (stable) or "Standing decisions" (live) and delete the narrative.
+## What landed since the s16 handoff (`0d13f0c` → `28a9868`)
+> Reconstructed from `git log` by session 17 — the sessions that shipped these did not keep this
+> file current, so there are no live session notes, only commit messages + code. Next agent: fold
+> live constraints into `docs/ar-survey.md` (stable) or "Standing decisions", delete the narrative.
 
-1. **Committed the s15 `setModeInfo()` fix** (`bb8eb1d`) — label chip + help/info box now refresh
-   together (setMode, lang switch, both kind-pickers), so the info panel no longer goes stale behind
-   the label. Was the one uncommitted change from s15.
-2. **Fixed a real on-device bug: marker DIMS never committed / drew** (`0e98d02`). The desktop
-   `Sketch2D` re-renders on **every** `project.onChange` — including during the AR session — and its
-   `_edgeLineWorld` assumed every constraint endpoint is a rect edge. A marker pin's `{marker}`
-   endpoint has no `.rect`, so `ref.rect.id` threw; the exception propagated out of `_emit` and
-   aborted the AR `commitEntry` **before** `buildPlan()`, so the numpad stayed open and no floor dim
-   drew. Fix: `_edgeLineWorld` bails on non-edge endpoints; `_drawDimensions` skips marker pins;
-   `main.js renderConstraints` filters them from the 2D list. Verified on device (dev-server `?ar=1`,
-   `rlog` showed `dim set` for both a TOP and a LEFT pin).
-3. **Doc:** recorded the Sketch2D-onChange trap in `docs/ar-survey.md` (`0d13f0c`).
+Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exact order):
+
+1. **Plan sheets — the CLAUDE.md "Plan sheets" section is the outcome.** `f98d85c` printable
+   to-scale sheets (one per floor, dual SVG+canvas backend so desktop print/download and the in-AR
+   preview can't diverge; new `src/core/dimline.js` shared `edgeLineWorld`; new AR **PROJECT·SHEET**
+   mode). Then `274d502` refine sheets + marker editing, `28a9868` align floor print sheets,
+   `d56f688` allow dimension labels beyond endpoints.
+2. **Zone vocabulary expanded** (add/subtract is no longer the whole story): `b38ab05` door zones,
+   `cff5dbb` window, `44b5ada` stairs + cabinet. `991c3cf` show connected room areas.
+3. **AR / multi-floor:** `d048228` teleport + dimension-label placement; `339cfb7` move Quest floor
+   plans between storeys; `1334f20` read-only all-floors AR view.
+4. **Closed prior "Next step" items:** `b38ab05` **AR unit selector** (parity gap D — unit switch in
+   AR); `0226cbd` **confirm Quest save overwrites** (parity gap D); `15dc9c0` **copy floors between
+   saved projects** (item C — desktop↔APK model transfer, advanced).
+5. **`1b49b36` (s17) RJ45/ethernet marker glyph** redrawn as a real network port (framed socket +
+   8 contacts + centered latch recess), consistent across `src/io/planSheet.js` (sheet symbol) and
+   `src/ui/mr.js` (AR canvas glyph). Build-clean; both surfaces eyeballed via rsvg render (sheet
+   symbol + AR faceplate) — reads clearly as a jack. Pushed; on-device raster still unwalked.
+6. **(s17) dimension-leader fix — sheet + AR.** The s16 "labels beyond endpoints" feature
+   (`d56f688`) let `labelT` fall outside 0..1 but the dim LINE was still drawn only endpoint-to-
+   endpoint, so a value box dragged past an end printed/rendered floating with nothing connecting it.
+   Added `drawLabelLeader` (planSheet, all 4 draw spots) + `pushLeader` (mr.js, all 6) to continue
+   the line from the nearer endpoint out to the label. planSheet verified by rsvg render of a
+   labelT=1.5 dim (leader draws to the outside box); mr.js build-verified only.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -99,8 +114,14 @@ work, read `docs/ar-survey.md`.
 
 ## Commits (substantive only; doc-only omitted — `git log` has all)
 
-`main` = `origin/main` at `0d13f0c` — pushed, clean tree.
+HEAD = `1b49b36` — pushed, clean tree; `git log` has the full list.
 
+- `1b49b36` (s17) redraw ethernet marker as RJ45 jack (sheet + AR in sync).
+- `28a9868` align floor print sheets · `d56f688` dim labels beyond endpoints · `991c3cf` connected
+  room areas · `cff5dbb` window zone · `44b5ada` stairs+cabinet zones · `1334f20` all-floors AR view ·
+  `15dc9c0` copy floors between projects · `b38ab05` door zones + AR unit selector · `0226cbd`
+  confirm Quest save overwrites · `339cfb7` move Quest plans between storeys · `d048228` teleport +
+  dim-label placement · `274d502` refine sheets/markers · `f98d85c` printable plan sheets (s16→s17).
 - `0e98d02` (s16) fix: 2D editor no longer crashes the change bus on marker pins (the marker-DIMS
   commit/render bug).
 - `bb8eb1d` (s16) fix: unify mode label + help via `setModeInfo()` (the s15 info-panel fix).
@@ -137,11 +158,17 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
   ~~light / ethernet types~~ **DONE** (`markerFace` bulb / RJ45 glyphs, `marker.<type>` i18n, sheet
   legend; lights drop with z = storey height). Remaining: **wires** (`THREE.Line` polyline). Keep
   each an increment.
-- **C — Model transfer desktop→APK.** Desktop autosave (`house-cad:autosave:v1`) and AR slots
-  (`house-cad:slot:<i>`) use different localStorage keys; verify the TWA sees Quest-Browser storage
-  and decide if LOAD should surface the desktop autosave as a slot.
-- **D — Remaining parity gaps** (`ar-2d-parity` memory): unit switch in AR; slot naming/delete/
-  overwrite-confirm; LEVEL's inert SWAP/DEL keys could be hidden.
+- **C — Model transfer desktop→APK.** `15dc9c0` added copy-floors-between-saved-projects; still
+  open: desktop autosave (`house-cad:autosave:v1`) vs AR slots (`house-cad:slot:<i>`) use different
+  localStorage keys — verify the TWA sees Quest-Browser storage and decide if LOAD should surface the
+  desktop autosave as a slot.
+- **D — Remaining parity gaps** (`ar-2d-parity` memory): ~~unit switch in AR~~ DONE (`b38ab05`);
+  ~~overwrite-confirm~~ DONE (`0226cbd`); still open: slot naming/delete; LEVEL's inert SWAP/DEL keys
+  could be hidden.
+- **E — On-device QA of the s16→s17 features.** Plan sheets (AR PROJECT·SHEET raster + SVG download
+  while immersive), the new zone types (door/window/stairs/cabinet), teleport, move-plans-between-
+  storeys, all-floors AR view, AR unit selector — all **build-verified only**. Plus the uncommitted
+  ethernet glyph needs a visual check on both surfaces before committing.
 - ~~marker-DIMS commit/render bug~~ — FIXED (`0e98d02`, s16). ~~RECAL corner-select reticle~~ — DONE
   (`5560020`, s13). ~~subtract/dim ops/save-load/in-AR floors/first markers/plan-marker split/
   ROOM+WALL merge~~ — DONE. ~~Store distribution~~ — out of scope.

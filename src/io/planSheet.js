@@ -292,6 +292,21 @@ function drawDimLabel(be, text, cx, cy, color) {
   be.text(text, cx, cy + 0.15, { fill: color, size, align: 'center', baseline: 'middle' });
 }
 
+// When a value box is dragged beyond the measured endpoints (labelT outside 0..1),
+// extend the dimension line from the nearer endpoint out to the label so it never
+// floats disconnected. `along*` are the on-axis screen coords, `perp` the fixed
+// cross-axis coord, `style` matches the dimension line it continues. No-op when the
+// label sits between the endpoints — the main line already reaches it.
+function drawLabelLeader(be, along0, along1, alongLabel, perp, axis, style) {
+  const lo = Math.min(along0, along1), hi = Math.max(along0, along1);
+  let from;
+  if (alongLabel < lo) from = lo;
+  else if (alongLabel > hi) from = hi;
+  else return;
+  if (axis === 'x') be.line(from, perp, alongLabel, perp, style);
+  else be.line(perp, from, perp, alongLabel, style);
+}
+
 // A small white knockout chip for a value that sits over the footprint fill (marker
 // heights) — keeps it readable and stops it disappearing into the gray.
 function drawTextChip(be, text, cx, cy, size = 1.9, color = C_MARK) {
@@ -327,10 +342,12 @@ function drawDimensions(be, L, floor) {
         const sx = L.X(l.coord);
         be.line(sx, conn, sx, dimY + Math.sign(dimY - conn) * EXT_OVER, { stroke: color, width: 0.13, dash: [1, 1] });
       }
+      const lx = L.X(dimLabelCoord(c, la.coord, lb.coord));
       be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18 });
       drawArrow(be, sxa, dimY, Math.sign(sxb - sxa), 'x');
       drawArrow(be, sxb, dimY, Math.sign(sxa - sxb), 'x');
-      drawDimLabel(be, label, L.X(dimLabelCoord(c, la.coord, lb.coord)), dimY, color);
+      drawLabelLeader(be, sxa, sxb, lx, dimY, 'x', { stroke: color, width: 0.18 });
+      drawDimLabel(be, label, lx, dimY, color);
     } else {
       const sya = L.Y(la.coord), syb = L.Y(lb.coord);
       const rightModel = Math.max(la.p1.x, lb.p1.x);
@@ -343,10 +360,12 @@ function drawDimensions(be, L, floor) {
         const sy = L.Y(l.coord);
         be.line(conn, sy, dimX + Math.sign(dimX - conn) * EXT_OVER, sy, { stroke: color, width: 0.13, dash: [1, 1] });
       }
+      const ly = L.Y(dimLabelCoord(c, la.coord, lb.coord));
       be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18 });
       drawArrow(be, dimX, sya, Math.sign(syb - sya), 'y');
       drawArrow(be, dimX, syb, Math.sign(sya - syb), 'y');
-      drawDimLabel(be, label, dimX, L.Y(dimLabelCoord(c, la.coord, lb.coord)), color);
+      drawLabelLeader(be, sya, syb, ly, dimX, 'y', { stroke: color, width: 0.18 });
+      drawDimLabel(be, label, dimX, ly, color);
     }
   }
 }
@@ -375,16 +394,20 @@ function drawMarkerPins(be, L, floor) {
     const label = fmt(Math.abs(c.value));
     if (c.axis === 'x') {
       const y = L.Y(c.offset != null ? c.offset : m.y), xa = L.X(refCoord), xb = L.X(m.x);
+      const lx = L.X(dimLabelCoord(c, refCoord, m.x));
       be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
-      drawDimLabel(be, label, L.X(dimLabelCoord(c, refCoord, m.x)), y, C_PIN);
+      drawLabelLeader(be, xa, xb, lx, y, 'x', { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      drawDimLabel(be, label, lx, y, C_PIN);
     } else {
       const x = L.X(c.offset != null ? c.offset : m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
+      const ly = L.Y(dimLabelCoord(c, refCoord, m.y));
       be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
-      drawDimLabel(be, label, x, L.Y(dimLabelCoord(c, refCoord, m.y)), C_PIN);
+      drawLabelLeader(be, ya, yb, ly, x, 'y', { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      drawDimLabel(be, label, x, ly, C_PIN);
     }
   }
 }
