@@ -395,6 +395,7 @@ export function setupMR(view, project, getFootprint) {
   // from the SAME renderer that produces the printable/downloadable SVG (src/io/planSheet.js),
   // so what you see here is what prints. redraw() re-rasters a floor and fits the plane to
   // the page aspect (portrait or landscape). Read-only — a trigger downloads the SVG.
+  const SHEET_RENDER_ORDER = 90; // above world annotations/panels; below controller HUD (100)
   function makeSheetPanel() {
     const canvas = document.createElement('canvas');
     canvas.width = 1448; canvas.height = 2048; // A4 portrait; resized per render by floorToCanvas
@@ -407,9 +408,18 @@ export function setupMR(view, project, getFootprint) {
     let tex = makeTexture();
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+      // `transparent:true` deliberately places the sheet in Three's transparent
+      // pass. Its canvas is still solid white, while renderOrder makes it paint
+      // after room tints, dimension labels, markers, and world-space panels.
+      new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+      }),
     );
-    mesh.renderOrder = 20;
+    mesh.renderOrder = SHEET_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;

@@ -91,6 +91,9 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
   Only physical-controller input sources (`gamepad` and no `hand`) qualify; hand pinch/select is
   ignored. The sheet is positioned 0.42 m on the controller's outside (-X), clear of the aim ray,
   yawed 45° inward, and pitched 45° upward toward the headset for a natural leftward glance.
+  Its opaque-white canvas is a transparent-pass material at render order 90, above every world
+  overlay/panel (≤33) and below the fixed right-controller HUD (100), so plan tint/dim labels cannot
+  paint across the paper.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
   cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
   room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS

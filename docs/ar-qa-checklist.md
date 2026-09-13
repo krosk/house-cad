@@ -171,6 +171,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
 - [ ] The sheet faces 45° inward and tilts 45° upward toward the user; it reads comfortably with a leftward head turn
+- [ ] Room tint, dimensions, markers, and edit/numpad panels never paint over the solid-white sheet
 - [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present

@@ -149,6 +149,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   events are ignored. The sheet is offset along the left controller's outside (-X) so it does not
   cover that controller's pointing ray or teleport reticle, then yawed 45° inward toward the
   headset and pitched 45° upward toward the user for comfortable reading with a leftward head turn.
+  Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
+  markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
 - RIGHT **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
   MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
