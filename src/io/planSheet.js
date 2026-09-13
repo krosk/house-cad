@@ -908,7 +908,7 @@ function renderFloor(be, floor, opts = {}) {
   drawElectricalLinks(be, L, floor); // dotted switch-to-light ceiling-route projection
   if (layers.planDims) drawDimensions(be, L, floor);
   if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
-  drawRoomAreas(be, L, floor);
+  if (layers.area) drawRoomAreas(be, L, floor);
   if (layers.markerIcons) drawMarkers(be, L, floor); // glyphs/fixture-stack callouts stay foremost
   drawStrip(be, L, floor, opts);
   return L;

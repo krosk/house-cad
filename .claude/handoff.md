@@ -121,7 +121,7 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     borders remain amber for domain identity; only the value text changes to high-contrast black.
 22. **(s18, pending commit) unified AR output panel.** `PROJECT · EXPORT` replaces separate SHEET
     and DXF modes. It always targets the active LEVEL floor; thumbstick up/down switches SVG/DXF.
-    Ray-triggered device-local toggles control plan dims, marker dims, marker icons, and furniture,
+    Ray-triggered device-local toggles control plan dims, marker dims, marker icons, furniture, and area,
     and only a separate EXPORT button downloads. The optional LEFT sheet previews these choices
     immediately. Preferences use `house-cad:output:v1` and never enter project saves. Furniture
     constraints remain excluded even when furniture geometry is enabled in SVG/DXF.

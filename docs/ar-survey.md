@@ -124,7 +124,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   so preview == print. Model rebuilds dirty this live sheet; the frame loop redraws it at up to
   8 fps during continuous dimension/edge drags. The preview/export floor is always the active
   real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
-  `SVG` / `DXF`. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, and FURNITURE;
+  `SVG` / `DXF`. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
   a separate **EXPORT** button downloads the selected format to the headset. These choices persist
   locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
   The panel is absent
@@ -303,10 +303,11 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - **Whole-number dimension labels are compacted on the sheet** (`fmtSheetDim`): an all-zero
   fractional part is omitted (`3.00` → `3`, `300.0` → `300`), while non-integers retain the
   configured display precision. This applies to structural and marker-pin dimensions only.
-- **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, and FURNITURE
-  default to on/on/on/off. The first three independently control drawing, legend, and scale-fitting
+- **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA
+  default to on/on/on/off/on. The first three independently control drawing, legend, and scale-fitting
   participation; FURNITURE controls its footprint/symbol/legend in both SVG and DXF. Furniture
   constraints remain authoring-only and are excluded from both formats even when furniture is shown.
+  AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF.
   The model geometry and constraints remain stored and solved.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
   perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
@@ -402,6 +403,6 @@ teleport reticle; no last-active routing remains.
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
-| `src/io/outputOptions.js` | Device-local SVG/DXF format and plan-dims/marker-dims/marker-icons/furniture output profile |
+| `src/io/outputOptions.js` | Device-local SVG/DXF format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

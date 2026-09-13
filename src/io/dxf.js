@@ -369,14 +369,16 @@ export function floorToDxf(floor, opts = {}) {
   if (layers.markerIcons) for (const marker of floor.markers || []) writeMarker(w, marker);
   writeElectricalLinks(w, floor);
 
-  for (const component of connectedRoomComponents(floor.rectangles)) {
-    const anchor = component.rectangles.reduce((largest, rect) => {
-      const b = rect.bounds, lb = largest.bounds;
-      return (b.x1 - b.x0) * (b.y1 - b.y0) > (lb.x1 - lb.x0) * (lb.y1 - lb.y0) ? rect : largest;
-    });
-    const b = anchor.bounds;
-    w.text('ROOM_INFO', `AREA=${component.area.toFixed(2)}m2`,
-      (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, 0.16);
+  if (layers.area) {
+    for (const component of connectedRoomComponents(floor.rectangles)) {
+      const anchor = component.rectangles.reduce((largest, rect) => {
+        const b = rect.bounds, lb = largest.bounds;
+        return (b.x1 - b.x0) * (b.y1 - b.y0) > (lb.x1 - lb.x0) * (lb.y1 - lb.y0) ? rect : largest;
+      });
+      const b = anchor.bounds;
+      w.text('ROOM_INFO', `AREA=${component.area.toFixed(2)}m2`,
+        (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, 0.16);
+    }
   }
 
   w.pair(0, 'ENDSEC'); w.pair(0, 'EOF');

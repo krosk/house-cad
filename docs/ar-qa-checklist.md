@@ -204,9 +204,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
 - [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
-- [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, and MARKER ICONS checked; FURNITURE unchecked
+- [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, MARKER ICONS, and AREA checked; FURNITURE unchecked
 - [ ] Triggering each row toggles it and immediately refreshes the companion sheet
 - [ ] FURNITURE off excludes it from footprint, symbols, legend, and scale; on restores those in SVG and DXF
+- [ ] AREA off hides room-area chips in the sheet and `ROOM_INFO` entities in DXF; on restores both
 - [ ] A structural dimension with either endpoint on FURNITURE remains absent from SVG/DXF and does not reduce sheet scale
 - [ ] A marker-pin dimension anchored to a FURNITURE edge is likewise always absent from SVG/DXF
 - [ ] Both hidden furniture constraints remain stored and continue driving geometry in AR

@@ -83,7 +83,7 @@ zone kinds, enabled structural and marker-pin dimensions/markers, room areas, tr
 `ELECTRICAL_ROUTE` switch legs, and `ORIGIN`.
 The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
 **PROJECT · EXPORT** always targets the active LEVEL floor. Right thumbstick up/down switches SVG/DXF;
-a ray-picked panel toggles plan dims, marker dims, marker icons, and furniture, while a separate
+a ray-picked panel toggles plan dims, marker dims, marker icons, furniture, and room area, while a separate
 EXPORT button downloads. The profile persists locally (`house-cad:output:v1`), outside project saves,
 and the optional left-controller preview updates immediately.
 

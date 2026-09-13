@@ -60,6 +60,7 @@ const STRINGS = {
   'export.markerDims': { en: 'MARKER DIMS', fr: 'COTES MARQUEURS', zh: '标记尺寸' },
   'export.markerIcons': { en: 'MARKER ICONS', fr: 'ICÔNES MARQUEURS', zh: '标记图标' },
   'export.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
+  'export.area': { en: 'AREA', fr: 'SURFACE', zh: '面积' },
   'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------

@@ -3,12 +3,13 @@
 // live in localStorage and old project saves remain unchanged.
 
 export const OUTPUT_FORMATS = ['svg', 'dxf'];
-export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'furniture'];
+export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'furniture', 'area'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,
   markerDims: true,
   markerIcons: true,
   furniture: false,
+  area: true,
 });
 
 const STORE_KEY = 'house-cad:output:v1';
@@ -22,6 +23,7 @@ export function resolveOutputLayers(options = {}) {
     markerDims: bool(source.markerDims, OUTPUT_LAYER_DEFAULTS.markerDims),
     markerIcons: bool(source.markerIcons, OUTPUT_LAYER_DEFAULTS.markerIcons),
     furniture: bool(source.furniture, OUTPUT_LAYER_DEFAULTS.furniture),
+    area: bool(source.area, OUTPUT_LAYER_DEFAULTS.area),
   };
 }
 

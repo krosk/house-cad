@@ -209,7 +209,7 @@ export function setupMR(view, project, getFootprint) {
   // per-key meshes). Layout: a display line (field + typed value + unit) over a
   // 3x4 digit grid and a full-width ENTER row.
   function makeNumpad() {
-    const W = 512, H = 640;
+    const W = 512, H = 720;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -570,7 +570,7 @@ export function setupMR(view, project, getFootprint) {
     const ctx = canvas.getContext('2d');
     const tex = new THREE.CanvasTexture(canvas);
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.32, 0.40),
+      new THREE.PlaneGeometry(0.32, 0.45),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
     mesh.renderOrder = 20;
@@ -578,8 +578,8 @@ export function setupMR(view, project, getFootprint) {
     group.add(mesh);
     group.visible = false;
 
-    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'furniture'];
-    const TOGGLE_Y = 196, ROW_H = 70, BUTTON_Y = 506, BUTTON_H = 104;
+    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'furniture', 'area'];
+    const TOGGLE_Y = 196, ROW_H = 70, BUTTON_Y = 566, BUTTON_H = 124;
     function actionAt(u, v) {
       const cy = (1 - v) * H;
       if (cy >= TOGGLE_Y && cy < TOGGLE_Y + TOGGLES.length * ROW_H) {
