@@ -44,6 +44,8 @@ const DIM_TIER = 6;      // spacing between stacked dimensions on one axis
 const EXT_OVER = 1.5;    // extension line overrun past the dimension line
 const ARROW = 2.2;       // arrowhead length
 const ARROW_H = 1;       // arrowhead half-width
+const DIM_DASH = [1.4, 1];     // measured span
+const LEADER_DOT = [0.1, 0.8]; // endpoint -> outside value panel
 
 // print palette
 const C_LINE = '#111';       // footprint outline
@@ -65,12 +67,13 @@ function svgBackend() {
   const parts = [];
   const esc = (s) => String(s).replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' }[c]));
   const dash = (d) => (d && d.length ? ` stroke-dasharray="${d.join(' ')}"` : '');
+  const cap = (c) => (c ? ` stroke-linecap="${c}"` : '');
   const num = (n) => (Math.round(n * 1000) / 1000);
   return {
     parts,
     line(x0, y0, x1, y1, s = {}) {
       parts.push(`<line x1="${num(x0)}" y1="${num(y0)}" x2="${num(x1)}" y2="${num(y1)}" `
-        + `stroke="${s.stroke || '#000'}" stroke-width="${s.width ?? 0.2}"${dash(s.dash)}/>`);
+        + `stroke="${s.stroke || '#000'}" stroke-width="${s.width ?? 0.2}"${dash(s.dash)}${cap(s.cap)}/>`);
     },
     // rings = array of point-lists ([[x,y],...]); one fillable path, nonzero winding
     // (footprint outer rings and holes wind oppositely, so holes cut out).
@@ -108,9 +111,11 @@ function canvasBackend(ctx, k) {
     line(x0, y0, x1, y1, s = {}) {
       ctx.strokeStyle = s.stroke || '#000';
       ctx.lineWidth = (s.width ?? 0.2) * k;
+      ctx.lineCap = s.cap || 'butt';
       ctx.setLineDash(dashPx(s.dash));
       ctx.beginPath(); ctx.moveTo(x0 * k, y0 * k); ctx.lineTo(x1 * k, y1 * k); ctx.stroke();
       ctx.setLineDash([]);
+      ctx.lineCap = 'butt';
     },
     region(rings, s = {}) {
       // One path, one subpath per ring; nonzero winding cuts the (oppositely-wound) holes.
@@ -295,16 +300,18 @@ function drawDimLabel(be, text, cx, cy, color) {
 // When a value box is dragged beyond the measured endpoints (labelT outside 0..1),
 // extend the dimension line from the nearer endpoint out to the label so it never
 // floats disconnected. `along*` are the on-axis screen coords, `perp` the fixed
-// cross-axis coord, `style` matches the dimension line it continues. No-op when the
-// label sits between the endpoints — the main line already reaches it.
+// cross-axis coord. The leader is dotted so it cannot be mistaken for the dashed
+// span where the distance applies. No-op when the label sits between the endpoints
+// — the measured span already reaches it.
 function drawLabelLeader(be, along0, along1, alongLabel, perp, axis, style) {
   const lo = Math.min(along0, along1), hi = Math.max(along0, along1);
   let from;
   if (alongLabel < lo) from = lo;
   else if (alongLabel > hi) from = hi;
   else return;
-  if (axis === 'x') be.line(from, perp, alongLabel, perp, style);
-  else be.line(perp, from, perp, alongLabel, style);
+  const dotted = { ...style, dash: LEADER_DOT, cap: 'round' };
+  if (axis === 'x') be.line(from, perp, alongLabel, perp, dotted);
+  else be.line(perp, from, perp, alongLabel, dotted);
 }
 
 // A small white knockout chip for a value that sits over the footprint fill (marker
@@ -343,7 +350,7 @@ function drawDimensions(be, L, floor) {
         be.line(sx, conn, sx, dimY + Math.sign(dimY - conn) * EXT_OVER, { stroke: color, width: 0.13, dash: [1, 1] });
       }
       const lx = L.X(dimLabelCoord(c, la.coord, lb.coord));
-      be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18 });
+      be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18, dash: DIM_DASH });
       drawArrow(be, sxa, dimY, Math.sign(sxb - sxa), 'x');
       drawArrow(be, sxb, dimY, Math.sign(sxa - sxb), 'x');
       drawLabelLeader(be, sxa, sxb, lx, dimY, 'x', { stroke: color, width: 0.18 });
@@ -361,7 +368,7 @@ function drawDimensions(be, L, floor) {
         be.line(conn, sy, dimX + Math.sign(dimX - conn) * EXT_OVER, sy, { stroke: color, width: 0.13, dash: [1, 1] });
       }
       const ly = L.Y(dimLabelCoord(c, la.coord, lb.coord));
-      be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18 });
+      be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18, dash: DIM_DASH });
       drawArrow(be, dimX, sya, Math.sign(syb - sya), 'y');
       drawArrow(be, dimX, syb, Math.sign(sya - syb), 'y');
       drawLabelLeader(be, sya, syb, ly, dimX, 'y', { stroke: color, width: 0.18 });
@@ -395,18 +402,18 @@ function drawMarkerPins(be, L, floor) {
     if (c.axis === 'x') {
       const y = L.Y(c.offset != null ? c.offset : m.y), xa = L.X(refCoord), xb = L.X(m.x);
       const lx = L.X(dimLabelCoord(c, refCoord, m.x));
-      be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
-      drawLabelLeader(be, xa, xb, lx, y, 'x', { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      drawLabelLeader(be, xa, xb, lx, y, 'x', { stroke: C_PIN, width: 0.15 });
       drawDimLabel(be, label, lx, y, C_PIN);
     } else {
       const x = L.X(c.offset != null ? c.offset : m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
       const ly = L.Y(dimLabelCoord(c, refCoord, m.y));
-      be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
-      drawLabelLeader(be, ya, yb, ly, x, 'y', { stroke: C_PIN, width: 0.15, dash: [1.4, 1] });
+      drawLabelLeader(be, ya, yb, ly, x, 'y', { stroke: C_PIN, width: 0.15 });
       drawDimLabel(be, label, x, ly, C_PIN);
     }
   }

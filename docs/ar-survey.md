@@ -104,12 +104,16 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   never overwrites or implicitly merges data; floor names, heights, elevations, and the ground datum
   stay attached to their existing storeys.
 - **SHEET** (`id: sheet`) — preview + download the to-scale plan sheet, ONE floor at a time.
-  A floating panel (`makeSheetPanel`) shows a floor rasterized by `floorToCanvas`
+  When the optional LEFT controller is detected, an enlarged panel (`makeSheetPanel`) follows it
+  in every mode and shows the active floor rasterized by `floorToCanvas`
   (`src/io/planSheet.js`) — the SAME renderer that produces the printable/downloadable SVG,
-  so preview == print. **Thumbstick up/down** cycles the previewed floor (`cycleSheetFloor`,
-  wraps; the label TOOL part shows the floor name). **Trigger** downloads that floor's SVG
+  so preview == print. Model rebuilds dirty this live sheet; the frame loop redraws it at up to
+  8 fps during continuous dimension/edge drags. In SHEET mode, RIGHT **thumbstick up/down** cycles
+  the previewed floor (`cycleSheetFloor`, wraps; the label TOOL part shows the floor name) and
+  RIGHT **trigger** downloads that floor's SVG
   (`floorToSvg` → blob → the headset's Download folder; the label flashes the filename).
-  Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
+  Outside SHEET mode the companion automatically returns to the active floor. The panel is absent
+  when no LEFT controller is connected. Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
   immersive session has no print dialog; the SVG blob is the off-headset deliverable
   (retrieve by cable). Desktop is where you actually print (Print menu → Save-as-PDF).
 - **UNIT** (`id: unit`) — display/input unit switch. Thumbstick up/down cycles `m` / `cm` / `mm`;
@@ -137,8 +141,12 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
 
 ## Inputs
 
-- **trigger** = mode action (place / pick / press a numpad or slot key).
-- **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
+- Controller roles are fixed by WebXR handedness; recent activity never transfers control.
+  **RIGHT** is the editing controller and owns all mode navigation, panels, picks, and edits.
+  The optional **LEFT** is an independent companion: its trigger always teleports to its dedicated
+  cyan floor reticle, and its other controls never invoke the active editing mode.
+- RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
+- RIGHT **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
   MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
   dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
   nothing). UNLESS the
@@ -151,7 +159,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
   `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
-- **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
+- RIGHT **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER** = retype the selected marker, or the drop type if none selected
@@ -159,11 +167,12 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.
-- **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
+- RIGHT **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
   (prev). B/Y's only action is flipping the dimension side in either DIMS mode with a completed pair
   (`flipConstraintSide`, NOT `swapConstraint`); it is otherwise inert. All contextual cycling lives
   on thumbstick-y (above).
-- Only the last-active controller is read (`activeSource`/`pickSource`); the idle hand hides.
+- Both tracked controllers remain visible. The RIGHT HUD and LEFT sheet/teleport target are displayed
+  by role; when LEFT is absent, its sheet and reticle are absent and RIGHT continues alone.
 
 ## Dimensioning (PLAN DIMS / MARKER DIMS)
 
@@ -183,7 +192,9 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
 - Every marker pin renders an orange dashed floor dimension from the anchored wall edge to the
   marker's projected coordinate, plus a value label. That label can be selected or grip-dragged
   only in MARKER DIMS; PLAN DIMS ignores it. Parallel dragging may carry either a structural or
-  marker label beyond both measured endpoints; print preserves that outside placement.
+  marker label beyond both measured endpoints; print preserves that outside placement. The span
+  where the distance applies is dashed; if the value panel sits beyond it, a dotted leader joins
+  the nearer endpoint to the panel (AR and print).
 
 - Distance = ordered + signed (`value = coord(b) − coord(a)`). **FLIP = `flipConstraintSide`**
   (negate value, keep order). `swapConstraint` is geometrically a NO-OP (swaps a,b AND negates;
@@ -277,9 +288,10 @@ through planGroup. HUD `ptr`/`ret` read in registered-origin (plan) coords.
 ## HUD (controller-mounted panels)
 
 All controller UI uses `depthTest:false` + `renderOrder = HUD_ORDER (100)` so it paints over
-world overlays. Per controller, stacked above the tip: mode **label**, hover **readout** pill
+world overlays. On the RIGHT editor, stacked above the tip: mode **label**, hover **readout** pill
 (dimension value on ray-hover), **debug** HUD, **help** box (per-mode `help` string, set in
-`setMode`). The idle hand's whole controller is hidden.
+`setMode`). The optional LEFT instead carries the enlarged live plan sheet and its own cyan
+teleport reticle; no last-active routing remains.
 
 - **Debug HUD** lines: `build:` stamp, `ptr:` (tip in plan coords + height above floor), `ret:`
   (reticle floor point), `edge:` (length of the highlighted edge, EDGE mode only), `batt:`

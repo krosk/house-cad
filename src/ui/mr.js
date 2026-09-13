@@ -29,6 +29,7 @@ import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColo
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
+const C_TELEPORT = 0x38bdf8;
 
 // Build stamp (git hash + UTC time), injected by Vite `define`. Shown on the HUD so
 // you can confirm on-device that a fresh deploy loaded, not a stale SW cache.
@@ -390,7 +391,7 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, slotAt, actionAt, draw };
   }
 
-  // SHEET preview: a floating panel showing one floor's to-scale plan sheet, rasterized
+  // SHEET preview: a controller-mounted panel showing one floor's to-scale plan sheet, rasterized
   // from the SAME renderer that produces the printable/downloadable SVG (src/io/planSheet.js),
   // so what you see here is what prints. redraw() re-rasters a floor and fits the plane to
   // the page aspect (portrait or landscape). Read-only — a trigger downloads the SVG.
@@ -408,7 +409,7 @@ export function setupMR(view, project, getFootprint) {
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
-    const SIZE = 0.52; // meters on the long edge
+    const SIZE = 0.78; // meters on the long edge; large enough to inspect while editing
 
     function redraw(floor) {
       floorToCanvas(floor, canvas, { page: 'a4', targetPx: 2048, markerLabel: (ty) => t(`marker.${ty}`) });
@@ -538,21 +539,24 @@ export function setupMR(view, project, getFootprint) {
   // hand, the info HUD on top.
   const PANEL_Y = { label: 0.05, readout: 0.11, help: 0.26, debug: 0.46 };
 
-  // Controllers, each with a small sphere "tip" you touch to the real floor, plus
-  // a mode label. Placement uses the controller's tracked position (cm-accurate)
-  // rather than a depth raycast, so the floor is defined by physically touching it.
+  // Controller objects are resolved by input-source handedness at runtime: RIGHT is
+  // the editor, while an optional LEFT is an independent sheet + teleport companion.
+  // Each still owns the same child UI objects here; the frame loop exposes only the
+  // children appropriate to that fixed role.
   const tipGeom = new THREE.SphereGeometry(0.012, 16, 12);
-  const tipMat = new THREE.MeshBasicMaterial({ color: ACCENT });
   const controllers = [];
+  const controllerTips = [];
   const labels = [];
   const debugs = [];
   const readouts = []; // per-controller dimension-value pill (shown on ray hover)
   const helps = [];    // per-controller mode explanation box
   for (const i of [0, 1]) {
     const c = renderer.xr.getController(i); // target-ray space: -Z is the pointing dir
-    const tip = new THREE.Mesh(tipGeom, tipMat);
+    c.userData.uiIndex = i;
+    const tip = new THREE.Mesh(tipGeom, new THREE.MeshBasicMaterial({ color: ACCENT }));
     tip.position.copy(TIP_OFFSET);
     c.add(tip);
+    controllerTips.push(tip);
     const label = makeLabel();
     label.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.label, TIP_OFFSET.z);
     label.sprite.renderOrder = HUD_ORDER; // controller UI paints over every world overlay (zebra etc.)
@@ -583,8 +587,8 @@ export function setupMR(view, project, getFootprint) {
     c.addEventListener('squeezestart', onSqueezeStart); // grip press: begin a grip-drag if over a target
     c.addEventListener('squeeze', onReset);   // grip: undo placement (unless a grip-drag ran)
     c.addEventListener('squeezeend', onSqueezeEnd);     // grip release: end the grip-drag
-    // Remember which XRInputSource drives this controller object so we can show
-    // its tip/label only while it's the active hand.
+    // Remember which XRInputSource drives this indexed controller object; handedness
+    // (not recent activity) assigns its fixed role in the frame loop.
     c.addEventListener('connected', (e) => { c.userData.inputSource = e.data; });
     c.addEventListener('disconnected', () => { c.userData.inputSource = null; });
     scene.add(c);
@@ -592,21 +596,24 @@ export function setupMR(view, project, getFootprint) {
   }
   const lastTouch = new THREE.Vector3(NaN, NaN, NaN);
 
-  // A ring that lies on the floor under the active controller tip, previewing
-  // where a touch will land. Recolors with the current mode.
+  // Floor-target rings. The main one follows the RIGHT editor and recolors with its
+  // current mode. The cyan one belongs permanently to the optional LEFT companion
+  // and is always a teleport target.
   const RETICLE_OUTER = 0.08; // m; also the EDGE-pick radius (edge must fall in the ring)
-  const reticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.06, RETICLE_OUTER, 32).rotateX(-Math.PI / 2),
+  const reticleGeom = new THREE.RingGeometry(0.06, RETICLE_OUTER, 32).rotateX(-Math.PI / 2);
+  const reticleMaterial = (color) => new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.6,
     // The active storey may be above or below the user's physical storey. Keep the
     // ring visible from either side of that plane; normal depth ordering lets it
     // remain subtly visible through the translucent floor overlay when seen below.
-    new THREE.MeshBasicMaterial({
-      color: ACCENT, transparent: true, opacity: 0.6,
-      side: THREE.DoubleSide, depthWrite: false,
-    }),
-  );
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const reticle = new THREE.Mesh(reticleGeom, reticleMaterial(ACCENT));
   reticle.visible = false;
   scene.add(reticle);
+  const leftTeleportReticle = new THREE.Mesh(reticleGeom, reticleMaterial(C_TELEPORT));
+  leftTeleportReticle.visible = false;
+  scene.add(leftTeleportReticle);
 
   // Highlights for the survey edge you're pointing at (magenta) or have locked
   // (yellow) — a strip drawn along that edge, just above the floor. Two of them so
@@ -885,6 +892,8 @@ export function setupMR(view, project, getFootprint) {
   const DIM_T = 0.0025;     // m, strip half-width -> 0.5 cm thin, so dims don't cover room edges
   const DIM_DASH = 0.04;    // m, dash length for the dashed dim/extension lines
   const DIM_GAP = 0.03;     // m, gap between dashes
+  const DIM_DOT = 0.006;    // m, near-square dot along an outside-panel leader
+  const DIM_DOT_GAP = 0.024; // m, gap between leader dots
 
   // Dimension value labels currently in the plan, for ray-hover pick (their value
   // is echoed big on the controller). Rebuilt with the plan each edit.
@@ -947,16 +956,17 @@ export function setupMR(view, project, getFootprint) {
       if (selectable) dimSprites.push(sprite);
     };
     // When a value box is dragged beyond the measured span (labelT outside 0..1),
-    // continue the dim line from the nearer endpoint out to the label so it never
-    // floats disconnected. Mirrors the plan sheet's drawLabelLeader.
+    // join the nearer endpoint to the label with a DOTTED leader so the connection
+    // cannot be mistaken for the dashed span where the distance actually applies.
+    // Mirrors the plan sheet's drawLabelLeader.
     const pushLeader = (a0, a1, aLabel, perp, axis, flags) => {
       const lo = Math.min(a0, a1), hi = Math.max(a0, a1);
       let from;
       if (aLabel < lo) from = lo;
       else if (aLabel > hi) from = hi;
       else return;
-      if (axis === 'x') segs.push({ ax: from, ay: perp, bx: aLabel, by: perp, ...flags });
-      else segs.push({ ax: perp, ay: from, bx: perp, by: aLabel, ...flags });
+      if (axis === 'x') segs.push({ ax: from, ay: perp, bx: aLabel, by: perp, ...flags, dotted: true });
+      else segs.push({ ax: perp, ay: from, bx: perp, by: aLabel, ...flags, dotted: true });
     };
     let xTier = 0, yTier = 0;
     for (const c of (floor.constraints || [])) {
@@ -1055,12 +1065,12 @@ export function setupMR(view, project, getFootprint) {
       const tri = (p) => arr.push(p[0], 0, -p[1]);
       // Emit a segment as a row of dashes (thin quads) so dim lines read as dashed
       // and don't visually cover the solid room edges underneath.
-      const pushDashed = (ax, ay, bx, by) => {
+      const pushPattern = (ax, ay, bx, by, dash, gap) => {
         const len = Math.hypot(bx - ax, by - ay);
         if (len < 1e-6) return;
-        const ux = (bx - ax) / len, uy = (by - ay) / len, period = DIM_DASH + DIM_GAP;
+        const ux = (bx - ax) / len, uy = (by - ay) / len, period = dash + gap;
         for (let t = 0; t < len; t += period) {
-          const t2 = Math.min(t + DIM_DASH, len);
+          const t2 = Math.min(t + dash, len);
           const cc = stripCorners(ax + ux * t, ay + uy * t, ax + ux * t2, ay + uy * t2, DIM_T);
           tri(cc[0]); tri(cc[1]); tri(cc[2]);
           tri(cc[0]); tri(cc[2]); tri(cc[3]);
@@ -1069,7 +1079,9 @@ export function setupMR(view, project, getFootprint) {
       for (const s of segs) {
         const segmentStyle = s.conflict ? 'conflict' : s.marker ? 'marker' : 'plan';
         if (segmentStyle !== style) continue;
-        pushDashed(s.ax, s.ay, s.bx, s.by);
+        pushPattern(s.ax, s.ay, s.bx, s.by,
+          s.dotted ? DIM_DOT : DIM_DASH,
+          s.dotted ? DIM_DOT_GAP : DIM_GAP);
       }
       if (!arr.length) continue;
       const geo = new THREE.BufferGeometry();
@@ -1420,7 +1432,10 @@ export function setupMR(view, project, getFootprint) {
 
   // All existing model-changing call sites rebuild through this dispatcher, so a
   // LOAD/unit change made while overviewing cannot silently fall back to one floor.
+  // It also dirties the optional left-hand sheet; the frame loop throttles the
+  // expensive 2048px raster refresh during continuous grip drags.
   function buildPlan(withDims = true) {
+    sheetDirty = true;
     return allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
   }
 
@@ -2288,27 +2303,54 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // ---- SHEET: preview + download a to-scale plan sheet (one floor at a time) ----
-  // Read-only. Thumbstick-y cycles which floor is previewed; trigger downloads that
-  // floor's SVG (blob -> the headset's Download folder). No print on-device (no print
-  // service in an immersive session); the SVG is the off-headset deliverable.
+  // The preview is persistently mounted on the optional LEFT controller. In SHEET
+  // mode, RIGHT thumbstick-y cycles the preview and RIGHT trigger downloads its SVG;
+  // in every other mode it follows the active floor and refreshes as edits land.
   let sheetFloorIdx = 0;      // index into project.floors for the preview
   let sheetFlashTimer = null;
+  let sheetDirty = true;
+  let lastSheetRedrawAt = -Infinity;
+  const SHEET_REFRESH_MS = 125; // at most 8 fps while a dim/edge is being dragged
+  const LEFT_SHEET_POS = new THREE.Vector3(0.30, 0.22, -0.32); // inward, up, and ahead of the left hand
 
   function currentSheetFloor() {
     sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
     return project.floors[sheetFloorIdx];
   }
-  const redrawSheet = () => sheetPanel.redraw(currentSheetFloor());
+  const redrawSheet = () => {
+    sheetPanel.redraw(currentSheetFloor());
+    sheetDirty = false;
+    lastSheetRedrawAt = performance.now();
+  };
 
-  function showSheet() {
-    sheetFloorIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
-    redrawSheet();
-    placePanel(sheetPanel.group, 0.72, 0.06); // a bit further out + higher; it's a big panel to read
+  // Reparenting to the detected left controller makes the sheet follow its tracked
+  // pose exactly like the controller HUD. The panel + dedicated teleport reticle are
+  // both absent when LEFT is not connected.
+  function updateLeftSheet(time, leftController) {
+    if (!leftController) {
+      sheetPanel.group.visible = false;
+      return;
+    }
+    if (sheetPanel.group.parent !== leftController) {
+      leftController.add(sheetPanel.group);
+      sheetPanel.group.position.copy(LEFT_SHEET_POS);
+      sheetPanel.group.quaternion.identity();
+    }
+    if (modes[currentMode].id !== 'sheet') {
+      const activeIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
+      if (sheetFloorIdx !== activeIdx) { sheetFloorIdx = activeIdx; sheetDirty = true; }
+    }
+    if (sheetDirty && time - lastSheetRedrawAt >= SHEET_REFRESH_MS) redrawSheet();
     sheetPanel.group.visible = true;
   }
 
+  function showSheet() {
+    sheetFloorIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
+    sheetDirty = true;
+    redrawSheet();
+  }
+
   function hideSheet() {
-    sheetPanel.group.visible = false;
     clearTimeout(sheetFlashTimer);
   }
 
@@ -2642,7 +2684,8 @@ export function setupMR(view, project, getFootprint) {
     navOffset.x += head.x - hit.x;
     navOffset.z += head.z - hit.z;
     applyPlanMatrix();
-    reticle.visible = false;
+    if (inputSource?.handedness === 'left') leftTeleportReticle.visible = false;
+    else reticle.visible = false;
     rlog('teleport', {
       px: +px.toFixed(3), py: +py.toFixed(3),
       dx: +(head.x - hit.x).toFixed(3), dz: +(head.z - hit.z).toFixed(3),
@@ -2830,7 +2873,7 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onLevelTouch,
     },
     {
-      id: 'teleport', color: 0x38bdf8,
+      id: 'teleport', color: C_TELEPORT,
       // Locomotion only: aim at the active floor and bring that virtual plan point
       // beneath the headset. Does not mutate geometry, constraints, or registration.
       onTouch: (_pos, inputSource) => teleportToReticle(inputSource),
@@ -3106,7 +3149,7 @@ export function setupMR(view, project, getFootprint) {
   // Recolor the tip + reticle and set the floating label — used both by setMode
   // and by REGISTER to flip ORIGIN<->ALIGN mid-gesture.
   function applyModeVisual(label, color) {
-    tipMat.color.setHex(color);
+    for (const tip of controllerTips) tip.material.color.setHex(color);
     reticle.material.color.setHex(color);
     const id = modes[currentMode]?.id;
     const title = id ? modeBreadcrumb(id, label) : label;
@@ -3336,9 +3379,10 @@ export function setupMR(view, project, getFootprint) {
   renderer.xr.addEventListener('sessionend', () => {
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
-    activeSource = null; // next session re-latches on first use
     anchor = null;
     reticle.visible = false;
+    leftTeleportReticle.visible = false;
+    sheetPanel.group.visible = false;
     edgeHi.visible = false;
     edgeHi2.visible = false;
     cornerHi.visible = false;
@@ -3375,7 +3419,11 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function onSelect(event) {
-    activeSource = event.data; // trigger claims control for this controller
+    // LEFT trigger is permanently teleport, independent of RIGHT's current mode.
+    if (event.data?.handedness === 'left') {
+      if (event.data.gamepad) teleportToReticle(event.data);
+      return;
+    }
     const pos = tipPosition(event.data);
     if (!pos) return;
     lastTouch.copy(pos); // for the debug HUD
@@ -3398,7 +3446,7 @@ export function setupMR(view, project, getFootprint) {
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
   // of an undo — a domain-matched dim value panel, an edge, or an outlet.
   function onSqueezeStart(event) {
-    if (event?.data) activeSource = event.data;
+    if (event?.data?.handedness === 'left') return; // companion grip has no editing role
     const id = modes[currentMode].id;
     if (isDimMode(id) && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
@@ -3416,7 +3464,8 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
-  function onSqueezeEnd() {
+  function onSqueezeEnd(event) {
+    if (event?.data?.handedness === 'left') return;
     if (gripDrag) {
       const rebuild = gripDrag.kind === 'edge' || gripDrag.kind === 'marker';
       project.touch(); rlog('grip-drag end', gripDrag);
@@ -3435,7 +3484,7 @@ export function setupMR(view, project, getFootprint) {
   //  - EDGE: cancel a pending locked edge.
   //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
-    if (event?.data) activeSource = event.data; // grip claims control too
+    if (event?.data?.handedness === 'left') return;
     if (gripDrag) return; // this grip was a drag, not an undo (cleared on squeezeend)
     const mode = modes[currentMode];
     if (mode.id === 'save' && overwriteSlot != null) {
@@ -3515,35 +3564,30 @@ export function setupMR(view, project, getFootprint) {
   let exitWasActive = false; // EXIT bar shown last frame -> force one redraw when it clears
   let exiting = false;   // guard so session.end() fires once
 
-  // The controller the user is currently driving with. Two controllers reading
-  // the same actions fight each other (e.g. both sticks summed), so ALL input —
-  // buttons, sticks, the exit hold, and every ray/tip pick — reads from ONLY
-  // this one. It flips to whichever controller last showed activity.
-  let activeSource = null;
-  // Any button pressed or a real stick deflection counts as "using" a controller.
-  function isActing(gp) {
-    return gp.buttons.some((b) => b?.pressed) ||
-      Math.abs(gp.axes[2] ?? 0) > 0.5 || Math.abs(gp.axes[3] ?? 0) > 0.5;
-  }
-  // The source to read this frame: the active one if still present, else the
-  // first tracked source (so reticles preview before the user has acted).
-  function pickSource(frame) {
+  // Fixed controller roles — never reassigned by recent activity. RIGHT owns the
+  // editing modes/HUD; optional LEFT owns only its live sheet and teleport trigger.
+  // An unhanded source is accepted as the editor only when no right/left-labelled
+  // editor exists, preserving support for runtimes that omit handedness metadata.
+  function sourceForHand(frame, handedness) {
     const list = [...frame.session.inputSources];
-    if (activeSource && list.includes(activeSource)) return activeSource;
-    return list.find((s) => s.gamepad) ?? list[0] ?? null;
+    return list.find((s) => s.handedness === handedness && s.gamepad) ?? null;
   }
+  const leftSource = (frame) => sourceForHand(frame, 'left');
+  function editorSource(frame) {
+    const right = sourceForHand(frame, 'right');
+    if (right) return right;
+    return [...frame.session.inputSources].find((s) => s.handedness !== 'left' && s.gamepad) ?? null;
+  }
+  const controllerForSource = (source) => controllers.find((c) => c.userData.inputSource === source) ?? null;
 
   function pollModeCycle(frame, time) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
     // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS flip only; does NOT cycle modes),
     // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
     // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT zone type).
-    // Latch onto whichever controller is being used, then read ONLY that one.
-    for (const src of frame.session.inputSources) {
-      if (src.gamepad && isActing(src.gamepad)) activeSource = src;
-    }
+    // Only the fixed RIGHT editor role is read; LEFT never changes modes.
     let next = false, prev = false, stickX = 0, stickY = 0, stickDown = false;
-    const gp = pickSource(frame)?.gamepad;
+    const gp = editorSource(frame)?.gamepad;
     if (gp) {
       next = !!gp.buttons[5]?.pressed;     // upper face button -> next
       prev = !!gp.buttons[4]?.pressed;     // lower face button -> previous
@@ -3629,19 +3673,38 @@ export function setupMR(view, project, getFootprint) {
   function onXRFrame(time, frame) {
     currentFrame = frame;
     pollModeCycle(frame, time);
-    // Show the tip/label/HUD on ONLY the active controller — the other hand's
-    // markers are hidden so the two don't clutter or read as both being live.
-    const activeCtl = pickSource(frame);
-    for (const c of controllers) c.visible = c.userData.inputSource === activeCtl;
-    // Echo the pointed-at constraint's value big on the active controller. PLAN ·
+    const editCtl = editorSource(frame);
+    const companionCtl = leftSource(frame);
+    const companionController = controllerForSource(companionCtl);
+    // Fixed roles replace last-active hiding. RIGHT exposes the editor HUD; LEFT,
+    // when present, exposes its controller-mounted sheet and teleport target only.
+    controllers.forEach((c, i) => {
+      const editor = c.userData.inputSource === editCtl;
+      const companion = c.userData.inputSource === companionCtl;
+      c.visible = editor || companion;
+      if (editor) controllerTips[i].material.color.setHex(modeColor(modes[currentMode]));
+      else if (companion) controllerTips[i].material.color.setHex(C_TELEPORT);
+      labels[i].sprite.visible = editor;
+      helps[i].sprite.visible = editor;
+      debugs[i].sprite.visible = editor;
+    });
+    updateLeftSheet(time, companionController);
+    const companionHit = placed && companionCtl ? rayFloorHit(companionCtl) : null;
+    if (companionHit) {
+      leftTeleportReticle.position.set(companionHit.x, overlayY() + 0.003, companionHit.z);
+      leftTeleportReticle.visible = true;
+    } else {
+      leftTeleportReticle.visible = false;
+    }
+    // Echo the pointed-at constraint's value on the RIGHT editor. PLAN ·
     // EDIT instead owns this prominent pill for the selected zone kind; the small
     // breadcrumb alone proved too easy to miss on-device.
-    const hovSprite = pickDimLabel(activeCtl);
+    const hovSprite = pickDimLabel(editCtl);
     const hovDim = hovSprite?.userData.dimText ?? null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const readoutText = editKind ? `${t('zone.type')} · ${t(`mode.${zoneModeId(editKind)}`)}` : hovDim;
     controllers.forEach((c, i) => {
-      const on = c.userData.inputSource === activeCtl && !!readoutText;
+      const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
       if (on) readouts[i].setText(readoutText, editKind ? zoneColor(editKind) : 0x79c0ff);
     });
@@ -3659,7 +3722,7 @@ export function setupMR(view, project, getFootprint) {
     if (exitProgress > 0 || exitWasActive || time - lastHudAt >= 500) {
       lastHudAt = time;
       exitWasActive = exitProgress > 0;
-      const ptrW = tipPosition(activeCtl);
+      const ptrW = tipPosition(editCtl);
       const ptr = ptrW ? worldToPlan(ptrW) : null;
       const ret = reticle.visible ? worldToPlan(reticle.position) : null;
       // Length of the currently highlighted edge (locked wins over hovered). In EDGE
@@ -3697,7 +3760,7 @@ export function setupMR(view, project, getFootprint) {
     if (modeId === 'teleport') {
       // Dedicated locomotion target. Trigger brings the pointed plan coordinate
       // beneath the headset; no geometry or survey-registration state is edited.
-      const hit = placed ? rayFloorHit(pickSource(frame)) : null;
+      const hit = placed ? rayFloorHit(editCtl) : null;
       if (hit) {
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
@@ -3709,7 +3772,7 @@ export function setupMR(view, project, getFootprint) {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
       // ALL zones, ring the aim point. edgeAtPoint uses true segment distance + a
       // cap, so the highlight tracks the edge under your reticle (open floor = none).
-      const hit = rayFloorHit(pickSource(frame));
+      const hit = rayFloorHit(editCtl);
       if (hit) {
         const { px, py } = worldToPlan(hit);
         hoverEdge = edgeAtPoint(px, py); // {rectId, edge} | null
@@ -3740,7 +3803,7 @@ export function setupMR(view, project, getFootprint) {
     } else if (modeId === 'floor' || modeId === 'register' || modeId === 'recal') {
       // FLOOR and REGISTER are tip-touch modes. RECAL starts with a pointer-driven
       // corner pick; after the corner locks, its three real-wall points are tip touches.
-      const source = pickSource(frame);
+      const source = editCtl;
       const tipPos = tipPosition(source);
       let recalAim = null;
       if (modeId === 'recal' && !recalLocked) {
@@ -3807,7 +3870,7 @@ export function setupMR(view, project, getFootprint) {
       originRingMat.color.setHex(C_ORIGIN_GIZMO);
       if (dimRefA && dimRefB) {
         // Numpad phase: raycast the panel for the key under the ray.
-        const panelHit = rayPanelHit(pickSource(frame));
+        const panelHit = rayPanelHit(editCtl);
         if (numpad.group.visible && panelHit) {
           hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
           numpadCursor.position.copy(panelHit.point);
@@ -3817,7 +3880,7 @@ export function setupMR(view, project, getFootprint) {
         // Reference-pick phase. Plan value panels are selectable only in PLAN DIMS.
         // OUTLET DIMS requires the projected outlet icon first, making it impossible
         // for an accidental edge-to-edge pick to alter a room dimension.
-        const source = pickSource(frame);
+        const source = editCtl;
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true; // reticle always tracks the floor point
@@ -3874,7 +3937,7 @@ export function setupMR(view, project, getFootprint) {
       edgeHi.visible = false;
       hoverKey = null;
       numpadCursor.visible = false;
-      const panelHit = rayPanelHit(pickSource(frame));
+      const panelHit = rayPanelHit(editCtl);
       if (numpad.group.visible && panelHit) {
         hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
         numpadCursor.position.copy(panelHit.point);
@@ -3886,7 +3949,7 @@ export function setupMR(view, project, getFootprint) {
       // intentionally inert in this domain; OUTLET owns all marker interactions.
       hoverKey = null;
       numpadCursor.visible = false;
-      const source = pickSource(frame);
+      const source = editCtl;
       const hit = rayFloorHit(source);
       if (hit) {
         const { px, py } = worldToPlan(hit);
@@ -3914,7 +3977,7 @@ export function setupMR(view, project, getFootprint) {
       // While the height pad is open, the ray drives the numpad instead.
       hoverKey = null;
       numpadCursor.visible = false;
-      const source = pickSource(frame);
+      const source = editCtl;
       if (selectedMarker && numpad.group.visible) {
         const panelHit = rayPanelHit(source);
         if (panelHit) {
@@ -3957,7 +4020,7 @@ export function setupMR(view, project, getFootprint) {
       hoverSlot = null;
       hoverSlotAction = null;
       numpadCursor.visible = false;
-      const panelHit = rayPanelHit(pickSource(frame), slotMenu.mesh);
+      const panelHit = rayPanelHit(editCtl, slotMenu.mesh);
       if (slotMenu.group.visible && panelHit) {
         if (overwriteSlot != null) hoverSlotAction = slotMenu.actionAt(panelHit.uv.x, panelHit.uv.y);
         else hoverSlot = slotMenu.slotAt(panelHit.uv.x, panelHit.uv.y);
@@ -3979,7 +4042,7 @@ export function setupMR(view, project, getFootprint) {
       edgeHi.visible = false;
       hoverLang = null;
       numpadCursor.visible = false;
-      const panelHit = rayPanelHit(pickSource(frame), langMenu.mesh);
+      const panelHit = rayPanelHit(editCtl, langMenu.mesh);
       if (langMenu.group.visible && panelHit) {
         hoverLang = langMenu.langAt(panelHit.uv.x, panelHit.uv.y);
         numpadCursor.position.copy(panelHit.point);
@@ -3992,7 +4055,7 @@ export function setupMR(view, project, getFootprint) {
       edgeHi.visible = false;
       hoverUnit = null;
       numpadCursor.visible = false;
-      const panelHit = rayPanelHit(pickSource(frame), unitMenu.mesh);
+      const panelHit = rayPanelHit(editCtl, unitMenu.mesh);
       if (unitMenu.group.visible && panelHit) {
         hoverUnit = unitMenu.unitAt(panelHit.uv.x, panelHit.uv.y);
         numpadCursor.position.copy(panelHit.point);

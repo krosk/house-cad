@@ -16,7 +16,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] APK installs, verifies origin, launches straight into passthrough AR *(proven on device)*
 - [x] **Guardian disabled** on-device so you can walk the whole house *(necessarily true — a full walk happened)*
 - [ ] HUD build stamp visible and matches the deployed build
-- [ ] Only the last-active controller is read; the idle hand hides
+- [ ] RIGHT remains the editor regardless of which hand moved last; LEFT activity never steals its modes
+- [ ] With LEFT absent, RIGHT works normally and no companion sheet/teleport reticle is shown
+- [ ] With LEFT detected, both tracked controllers remain visible
 
 ## SETUP · ORIGIN (`register`)  ✅ session 14
 - [x] 3-point origin: P1,P2 along one wall (sets +X down it), P3 on the perpendicular wall
@@ -61,6 +63,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Survey geometry, dimensions, yaw, and anchored `planPos` are unchanged
 - [ ] Switching modes keeps the teleported position; ORIGIN/FLOOR/RECAL clears it
 - [ ] Grip and thumbstick up/down are inert
+- [ ] LEFT has its own cyan teleport reticle in every mode; LEFT trigger teleports without invoking RIGHT's active tool
 
 ## PLAN · DROP (`drop`)  ⬜ five-kind picker needs Quest verification
 - [ ] **Thumbstick up/down picks ROOM → WALL → DOOR → STAIRS → CABINET** and wraps; label tracks the selected kind
@@ -127,6 +130,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Pin is one-way: it moves the outlet, not the wall
 - [ ] The floor dim label is selectable / grip-draggable here (PLAN DIMS ignores it)
 - [ ] A marker dim label can move beyond both endpoints and print at that outside position
+- [ ] Measured spans are dashed; an outside value panel is joined from the nearer endpoint by a visually distinct dotted leader
 
 ## PROJECT · SAVE / LOAD (`save` / `load`)  ✅ session 14
 - [x] Ray-aimed 6-slot menu appears
@@ -163,8 +167,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## PROJECT · SHEET (`sheet`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
 > Preview + download a to-scale plan sheet. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
-- [ ] Entering SHEET shows a floating panel with the ACTIVE floor's plan, correctly proportioned
-- [ ] The sheet reads clearly through passthrough (linework/text legible at the panel distance)
+- [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
+- [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
+- [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker
 - [ ] A marker sitting on its wall (0.00 pin) draws NO pin dimension; other 0.00 dims are omitted too
@@ -176,7 +181,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] The previewed floor's geometry matches that floor (not the active one) after cycling
 - [ ] **Trigger** downloads the SVG; the label flashes `⬇ plan-<floor>.svg` (or `download blocked`)
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
-- [ ] Grip is inert here (no delete/undo); leaving the mode hides the panel
+- [ ] Grip is inert here (no delete/undo); leaving SHEET mode keeps the companion visible and returns it to the active floor
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only

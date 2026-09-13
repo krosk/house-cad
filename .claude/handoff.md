@@ -65,6 +65,10 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
+- **Controller roles are fixed, never last-active.** RIGHT owns the complete editing UI/input lane.
+  Optional LEFT is an independent companion: an enlarged, live active-floor print sheet follows the
+  controller in every mode, and its cyan reticle + trigger always teleport. LEFT grip/sticks do not
+  invoke editor actions. With no LEFT source, its sheet/reticle are absent and RIGHT works alone.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
   cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
   room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
@@ -179,10 +183,11 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
 - **D — Remaining parity gaps** (`ar-2d-parity` memory): ~~unit switch in AR~~ DONE (`b38ab05`);
   ~~overwrite-confirm~~ DONE (`0226cbd`); still open: slot naming/delete; LEVEL's inert SWAP/DEL keys
   could be hidden.
-- **E — On-device QA of the s16→s17 features.** Plan sheets (AR PROJECT·SHEET raster + SVG download
-  while immersive), the new zone types (door/window/stairs/cabinet), teleport, move-plans-between-
-  storeys, all-floors AR view, AR unit selector — all **build-verified only**. Plus the uncommitted
-  ethernet glyph needs a visual check on both surfaces before committing.
+- **E — On-device QA of the s16→s17 features.** Plan sheets (including the persistent enlarged
+  LEFT-controller live preview) + SVG download while immersive, the new zone types
+  (door/window/stairs/cabinet), teleport, move-plans-between-
+  storeys, all-floors AR view, AR unit selector — all **build-verified only**. The committed Ethernet
+  glyph still needs a visual check on both surfaces.
 - ~~marker-DIMS commit/render bug~~ — FIXED (`0e98d02`, s16). ~~RECAL corner-select reticle~~ — DONE
   (`5560020`, s13). ~~subtract/dim ops/save-load/in-AR floors/first markers/plan-marker split/
   ROOM+WALL merge~~ — DONE. ~~Store distribution~~ — out of scope.
