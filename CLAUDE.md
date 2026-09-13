@@ -65,7 +65,9 @@ A rectangle's exact size is authored **only** through dimension constraints. The
 importers such as Coohom. It is model-space CAD, not a paper sheet: one meter becomes 1000 DXF
 units and `$INSUNITS=4` declares millimeters. Separate layers retain `FOOTPRINT`, every semantic
 zone kind, structural and marker-pin dimensions, room areas, marker heights/types, and `ORIGIN`.
-The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action.
+The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
+**PROJECT · DXF** shows the same optional left-controller floor preview used by SHEET; right
+thumbstick up/down selects a floor and right trigger downloads its DXF to the headset.
 
 ## Conventions
 

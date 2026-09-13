@@ -42,6 +42,7 @@ const STRINGS = {
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
   'mode.sheet':    { en: 'SHEET',  fr: 'PLANCHE',  zh: '图纸' },
+  'mode.dxf':      { en: 'DXF',    fr: 'DXF',       zh: 'DXF' },
   'mode.copy_floor': { en: 'COPY FLOOR', fr: 'COPIER ÉTAGE', zh: '复制楼层' },
   'mode.paste_floor': { en: 'PASTE FLOOR', fr: 'COLLER ÉTAGE', zh: '粘贴楼层' },
   'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
@@ -122,6 +123,11 @@ const STRINGS = {
     en: 'Preview the to-scale plan sheet. Thumbstick up/down: previous/next floor. Trigger downloads this floor as an SVG (saved to the headset).',
     fr: 'Aperçu de la planche à l’échelle. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en SVG (enregistré sur le casque).',
     zh: '预览按比例的平面图纸。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为 SVG（保存到头显）。',
+  },
+  'help.dxf': {
+    en: 'Preview the selected floor. Thumbstick up/down: previous/next floor. Trigger downloads this floor as a 1:1 millimeter DXF (saved to the headset).',
+    fr: 'Aperçu de l’étage sélectionné. Joystick haut/bas : étage précédent/suivant. Gâchette : télécharge cet étage en DXF à l’échelle 1:1 en millimètres (enregistré sur le casque).',
+    zh: '预览所选楼层。摇杆上/下：上一/下一楼层。扣动扳机将本层下载为毫米单位、1:1 比例的 DXF（保存到头显）。',
   },
   'help.copy_floor': {
     en: 'Trigger to copy the active floor, including its dimensions and markers. It remains available after loading another save.',

@@ -172,7 +172,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
 - [ ] The sheet faces 45° inward and tilts 45° upward toward the user; it reads comfortably with a leftward head turn
 - [ ] Room tint, dimensions, markers, and edit/numpad panels never paint over the solid-white sheet
-- [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
+- [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET/DXF export modes
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
@@ -192,11 +192,19 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] The previewed floor's geometry matches that floor (not the active one) after cycling
 - [ ] **Trigger** downloads the SVG; the label flashes `⬇ plan-<floor>.svg` (or `download blocked`)
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
-- [ ] Grip is inert here (no delete/undo); leaving SHEET mode keeps the companion visible and returns it to the active floor
+- [ ] Grip is inert here (no delete/undo); leaving the export modes keeps the companion visible and returns it to the active floor
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 - [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
 - [ ] Coohom recognizes the DXF wall/door/window geometry; annotation layers can be hidden if needed
+
+## PROJECT · DXF (`dxf`)  ⬜ NEW — build-verified only
+- [ ] Entering DXF shows the active floor in the optional left-controller sheet and labels it `DXF · <FloorName>`
+- [ ] **Thumbstick up/down** cycles floors (wraps), updates the label, and does not change the active floor
+- [ ] **Trigger** downloads that selected floor as `plan-<floor>.dxf`; the label flashes the filename
+- [ ] The downloaded DXF lands in the headset's Download folder and opens as AC1015 at 1:1 millimeter scale
+- [ ] The DXF floor selection remains stable while the mode is active; leaving returns the companion sheet to the active floor
+- [ ] Grip is inert; the optional left controller still only teleports and never invokes the export
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted

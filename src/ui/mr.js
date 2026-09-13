@@ -24,6 +24,7 @@ import {
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas, sharedScaleSheetOptions } from '../io/planSheet.js';
+import { floorToDxf } from '../io/dxf.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
@@ -2335,10 +2336,10 @@ export function setupMR(view, project, getFootprint) {
     overwriteSlot = null;
   }
 
-  // ---- SHEET: preview + download a to-scale plan sheet (one floor at a time) ----
+  // ---- SHEET / DXF: preview + download one selected floor at a time ----
   // The preview is persistently mounted on the optional LEFT controller. In SHEET
-  // mode, RIGHT thumbstick-y cycles the preview and RIGHT trigger downloads its SVG;
-  // in every other mode it follows the active floor and refreshes as edits land.
+  // or DXF mode, RIGHT thumbstick-y cycles the preview and RIGHT trigger downloads
+  // the selected format; in every other mode it follows the active floor.
   let sheetFloorIdx = 0;      // index into project.floors for the preview
   let sheetFlashTimer = null;
   let sheetDirty = true;
@@ -2362,6 +2363,7 @@ export function setupMR(view, project, getFootprint) {
     sheetDirty = false;
     lastSheetRedrawAt = performance.now();
   };
+  const isSheetExportMode = (id) => id === 'sheet' || id === 'dxf';
 
   // Reparenting to the detected left controller makes the sheet follow its tracked
   // pose exactly like the controller HUD. The panel + dedicated teleport reticle are
@@ -2376,7 +2378,7 @@ export function setupMR(view, project, getFootprint) {
       sheetPanel.group.position.copy(LEFT_SHEET_POS);
       sheetPanel.group.rotation.set(LEFT_SHEET_PITCH, LEFT_SHEET_YAW, 0);
     }
-    if (modes[currentMode].id !== 'sheet') {
+    if (!isSheetExportMode(modes[currentMode].id)) {
       const activeIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
       if (sheetFloorIdx !== activeIdx) { sheetFloorIdx = activeIdx; sheetDirty = true; }
     }
@@ -2394,14 +2396,14 @@ export function setupMR(view, project, getFootprint) {
     clearTimeout(sheetFlashTimer);
   }
 
-  // Thumbstick-y in SHEET: preview the previous/next floor (wraps). The label's TOOL
-  // part shows the floor name so a glance says which sheet you're on.
+  // Thumbstick-y in SHEET/DXF previews the previous/next floor (wraps). The label's
+  // TOOL part shows the floor name so a glance says which export you're acting on.
   function cycleSheetFloor(dir) {
     const n = project.floors.length;
     if (n < 1) return;
     sheetFloorIdx = (sheetFloorIdx + dir + n) % n;
     redrawSheet();
-    setModeInfo(); // label -> "SHEET · <FloorName>"
+    setModeInfo(); // label -> "SHEET/DXF · <FloorName>"
   }
 
   // Fire-and-forget blob download. In the immersive TWA the download UI isn't visible,
@@ -2419,19 +2421,19 @@ export function setupMR(view, project, getFootprint) {
     } catch { return false; }
   }
 
-  const sheetFileName = (f) =>
-    `plan-${(f.name || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor'}.svg`;
+  const exportFileName = (f, extension) =>
+    `plan-${(f.name || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor'}.${extension}`;
 
   // Briefly show a message on the mode label, then restore the breadcrumb.
   function sheetFlash(msg) {
     for (const l of labels) l.setText(msg, modes[currentMode].color);
     clearTimeout(sheetFlashTimer);
-    sheetFlashTimer = setTimeout(() => { if (modes[currentMode].id === 'sheet') setModeInfo(); }, 1600);
+    sheetFlashTimer = setTimeout(() => { if (isSheetExportMode(modes[currentMode].id)) setModeInfo(); }, 1600);
   }
 
   function onSheetTouch() {
     const f = currentSheetFloor();
-    const name = sheetFileName(f);
+    const name = exportFileName(f, 'svg');
     const sheetOpts = sharedScaleSheetOptions(project.floors, {
       page: 'a4',
       markerLabel: (ty) => t(`marker.${ty}`),
@@ -2440,6 +2442,14 @@ export function setupMR(view, project, getFootprint) {
     });
     const ok = downloadBlob(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
     rlog('sheet download', { floor: f.name, name, ok });
+    sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
+  }
+
+  function onDxfTouch() {
+    const f = currentSheetFloor();
+    const name = exportFileName(f, 'dxf');
+    const ok = downloadBlob(name, floorToDxf(f), 'application/dxf');
+    rlog('dxf download', { floor: f.name, name, ok });
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
   }
 
@@ -3120,6 +3130,12 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onSheetTouch,
     },
     {
+      id: 'dxf', color: 0x22c55e, // label/help via i18n: mode.dxf / help.dxf
+      // Reuse the floor preview/cycling UI, but export true-scale millimeter CAD
+      // model space rather than the laid-out SVG sheet.
+      onTouch: onDxfTouch,
+    },
+    {
       id: 'copy_floor', color: 0x34d399,
       // Snapshot the complete active floor into a clipboard that survives LOAD.
       onTouch: copyActiveFloor,
@@ -3159,14 +3175,14 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'plan_dims',
-    'marker', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'unit', 'lang',
+    'marker', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'sheet', 'dxf', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
-    save: 'project', load: 'project', sheet: 'project', unit: 'project', lang: 'project',
+    save: 'project', load: 'project', sheet: 'project', dxf: 'project', unit: 'project', lang: 'project',
   };
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
@@ -3177,15 +3193,15 @@ export function setupMR(view, project, getFootprint) {
   const modeBreadcrumb = (id, child = t(`mode.${id}`)) => `${t(`group.${MODE_GROUP[id]}`)} · ${child}`;
 
   // The tool portion of a mode's label. MARKER · EDIT appends the marker type,
-  // PLAN · DROP shows the current zone kind, UNIT shows the current unit, and SHEET
-  // names the previewed floor; the remaining modes use only their tool name.
+  // PLAN · DROP shows the current zone kind, UNIT shows the current unit, and both
+  // export modes name the previewed floor; the remaining modes use only their tool name.
   const markerTypeName = () => t(`marker.${currentMarkerType}`);
   const modeChildLabel = (id) =>
     id === 'marker' ? `${t('mode.marker')} · ${markerTypeName()}`
     : id === 'drop' ? t(`mode.${zoneModeId(currentZoneKind)}`)
     : id === 'edit' && selectedRect ? `${t('mode.edit')} · ${t(`mode.${zoneModeId(zoneKindOf(selectedRect))}`)}`
     : id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
-    : id === 'sheet' ? `${t('mode.sheet')} · ${currentSheetFloor().name}` // TOOL part = previewed floor
+    : isSheetExportMode(id) ? `${t(`mode.${id}`)} · ${currentSheetFloor().name}` // TOOL part = previewed floor
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
     : t(`mode.${id}`);
   // PLAN · DROP's accent follows boolean behavior (green ROOM; red subtract kinds);
@@ -3239,7 +3255,7 @@ export function setupMR(view, project, getFootprint) {
     else hideLangMenu();
     if (m.id === 'unit') showUnitMenu(); // park the unit menu in front of you
     else hideUnitMenu();
-    if (m.id === 'sheet') showSheet(); // park the plan-sheet preview in front of you
+    if (isSheetExportMode(m.id)) showSheet(); // select the active floor for SHEET/DXF
     else hideSheet();
   }
 
@@ -3695,7 +3711,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
-      else if (modeId === 'sheet') cycleSheetFloor(stickY < 0 ? 1 : -1); // preview prev / next floor
+      else if (isSheetExportMode(modeId)) cycleSheetFloor(stickY < 0 ? 1 : -1); // export prev / next floor
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;

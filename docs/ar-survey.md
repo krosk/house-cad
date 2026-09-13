@@ -10,20 +10,21 @@ AR (`src/ui/mr.js`) is the **only** authoring surface on the Quest — the immer
 AR by quitting, there is no 2D editor on-device — so it must reach parity with the desktop 2D
 editor (`ar-2d-parity` memory).
 
-## Mode hierarchy (13 tools with stable `id`s)
+## Mode hierarchy (tools with stable `id`s)
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · DROP (room/wall/door/window/stairs/cabinet) → EDGE → EDIT → DIMS
 MARKER   · EDIT → DIMS
-PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → UNIT → LANG
+PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → SHEET → DXF → UNIT → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `plan_dims`, `marker`, `outlet_dims`, `move_up`, `move_down`, `save`, `load`, `sheet`, `lang`.
+`edit`, `plan_dims`, `marker`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`move_down`, `save`, `load`, `sheet`, `dxf`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -112,10 +113,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the previewed floor (`cycleSheetFloor`, wraps; the label TOOL part shows the floor name) and
   RIGHT **trigger** downloads that floor's SVG
   (`floorToSvg` → blob → the headset's Download folder; the label flashes the filename).
-  Outside SHEET mode the companion automatically returns to the active floor. The panel is absent
+  Outside the SHEET and DXF export modes the companion automatically returns to the active floor. The panel is absent
   when no LEFT controller is connected. Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
   immersive session has no print dialog; the SVG blob is the off-headset deliverable
   (retrieve by cable). Desktop is where you actually print (Print menu → Save-as-PDF).
+- **DXF** (`id: dxf`) — uses the same left-controller floor preview and right thumbstick
+  up/down floor selection as SHEET. RIGHT trigger downloads the selected floor as a 1:1
+  millimeter DXF to the headset's Download folder. It is read-only and does not change the
+  active floor or project geometry.
 - **UNIT** (`id: unit`) — display/input unit switch. Thumbstick up/down cycles `m` / `cm` / `mm`;
   trigger picks the ray-aimed row, or advances one if the ray is off the panel. Dimension labels,
   numeric entry pads, sheets, and the desktop selector update immediately. This is a persisted UI
@@ -296,7 +301,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
   (AR preview) is build-verified only** — no browser/Quest raster test in CI.
 
-Desktop also offers **Download DXF (this floor)** via `src/io/dxf.js`. DXF is model space rather
+Desktop offers **Download DXF (this floor)** via `src/io/dxf.js`; AR exposes the same exporter as
+**PROJECT · DXF**, with floor selection independent of the active floor. DXF is model space rather
 than a paper rendition: ASCII AutoCAD 2000, millimeter units, 1:1 geometry, and separate semantic
 layers for footprint/zones/dimensions/markers/areas/origin. It targets CAD floor-plan importers such
 as Coohom and does not alter or replace the shared SVG/canvas sheet renderer.
@@ -370,6 +376,7 @@ teleport reticle; no last-active routing remains.
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
 | `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints incl. `offset` + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
-| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET preview) |
+| `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR SHEET/DXF floor preview) |
+| `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, shared by desktop and AR |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

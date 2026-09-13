@@ -81,13 +81,16 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     a label can reduce scale but cannot rotate the pages. If a legitimate geometry edit does change
     orientation, the left-panel CanvasTexture is recreated after the canvas dimensions swap, avoiding
     Quest's stale/squeezed prior texture and ensuring right-controller sheet changes appear.
-11. **(s18, pending commit) compact whole dimensions.** Structural and marker-pin values whose
+11. **(s18, `f29d6b3`) compact whole dimensions.** Structural and marker-pin values whose
     formatted fractional part is all zeros print as integers (`3.00` → `3`, `300.0` → `300`) to
     narrow their white value boxes; fractional values keep normal unit precision.
-12. **(s18, pending commit) active-floor DXF export.** The desktop Print menu now downloads an
+12. **(s18, `f29d6b3`) active-floor DXF export.** The desktop Print menu now downloads an
     ASCII AutoCAD 2000 DXF in millimeters at 1:1 model scale. `src/io/dxf.js` preserves computed
     footprint, authored room/wall/door/window/stairs/cabinet rectangles and symbols, structural and
     marker dimensions, room areas, origin, marker glyphs/heights, and semantic layers for Coohom.
+13. **(s18, pending commit) AR DXF action.** `PROJECT · DXF` reuses the optional left-controller
+    floor preview. RIGHT thumbstick up/down selects any floor without changing the active floor;
+    RIGHT trigger downloads that floor as the same layered 1:1 millimeter DXF used on desktop.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
