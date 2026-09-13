@@ -70,8 +70,9 @@ footprint, structural and marker-pin dimensions, dotted electrical routes, fixtu
 door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. FURNITURE defaults to
 hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
 remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
-still do. Markers mutually within 80 mm inclusive in plan use a bracketed callout; markers connected
-by 80 mm-inclusive full-3D neighbor links share a white box—horizontal with one height
+still do. Vertical marker stacks require strictly identical plan `x` and `y`; horizontal fixtures
+require exactly equal heights and group through connected 80 mm-inclusive plan neighbors. Markers connected by 80 mm-inclusive full-3D neighbor
+links share a white box—horizontal with one height
 when level, vertical with per-glyph heights otherwise. Clustering is transitive, so 117→109→101 cm
 is one box even though the endpoints are 16 cm apart.
 Stack callouts test all four sides against the printable footprint and prefer the placement inside

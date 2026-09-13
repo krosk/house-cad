@@ -140,6 +140,11 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
     electrical-route, and red conflict colors from SVG/print/LEFT preview output. Black/gray/white
     linework now relies on dashed/dotted patterns and weight for domain distinction; AR interaction
     overlays keep their colors.
+27. **(s18, pending commit) strict vertical-stack coordinates.** A vertical fixture callout now
+    requires exact equality of both plan coordinates. Different-height markers on opposite faces of
+    a 70 mm wall therefore remain separate. Horizontal fixtures require strict height equality and
+    now follow connected 80 mm-inclusive plan-neighbor links; exact-position height chains retain
+    connected-neighbor box grouping.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -206,8 +211,9 @@ HEAD moves with each push; `git log` has the full list.
 
 - `26564d1` (s18) FLOOR calibration works from any selected real storey by deriving the
   shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
-- `26564d1` (s18) plan-sheet fixture stacks now group markers within 80 mm inclusive in plan under one
-  bracket. Within it, full-3D 80 mm-inclusive neighbors share an outlined white box: horizontal + one height
+- `26564d1` (s18) introduced plan-sheet fixture stacks; the current rule requires identical plan
+  coordinates for vertical stacks and allows same-height horizontal fixtures within 80 mm inclusive.
+  Within a callout, full-3D 80 mm-inclusive neighbors share an outlined white box: horizontal + one height
   when level, vertical + per-glyph heights when not. Distant height groups keep separate boxes on
   the same leader. Shared by print/SVG and the live LEFT-controller canvas preview.
 - (s17) zone area readout: `connectedRoomComponents` (geometry2d) now deducts subtract cutouts

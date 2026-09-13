@@ -58,7 +58,6 @@ const ARROW_H = 1;       // arrowhead half-width
 const DIM_DASH = [1.4, 1];     // measured span
 const LEADER_DOT = [0.1, 0.8]; // endpoint -> outside value panel
 const MARKER_STACK_TOLERANCE = 0.08; // model m: one typical 8 cm fixture face, inclusive
-const MARKER_SAME_HEIGHT_EPS = 0.001; // model m: equal-height fixtures share one printed height
 const MARKER_STACK_ROW = 3.8;         // paper mm between rows inside a vertical fixture box
 const MARKER_STACK_BOX_GAP = 1.4;     // paper mm between distinct height groups
 
@@ -631,16 +630,6 @@ function connectedClusters(items, within) {
   return groups;
 }
 
-function completeClusters(items, within) {
-  const groups = [];
-  for (const item of items) {
-    const group = groups.find((candidate) => candidate.every((other) => within(item, other)));
-    if (group) group.push(item);
-    else groups.push([item]);
-  }
-  return groups;
-}
-
 const markerHeight = (marker) => (Number.isFinite(marker.z) ? marker.z : 0);
 
 // One plan-position callout may contain several separate white boxes. Markers
@@ -651,9 +640,8 @@ function groupFixtureBoxes(markers, tolerance) {
   const boxes = connectedClusters(markers, (a, b) => Math.hypot(
     a.x - b.x, a.y - b.y, markerHeight(a) - markerHeight(b),
   ) <= tolerance + 1e-9).map((members) => {
-    const minZ = Math.min(...members.map(markerHeight));
     const maxZ = Math.max(...members.map(markerHeight));
-    const horizontal = maxZ - minZ <= MARKER_SAME_HEIGHT_EPS;
+    const horizontal = members.every((marker) => markerHeight(marker) === markerHeight(members[0]));
     const ordered = [...members];
     if (horizontal) {
       const xs = ordered.map((m) => m.x), ys = ordered.map((m) => m.y);
@@ -667,12 +655,17 @@ function groupFixtureBoxes(markers, tolerance) {
   return boxes.sort((a, b) => b.maxZ - a.maxZ);
 }
 
-// Markers within 8 cm inclusive in plan share one leader so their projected glyphs
-// cannot obscure each other. Requiring every pair to qualify prevents a long row
-// of adjacent fixtures from collapsing into one distant callout.
+// A vertical fixture stack requires STRICT plan coincidence: both x and y must be
+// exactly equal. This prevents fixtures on opposite faces of a thin wall (for
+// example 7 cm apart) from sharing a callout. Side-by-side fixtures may still form
+// a horizontal stack only when their heights match exactly and successive plan
+// neighbors are within the inclusive 8 cm face-width threshold. Both relationships
+// form connected components, so a row may extend through several qualifying links.
 export function groupFixtureStacks(markers, tolerance = MARKER_STACK_TOLERANCE) {
-  const groups = completeClusters(markers || [], (a, b) =>
-    Math.hypot(a.x - b.x, a.y - b.y) <= tolerance + 1e-9);
+  const samePlanPosition = (a, b) => a.x === b.x && a.y === b.y;
+  const sameHeight = (a, b) => markerHeight(a) === markerHeight(b);
+  const groups = connectedClusters(markers || [], (a, b) => samePlanPosition(a, b)
+    || (sameHeight(a, b) && Math.hypot(a.x - b.x, a.y - b.y) <= tolerance + 1e-9));
   return groups.map((members) => {
     const markersByHeight = [...members].sort((a, b) =>
       (Number.isFinite(b.z) ? b.z : -Infinity) - (Number.isFinite(a.z) ? a.z : -Infinity));
