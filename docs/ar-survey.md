@@ -147,7 +147,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   cyan floor reticle, and its other controls never invoke the active editing mode. Roles require a
   physical controller input source (`gamepad` present, `hand` absent): tracked-hand select/pinch
   events are ignored. The sheet is offset along the left controller's outside (-X) so it does not
-  cover that controller's pointing ray or teleport reticle.
+  cover that controller's pointing ray or teleport reticle, then yawed 45° inward toward the
+  headset for comfortable reading with a leftward head turn.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
 - RIGHT **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
   MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
@@ -266,7 +267,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   **marker floor-pin dimensions** (`drawMarkerPins`, a distinct amber) — the surveyed
   distance from a wall/origin to each marker, i.e. *where to place the fixture*, terminating at
   the glyph; **markers + a legend** (`drawMarkerGlyph` per type, shared by plan and legend);
-  and a **scale bar + `1:N · unit` caption + floor name**. Marker/legend names come from
+  and a **scale bar + `1:N · unit` caption + floor name + local `YYYY-MM-DD HH:mm` generation
+  timestamp**. A shared print set captures the generation time once, so every page agrees.
+  Marker/legend names come from
   `opts.markerLabel` (desktop = English; AR passes `t('marker.<type>')`).
 - **Zero-value dimensions are omitted** (`displaysZero`): any structural or pin distance that
   rounds to `0.00` at the current display unit (coincident edges, a marker sitting on its wall)

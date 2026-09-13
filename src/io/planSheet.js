@@ -63,6 +63,14 @@ const MARKER_LABELS = {
 const ZONE_LABELS = { door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet' };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 
+function localGenerationTime(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const valid = Number.isFinite(date.getTime()) ? date : new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${valid.getFullYear()}-${pad(valid.getMonth() + 1)}-${pad(valid.getDate())}`
+    + ` ${pad(valid.getHours())}:${pad(valid.getMinutes())}`;
+}
+
 // ---------------------------------------------------------------------------
 // Drawing backends — both consume PAGE MILLIMETERS.
 // ---------------------------------------------------------------------------
@@ -561,6 +569,9 @@ function drawStrip(be, L, floor, opts) {
 
   // Floor name (left) — a single label, not a full title block.
   be.text(floor.name || 'Floor', MARGIN, yBase + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
+  const generatedLabel = opts.generatedLabel || 'Generated';
+  be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)}`, MARGIN, yBase + 8,
+    { fill: '#444', size: 2.1, baseline: 'top' });
 
   // Scale bar (left, below the name): a divided bar of a round metric length.
   const target = 40; // mm
@@ -670,20 +681,23 @@ export function floorToSvg(floor, opts = {}) {
  * the multi-floor print set: same page, orientation, scale, and origin.
  */
 export function sharedScaleSheetOptions(floors, opts = {}) {
-  const page = PAGES[opts.page] || PAGES.a4;
+  // Capture generation time once for the complete rendition so every page in a
+  // print set—and any single-floor view made from these options—shows one date.
+  const sharedOpts = { ...opts, generatedAt: opts.generatedAt ?? new Date() };
+  const page = PAGES[sharedOpts.page] || PAGES.a4;
   const boxes = floors.map((floor) => {
     const footprint = computeFootprint(floor.rectangles);
     return contentBBox(floor, footprint);
   }).filter(Boolean);
-  if (!boxes.length) return { ...opts };
+  if (!boxes.length) return sharedOpts;
   const layoutBBox = boxes.reduce((all, bbox) => ({
     x0: Math.min(all.x0, bbox.x0), y0: Math.min(all.y0, bbox.y0),
     x1: Math.max(all.x1, bbox.x1), y1: Math.max(all.y1, bbox.y1),
   }), { ...boxes[0] });
-  const orientation = opts.orientation || bestOrientation(layoutBBox, page);
+  const orientation = sharedOpts.orientation || bestOrientation(layoutBBox, page);
   let mmPerM;
-  if (Number.isFinite(opts.mmPerM) && opts.mmPerM > 0) {
-    mmPerM = opts.mmPerM;
+  if (Number.isFinite(sharedOpts.mmPerM) && sharedOpts.mmPerM > 0) {
+    mmPerM = sharedOpts.mmPerM;
   } else {
     // Maximize the drawing, then round the scale denominator UP to a whole
     // number. Upward is deliberate: 1:56.7 -> 1:57 gets fractionally smaller
@@ -693,7 +707,7 @@ export function sharedScaleSheetOptions(floors, opts = {}) {
     mmPerM = 1000 / integerRatio;
   }
   return {
-    ...opts,
+    ...sharedOpts,
     layoutBBox,
     orientation,
     mmPerM,

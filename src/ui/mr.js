@@ -417,6 +417,7 @@ export function setupMR(view, project, getFootprint) {
         targetPx: 2048,
         markerLabel: (ty) => t(`marker.${ty}`),
         zoneLabel: (kind) => t(`mode.${kind}`),
+        generatedLabel: t('sheet.generated'),
       });
       floorToCanvas(floor, canvas, sheetOpts);
       tex.needsUpdate = true;
@@ -2319,8 +2320,10 @@ export function setupMR(view, project, getFootprint) {
   const SHEET_REFRESH_MS = 125; // at most 8 fps while a dim/edge is being dragged
   // Keep the large sheet on the OUTSIDE of the left controller. In controller-local
   // coordinates -X is left/outward, leaving a clear corridor around the -Z aim ray
-  // and its cyan floor reticle.
+  // and its cyan floor reticle. Yaw its front normal inward (+X/+Z) so the sheet
+  // faces the headset and reads naturally with a simple look to the left.
   const LEFT_SHEET_POS = new THREE.Vector3(-0.42, 0.22, -0.32);
+  const LEFT_SHEET_YAW = Math.PI / 4;
 
   function currentSheetFloor() {
     sheetFloorIdx = Math.max(0, Math.min(sheetFloorIdx, project.floors.length - 1));
@@ -2343,7 +2346,7 @@ export function setupMR(view, project, getFootprint) {
     if (sheetPanel.group.parent !== leftController) {
       leftController.add(sheetPanel.group);
       sheetPanel.group.position.copy(LEFT_SHEET_POS);
-      sheetPanel.group.quaternion.identity();
+      sheetPanel.group.rotation.set(0, LEFT_SHEET_YAW, 0);
     }
     if (modes[currentMode].id !== 'sheet') {
       const activeIdx = Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId));
@@ -2401,7 +2404,12 @@ export function setupMR(view, project, getFootprint) {
   function onSheetTouch() {
     const f = currentSheetFloor();
     const name = sheetFileName(f);
-    const sheetOpts = sharedScaleSheetOptions(project.floors, { page: 'a4' });
+    const sheetOpts = sharedScaleSheetOptions(project.floors, {
+      page: 'a4',
+      markerLabel: (ty) => t(`marker.${ty}`),
+      zoneLabel: (kind) => t(`mode.${kind}`),
+      generatedLabel: t('sheet.generated'),
+    });
     const ok = downloadBlob(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
     rlog('sheet download', { floor: f.name, name, ok });
     sheetFlash(ok ? `⬇ ${name}` : 'download blocked');

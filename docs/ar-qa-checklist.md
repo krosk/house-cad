@@ -170,9 +170,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
+- [ ] The sheet faces 45° inward and is comfortably readable by turning the head left
 - [ ] The companion sheet reads clearly through passthrough and shows the active floor outside SHEET mode
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
+- [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
 - [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] Marker floor-pin dimensions (amber, wall→fixture) show where to place each marker

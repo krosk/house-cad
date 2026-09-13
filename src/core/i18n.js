@@ -49,6 +49,9 @@ const STRINGS = {
   'mode.unit':     { en: 'UNIT',   fr: 'UNITÉ',     zh: '单位' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
 
+  // --- plan sheet ------------------------------------------------------------
+  'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
+
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
   'help.floor': {
     en: 'Touch the tip to the real ground to set the base level. Re-level only on the ground floor.',

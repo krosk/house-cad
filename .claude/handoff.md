@@ -73,6 +73,9 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
    fitted ratio denominator upward to a whole number (`1:56.7` → `1:57`) so content still fits. Print All,
    active-floor desktop SVG, AR preview, and AR SVG download now all use it, so a single-floor sheet
    exactly matches its page in the multi-floor set and can be physically superposed without scaling.
+9. **(s18, pending commit) sheet generation timestamp.** The title strip includes an unambiguous
+   local `YYYY-MM-DD HH:mm`. Shared sheet options capture the time once so every floor page in a
+   print run agrees; the AR canvas label follows LANG.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -81,7 +84,8 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
   controller in every mode, and its cyan reticle + trigger always teleport. LEFT grip/sticks do not
   invoke editor actions. With no LEFT source, its sheet/reticle are absent and RIGHT works alone.
   Only physical-controller input sources (`gamepad` and no `hand`) qualify; hand pinch/select is
-  ignored. The sheet is positioned 0.42 m on the controller's outside (-X), clear of the aim ray.
+  ignored. The sheet is positioned 0.42 m on the controller's outside (-X), clear of the aim ray,
+  and yawed 45° inward (+X/+Z normal) toward the headset for a natural leftward glance.
 - **Input model: thumbstick-y = "cycle the current thing"; B/Y ≠ mode nav.** Thumbstick up/down
   cycles the contextual attribute per mode (LEVEL floor, LANG language, MARKER type/retype, PLAN·DROP
   room/wall, PLAN·EDIT room↔wall). Mode nav is thumbstick-x + A/X. B/Y only flips a completed DIMS
