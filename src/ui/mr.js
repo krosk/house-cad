@@ -1175,17 +1175,27 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'ethernet') {
-      // RJ45 jack: a port rectangle with a bottom tab notch and contact pins.
+      // Front view of an RJ45 jack: a framed socket, eight contacts, and the
+      // distinctive centered latch recess (matching the plan-sheet symbol).
       ctx.beginPath(); ctx.roundRect(42, 42, 44, 40, 5);
       ctx.fillStyle = '#e5e7eb'; ctx.fill();
       ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
-      ctx.beginPath(); ctx.roundRect(56, 78, 16, 10, 3);
+      ctx.beginPath();
+      ctx.moveTo(47, 47);
+      ctx.lineTo(81, 47);
+      ctx.lineTo(81, 70);
+      ctx.lineTo(73, 70);
+      ctx.lineTo(73, 79);
+      ctx.lineTo(55, 79);
+      ctx.lineTo(55, 70);
+      ctx.lineTo(47, 70);
+      ctx.closePath();
       ctx.fillStyle = '#f8fafc'; ctx.fill();
       ctx.lineWidth = 2; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
       ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
-      for (let i = 0; i < 6; i++) {
-        const x = 50 + i * 6;
-        ctx.beginPath(); ctx.moveTo(x, 47); ctx.lineTo(x, 58); ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const x = 50 + i * 4;
+        ctx.beginPath(); ctx.moveTo(x, 50); ctx.lineTo(x, 59); ctx.stroke();
       }
       return;
     }
