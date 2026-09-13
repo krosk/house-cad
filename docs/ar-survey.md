@@ -224,6 +224,9 @@ basement negative). See `multi-floor-design` memory for the settled design.
   Editing the topmost floor's own height moves nothing.
 - **Cross-floor size constraints are impossible by construction** — `edgeAtPoint` only scans the
   active floor's rectangles and constraints are stored per floor.
+- The shared pointer reticle is two-sided, so the selected storey's target remains subtly visible
+  through its translucent overlay when the user views it from another storey (for example, Upper
+  from Ground).
 
 ## Plan sheets (printing / SVG) — `src/io/planSheet.js`
 

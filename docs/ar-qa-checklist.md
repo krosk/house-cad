@@ -201,6 +201,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Thumbstick-hold (~1.2 s) exits AR; the EXIT bar shows during the hold
 - [ ] HUD debug lines present: `build` `ptr` `ret` `edge` (EDGE only) `batt`
 - [ ] Overlays ride the correct elevation on each floor
+- [ ] With Upper selected while physically on Ground, the pointer reticle remains visible from below
+      in every floor-targeting mode
 
 ## Harder / accuracy (do last)
 - [ ] Anchor drift over a multi-room, multi-floor house stays acceptable

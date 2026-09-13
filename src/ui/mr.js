@@ -597,7 +597,13 @@ export function setupMR(view, project, getFootprint) {
   const RETICLE_OUTER = 0.08; // m; also the EDGE-pick radius (edge must fall in the ring)
   const reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.06, RETICLE_OUTER, 32).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 }),
+    // The active storey may be above or below the user's physical storey. Keep the
+    // ring visible from either side of that plane; normal depth ordering lets it
+    // remain subtly visible through the translucent floor overlay when seen below.
+    new THREE.MeshBasicMaterial({
+      color: ACCENT, transparent: true, opacity: 0.6,
+      side: THREE.DoubleSide, depthWrite: false,
+    }),
   );
   reticle.visible = false;
   scene.add(reticle);
