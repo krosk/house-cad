@@ -50,7 +50,9 @@ export const PAGES = {
 const RATIOS = [20, 50, 100, 200, 500, 1000];
 
 const MARGIN = 12;       // blank border on every side
-const STRIP = 16;        // bottom band: floor name, scale bar, caption, legend
+// Three wrapped legend rows plus a compact title/scale row. A fixed reserve keeps
+// every floor in a shared-scale set aligned even when their legend contents differ.
+const STRIP = 34;
 const DIM_RESERVE = 18;  // band on top + right where auto-stacked dims live
 
 // dimension annotation (paper mm)
@@ -1144,15 +1146,15 @@ function drawRoomAreas(be, L, floor) {
 function drawStrip(be, L, floor, opts) {
   const { page, ratio, exact } = L;
   const yBase = page.h - MARGIN - STRIP;
-  const rowY = yBase + STRIP * 0.5; // vertical center of the strip content
+  const rowY = yBase + STRIP - 5; // title/scale row below the wrapped legends
 
   // Floor name (left) — a single label, not a full title block.
   const floorName = opts.floorLabel?.(floor.name) || floor.name || 'Floor';
-  be.text(floorName, MARGIN, yBase + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
+  be.text(floorName, MARGIN, yBase + 20, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
   const generatedLabel = opts.generatedLabel || 'Generated';
   const buildLabel = opts.buildLabel || 'Build';
   const buildId = opts.buildId || BUILD_ID;
-  be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)} · ${buildLabel}: ${buildId}`, MARGIN, yBase + 8,
+  be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)} · ${buildLabel}: ${buildId}`, MARGIN, yBase + 25,
     { fill: '#444', size: 2.1, baseline: 'top' });
 
   // Scale bar (left, below the name): a divided bar of a round metric length.
@@ -1174,8 +1176,9 @@ function drawStrip(be, L, floor, opts) {
   be.text(`1:${ratioText}  ·  ${unitLabel()}`, page.w / 2, rowY,
     { fill: '#000', size: 3, align: 'center', baseline: 'middle' });
 
-  // Legends (right): semantic plan zones and fixture markers have independent
-  // rows. Entries are included only when that type occurs on this floor.
+  // Legends: semantic plan zones and fixture markers occupy separate row groups.
+  // Greedy wrapping keeps every row inside the printable width; this matters for
+  // descriptive entries such as "Aircon supply · dedicated circuit".
   const layers = resolveOutputLayers(opts);
   const markerTypes = layers.markerIcons
     ? [...new Set((floor.markers || []).map((m) => m.type))] : [];
@@ -1186,32 +1189,43 @@ function drawStrip(be, L, floor, opts) {
   const markerNote = opts.markerLegendNote || ((t) => t === 'outlet_aircon' ? 'Dedicated circuit' : '');
   const zoneName = opts.zoneLabel || ((t) => ZONE_LABELS[t] || t);
 
-  if (zoneTypes.length) {
-    const entries = zoneTypes.map((t) => ({ t, label: zoneName(t) }));
-    const widths = entries.map((e) => 7.4 + be.measure(e.label, 2.2) + 2.2);
-    let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);
-    const y = markerTypes.length ? yBase + 4.5 : rowY;
-    for (let i = 0; i < entries.length; i++) {
-      drawZoneGlyph(be, x, y - 1.6, 6, 3.2, entries[i].t);
-      be.text(entries[i].label, x + 7.4, y,
-        { fill: '#000', size: 2.2, align: 'left', baseline: 'middle' });
-      x += widths[i];
+  const wrapRows = (entries, widthOf) => {
+    const rows = [];
+    const available = page.w - 2 * MARGIN;
+    for (const entry of entries) {
+      entry.width = widthOf(entry);
+      const row = rows[rows.length - 1];
+      if (!row || row.width + entry.width > available) rows.push({ entries: [entry], width: entry.width });
+      else { row.entries.push(entry); row.width += entry.width; }
     }
-  }
-
-  if (markerTypes.length) {
-    const entries = markerTypes.map((t) => ({
+    return rows;
+  };
+  const zoneRows = wrapRows(zoneTypes.map((t) => ({ t, label: zoneName(t) })),
+    (entry) => 7.4 + be.measure(entry.label, 2.2) + 2.2);
+  const markerRows = wrapRows(markerTypes.map((t) => ({
       t,
       label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : markerNote(t) ? ` · ${markerNote(t)}` : ''}`,
-    }));
-    const widths = entries.map((e) => 4.4 + be.measure(e.label, 2.4) + 3);
-    let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);
-    const y = zoneTypes.length ? yBase + 11.5 : rowY;
-    for (let i = 0; i < entries.length; i++) {
-      drawMarkerGlyph(be, x + 2, y, entries[i].t, 2.6);
-      be.text(entries[i].label, x + 4.4, y,
+    })), (entry) => 4.4 + be.measure(entry.label, 2.4) + 3);
+
+  let legendRow = 0;
+  for (const row of zoneRows) {
+    let x = page.w - MARGIN - row.width;
+    const y = yBase + 4 + legendRow++ * 6;
+    for (const entry of row.entries) {
+      drawZoneGlyph(be, x, y - 1.6, 6, 3.2, entry.t);
+      be.text(entry.label, x + 7.4, y,
+        { fill: '#000', size: 2.2, align: 'left', baseline: 'middle' });
+      x += entry.width;
+    }
+  }
+  for (const row of markerRows) {
+    let x = page.w - MARGIN - row.width;
+    const y = yBase + 4 + legendRow++ * 6;
+    for (const entry of row.entries) {
+      drawMarkerGlyph(be, x + 2, y, entry.t, 2.6);
+      be.text(entry.label, x + 4.4, y,
         { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
-      x += widths[i];
+      x += entry.width;
     }
   }
 }
