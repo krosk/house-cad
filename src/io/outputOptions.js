@@ -2,7 +2,7 @@
 // export. These are UI preferences rather than authored project data, so they
 // live in localStorage and old project saves remain unchanged.
 
-export const OUTPUT_FORMATS = ['svg', 'dxf'];
+export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'json'];
 export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'furniture', 'area'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,

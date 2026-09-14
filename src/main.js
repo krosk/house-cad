@@ -13,7 +13,7 @@ import {
   serializeProject, deserializeInto,
 } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
-import { floorToSvg, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
+import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { floorToDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
@@ -404,8 +404,8 @@ syncUnitUI(); // apply a preference restored from an earlier desktop/AR session
 })();
 
 // ---- save / load ----
-function download(filename, text, mime = 'application/json') {
-  const blob = new Blob([text], { type: mime });
+function download(filename, data, mime = 'application/json') {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -478,11 +478,18 @@ fileInput.addEventListener('change', async () => {
 // A to-scale floor-plan sheet per floor, drawn from the model (src/io/planSheet.js).
 // "Print all floors" opens a hidden iframe holding every floor's SVG (one per page)
 // at a shared, maximized scale, then invokes the browser print dialog → Save as PDF.
-// "Download SVG" saves the active floor as a vector sheet. "Download DXF" saves
-// its authored CAD geometry at 1:1 in millimeters. Sheets are in real mm; print
-// at 100% for true scale.
+// SVG saves the active floor as a vector sheet; PNG rasterizes that same sheet at
+// high resolution. DXF saves authored CAD geometry at 1:1 in millimeters. Vector
+// sheets are in real mm; print SVG/PDF at 100% for true scale.
 function safeName(s) {
   return (s || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor';
+}
+
+function sheetDownloadName(floor, extension, now = new Date()) {
+  const pad = (n, width = 2) => String(n).padStart(width, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+    + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`;
+  return `plan-${safeName(floor.name)}-${stamp}.${extension}`;
 }
 
 function printSheets(svgs) {
@@ -525,7 +532,7 @@ function printSheets(svgs) {
   const anyGeometry = () => project.floors.some((f) => f.rectangles.length > 0);
 
   pop.querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', () => {
+    b.addEventListener('click', async () => {
       close();
       if (!anyGeometry()) { sketch.onStatus?.('Nothing to print — the plan is empty.'); return; }
       try {
@@ -534,12 +541,21 @@ function printSheets(svgs) {
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
           const sheetOpts = sharedScaleSheetOptions(project.floors, { floorLabel: localizedFloorName });
-          download(`plan-${safeName(f.name)}.svg`, floorToSvg(f, sheetOpts), 'image/svg+xml');
-          sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
+          const name = sheetDownloadName(f, 'svg');
+          download(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
+          sketch.onStatus?.(`Downloaded ${name}`);
+        } else if (b.dataset.print === 'png') {
+          const f = project.activeFloor;
+          const sheetOpts = sharedScaleSheetOptions(project.floors, { floorLabel: localizedFloorName });
+          const blob = await floorToPngBlob(f, sheetOpts);
+          const name = sheetDownloadName(f, 'png');
+          download(name, blob, 'image/png');
+          sketch.onStatus?.(`Downloaded ${name}`);
         } else if (b.dataset.print === 'dxf') {
           const f = project.activeFloor;
-          download(`plan-${safeName(f.name)}.dxf`, floorToDxf(f), 'application/dxf');
-          sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.dxf — millimeters, 1:1 CAD scale.`);
+          const name = sheetDownloadName(f, 'dxf');
+          download(name, floorToDxf(f), 'application/dxf');
+          sketch.onStatus?.(`Downloaded ${name} — millimeters, 1:1 CAD scale.`);
         } else {
           printSheets(floorsToSharedScaleSvgs(project.floors, { floorLabel: localizedFloorName }));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');

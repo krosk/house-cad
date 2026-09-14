@@ -1170,3 +1170,15 @@ export function floorToCanvas(floor, canvas, opts = {}) {
   const be = canvasBackend(ctx, k);
   return renderFloor(be, floor, opts);
 }
+
+/** Render one floor's complete paper sheet to a downloadable PNG image. */
+export function floorToPngBlob(floor, opts = {}) {
+  const canvas = document.createElement('canvas');
+  floorToCanvas(floor, canvas, { targetPx: 4096, ...opts });
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('PNG encoding failed'));
+    }, 'image/png');
+  });
+}

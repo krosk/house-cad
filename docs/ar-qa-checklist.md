@@ -196,7 +196,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Grip and thumbstick up/down are inert
 
 ## PROJECT · EXPORT (`export`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
-> Configure + download the active floor as SVG/DXF. The SVG path is desktop-verified (rendered + eyeballed);
+> Configure + download the active floor as SVG/PNG/DXF or the full project as JSON. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
@@ -212,8 +212,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Triggering each row toggles it and immediately refreshes the companion sheet
 - [ ] FURNITURE off excludes it from footprint, symbols, legend, and scale; on restores those in SVG and DXF
 - [ ] AREA off hides room-area chips in the sheet and `ROOM_INFO` entities in DXF; on restores both
-- [ ] A structural dimension with either endpoint on FURNITURE remains absent from SVG/DXF and does not reduce sheet scale
-- [ ] A marker-pin dimension anchored to a FURNITURE edge is likewise always absent from SVG/DXF
+- [ ] A structural dimension with either endpoint on FURNITURE remains absent from SVG/PNG/DXF and does not reduce sheet scale
+- [ ] A marker-pin dimension anchored to a FURNITURE edge is likewise always absent from SVG/PNG/DXF
 - [ ] Both hidden furniture constraints remain stored and continue driving geometry in AR
 - [ ] FURNITURE does not reduce a connected ROOM component's reported/printed area; every other
       subtract kind still does
@@ -246,10 +246,16 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] A legitimate portrait/landscape change refreshes the left sheet immediately without stale or squeezed texture content
 - [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
 - [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
-- [ ] **Thumbstick up/down** switches only `SVG` / `DXF`; it never changes the active floor
+- [ ] **Thumbstick up/down** switches only `SVG` / `PNG` / `DXF` / `JSON`; it never changes the active floor
 - [ ] Changing floor in LEVEL changes the panel's `Active · <FloorName>` and companion preview
 - [ ] Triggering blank panel space does nothing; only the separate EXPORT button downloads
-- [ ] With SVG selected, EXPORT downloads `plan-<active-floor>.svg`; with DXF it downloads `.dxf`
+- [ ] Sheet/CAD export downloads `plan-<active-floor>-<timestamp>` with the selected `.svg`, `.png`, or `.dxf` extension
+- [ ] JSON downloads `house-debug-<timestamp>.json` containing the complete serialized multi-floor project
+- [ ] Output checkboxes do not remove any data from the JSON debugging export
+- [ ] Every export receives a distinct timestamped filename
+- [ ] After one direct AR download, a later export opens Android's share sheet and can save/share
+      another floor or format instead of being blocked by Chromium's multi-download gate
+- [ ] PNG is a sharp 4096-pixel-long-edge raster matching the SVG sheet content and output filters
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
 - [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors
 - [ ] Grip is inert here (no delete/undo); leaving EXPORT keeps the active-floor companion visible

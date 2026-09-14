@@ -120,16 +120,24 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   or occupied destination, so it
   never overwrites or implicitly merges data; floor names, heights, elevations, and the ground datum
   stay attached to their existing storeys.
-- **EXPORT** (`id: export`) — preview + download the active LEVEL floor as SVG or DXF.
+- **EXPORT** (`id: export`) — preview + download the active LEVEL floor as SVG, PNG, or DXF,
+  or download the complete serialized project structure as debugging JSON.
   When the optional LEFT controller is detected, an enlarged panel (`makeSheetPanel`) follows it
   in every mode and shows the active floor rasterized by `floorToCanvas`
   (`src/io/planSheet.js`) — the SAME renderer that produces the printable/downloadable SVG,
   so preview == print. Model rebuilds dirty this live sheet; the frame loop redraws it at up to
   8 fps during continuous dimension/edge drags. The preview/export floor is always the active
   real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
-  `SVG` / `DXF`. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
+  `SVG` / `PNG` / `DXF` / `JSON`. PNG is a 4096-pixel-long-edge raster of the same complete paper sheet
+  as SVG. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
   a separate **EXPORT** button downloads the selected format to the headset. These choices persist
   locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
+  Every export gets a millisecond timestamp in its filename. Chromium may gate a second synthetic
+  download from one immersive session regardless of its name; after the first direct download,
+  AR therefore uses Android Web Share (when file sharing is supported) for subsequent exports.
+  The share sheet is an intentional user-confirmed delivery step around that browser restriction.
+  JSON uses `serializeProject` and contains the whole multi-floor persistent model; output-layer
+  toggles do not filter or mutate this debugging snapshot.
   The panel is absent
   when no LEFT controller is connected. Read-only: no massing/pin edits, grip is inert. There is NO on-device printing — an
   immersive session has no print dialog; the SVG blob is the off-headset deliverable
@@ -321,8 +329,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   `107` and `24`.
 - **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA
   default to on/on/on/off/on. The first three independently control drawing, legend, and scale-fitting
-  participation; FURNITURE controls its footprint/symbol/legend in both SVG and DXF. Furniture
-  constraints remain authoring-only and are excluded from both formats even when furniture is shown.
+  participation; FURNITURE controls its footprint/symbol/legend in SVG, PNG, and DXF. Furniture
+  constraints remain authoring-only and are excluded from those formats even when furniture is shown.
   AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF.
   The model geometry and constraints remain stored and solved.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
@@ -419,6 +427,6 @@ teleport reticle; no last-active routing remains.
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
-| `src/io/outputOptions.js` | Device-local SVG/DXF format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
+| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

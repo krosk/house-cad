@@ -23,7 +23,7 @@ import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
-import { floorToSvg, floorToCanvas, sharedScaleSheetOptions } from '../io/planSheet.js';
+import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { floorToDxf } from '../io/dxf.js';
 import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
@@ -867,7 +867,7 @@ export function setupMR(view, project, getFootprint) {
   const unitMenu = makeUnitMenu();
   scene.add(unitMenu.group);
 
-  // Unified SVG/DXF options + explicit export action.
+  // Unified SVG/PNG/DXF/JSON options + explicit export action.
   const exportMenu = makeExportMenu();
   scene.add(exportMenu.group);
 
@@ -2470,7 +2470,7 @@ export function setupMR(view, project, getFootprint) {
     overwriteSlot = null;
   }
 
-  // ---- EXPORT: live preview + SVG/DXF download of the active LEVEL floor ----
+  // ---- EXPORT: active-floor SVG/PNG/DXF + complete-project debug JSON ----
   // The preview is persistently mounted on the optional LEFT controller and always
   // follows the active floor. PROJECT · EXPORT only changes output format/layers;
   // floor selection remains owned by SETUP · LEVEL.
@@ -2527,9 +2527,9 @@ export function setupMR(view, project, getFootprint) {
   // Fire-and-forget blob download. In the immersive TWA the download UI isn't visible,
   // but Android's DownloadManager still writes the file to the headset's Download folder
   // (retrieve by cable). Returns false if the browser refused it.
-  function downloadBlob(filename, text, mime) {
+  function downloadBlob(filename, data, mime) {
     try {
-      const blob = new Blob([text], { type: mime });
+      const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.rel = 'noopener';
@@ -2539,8 +2539,38 @@ export function setupMR(view, project, getFootprint) {
     } catch { return false; }
   }
 
-  const exportFileName = (f, extension) =>
-    `plan-${(f.name || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor'}.${extension}`;
+  let directExportCount = 0;
+
+  // Chromium permits the first synthetic file download from an immersive page,
+  // then may gate later files behind its "multiple automatic downloads" setting.
+  // Android Web Share is a user-confirmed delivery path and is not subject to that
+  // gate, so use it for later exports where the platform supports sharing files.
+  async function deliverExport(filename, data, mime) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    const file = new File([blob], filename, { type: mime });
+    const shareData = { files: [file], title: filename };
+    if (directExportCount > 0 && navigator.share
+      && (!navigator.canShare || navigator.canShare(shareData))) {
+      await navigator.share(shareData);
+      return { ok: true, delivery: 'share' };
+    }
+    const ok = downloadBlob(filename, blob, mime);
+    if (ok) directExportCount += 1;
+    return { ok, delivery: 'download' };
+  }
+
+  // Android's download layer may reject a second write to the same destination
+  // name while the first still exists. Give every trigger its own sortable name
+  // so repeated exports in one immersive session never become implicit overwrites.
+  const exportFileName = (f, extension, now = new Date()) => {
+    const floor = (f.name || 'floor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'floor';
+    const pad = (n, width = 2) => String(n).padStart(width, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+      + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`;
+    return extension === 'json'
+      ? `house-debug-${stamp}.json`
+      : `plan-${floor}-${stamp}.${extension}`;
+  };
 
   // Briefly show a message on the mode label, then restore the breadcrumb.
   function sheetFlash(msg) {
@@ -2549,15 +2579,20 @@ export function setupMR(view, project, getFootprint) {
     sheetFlashTimer = setTimeout(() => { if (isSheetExportMode(modes[currentMode].id)) setModeInfo(); }, 1600);
   }
 
-  function performExport() {
+  async function performExport() {
     const f = currentSheetFloor();
     const settings = getOutputSettings();
     const extension = settings.format;
     const name = exportFileName(f, extension);
-    let text;
+    let data;
     let mime;
-    if (extension === 'dxf') {
-      text = floorToDxf(f, { layers: settings });
+    if (extension === 'json') {
+      // Debug export is the complete persisted project structure. Sheet filters
+      // deliberately do not alter it, so it can reproduce the exact saved state.
+      data = JSON.stringify(serializeProject(project), null, 2);
+      mime = 'application/json';
+    } else if (extension === 'dxf') {
+      data = floorToDxf(f, { layers: settings });
       mime = 'application/dxf';
     } else {
       const sheetOpts = sharedScaleSheetOptions(project.floors, {
@@ -2568,18 +2603,31 @@ export function setupMR(view, project, getFootprint) {
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
       });
-      text = floorToSvg(f, sheetOpts);
-      mime = 'image/svg+xml';
+      if (extension === 'png') {
+        data = await floorToPngBlob(f, sheetOpts);
+        mime = 'image/png';
+      } else {
+        data = floorToSvg(f, sheetOpts);
+        mime = 'image/svg+xml';
+      }
     }
-    const ok = downloadBlob(name, text, mime);
-    rlog('output download', { floor: f.name, format: extension, name, ok, layers: settings });
-    sheetFlash(ok ? `⬇ ${name}` : 'download blocked');
+    const result = await deliverExport(name, data, mime);
+    rlog('output download', {
+      floor: f.name, format: extension, name,
+      ok: result.ok, delivery: result.delivery, layers: settings,
+    });
+    sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'download blocked');
   }
 
-  function onExportTouch() {
+  async function onExportTouch() {
     if (!hoverExportAction) return;
     if (hoverExportAction === 'export') {
-      performExport();
+      try {
+        await performExport();
+      } catch (error) {
+        rlog('output download failed', String(error?.message || error));
+        sheetFlash('export failed');
+      }
       return;
     }
     toggleOutputLayer(hoverExportAction);
@@ -3334,7 +3382,8 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'export', color: C_EXPORT, // label/help via i18n: mode.export / help.export
-      // Active LEVEL floor only. Thumbstick-y switches SVG/DXF; ray+trigger toggles
+      // Active LEVEL floor for sheet/CAD formats; JSON exports the complete project.
+      // Thumbstick-y switches SVG/PNG/DXF/JSON; ray+trigger toggles
       // the output profile or presses the separate EXPORT button.
       onTouch: onExportTouch,
     },
@@ -3918,7 +3967,7 @@ export function setupMR(view, project, getFootprint) {
       btn.stick = false;
     }
     // Stick up/down is the universal "cycle the current thing" control: LEVEL = floor,
-    // UNIT = display/input unit, LANG = language, EXPORT = SVG/DXF format,
+    // UNIT = display/input unit, LANG = language, EXPORT = SVG/PNG/DXF/JSON format,
     // MARKER = retype the selected marker (or the drop type if none
     // selected), PLAN·ADD = zone kind to add, PLAN·EDIT = selected zone kind.
     // Inert in every other mode.
