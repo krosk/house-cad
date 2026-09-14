@@ -718,7 +718,10 @@ function drawFixtureBox(be, box, metrics, x, y) {
       glyphX += glyphSize + metrics.glyphGap;
     }
     if (labels[0]) {
-      be.text(labels[0], glyphX - metrics.glyphGap + labelGap, glyphY, {
+      // `glyphX` now points at the next glyph centre. Step back by the inter-glyph
+      // gap and one radius to reach the last glyph's right edge before adding the
+      // label gap. Omitting the radius placed the label outside its measured box.
+      be.text(labels[0], glyphX - metrics.glyphGap - glyphR + labelGap, glyphY, {
         fill: C_MARK, size: textSize, align: 'left', baseline: 'middle',
       });
     }
