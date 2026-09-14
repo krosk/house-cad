@@ -145,9 +145,9 @@ const STRINGS = {
     zh: '瞄准一个已占用的槽位并扣动扳机，将其加载到已注册的坐标系中。空槽位无效。',
   },
   'help.export': {
-    en: 'Exports the active LEVEL floor as SVG, PNG, or DXF, or the complete raw project as JSON. Thumbstick up/down changes format; use the separate EXPORT button.',
-    fr: 'Exporte l’étage actif en SVG, PNG ou DXF, ou le projet brut complet en JSON. Joystick haut/bas : format ; utilisez le bouton EXPORTER.',
-    zh: '将当前楼层导出为 SVG、PNG 或 DXF，或将完整原始项目导出为 JSON。摇杆上/下切换格式；选择单独的“导出”按钮。',
+    en: 'Exports the active LEVEL floor as SVG, PNG, detailed DXF, or simplified COOHOM DXF, or the complete raw project as JSON. Thumbstick up/down changes format; use the separate EXPORT button.',
+    fr: 'Exporte l’étage actif en SVG, PNG, DXF détaillé ou DXF COOHOM simplifié, ou le projet brut complet en JSON. Joystick haut/bas : format ; utilisez le bouton EXPORTER.',
+    zh: '将当前楼层导出为 SVG、PNG、详细 DXF 或简化的 COOHOM DXF，或将完整原始项目导出为 JSON。摇杆上/下切换格式；选择单独的“导出”按钮。',
   },
   'help.copy_floor': {
     en: 'Trigger to copy the active floor, including its dimensions and markers. It remains available after loading another save.',

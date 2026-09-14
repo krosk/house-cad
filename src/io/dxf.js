@@ -103,7 +103,7 @@ function writeHeader(w) {
   w.pair(0, 'ENDSEC');
 }
 
-function writeTables(w) {
+function writeTables(w, layers = LAYERS) {
   w.pair(0, 'SECTION'); w.pair(2, 'TABLES');
 
   w.pair(0, 'TABLE'); w.pair(2, 'LTYPE');
@@ -125,8 +125,8 @@ function writeTables(w) {
 
   w.pair(0, 'TABLE'); w.pair(2, 'LAYER');
   const layerTable = w.handle();
-  w.pair(5, layerTable); w.pair(330, 0); w.pair(100, 'AcDbSymbolTable'); w.pair(70, LAYERS.length);
-  for (const [name, color, linetype] of LAYERS) {
+  w.pair(5, layerTable); w.pair(330, 0); w.pair(100, 'AcDbSymbolTable'); w.pair(70, layers.length);
+  for (const [name, color, linetype] of layers) {
     w.pair(0, 'LAYER'); w.pair(5, w.handle()); w.pair(330, layerTable);
     w.pair(100, 'AcDbSymbolTableRecord'); w.pair(100, 'AcDbLayerTableRecord');
     w.pair(2, name); w.pair(70, 0);
@@ -385,4 +385,154 @@ export function floorToDxf(floor, opts = {}) {
 
   w.pair(0, 'ENDSEC'); w.pair(0, 'EOF');
   return w.toString();
+}
+
+// Coohom's CAD recognizer works best on a deliberately sparse architectural
+// drawing: one floor in model space, millimetres, with only wall faces, doors,
+// and windows. Keep this separate from the detailed archival/electrical DXF.
+const COOHOM_LAYERS = [
+  ['WALL', 7, 'CONTINUOUS'],
+  ['WINDOW', 7, 'CONTINUOUS'],
+];
+
+// R12 ASCII deliberately avoids the handles, subclass markers, block-record
+// tables, and object dictionaries required by later DXF revisions. Recognition
+// services tend to accept this small interchange subset more reliably.
+class R12DxfWriter extends DxfWriter {
+  entity(type, layer, _subclass, linetype = null) {
+    this.pair(0, type);
+    this.pair(8, layer);
+    if (linetype) this.pair(6, linetype);
+  }
+}
+
+function writeR12CoohomHeader(w) {
+  w.pair(0, 'SECTION'); w.pair(2, 'HEADER');
+  w.pair(9, '$ACADVER'); w.pair(1, 'AC1009');
+  w.pair(9, '$MEASUREMENT'); w.pair(70, 1);
+  w.pair(0, 'ENDSEC');
+}
+
+function writeR12CoohomTables(w) {
+  w.pair(0, 'SECTION'); w.pair(2, 'TABLES');
+  w.pair(0, 'TABLE'); w.pair(2, 'LTYPE'); w.pair(70, 1);
+  w.pair(0, 'LTYPE'); w.pair(2, 'CONTINUOUS'); w.pair(70, 0);
+  w.pair(3, 'Solid line'); w.pair(72, 65); w.pair(73, 0); w.pair(40, 0);
+  w.pair(0, 'ENDTAB');
+  w.pair(0, 'TABLE'); w.pair(2, 'LAYER'); w.pair(70, COOHOM_LAYERS.length);
+  for (const [name, color, linetype] of COOHOM_LAYERS) {
+    w.pair(0, 'LAYER'); w.pair(2, name); w.pair(70, 0);
+    w.pair(62, color); w.pair(6, linetype);
+  }
+  w.pair(0, 'ENDTAB');
+  w.pair(0, 'ENDSEC');
+}
+
+function coohomLineWriter(w) {
+  const seen = new Set();
+  return (layer, ax, ay, bx, by) => {
+    const a = [cleanNumber(ax), cleanNumber(ay)];
+    const b = [cleanNumber(bx), cleanNumber(by)];
+    const ordered = a[0] < b[0] || (a[0] === b[0] && a[1] <= b[1]) ? [a, b] : [b, a];
+    const key = `${layer}:${ordered[0].join(',')}:${ordered[1].join(',')}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    w.line(layer, ax, ay, bx, by);
+  };
+}
+
+function writeCoohomWindow(line, rect) {
+  const b = rect.bounds;
+  const width = b.x1 - b.x0, height = b.y1 - b.y0;
+  // Four parallel projection lines match Coohom's documented linear-window
+  // convention. End caps are intentionally omitted to avoid a generic rectangle.
+  for (let i = 0; i < 4; i++) {
+    const t = i / 3;
+    if (width >= height) {
+      const y = b.y0 + height * t;
+      line('WINDOW', b.x0, y, b.x1, y);
+    } else {
+      const x = b.x0 + width * t;
+      line('WINDOW', x, b.y0, x, b.y1);
+    }
+  }
+}
+
+// Remove door intervals from axis-aligned wall faces. Coohom then receives a
+// literal opening rather than a door symbol it might fail to recognize.
+function writeCoohomWallSegment(line, a, b, doors) {
+  const epsilon = 1e-7;
+  const horizontal = Math.abs(a[1] - b[1]) <= epsilon;
+  const vertical = Math.abs(a[0] - b[0]) <= epsilon;
+  if (!horizontal && !vertical) {
+    line('WALL', a[0], a[1], b[0], b[1]);
+    return;
+  }
+  const start = horizontal ? Math.min(a[0], b[0]) : Math.min(a[1], b[1]);
+  const end = horizontal ? Math.max(a[0], b[0]) : Math.max(a[1], b[1]);
+  const fixed = horizontal ? a[1] : a[0];
+  const cuts = [];
+  for (const door of doors) {
+    const d = door.bounds;
+    const doorHorizontal = d.x1 - d.x0 >= d.y1 - d.y0;
+    if (horizontal !== doorHorizontal) continue;
+    const crosses = horizontal
+      ? fixed >= d.y0 - epsilon && fixed <= d.y1 + epsilon
+      : fixed >= d.x0 - epsilon && fixed <= d.x1 + epsilon;
+    if (!crosses) continue;
+    const lo = Math.max(start, horizontal ? d.x0 : d.y0);
+    const hi = Math.min(end, horizontal ? d.x1 : d.y1);
+    if (hi > lo + epsilon) cuts.push([lo, hi]);
+  }
+  cuts.sort((x, y) => x[0] - y[0]);
+  let cursor = start;
+  for (const [lo, hi] of cuts) {
+    if (lo > cursor + epsilon) {
+      if (horizontal) line('WALL', cursor, fixed, lo, fixed);
+      else line('WALL', fixed, cursor, fixed, lo);
+    }
+    cursor = Math.max(cursor, hi);
+  }
+  if (cursor < end - epsilon) {
+    if (horizontal) line('WALL', cursor, fixed, end, fixed);
+    else line('WALL', fixed, cursor, fixed, end);
+  }
+}
+
+/**
+ * Recognition-oriented DXF for Coohom: one floor, 2D model space, millimetres,
+ * and no annotations/electrical/furniture entities. Rooms provide the wall-face
+ * linework; explicit WALL rectangles preserve authored wall thicknesses.
+ */
+export function floorToCoohomDxf(floor) {
+  const w = new R12DxfWriter();
+  writeR12CoohomHeader(w);
+  writeR12CoohomTables(w);
+  w.pair(0, 'SECTION'); w.pair(2, 'ENTITIES');
+  const line = coohomLineWriter(w);
+
+  // Union room construction rectangles first, otherwise their authored seams
+  // would be misread as walls. Include explicit WALL subtraction rectangles so
+  // their opposite faces remain present in the resulting free-space boundary.
+  const structural = (floor.rectangles || [])
+    .filter((rect) => ['room', 'wall'].includes(zoneKind(rect)));
+  const doors = (floor.rectangles || []).filter((rect) => zoneKind(rect) === 'door');
+  const footprint = computeFootprint(structural);
+  for (const polygon of footprint) {
+    for (const ring of polygon) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        writeCoohomWallSegment(line, a, b, doors);
+      }
+    }
+  }
+  for (const rect of floor.rectangles || []) {
+    const kind = zoneKind(rect);
+    if (kind === 'window') writeCoohomWindow(line, rect);
+  }
+
+  w.pair(0, 'ENDSEC'); w.pair(0, 'EOF');
+  // AutoCAD-authored ASCII DXF conventionally uses CRLF; keep the recognition
+  // preset conservative for importers with stricter text parsers.
+  return w.toString().replace(/\n/g, '\r\n');
 }

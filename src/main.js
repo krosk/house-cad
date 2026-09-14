@@ -14,7 +14,7 @@ import {
 } from './io/serialize.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
-import { floorToDxf } from './io/dxf.js';
+import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
 import { t, localizedFloorName } from './core/i18n.js';
@@ -562,6 +562,11 @@ function printSheets(svgs) {
           const name = sheetDownloadName(f, 'dxf');
           download(name, floorToDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — millimeters, 1:1 CAD scale.`);
+        } else if (b.dataset.print === 'coohom') {
+          const f = project.activeFloor;
+          const name = sheetDownloadName(f, 'coohom.dxf');
+          download(name, floorToCoohomDxf(f), 'application/dxf');
+          sketch.onStatus?.(`Downloaded ${name} — simplified Coohom recognition geometry.`);
         } else {
           printSheets(floorsToSharedScaleSvgs(project.floors, localizedSheetOptions()));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');

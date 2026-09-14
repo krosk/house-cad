@@ -211,7 +211,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Grip and thumbstick up/down are inert
 
 ## PROJECT · EXPORT (`export`)  ⬜ NEW — build-verified only (canvas preview never rendered on device)
-> Configure + download the active floor as SVG/PNG/DXF or the full project as JSON. The SVG path is desktop-verified (rendered + eyeballed);
+> Configure + download the active floor as SVG/PNG/detailed DXF/COOHOM DXF or the full project as JSON. The SVG path is desktop-verified (rendered + eyeballed);
 > the in-AR canvas raster is untested on the Quest. Debug via the plain Quest Browser (`?ar=1`).
 - [ ] Detecting LEFT shows an enlarged sheet mounted to and following that controller in every mode
 - [ ] The sheet sits outside the left hand and leaves its cyan aiming ray/reticle unobstructed
@@ -264,7 +264,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] A legitimate portrait/landscape change refreshes the left sheet immediately without stale or squeezed texture content
 - [ ] Model origin `(0,0)` maps to the identical paper point on every page, so physically superposed sheets align
 - [ ] An empty floor produces its own labeled empty page at the shared scale; adjacent floor content never flows onto it
-- [ ] **Thumbstick up/down** switches only `SVG` / `PNG` / `DXF` / `JSON`; it never changes the active floor
+- [ ] **Thumbstick up/down** switches only `SVG` / `PNG` / `DXF` / `COOHOM DXF` / `JSON`; it never changes the active floor
 - [ ] Changing floor in LEVEL changes the panel's `Active · <FloorName>` and companion preview
 - [ ] Triggering blank panel space does nothing; only the separate EXPORT button downloads
 - [ ] Sheet/CAD export downloads `plan-<active-floor>-<timestamp>` with the selected `.svg`, `.png`, or `.dxf` extension
@@ -280,7 +280,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
 - [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
-- [ ] Coohom recognizes the DXF wall/door/window geometry; annotation layers can be hidden if needed
+- [ ] COOHOM DXF contains only 2D LINE entities on WALL/WINDOW layers in millimetre model space; doors are empty wall gaps
+- [ ] Coohom recognizes the COOHOM DXF wall/door/window geometry after an AutoCAD save-as round trip if required
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted

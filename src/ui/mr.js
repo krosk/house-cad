@@ -24,7 +24,7 @@ import {
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
-import { floorToDxf } from '../io/dxf.js';
+import { floorToDxf, floorToCoohomDxf } from '../io/dxf.js';
 import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
 } from '../io/outputOptions.js';
@@ -603,7 +603,8 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillText(`${t('export.active')} · ${floorName}`, 28, 99);
       ctx.fillStyle = '#e6edf3';
       ctx.font = 'bold 30px sans-serif';
-      ctx.fillText(`${t('export.format')} · ${settings.format.toUpperCase()}`, 28, 152);
+      const formatLabel = settings.format === 'coohom' ? 'COOHOM DXF' : settings.format.toUpperCase();
+      ctx.fillText(`${t('export.format')} · ${formatLabel}`, 28, 152);
       ctx.fillStyle = '#768390';
       ctx.font = '21px sans-serif';
       ctx.textAlign = 'right';
@@ -2588,8 +2589,11 @@ export function setupMR(view, project, getFootprint) {
   async function performExport() {
     const f = currentSheetFloor();
     const settings = getOutputSettings();
-    const extension = settings.format;
-    const name = exportFileName(f, extension);
+    const format = settings.format;
+    const extension = format === 'coohom' ? 'dxf' : format;
+    const name = format === 'coohom'
+      ? exportFileName(f, 'coohom.dxf')
+      : exportFileName(f, extension);
     let data;
     let mime;
     if (extension === 'json') {
@@ -2597,6 +2601,9 @@ export function setupMR(view, project, getFootprint) {
       // deliberately do not alter it, so it can reproduce the exact saved state.
       data = JSON.stringify(serializeProject(project), null, 2);
       mime = 'application/json';
+    } else if (format === 'coohom') {
+      data = floorToCoohomDxf(f);
+      mime = 'application/dxf';
     } else if (extension === 'dxf') {
       data = floorToDxf(f, { layers: settings });
       mime = 'application/dxf';
@@ -2620,7 +2627,7 @@ export function setupMR(view, project, getFootprint) {
     }
     const result = await deliverExport(name, data, mime);
     rlog('output download', {
-      floor: f.name, format: extension, name,
+      floor: f.name, format, name,
       ok: result.ok, delivery: result.delivery, layers: settings,
     });
     sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'download blocked');
@@ -4192,7 +4199,8 @@ export function setupMR(view, project, getFootprint) {
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
       : null;
     const exportStatus = modes[currentMode].id === 'export'
-      ? `${t('export.format')} · ${getOutputSettings().format.toUpperCase()}` : null;
+      ? `${t('export.format')} · ${getOutputSettings().format === 'coohom'
+        ? 'COOHOM DXF' : getOutputSettings().format.toUpperCase()}` : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER

@@ -139,7 +139,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   so preview == print. Model rebuilds dirty this live sheet; the frame loop redraws it at up to
   8 fps during continuous dimension/edge drags. The preview/export floor is always the active
   real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
-  `SVG` / `PNG` / `DXF` / `JSON`. PNG is a 4096-pixel-long-edge raster of the same complete paper sheet
+  `SVG` / `PNG` / `DXF` / `COOHOM DXF` / `JSON`. PNG is a 4096-pixel-long-edge raster of the same complete paper sheet
   as SVG. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
   a separate **EXPORT** button downloads the selected format to the headset. These choices persist
   locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
@@ -363,11 +363,12 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
 - Verified: the SVG path is rendered + eyeballed (rsvg) on desktop. **The canvas backend
   (AR preview) is build-verified only** — no browser/Quest raster test in CI.
 
-Desktop offers **Download DXF (this floor)** via `src/io/dxf.js`; AR exposes the same exporter in
-**PROJECT · EXPORT**, always targeting the active LEVEL floor. DXF is model space rather
-than a paper rendition: ASCII AutoCAD 2000, millimeter units, 1:1 geometry, and separate semantic
-layers for footprint/zones/dimensions/markers/areas/origin. It targets CAD floor-plan importers such
-as Coohom and does not alter or replace the shared SVG/canvas sheet renderer.
+Desktop offers **Download DXF (this floor)** and **Download Coohom DXF (this floor)** via
+`src/io/dxf.js`; AR exposes both in **PROJECT · EXPORT**, always targeting the active LEVEL floor.
+Detailed DXF is a 1:1, millimetre model-space archive with semantic layers for footprint, zones,
+dimensions, markers, areas, and origin. COOHOM DXF is a separate recognition preset containing only
+simple 2D LINE entities on WALL and WINDOW layers; doors are left as empty wall openings, while all
+annotations, markers, furniture, electrical routes, and unrelated zone types are omitted.
 
 ## Coordinate mapping
 
@@ -442,6 +443,6 @@ teleport reticle; no last-active routing remains.
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
-| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
+| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |
