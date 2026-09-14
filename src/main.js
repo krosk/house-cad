@@ -196,7 +196,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;

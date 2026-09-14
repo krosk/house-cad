@@ -21,6 +21,7 @@ const LAYERS = [
   ['FOOTPRINT', 7, 'CONTINUOUS'],
   ['ROOM', 5, 'CONTINUOUS'],
   ['WALL', 1, 'CONTINUOUS'],
+  ['INSULATION', 6, 'CONTINUOUS'],
   ['DOOR', 3, 'CONTINUOUS'],
   ['WINDOW', 4, 'CONTINUOUS'],
   ['STAIRS', 2, 'CONTINUOUS'],
@@ -147,6 +148,17 @@ function writeZoneSymbol(w, rect, kind) {
   const horizontal = width >= height;
   if (kind === 'door') {
     w.line('DOOR', b.x0, b.y0, b.x1, b.y1);
+  } else if (kind === 'insulation') {
+    const count = 6;
+    for (let i = 0; i < count; i++) {
+      if (horizontal) {
+        const xa = b.x0 + width * i / count, xb = b.x0 + width * (i + 1) / count;
+        w.line('INSULATION', xa, i % 2 ? b.y0 : b.y1, xb, i % 2 ? b.y1 : b.y0);
+      } else {
+        const ya = b.y0 + height * i / count, yb = b.y0 + height * (i + 1) / count;
+        w.line('INSULATION', i % 2 ? b.x0 : b.x1, ya, i % 2 ? b.x1 : b.x0, yb);
+      }
+    }
   } else if (kind === 'window') {
     if (horizontal) {
       w.line('WINDOW', b.x0, b.y0 + height * 0.35, b.x1, b.y0 + height * 0.35);
@@ -515,7 +527,7 @@ export function floorToCoohomDxf(floor) {
   // would be misread as walls. Include explicit WALL subtraction rectangles so
   // their opposite faces remain present in the resulting free-space boundary.
   const structural = (floor.rectangles || [])
-    .filter((rect) => ['room', 'wall'].includes(zoneKind(rect)));
+    .filter((rect) => ['room', 'wall', 'insulation'].includes(zoneKind(rect)));
   const doors = (floor.rectangles || []).filter((rect) => zoneKind(rect) === 'door');
   const footprint = computeFootprint(structural);
   for (const polygon of footprint) {

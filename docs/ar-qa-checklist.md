@@ -77,6 +77,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Trigger with **WALL** selected drops a **subtract** rectangle (solid wall)
 - [ ] Trigger with **DOOR** selected also drops a subtract rectangle, but saves `kind: "door"`
 - [ ] **STAIRS** and **CABINET** also subtract for now while saving their distinct kinds
+- [ ] **INSULATION** subtracts like WALL, saves `kind: "insulation"`, and uses its own type tint
 - [ ] **FURNITURE** subtracts for now, saves `kind: "furniture"`, and uses its orange type tint
 - [ ] 3D extrusion updates live *(drop-of-a-box itself was verified s14; the kind picker is new)*
 
@@ -193,7 +194,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] COPY snapshots the active floor and flashes its name without changing the project
 - [ ] After loading a different save, PASTE replaces the currently active floor's plan
 - [ ] The destination floor keeps its id, name, height, elevation, and ground designation
-- [ ] The pasted plan preserves room/wall/door/window/stairs/cabinet/furniture kinds, dimensions, marker types and positions
+- [ ] The pasted plan preserves room/wall/insulation/door/window/stairs/cabinet/furniture kinds, dimensions, marker types and positions
 - [ ] Pasted rectangle, constraint and marker ids are fresh; every constraint points to pasted objects
 - [ ] The clipboard survives an APK relaunch and can be pasted repeatedly
 - [ ] An occupied target requires a second trigger; grip or changing mode cancels confirmation
@@ -222,8 +223,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
 - [ ] The generating software build id (Git revision + UTC build stamp) appears beside the timestamp
-- [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
-- [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
+- [ ] Insulation batts, door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
+- [ ] Each insulation/door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, MARKER ICONS, and AREA checked; FURNITURE unchecked
 - [ ] Triggering each row toggles it and immediately refreshes the companion sheet
 - [ ] MARKER ICONS off hides switch-light routes as well as endpoint glyphs, in sheet/SVG/PNG/DXF
@@ -278,7 +279,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors
 - [ ] Grip is inert here (no delete/undo); leaving EXPORT keeps the active-floor companion visible
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
-- [ ] Zone legend names switch with LANG (door/window/stairs/cabinet localized)
+- [ ] Zone legend names switch with LANG (insulation/door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
 - [ ] COOHOM DXF contains only 2D LINE entities on WALL/WINDOW layers in millimetre model space; doors are empty wall gaps
 - [ ] Coohom recognizes the COOHOM DXF wall/door/window geometry after an AutoCAD save-as round trip if required

@@ -80,7 +80,7 @@ const MARKER_LABELS = {
   outlet: 'Outlet', switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
 };
 const ZONE_LABELS = {
-  door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -375,6 +375,18 @@ function drawZoneGlyph(be, x, y, w, h, kind) {
   if (kind === 'door') {
     // Door leaf: one unmistakable diagonal across the authored opening.
     line(x, y1, x1, y, 0.28);
+  } else if (kind === 'insulation') {
+    // Repeating diagonal batts distinguish insulation from a plain wall cutout.
+    const count = 6;
+    for (let i = 0; i < count; i++) {
+      if (horizontal) {
+        const xa = x + w * i / count, xb = x + w * (i + 1) / count;
+        line(xa, i % 2 ? y : y1, xb, i % 2 ? y1 : y, 0.13);
+      } else {
+        const ya = y + h * i / count, yb = y + h * (i + 1) / count;
+        line(i % 2 ? x : x1, ya, i % 2 ? x1 : x, yb, 0.13);
+      }
+    }
   } else if (kind === 'window') {
     // Glazing: two parallel panes along the wall/opening's long axis.
     if (horizontal) {

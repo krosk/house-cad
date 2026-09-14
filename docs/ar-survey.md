@@ -55,7 +55,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), grip deletes it, and thumbstick up/down cycles
-  room→wall→door→window→stairs→cabinet→furniture. Marker
+  room→wall→insulation→door→window→stairs→cabinet→furniture. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
   readout continuously shows `TYPE · <kind>` and is the only label that changes while cycling.
   All subtract kinds deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
@@ -207,7 +207,7 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/door/window/stairs/cabinet/furniture kind to add
+  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/insulation/door/window/stairs/cabinet/furniture kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.
