@@ -152,7 +152,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   (`house-cad:lang:v1`) so it survives an APK relaunch. Missing key/lang falls back to en → key.
 - `mr.js` re-renders on `onLangChange`: current mode label/help + any open pad/menu. Canvas panels
   (numpad keys, slot cells, lang rows) resolve `t()` **at draw time**, so a redraw picks up the
-  switch. Floor NAMES (Basement/Ground/Upper) are model data, deliberately NOT localized.
+  switch. Floor NAMES remain stable model data for save compatibility; their built-in
+  Basement/Ground/Upper presentation is localized on sheets, while custom names pass through.
 - **CJK wrapping**: the help-box `wrap()` is CJK-aware — Chinese has no inter-word spaces, so each
   CJK glyph is its own break token (Latin runs stay whole). Without this a ZH sentence overflows as
   one giant "word". Relies on the platform having a CJK font (Quest Chromium ships Noto CJK).

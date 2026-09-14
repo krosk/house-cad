@@ -54,6 +54,9 @@ const STRINGS = {
 
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
+  'floor.ground': { en: 'Ground floor', fr: 'Rez-de-chaussée', zh: '底层' },
+  'floor.upper': { en: 'Upper floor', fr: 'Étage', zh: '上层' },
+  'floor.basement': { en: 'Basement', fr: 'Sous-sol', zh: '地下室' },
   'export.active': { en: 'Active', fr: 'Actif', zh: '当前楼层' },
   'export.format': { en: 'FORMAT', fr: 'FORMAT', zh: '格式' },
   'export.planDims': { en: 'PLAN DIMS', fr: 'COTES PLAN', zh: '平面尺寸' },
@@ -278,4 +281,14 @@ export function onLangChange(fn) {
 export function t(key) {
   const e = STRINGS[key];
   return (e && (e[current] ?? e.en)) ?? key;
+}
+
+// Built-in floor names remain stable model data for save compatibility. Translate
+// only their presentation; a user-renamed floor passes through verbatim.
+export function localizedFloorName(name) {
+  const normalized = String(name || '').trim().toLowerCase();
+  if (normalized === 'ground' || normalized === 'ground floor') return t('floor.ground');
+  if (normalized === 'upper' || normalized === 'upper floor') return t('floor.upper');
+  if (normalized === 'basement') return t('floor.basement');
+  return name;
 }

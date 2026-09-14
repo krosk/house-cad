@@ -971,7 +971,8 @@ function drawStrip(be, L, floor, opts) {
   const rowY = yBase + STRIP * 0.5; // vertical center of the strip content
 
   // Floor name (left) — a single label, not a full title block.
-  be.text(floor.name || 'Floor', MARGIN, yBase + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
+  const floorName = opts.floorLabel?.(floor.name) || floor.name || 'Floor';
+  be.text(floorName, MARGIN, yBase + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
   const generatedLabel = opts.generatedLabel || 'Generated';
   be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)}`, MARGIN, yBase + 8,
     { fill: '#444', size: 2.1, baseline: 'top' });
@@ -1055,7 +1056,8 @@ function renderFloor(be, floor, opts = {}) {
       return L;
     }
     const page = PAGES[opts.page] || PAGES.a4;
-    be.text(floor.name || 'Floor', MARGIN, MARGIN + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
+    const floorName = opts.floorLabel?.(floor.name) || floor.name || 'Floor';
+    be.text(floorName, MARGIN, MARGIN + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
     be.text('(empty floor)', page.w / 2, page.h / 2, { fill: '#888', size: 4, align: 'center', baseline: 'middle' });
     return { page, ratio: 0, exact: false };
   }

@@ -17,6 +17,7 @@ import { floorToSvg, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './
 import { floorToDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
+import { localizedFloorName } from './core/i18n.js';
 
 const project = new Project();
 
@@ -532,7 +533,7 @@ function printSheets(svgs) {
           const f = project.activeFloor;
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
-          const sheetOpts = sharedScaleSheetOptions(project.floors);
+          const sheetOpts = sharedScaleSheetOptions(project.floors, { floorLabel: localizedFloorName });
           download(`plan-${safeName(f.name)}.svg`, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.svg`);
         } else if (b.dataset.print === 'dxf') {
@@ -540,7 +541,7 @@ function printSheets(svgs) {
           download(`plan-${safeName(f.name)}.dxf`, floorToDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded plan-${safeName(f.name)}.dxf — millimeters, 1:1 CAD scale.`);
         } else {
-          printSheets(floorsToSharedScaleSvgs(project.floors));
+          printSheets(floorsToSharedScaleSvgs(project.floors, { floorLabel: localizedFloorName }));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');
         }
       } catch (err) {

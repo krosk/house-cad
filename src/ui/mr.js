@@ -18,7 +18,7 @@ import { connectedRoomComponent } from '../core/geometry2d.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
-import { t, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
+import { t, localizedFloorName, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
@@ -438,6 +438,7 @@ export function setupMR(view, project, getFootprint) {
         layers: getOutputSettings(),
         markerLabel: (ty) => t(`marker.${ty}`),
         zoneLabel: (kind) => t(`mode.${kind}`),
+        floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
       });
       floorToCanvas(floor, canvas, sheetOpts);
@@ -2564,6 +2565,7 @@ export function setupMR(view, project, getFootprint) {
         layers: settings,
         markerLabel: (ty) => t(`marker.${ty}`),
         zoneLabel: (kind) => t(`mode.${kind}`),
+        floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
       });
       text = floorToSvg(f, sheetOpts);
