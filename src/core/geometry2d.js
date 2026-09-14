@@ -10,15 +10,23 @@
 import polygonClipping from 'polygon-clipping';
 import { zoneKind } from './zoneColors.js';
 
+// Constraint solving and JSON round-trips can leave mathematically coincident
+// edges a few floating-point ulps apart (for example 1.7e-16 m). Polygon boolean
+// operations correctly treat those raw numbers as distinct and retain a hairline
+// seam. Snap only the boolean input to a nanometre grid; authored/model values and
+// serialized precision remain untouched.
+const BOOLEAN_SNAP = 1e-9;
+const snapBooleanCoord = (value) => Math.round(value / BOOLEAN_SNAP) * BOOLEAN_SNAP;
+
 function ringOf(rect) {
   const { x0, y0, x1, y1 } = rect.bounds;
   // Closed ring, counter-clockwise.
   return [
-    [x0, y0],
-    [x1, y0],
-    [x1, y1],
-    [x0, y1],
-    [x0, y0],
+    [snapBooleanCoord(x0), snapBooleanCoord(y0)],
+    [snapBooleanCoord(x1), snapBooleanCoord(y0)],
+    [snapBooleanCoord(x1), snapBooleanCoord(y1)],
+    [snapBooleanCoord(x0), snapBooleanCoord(y1)],
+    [snapBooleanCoord(x0), snapBooleanCoord(y0)],
   ];
 }
 
