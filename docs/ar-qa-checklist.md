@@ -226,6 +226,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, MARKER ICONS, and AREA checked; FURNITURE unchecked
 - [ ] Triggering each row toggles it and immediately refreshes the companion sheet
+- [ ] MARKER ICONS off hides switch-light routes as well as endpoint glyphs, in sheet/SVG/PNG/DXF
+- [ ] Hidden links and endpoints no longer affect sheet scale-fitting
 - [ ] FURNITURE off excludes it from footprint, symbols, legend, and scale; on restores those in SVG and DXF
 - [ ] AREA off hides room-area chips in the sheet and `ROOM_INFO` entities in DXF; on restores both
 - [ ] A structural dimension with either endpoint on FURNITURE remains absent from SVG/PNG/DXF and does not reduce sheet scale

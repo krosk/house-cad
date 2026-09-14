@@ -366,8 +366,10 @@ export function floorToDxf(floor, opts = {}) {
 
   if (layers.planDims) writeDimensions(w, floor);
   if (layers.markerDims) writeMarkerDimensions(w, floor);
-  if (layers.markerIcons) for (const marker of floor.markers || []) writeMarker(w, marker);
-  writeElectricalLinks(w, floor);
+  if (layers.markerIcons) {
+    for (const marker of floor.markers || []) writeMarker(w, marker);
+    writeElectricalLinks(w, floor);
+  }
 
   if (layers.area) {
     for (const component of connectedRoomComponents(floor.rectangles)) {

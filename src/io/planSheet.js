@@ -220,9 +220,9 @@ function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
   for (const poly of footprint) for (const ring of poly) for (const [x, y] of ring) add(x, y);
   // Raw rect bounds too, so an all-subtract or otherwise empty footprint still frames.
   for (const r of printableRectangles(floor, layers)) { const b = r.bounds; add(b.x0, b.y0); add(b.x1, b.y1); }
-  // Marker positions affect fit when their glyphs or dimensions are visible. Keep
-  // linked endpoints too because electrical routes remain an independent layer.
-  if (layers.markerIcons || layers.markerDims || (floor.electricalLinks || []).length) {
+  // Marker positions affect fit only when their glyphs or dimensions are visible.
+  // Electrical routes are tied to markerIcons and therefore add no independent fit.
+  if (layers.markerIcons || layers.markerDims) {
     for (const m of floor.markers || []) add(m.x, m.y);
   }
   // Saved dimension placement is authoritative, including a label dragged beyond
@@ -283,7 +283,7 @@ function geometryBBox(floor, footprint, layers = resolveOutputLayers()) {
     const b = r.bounds;
     add(b.x0, b.y0); add(b.x1, b.y1);
   }
-  if (layers.markerIcons || (floor.electricalLinks || []).length) {
+  if (layers.markerIcons) {
     for (const m of floor.markers || []) add(m.x, m.y);
   }
   return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
@@ -1070,7 +1070,7 @@ function renderFloor(be, floor, opts = {}) {
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
   drawZones(be, L, floor, layers); // semantic fixed-zone/furniture symbols over the footprint
-  drawElectricalLinks(be, L, floor); // dotted switch-to-light ceiling-route projection
+  if (layers.markerIcons) drawElectricalLinks(be, L, floor); // links have no meaning without their endpoint glyphs
   if (layers.planDims) drawDimensions(be, L, floor);
   if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);

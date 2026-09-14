@@ -343,7 +343,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   default to on/on/on/off/on. The first three independently control drawing, legend, and scale-fitting
   participation; FURNITURE controls its footprint/symbol/legend in SVG, PNG, and DXF. Furniture
   constraints remain authoring-only and are excluded from those formats even when furniture is shown.
-  AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF.
+  AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF. Electrical switch-light
+  routes are tied to MARKER ICONS: hiding endpoint glyphs also hides their otherwise contextless links
+  and removes those links from sheet scale-fitting and DXF output.
   The model geometry and constraints remain stored and solved.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
   perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
