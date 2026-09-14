@@ -133,6 +133,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Dropping a **light** defaults its height to the storey height (ceiling); other types capture tip height
 - [ ] A **floor reticle** tracks the aimed floor point; the marker under it highlights (floor icon + wall glyph outlined, yellow hover / amber selected)
 - [ ] Hovering a marker's **floor icon** picks it (stable plan-space target, not the floating billboard)
+- [ ] At exact same-X/Y stacks, repeated triggers cycle every marker highest-to-lowest; selected is amber, next is yellow
+- [ ] Cycling a stack refreshes the TYPE readout and height-pad title/value for the newly selected marker
 - [ ] Aiming at a marker + trigger opens its **height pad** (pad title shows the type); ENTER commits, closes, clears
 - [ ] **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D; it does NOT snap back on release
 - [ ] Dragging a marker with a **pinned X or Y leaves that axis fixed** (only free axes + z move); a fully-pinned marker acts as a **vertical z slider**

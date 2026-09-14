@@ -2969,6 +2969,23 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // MARKER · EDIT disambiguates any marker types sharing the exact same floor
+  // projection. Once one is selected, keep the amber selection on it and preview
+  // the next marker in height order under the yellow reticle; another trigger
+  // advances the selection and refreshes its height editor.
+  function editMarkerAtFloorPoint(px, py) {
+    const marker = markerAtFloorPoint(px, py);
+    if (!marker) return null;
+    const stack = project.markers
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => candidate.x === marker.x && candidate.y === marker.y)
+      .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
+      .map(({ candidate }) => candidate);
+    if (stack.length < 2) return marker;
+    const selectedIndex = stack.findIndex((candidate) => candidate.id === selectedMarker?.id);
+    return stack[selectedIndex < 0 ? 0 : (selectedIndex + 1) % stack.length];
+  }
+
   // LINK must disambiguate switches that share one floor projection. Keep the
   // shared marker picker unchanged for EDIT/DIMS. LINK ignores unrelated marker
   // types entirely, then previews the next switch in top-to-bottom order after
@@ -4548,7 +4565,7 @@ export function setupMR(view, project, getFootprint) {
           reticle.visible = true;
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
-          hoverMarker = markerAtFloorPoint(px, py);
+          hoverMarker = editMarkerAtFloorPoint(px, py);
         } else {
           reticle.visible = false;
         }

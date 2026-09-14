@@ -110,9 +110,9 @@ const STRINGS = {
     zh: '整体平移当前楼层。选择一条 X 方向边和一条 Y 方向边，并分别输入其到原点的目标距离。“翻转”可改变所在侧；两项均设定后才移动整个楼层。',
   },
   'help.marker': {
-    en: 'Edit markers only. Thumbstick up/down picks the drop type — or retypes the selected marker. Trigger empty space to place at the tip. Aim a marker + trigger to edit height; ENTER saves. Grip-drag moves one, grip away deletes.',
-    fr: 'Modifiez seulement les marqueurs. Joystick haut/bas : choisit le type à poser, ou change le type du marqueur sélectionné. Gâchette dans le vide : poser à la pointe. Visez un marqueur + gâchette : hauteur ; VALIDER enregistre. Poignée-glisser : déplacer ; poignée ailleurs : supprimer.',
-    zh: '仅编辑标记。摇杆上/下：选择放置类型，或更改所选标记的类型。对空处扣动扳机在笔尖处放置。瞄准标记并扣动扳机编辑高度；按确定保存。按住握把拖动，移开后按握把删除。',
+    en: 'Edit markers only. Trigger repeatedly to cycle markers stacked at one position. Thumbstick up/down picks or changes type. Trigger empty space to place; ENTER saves height. Grip-drag moves one, grip away deletes.',
+    fr: 'Modifiez seulement les marqueurs. Répétez la gâchette pour parcourir ceux empilés au même point. Joystick haut/bas : type. Gâchette dans le vide : poser ; VALIDER enregistre la hauteur. Poignée-glisser : déplacer ; poignée ailleurs : supprimer.',
+    zh: '仅编辑标记。在同一位置重复扣动扳机可循环选择堆叠标记。摇杆上/下选择或更改类型。对空处扣动扳机放置；按确定保存高度。按住握把拖动，移开后按握把删除。',
   },
   'help.marker_link': {
     en: 'Link electrical controls. Trigger a switch, then trigger lights to add or remove their connection. Grip clears the selected switch. Routes rise to the ceiling automatically.',

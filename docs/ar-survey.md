@@ -84,7 +84,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   that changes while cycling. A **floor reticle**
   tracks the aimed floor point and the marker under it is picked through its **flat floor icon**
   (`markerAtFloorPoint`, reticle-radius gated) — a stable plan-space target, not the floating wall
-  billboard — with both its floor icon and wall glyph outlined (hover = yellow, selected = amber).
+  billboard. When markers share exact X/Y, repeated triggers cycle them highest-to-lowest; the
+  current selection stays amber while the next candidate previews yellow. Both the selected floor
+  icon and wall glyph are outlined, and the height pad refreshes for each cycled marker.
   Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
   hovered marker opens its height pad; ENTER commits the height, closes the pad, and clears the
   selection. **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D, but a
