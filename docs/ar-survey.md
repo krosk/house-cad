@@ -14,7 +14,7 @@ editor (`ar-2d-parity` memory).
 
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
-PLAN     · ADD → EDGE → EDIT → DIMS
+PLAN     · ADD → EDGE → EDIT → TRANSLATE → DIMS
 MARKER   · EDIT → LINK → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
@@ -23,7 +23,7 @@ The headset label and help header show the localized `GROUP · TOOL` breadcrumb.
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `plan_dims`, `marker`, `marker_link`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
 `move_down`, `save`, `load`, `export`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -62,6 +62,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `room: <area> m²` to the info panel, independent of reticle position. Positive-length shared edges and
   overlaps connect rectangles; corner-only contact does not, and overlapping area is counted once. The
   plan sheet prints the same union area once inside every distinct ROOM component.
+- **PLAN · TRANSLATE** (`id: translate`) — rigidly relocate the complete active floor relative to
+  the unchanged plan origin. Pick one vertical edge and enter its desired signed X distance, then
+  pick one horizontal edge and enter its desired signed Y distance (either axis may be first).
+  FLIP changes the pending coordinate to the other side of origin. Only after both entries does one
+  atomic `(dx,dy)` transform move every rectangle and marker. Edge↔edge and marker↔edge constraint
+  values remain invariant; every origin-referenced value is updated, and manually positioned
+  dimension lines/value boxes receive the same translation. The two picked edges are retained as
+  explicit origin constraints. Grip backs out the pending edge/axis. Floor elevation and the physical
+  ORIGIN/RECAL registration are untouched.
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. The origin target is tested in plan space, so it remains aligned with the visible
   origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
@@ -201,9 +210,9 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   **thumbstick-hold (~1.2 s)** =
   exit AR.
 - RIGHT **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
-  (prev). B/Y's only action is flipping the dimension side in either DIMS mode with a completed pair
-  (`flipConstraintSide`, NOT `swapConstraint`); it is otherwise inert. All contextual cycling lives
-  on thumbstick-y (above).
+  (prev). B/Y flips the dimension side in either DIMS mode with a completed pair
+  (`flipConstraintSide`, NOT `swapConstraint`), or the pending coordinate side in TRANSLATE; it is
+  otherwise inert. All contextual cycling lives on thumbstick-y (above).
 - Both tracked controllers remain visible. The RIGHT HUD and LEFT sheet/teleport target are displayed
   by role; when LEFT is absent, its sheet and reticle are absent and RIGHT continues alone.
 
@@ -424,6 +433,7 @@ teleport reticle; no last-active routing remains.
 | `src/ui/mr.js` | The whole MR session: modes, HUD, numpad, slot menu, grip-drag, multi-floor/LEVEL, RECAL, `?ar=1` auto-AR, thumbstick-hold exit |
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
+| `src/core/translate.js` | atomic rigid floor translation; preserves relative constraints and moves origin locks + authored dimension-label placements coherently |
 | `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints + markers + electrical links + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |

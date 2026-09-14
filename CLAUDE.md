@@ -51,6 +51,11 @@ All geometry is stored in **meters** (maps 1:1 to the extruded mesh and future W
 
 A rectangle's exact size is authored **only** through dimension constraints. There is intentionally **no** on-canvas size label, no inline size editor, and no W/H field in the properties panel — do not re-add these. Rough sizing is via drawing and the 8 resize handles; the properties panel edits X/Y position and add/subtract only.
 
+AR `PLAN · TRANSLATE` is the exception for rigid relocation, not sizing: it takes one target edge
+coordinate per axis and applies one atomic `(dx,dy)` to the complete active floor. The transform in
+`src/core/translate.js` updates origin constraint values plus authored dimension-label placement
+before the solver runs once, preserving all relative dimensions and marker pins.
+
 ### Persistence
 
 `src/io/serialize.js` serializes the parametric definition (rectangles + constraints + markers + electrical links + height) to JSON; the footprint/mesh is always recomputed, never stored. Missing `electricalLinks` default to `[]`, so older saves remain compatible. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`), and paste replaces the selected floor's authored plan with collision-free rectangle/constraint/marker/link ids plus remapped references. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.

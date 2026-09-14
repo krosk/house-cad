@@ -9,8 +9,9 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { solve, solveMarkers } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers } from './constraints.js';
 import { ZONE_KINDS } from './zoneColors.js';
+import { translateFloor } from './translate.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -236,6 +237,22 @@ export class Project {
     this.activeFloorId = target.id;
     this._emit();
     return { ok: true, source, target };
+  }
+
+  // Apply one rigid XY transform to the active floor, including origin locks and
+  // authored dimension-label placement, then solve/notify exactly once.
+  translateActiveFloor(dx, dy, { originEdges = [] } = {}) {
+    if (!translateFloor(this.activeFloor, dx, dy)) return false;
+    for (const ref of originEdges) {
+      const rect = this.rectangles.find((r) => r.id === ref.rectId);
+      if (!rect) continue;
+      const exists = this.constraints.some((c) =>
+        (c.a?.rect === ORIGIN_ID && c.b?.rect === rect.id && c.b?.edge === ref.edge)
+        || (c.b?.rect === ORIGIN_ID && c.a?.rect === rect.id && c.a?.edge === ref.edge));
+      if (!exists) this.constraints.push(makeOriginDistance(rect, ref.edge));
+    }
+    this._emit();
+    return true;
   }
 
   addRectangle(rect) {

@@ -98,6 +98,19 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] SHEET preview, SVG, and print show one matching area chip inside each distinct ROOM component
 - [ ] Outlet glyphs are **inert** here *(needs an outlet placed to confirm — see OUTLET EDIT)*
 
+## PLAN · TRANSLATE (`translate`)  ⬜ NEW — build-verified only
+- [ ] The mode starts with `PICK X OR Y EDGE`; either axis may be defined first
+- [ ] Selecting an edge opens the numpad prefilled with its current absolute origin distance
+- [ ] FLIP changes the pending target to the opposite side of the origin
+- [ ] After the first ENTER, no geometry moves and the readout asks for the missing axis
+- [ ] After the second ENTER, every rectangle and marker moves by one common `(dx,dy)`
+- [ ] Room widths/heights and all edge↔edge / marker↔edge values remain unchanged
+- [ ] Existing origin constraints update to the translated coordinates without conflicts
+- [ ] The two chosen edges remain constrained to origin at exactly the entered coordinates
+- [ ] Manually placed plan and marker dimension lines/value boxes move with the floor
+- [ ] Electrical links/routes remain attached; floor height/elevation and AR registration do not change
+- [ ] Grip cancels the pending edge, then the most recently entered axis, without moving geometry
+
 ## PLAN · DIMS (`plan_dims`)  ✅ session 14
 - [x] edge↔edge size: pick two edges → numpad → size applied
 - [x] edge↔origin position lock (**0 m valid**)
@@ -282,7 +295,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)
 - [ ] Mode label + help show the localized `GROUP · TOOL` breadcrumb
-- [ ] Thumbstick-x cycles modes (both ways); A/X = prev mode; **B/Y does NOT cycle modes** (only flips a completed DIMS pair, else inert)
+- [ ] Thumbstick-x cycles modes (both ways); A/X = prev mode; **B/Y does NOT cycle modes** (flips DIMS or a pending TRANSLATE coordinate, else inert)
 - [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / UNIT unit / LANG language / MARKER type / EDIT zone kind), no-op elsewhere
 - [ ] Thumbstick-hold (~1.2 s) exits AR; the EXIT bar shows during the hold
 - [ ] HUD debug lines present: `build` `ptr` `ret` `edge` (EDGE only) `batt`

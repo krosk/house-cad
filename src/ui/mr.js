@@ -1667,6 +1667,11 @@ export function setupMR(view, project, getFootprint) {
   let dimBuffer = '';       // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
+  let translateTargets = { x: null, y: null }; // rigid TRANSLATE target per axis: {ref,value}
+  let translateEdge = null; // edge currently awaiting its desired origin coordinate
+  let translateBuffer = '';
+  let translatePristine = false;
+  let translateSign = 1;
   let hoverKey = null;      // numpad key under the ray this frame
   let prevHoverKey = null;  // last drawn hover (redraw only on change)
   let hoverSlot = null;     // SAVE/LOAD slot under the ray this frame (0-based)
@@ -3136,6 +3141,98 @@ export function setupMR(view, project, getFootprint) {
     rlog('dim flip', { id: c.id, value: +c.value.toFixed(3) });
   }
 
+  // ---- PLAN · TRANSLATE: define one X edge and one Y edge against origin, then
+  // move the complete active floor once. This avoids asking the solver to satisfy
+  // the two coordinates sequentially, which can deform a constrained graph.
+  const translateAxis = (ref) => isXEdge(ref.edge) ? 'x' : 'y';
+
+  function resetTranslate() {
+    translateTargets = { x: null, y: null };
+    translateEdge = null;
+    translateBuffer = '';
+    translatePristine = false;
+    translateSign = 1;
+    numpad.group.visible = false;
+    numpadCursor.visible = false;
+    hoverKey = prevHoverKey = null;
+  }
+
+  const translateTitle = () => translateEdge
+    ? `${t(`edge.${translateEdge.edge}`)} · ${t(`translate.set${translateAxis(translateEdge).toUpperCase()}`)}`
+    : t('translate.pickAny');
+  const redrawTranslatePad = () => numpad.draw(translateTitle(), `${translateSign < 0 ? '−' : ''}${translateBuffer}`, hoverKey);
+
+  function beginTranslateEdge(ref) {
+    const axis = translateAxis(ref);
+    if (translateTargets[axis]) return;
+    translateEdge = { ...ref };
+    const coord = coordOnAxis(ref, axis);
+    translateSign = coord < 0 ? -1 : 1;
+    translateBuffer = fmt(Math.abs(coord));
+    translatePristine = true;
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    redrawTranslatePad();
+    rlog('translate edge', { axis, ref, coord: +coord.toFixed(3) });
+  }
+
+  function finishTranslateAxis() {
+    if (!translateEdge) return;
+    const entered = parseFloat(translateBuffer);
+    if (!Number.isFinite(entered) || entered < 0) return;
+    const axis = translateAxis(translateEdge);
+    translateTargets[axis] = { ref: { ...translateEdge }, value: translateSign * toMeters(entered) };
+    translateEdge = null;
+    translateBuffer = '';
+    numpad.group.visible = false;
+    numpadCursor.visible = false;
+    hoverKey = prevHoverKey = null;
+
+    if (!translateTargets.x || !translateTargets.y) {
+      rlog('translate axis set', { axis, value: +translateTargets[axis].value.toFixed(3) });
+      return;
+    }
+
+    const tx = translateTargets.x, ty = translateTargets.y;
+    const dx = tx.value - coordOnAxis(tx.ref, 'x');
+    const dy = ty.value - coordOnAxis(ty.ref, 'y');
+
+    // Retain the chosen positioning references as explicit origin constraints.
+    // They are created after the transform but before its single emit, so a new
+    // dimension starts at its natural midpoint rather than inheriting a phantom
+    // pre-translation label position.
+    project.translateActiveFloor(dx, dy, { originEdges: [tx.ref, ty.ref] });
+    rlog('floor translated', { dx: +dx.toFixed(3), dy: +dy.toFixed(3) });
+    resetTranslate();
+    buildPlan();
+    applyPlanMatrix();
+  }
+
+  function pressTranslateKey(k) {
+    if (!translateEdge) return;
+    if (k === 'enter') { finishTranslateAxis(); return; }
+    if (k === 'swap') { translateSign *= -1; redrawTranslatePad(); return; }
+    if (k === 'del') {
+      translateEdge = null;
+      translateBuffer = '';
+      numpad.group.visible = false;
+      numpadCursor.visible = false;
+      return;
+    }
+    if (translatePristine && k !== 'back') translateBuffer = '';
+    translatePristine = false;
+    if (k === 'back') translateBuffer = translateBuffer.slice(0, -1);
+    else if (k === '.') { if (!translateBuffer.includes('.')) translateBuffer += '.'; }
+    else if (translateBuffer.replace('.', '').length < 6) translateBuffer += k;
+    redrawTranslatePad();
+  }
+
+  function onTranslateTouch() {
+    if (!placed || !project.rectangles.length) return;
+    if (translateEdge) { if (hoverKey) pressTranslateKey(hoverKey); return; }
+    if (hoverEdge) beginTranslateEdge({ kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge });
+  }
+
   // Modes share the touch gesture (trigger). A/B (or thumbstick left/right) cycle
   // between them; the tip/reticle/label recolor so the active mode is always
   // visible. FLOOR + REGISTER set up the frame; DROP authors typed zones and EDGE snaps
@@ -3249,6 +3346,12 @@ export function setupMR(view, project, getFootprint) {
           id: selectedRect.id, kind: zoneKindOf(selectedRect), op: selectedRect.op, stack: hoverStack.length,
         });
       },
+    },
+    {
+      id: 'translate', color: 0x2dd4bf,
+      // Pick one vertical and one horizontal edge, enter their signed distances
+      // from origin, then rigidly translate every item and annotation on this floor.
+      onTouch: onTranslateTouch,
     },
     {
       id: 'marker', color: C_MARKER, // label/help via i18n: mode.marker / help.marker
@@ -3428,12 +3531,12 @@ export function setupMR(view, project, getFootprint) {
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
-    'drop', 'edge', 'edit', 'plan_dims',
+    'drop', 'edge', 'edit', 'translate', 'plan_dims',
     'marker', 'marker_link', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
-    drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
+    drop: 'plan', edge: 'plan', edit: 'plan', translate: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
@@ -3488,6 +3591,7 @@ export function setupMR(view, project, getFootprint) {
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedLinkSwitch = null; // ...and any electrical-link source switch
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
+    resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
     pasteConfirmFloorId = null;
     rectHi.visible = false;
@@ -3529,7 +3633,9 @@ export function setupMR(view, project, getFootprint) {
   onLangChange(() => {
     const m = modes[currentMode];
     setModeInfo();
-    if (numpad.group.visible) (m.id === 'level' ? redrawLevelPad : redrawNumpad)();
+    if (numpad.group.visible) {
+      (m.id === 'level' ? redrawLevelPad : m.id === 'translate' ? redrawTranslatePad : redrawNumpad)();
+    }
     if (slotMenu.group.visible) redrawSlotMenu();
     if (langMenu.group.visible) redrawLangMenu();
     if (unitMenu.group.visible) redrawUnitMenu(); // title follows the current language
@@ -3545,6 +3651,7 @@ export function setupMR(view, project, getFootprint) {
     buildPlan();
     if (numpad.group.visible) {
       if (m.id === 'level') refreshLevelPad();
+      else if (m.id === 'translate') redrawTranslatePad();
       else if (selectedMarker) refreshMarkerPad();
       else redrawNumpad();
     }
@@ -3575,6 +3682,7 @@ export function setupMR(view, project, getFootprint) {
     selectedMarker = null; // ...and any marker being height-edited
     selectedLinkSwitch = null; // LINK source selection is scoped to one floor
     resetDim();
+    resetTranslate();
   }
 
   // Ensure the survey has the three storeys we author on-device: a Basement below
@@ -3836,6 +3944,19 @@ export function setupMR(view, project, getFootprint) {
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       return;
     }
+    if (mode.id === 'translate') {
+      if (translateEdge) {
+        translateEdge = null;
+        translateBuffer = '';
+        numpad.group.visible = false;
+        numpadCursor.visible = false;
+        rlog('translate edge cancelled');
+        return;
+      }
+      if (translateTargets.y) { translateTargets.y = null; rlog('translate Y cancelled'); return; }
+      if (translateTargets.x) { translateTargets.x = null; rlog('translate X cancelled'); return; }
+      return;
+    }
     if (mode.id === 'edit') { // PLAN domain: grip deletes only a selected zone
       if (!selectedRect) return;
       const id = selectedRect.id;
@@ -3924,7 +4045,7 @@ export function setupMR(view, project, getFootprint) {
 
   function pollModeCycle(frame, time) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
-    // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS flip only; does NOT cycle modes),
+    // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS/TRANSLATE flip; does NOT cycle modes),
     // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
     // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT zone type).
     // Only the fixed RIGHT editor role is read; LEFT never changes modes.
@@ -3951,11 +4072,12 @@ export function setupMR(view, project, getFootprint) {
       exitProgress = 0;
     }
     // Upper face button (B/Y) does NOT cycle modes — mode nav is thumbstick-x (both ways)
-    // and A/X (prev). B/Y's only action is flipping a completed dimension in either DIMS
-    // mode; it is otherwise inert. Contextual "cycle the current thing" actions live on
-    // thumbstick-y.
+    // and A/X (prev). In DIMS, B/Y flips a completed dimension; in TRANSLATE it
+    // flips the pending coordinate across the origin. Contextual "cycle the current
+    // thing" actions live on thumbstick-y.
     if (next && !btn.next) {
       if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
+      else if (modes[currentMode].id === 'translate' && translateEdge) pressTranslateKey('swap');
     }
     if (prev && !btn.prev) stepMode(-1);
     btn.next = next;
@@ -4049,10 +4171,13 @@ export function setupMR(view, project, getFootprint) {
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
       ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
+    const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
+      ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
+      : null;
     const exportStatus = modes[currentMode].id === 'export'
       ? `${t('export.format')} · ${getOutputSettings().format.toUpperCase()}` : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : linkStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
@@ -4121,6 +4246,42 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       edgeHi.visible = false;
+    } else if (modeId === 'translate') {
+      // Pick one edge per axis. Each selected edge opens the numpad for its desired
+      // signed coordinate; after both entries the model applies one rigid delta.
+      reticle.visible = false;
+      hoverEdge = null;
+      hoverKey = null;
+      numpadCursor.visible = false;
+      edgeHi.visible = false;
+      edgeHi2.visible = false;
+      if (translateEdge) {
+        const panelHit = rayPanelHit(editCtl);
+        if (numpad.group.visible && panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+        if (hoverKey !== prevHoverKey) { redrawTranslatePad(); prevHoverKey = hoverKey; }
+      } else {
+        const hit = rayFloorHit(editCtl);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          const candidate = edgeAtPoint(px, py);
+          if (candidate && !translateTargets[isXEdge(candidate.edge) ? 'x' : 'y']) hoverEdge = candidate;
+        }
+      }
+      let slot = 0;
+      const showTranslateEdge = (ref, color) => {
+        if (!ref || slot > 1) return;
+        const rect = rectOf(ref);
+        if (rect) showEdge(rect, ref.edge, color, slot++ === 0 ? edgeHi : edgeHi2);
+      };
+      showTranslateEdge(translateTargets.x?.ref, 0xfbbf24);
+      showTranslateEdge(translateTargets.y?.ref, 0xfbbf24);
+      showTranslateEdge(translateEdge || hoverEdge, translateEdge ? 0xfbbf24 : 0xffe14d);
     } else if (modeId === 'edge') {
       // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
       // ALL zones, ring the aim point. edgeAtPoint uses true segment distance + a
