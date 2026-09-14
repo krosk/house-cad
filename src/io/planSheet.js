@@ -496,7 +496,7 @@ function drawDimensions(be, L, floor) {
         const cyTop = L.Y(l.p1.y), cyBot = L.Y(l.p0.y);
         const conn = Math.abs(dimY - cyTop) <= Math.abs(dimY - cyBot) ? cyTop : cyBot;
         const sx = L.X(l.coord);
-        be.line(sx, conn, sx, dimY + Math.sign(dimY - conn) * EXT_OVER, { stroke: color, width: 0.13, dash: [1, 1] });
+        be.line(sx, conn, sx, dimY + Math.sign(dimY - conn) * EXT_OVER, { stroke: color, width: 0.1 });
       }
       const lx = L.X(dimLabelCoord(c, la.coord, lb.coord));
       be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18, dash: DIM_DASH });
@@ -514,7 +514,7 @@ function drawDimensions(be, L, floor) {
         const cxRight = L.X(l.p1.x), cxLeft = L.X(l.p0.x);
         const conn = Math.abs(dimX - cxRight) <= Math.abs(dimX - cxLeft) ? cxRight : cxLeft;
         const sy = L.Y(l.coord);
-        be.line(conn, sy, dimX + Math.sign(dimX - conn) * EXT_OVER, sy, { stroke: color, width: 0.13, dash: [1, 1] });
+        be.line(conn, sy, dimX + Math.sign(dimX - conn) * EXT_OVER, sy, { stroke: color, width: 0.1 });
       }
       const ly = L.Y(dimLabelCoord(c, la.coord, lb.coord));
       be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18, dash: DIM_DASH });
@@ -552,6 +552,21 @@ function drawMarkerPins(be, L, floor) {
     if (c.axis === 'x') {
       const y = L.Y(c.offset != null ? c.offset : m.y), xa = L.X(refCoord), xb = L.X(m.x);
       const lx = L.X(dimLabelCoord(c, refCoord, m.x));
+      // Thin solid witness lines tie the offset dimension back to both measured
+      // objects. The measured span remains dashed and an external label leader
+      // remains dotted, preserving the three distinct drafting roles.
+      const markerY = L.Y(m.y);
+      be.line(xb, markerY, xb, y + Math.sign(y - markerY) * EXT_OVER,
+        { stroke: C_PIN, width: 0.1 });
+      if (refEnd.rect !== ORIGIN_ID) {
+        const refLine = edgeLineWorld(refEnd, rects);
+        if (refLine) {
+          const refA = L.Y(refLine.p0.y), refB = L.Y(refLine.p1.y);
+          const refY = Math.abs(y - refA) <= Math.abs(y - refB) ? refA : refB;
+          be.line(xa, refY, xa, y + Math.sign(y - refY) * EXT_OVER,
+            { stroke: C_PIN, width: 0.1 });
+        }
+      }
       be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
       drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
       drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
@@ -560,6 +575,18 @@ function drawMarkerPins(be, L, floor) {
     } else {
       const x = L.X(c.offset != null ? c.offset : m.x), ya = L.Y(refCoord), yb = L.Y(m.y);
       const ly = L.Y(dimLabelCoord(c, refCoord, m.y));
+      const markerX = L.X(m.x);
+      be.line(markerX, yb, x + Math.sign(x - markerX) * EXT_OVER, yb,
+        { stroke: C_PIN, width: 0.1 });
+      if (refEnd.rect !== ORIGIN_ID) {
+        const refLine = edgeLineWorld(refEnd, rects);
+        if (refLine) {
+          const refA = L.X(refLine.p0.x), refB = L.X(refLine.p1.x);
+          const refX = Math.abs(x - refA) <= Math.abs(x - refB) ? refA : refB;
+          be.line(refX, ya, x + Math.sign(x - refX) * EXT_OVER, ya,
+            { stroke: C_PIN, width: 0.1 });
+        }
+      }
       be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
       drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
       drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
@@ -641,6 +668,27 @@ const markerHeight = (marker) => (Number.isFinite(marker.z) ? marker.z : 0);
 // neighbors at one height produce a horizontal box, while vertical neighbors at
 // different heights produce a vertical box with one height per row.
 function groupFixtureBoxes(markers, tolerance) {
+  // A true vertical installation shares one physical face position, so keep all
+  // of its fixtures in one enclosure even when their heights are far apart. A
+  // separator records every break between the inclusive 8 cm height clusters.
+  // This reads as one installation without implying that 248 cm and 24 cm are
+  // members of the same tight fixture cluster.
+  if (markers.length > 1
+      && markers.every((marker) => marker.x === markers[0].x && marker.y === markers[0].y)) {
+    const ordered = [...markers].sort((a, b) => markerHeight(b) - markerHeight(a));
+    const separators = [];
+    for (let i = 1; i < ordered.length; i++) {
+      if (markerHeight(ordered[i - 1]) - markerHeight(ordered[i]) > tolerance + 1e-9) {
+        separators.push(i);
+      }
+    }
+    return [{
+      orientation: 'vertical',
+      markers: ordered,
+      maxZ: markerHeight(ordered[0]),
+      separators,
+    }];
+  }
   const boxes = connectedClusters(markers, (a, b) => Math.hypot(
     a.x - b.x, a.y - b.y, markerHeight(a) - markerHeight(b),
   ) <= tolerance + 1e-9).map((members) => {
@@ -738,6 +786,11 @@ function drawFixtureBox(be, box, metrics, x, y) {
       });
     }
   });
+  for (const row of box.separators || []) {
+    const separatorY = y + padding + glyphR + (row - 0.5) * MARKER_STACK_ROW;
+    be.line(x + 0.45, separatorY, x + metrics.width - 0.45, separatorY,
+      { stroke: C_MARK, width: 0.1 });
+  }
 }
 
 function pointOnRingSegment(x, y, a, b, epsilon = 1e-7) {
@@ -802,11 +855,7 @@ function fixtureStackCandidate(side, ax, ay, metrics, L) {
     placements.push({ x, y, cx: x + item.width / 2, cy: y + item.height / 2, item });
     y += item.height + gap;
   }
-  const leftEdge = Math.min(...placements.map((p) => p.x));
-  const rightEdge = Math.max(...placements.map((p) => p.x + p.item.width));
-  const branchSide = leftEdge - 1.2 >= MARGIN ? 'left' : 'right';
-  const branchSpine = branchSide === 'left' ? leftEdge - 1.2 : rightEdge + 1.2;
-  return { side, placements, spine, branchSide, branchSpine };
+  return { side, placements, spine };
 }
 
 function fixtureCandidateScore(candidate, stack, L, footprint) {
@@ -840,6 +889,54 @@ function markerHasZeroEdgeConstraint(floor, marker) {
     const refEnd = constraint.a?.marker ? constraint.b : constraint.a;
     return markerEnd?.marker === marker.id && refEnd?.rect && refEnd.rect !== ORIGIN_ID;
   });
+}
+
+// A zero-distance pin to a room edge tells us which face the fixture belongs to.
+// This is stronger evidence than footprint sampling on an internal wall, where
+// both sides can legitimately lie inside rooms and therefore receive equal scores.
+function fixtureStackAttachedRoomSide(stack, floor) {
+  const sides = [];
+  const sideForEdge = { left: 'right', right: 'left', bottom: 'above', top: 'below' };
+  const epsilon = 1e-7;
+  for (const marker of stack.markers) {
+    for (const constraint of floor.constraints || []) {
+      if (constraint.type !== 'distance' || !isMarkerConstraint(constraint)
+          || Math.abs(constraint.value) > 5e-7) continue;
+      const markerEnd = constraint.a?.marker ? constraint.a : constraint.b;
+      const refEnd = constraint.a?.marker ? constraint.b : constraint.a;
+      if (markerEnd?.marker !== marker.id || !refEnd?.rect || refEnd.rect === ORIGIN_ID) continue;
+      const rect = floor.rectangles.find((candidate) => candidate.id === refEnd.rect);
+      if (rect && zoneKind(rect) === 'room' && sideForEdge[refEnd.edge]) {
+        sides.push(sideForEdge[refEnd.edge]);
+        continue;
+      }
+      const refCoord = rect ? edgeCoord(rect, refEnd.edge) : null;
+      if (!Number.isFinite(refCoord)) continue;
+      // The authored reference can be a door, stair, wall, etc. Find a room edge
+      // coincident with that same constrained line and marker position, then use
+      // the adjoining room's inward face. This covers fixtures pinned to an
+      // opening drawn directly over a room boundary.
+      for (const room of floor.rectangles) {
+        if (zoneKind(room) !== 'room') continue;
+        const b = room.bounds;
+        if (constraint.axis === 'x' && Math.abs(marker.x - refCoord) <= epsilon
+            && marker.y >= b.y0 - epsilon && marker.y <= b.y1 + epsilon) {
+          if (Math.abs(marker.x - b.x0) <= epsilon) sides.push(sideForEdge.left);
+          if (Math.abs(marker.x - b.x1) <= epsilon) sides.push(sideForEdge.right);
+        } else if (constraint.axis === 'y'
+            && Math.abs(marker.y - refCoord) <= epsilon
+            && marker.x >= b.x0 - epsilon && marker.x <= b.x1 + epsilon) {
+          if (Math.abs(marker.y - b.y0) <= epsilon) sides.push(sideForEdge.bottom);
+          if (Math.abs(marker.y - b.y1) <= epsilon) sides.push(sideForEdge.top);
+        }
+      }
+    }
+  }
+  if (!sides.length) return null;
+  const counts = new Map();
+  for (const side of sides) counts.set(side, (counts.get(side) || 0) + 1);
+  const ranked = [...counts].sort((a, b) => b[1] - a[1]);
+  return ranked.length === 1 || ranked[0][1] > ranked[1][1] ? ranked[0][0] : null;
 }
 
 function contextualHeightChip(be, L, marker, footprint) {
@@ -895,9 +992,11 @@ function drawFixtureStack(be, L, stack, footprint, floor) {
   // The stable order preserves a predictable fallback when no room contains it.
   const candidates = ['right', 'left', 'below', 'above']
     .map((side) => fixtureStackCandidate(side, ax, ay, metrics, L));
-  const candidate = candidates.reduce((best, item) =>
-    fixtureCandidateScore(item, stack, L, footprint) > fixtureCandidateScore(best, stack, L, footprint)
-      ? item : best);
+  const attachedSide = fixtureStackAttachedRoomSide(stack, floor);
+  const candidate = candidates.find((item) => item.side === attachedSide)
+    || candidates.reduce((best, item) =>
+      fixtureCandidateScore(item, stack, L, footprint) > fixtureCandidateScore(best, stack, L, footprint)
+        ? item : best);
 
   // The bracket joins each distinct physical fixture box back to the compact
   // installation's shared plan anchor.
@@ -915,22 +1014,22 @@ function drawFixtureStack(be, L, stack, footprint, floor) {
       drawFixtureBox(be, boxes[i], p.item, p.x, p.y);
     });
   } else {
-    const dir = candidate.side === 'below' ? 1 : -1;
-    be.line(ax, ay + dir * 0.45, ax, candidate.spine, { stroke: C_MARK, width: 0.16 });
-    be.line(Math.min(ax, candidate.branchSpine), candidate.spine,
-      Math.max(ax, candidate.branchSpine), candidate.spine, {
-      stroke: C_MARK, width: 0.16,
-    });
-    const centers = candidate.placements.map((p) => p.cy);
-    be.line(candidate.branchSpine, Math.min(...centers, candidate.spine),
-      candidate.branchSpine, Math.max(...centers, candidate.spine), {
-        stroke: C_MARK, width: 0.16,
-      });
-    candidate.placements.forEach((p, i) => {
-      const nearX = candidate.branchSide === 'left' ? p.x : p.x + p.item.width;
-      be.line(candidate.branchSpine, p.cy, nearX, p.cy, { stroke: C_MARK, width: 0.16 });
-      drawFixtureBox(be, boxes[i], p.item, p.x, p.y);
-    });
+    const below = candidate.side === 'below';
+    const nearestIndex = below ? 0 : candidate.placements.length - 1;
+    const nearest = candidate.placements[nearestIndex];
+    const nearY = below ? nearest.y : nearest.y + nearest.item.height;
+    // Horizontal-wall callouts enter through the box face nearest the wall,
+    // instead of turning into its left or right side. When legacy grouping yields
+    // several boxes, join their facing horizontal edges through the vertical gaps.
+    be.line(ax, ay + (below ? 0.45 : -0.45), nearest.cx, nearY,
+      { stroke: C_MARK, width: 0.16 });
+    for (let i = 1; i < candidate.placements.length; i++) {
+      const previous = candidate.placements[i - 1];
+      const current = candidate.placements[i];
+      be.line(previous.cx, previous.y + previous.item.height, current.cx, current.y,
+        { stroke: C_MARK, width: 0.16 });
+    }
+    candidate.placements.forEach((p, i) => drawFixtureBox(be, boxes[i], p.item, p.x, p.y));
   }
 }
 
