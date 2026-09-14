@@ -77,7 +77,16 @@ const C_ELECTRICAL = '#555'; // dotted switch-to-light route
 const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
-  outlet: 'Outlet', switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
+  outlet: 'Outlet', outlet_shutter: 'Shutter', outlet_aircon: 'Aircon',
+  outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
+  outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance',
+  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
+};
+const MARKER_RECOMMENDED_AMPS = {
+  outlet_cooktop: 32,
+  outlet_oven: 20,
+  outlet_water_heater: 20,
+  outlet_appliance: 20,
 };
 const ZONE_LABELS = {
   insulation: 'Insulation', door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
@@ -639,6 +648,42 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
       const x = cx - r * 0.56 + i * (r * 1.12 / 7);
       be.line(x, cy - r * 0.36, x, cy - r * 0.05, { stroke: C_MARK, width: 0.1 });
     }
+  } else if (type === 'outlet_shutter') {
+    // Circular outlet family outline containing unmistakable shutter slats and
+    // a travel arrow. It remains legible in compact stacked-marker boxes.
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    for (const dy of [-0.42, -0.12, 0.18, 0.48]) {
+      be.line(cx - r * 0.58, cy + r * dy, cx + r * 0.32, cy + r * dy,
+        { stroke: C_MARK, width: 0.16 });
+    }
+    be.line(cx + r * 0.58, cy - r * 0.5, cx + r * 0.58, cy + r * 0.45,
+      { stroke: C_MARK, width: 0.16 });
+    be.line(cx + r * 0.58, cy + r * 0.45, cx + r * 0.4, cy + r * 0.22,
+      { stroke: C_MARK, width: 0.16 });
+  } else if (type === 'outlet_aircon') {
+    // Circular outlet family outline with a six-arm snowflake for HVAC supply.
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
+      const dx = Math.cos(angle) * r * 0.68, dy = Math.sin(angle) * r * 0.68;
+      be.line(cx - dx, cy - dy, cx + dx, cy + dy, { stroke: C_MARK, width: 0.17 });
+    }
+  } else if (type === 'outlet_cooktop') {
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
+      be.circle(cx + r * dx, cy + r * dy, r * 0.22, { fill: '#fff', stroke: C_MARK, width: 0.15 });
+  } else if (type === 'outlet_oven') {
+    be.rect(cx - r * 0.72, cy - r * 0.82, r * 1.44, r * 1.64, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    be.line(cx - r * 0.62, cy - r * 0.48, cx + r * 0.62, cy - r * 0.48, { stroke: C_MARK, width: 0.14 });
+    be.circle(cx, cy + r * 0.2, r * 0.42, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+  } else if (type === 'outlet_water_heater') {
+    be.rect(cx - r * 0.55, cy - r * 0.88, r * 1.1, r * 1.76, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    be.circle(cx, cy + r * 0.08, r * 0.34, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+    be.line(cx, cy - r * 0.45, cx - r * 0.2, cy, { stroke: C_MARK, width: 0.14 });
+    be.line(cx - r * 0.2, cy, cx, cy + r * 0.28, { stroke: C_MARK, width: 0.14 });
+  } else if (type === 'outlet_appliance') {
+    be.rect(cx - r * 0.72, cy - r * 0.82, r * 1.44, r * 1.64, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    be.circle(cx, cy + r * 0.18, r * 0.46, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+    be.circle(cx - r * 0.48, cy - r * 0.53, r * 0.08, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
   } else { // outlet (default): French Type E — round socket, two round contacts, top earth pin
     be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.circle(cx - r * 0.42, cy + r * 0.12, r * 0.2, { fill: C_MARK, stroke: C_MARK, width: 0.1 }); // line
@@ -1141,7 +1186,10 @@ function drawStrip(be, L, floor, opts) {
   }
 
   if (markerTypes.length) {
-    const entries = markerTypes.map((t) => ({ t, label: markerName(t) }));
+    const entries = markerTypes.map((t) => ({
+      t,
+      label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : ''}`,
+    }));
     const widths = entries.map((e) => 4.4 + be.measure(e.label, 2.4) + 3);
     let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);
     const y = zoneTypes.length ? yBase + 11.5 : rowY;

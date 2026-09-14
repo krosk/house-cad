@@ -251,6 +251,12 @@ const STRINGS = {
 
   // --- markers (wall-anchored annotations) ------------------------------------
   'marker.outlet':   { en: 'outlet',   fr: 'prise',        zh: '插座' },
+  'marker.outlet_shutter': { en: 'shutter outlet', fr: 'prise volet', zh: '卷帘插座' },
+  'marker.outlet_aircon': { en: 'aircon outlet', fr: 'prise clim.', zh: '空调插座' },
+  'marker.outlet_cooktop': { en: 'cooktop', fr: 'plaque de cuisson', zh: '灶台' },
+  'marker.outlet_oven': { en: 'oven', fr: 'four', zh: '烤箱' },
+  'marker.outlet_water_heater': { en: 'water heater', fr: 'chauffe-eau', zh: '热水器' },
+  'marker.outlet_appliance': { en: 'appliance', fr: 'électroménager', zh: '家用电器' },
   'marker.switch':   { en: 'switch',   fr: 'interrupteur', zh: '开关' },
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },

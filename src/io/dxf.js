@@ -33,6 +33,12 @@ const LAYERS = [
   ['ROOM_INFO', 8, 'CONTINUOUS'],
   ['MARKER_HEIGHT', 8, 'CONTINUOUS'],
   ['MARKER_OUTLET', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_SHUTTER', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_AIRCON', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_COOKTOP', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_OVEN', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_WATER_HEATER', 7, 'CONTINUOUS'],
+  ['MARKER_OUTLET_APPLIANCE', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
@@ -329,6 +335,33 @@ function writeMarker(w, marker) {
     w.line(layer, x - r * 0.65, y, x - r * 0.2, y + r * 0.45);
     w.line(layer, x - r * 0.2, y + r * 0.45, x + r * 0.2, y - r * 0.45);
     w.line(layer, x + r * 0.2, y - r * 0.45, x + r * 0.65, y);
+  } else if (marker.type === 'outlet_shutter') {
+    w.circle(layer, x, y, r);
+    for (const dy of [-0.42, -0.12, 0.18, 0.48]) {
+      w.line(layer, x - r * 0.58, y + r * dy, x + r * 0.32, y + r * dy);
+    }
+    w.line(layer, x + r * 0.58, y - r * 0.5, x + r * 0.58, y + r * 0.45);
+    w.line(layer, x + r * 0.58, y + r * 0.45, x + r * 0.4, y + r * 0.22);
+  } else if (marker.type === 'outlet_aircon') {
+    w.circle(layer, x, y, r);
+    for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
+      const dx = Math.cos(angle) * r * 0.68, dy = Math.sin(angle) * r * 0.68;
+      w.line(layer, x - dx, y - dy, x + dx, y + dy);
+    }
+  } else if (marker.type === 'outlet_cooktop') {
+    w.circle(layer, x, y, r);
+    for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
+      w.circle(layer, x + r * dx, y + r * dy, r * 0.22);
+  } else if (marker.type === 'outlet_oven') {
+    w.polyline(layer, [[x - r * 0.72, y - r * 0.82], [x + r * 0.72, y - r * 0.82], [x + r * 0.72, y + r * 0.82], [x - r * 0.72, y + r * 0.82]]);
+    w.line(layer, x - r * 0.62, y + r * 0.48, x + r * 0.62, y + r * 0.48);
+    w.circle(layer, x, y - r * 0.2, r * 0.42);
+  } else if (marker.type === 'outlet_water_heater') {
+    w.polyline(layer, [[x - r * 0.55, y - r * 0.88], [x + r * 0.55, y - r * 0.88], [x + r * 0.55, y + r * 0.88], [x - r * 0.55, y + r * 0.88]]);
+    w.circle(layer, x, y - r * 0.08, r * 0.34);
+  } else if (marker.type === 'outlet_appliance') {
+    w.polyline(layer, [[x - r * 0.72, y - r * 0.82], [x + r * 0.72, y - r * 0.82], [x + r * 0.72, y + r * 0.82], [x - r * 0.72, y + r * 0.82]]);
+    w.circle(layer, x, y - r * 0.18, r * 0.46);
   } else {
     // French Type E outlet: socket, line/neutral contacts, and earth pin.
     w.circle(layer, x, y, r);

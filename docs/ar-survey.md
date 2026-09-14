@@ -75,9 +75,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   position locks. The origin target is tested in plan space, so it remains aligned with the visible
   origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
-  type** (`MARKER_TYPES` = outlet, switch, light, ethernet; extend for more fixtures) — or, if a marker is
+  type** (standard/specialized outlets, switch, light, and ethernet) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
-  (outlet = Type E socket, switch = rocker, light = bulb + rays, ethernet = RJ45 jack) and a
+  (including Type E, shutter, aircon, cooktop, oven, water-heater, and appliance symbols) and a
   `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
   unreachable to tip-capture); other types capture z from the tip. The mode breadcrumb remains
   `MARKER · EDIT`; the separate prominent readout shows `TYPE · <type>` and is the only label
@@ -207,7 +207,8 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
-  (`cycleMarkerType`, wraps); **PLAN · ADD** = the room/wall/insulation/door/window/stairs/cabinet/furniture kind to add
+  (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
+  **PLAN · ADD** = the room/wall/insulation/door/window/stairs/cabinet/furniture kind to add
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.

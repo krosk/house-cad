@@ -1440,6 +1440,60 @@ export function setupMR(view, project, getFootprint) {
       }
       return;
     }
+    if (type === 'outlet_shutter') {
+      // Roller shutter: framed slats plus a vertical travel arrow.
+      ctx.beginPath(); ctx.roundRect(42, 40, 38, 44, 5);
+      ctx.fillStyle = '#f8fafc'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#64748b'; ctx.stroke();
+      ctx.lineWidth = 3;
+      for (let y = 48; y <= 72; y += 8) {
+        ctx.beginPath(); ctx.moveTo(47, y); ctx.lineTo(75, y); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(87, 43); ctx.lineTo(87, 82);
+      ctx.moveTo(87, 82); ctx.lineTo(81, 73);
+      ctx.moveTo(87, 82); ctx.lineTo(93, 73); ctx.stroke();
+      return;
+    }
+    if (type === 'outlet_aircon') {
+      // Snowflake/HVAC mark, deliberately large enough to identify at a glance.
+      ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
+        const dx = Math.cos(angle) * 26, dy = Math.sin(angle) * 26;
+        ctx.beginPath(); ctx.moveTo(64 - dx, 64 - dy); ctx.lineTo(64 + dx, 64 + dy); ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      return;
+    }
+    if (type === 'outlet_cooktop') {
+      // Four cooking zones make the dedicated cooktop feed unmistakable.
+      ctx.strokeStyle = '#334155'; ctx.lineWidth = 4;
+      for (const [x, y] of [[53, 53], [75, 53], [53, 75], [75, 75]]) {
+        ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
+      }
+      return;
+    }
+    if (type === 'outlet_oven') {
+      ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(46, 50); ctx.lineTo(82, 50); ctx.stroke();
+      ctx.beginPath(); ctx.arc(64, 69, 12, 0, Math.PI * 2); ctx.stroke();
+      return;
+    }
+    if (type === 'outlet_water_heater') {
+      ctx.beginPath(); ctx.roundRect(48, 37, 32, 54, 14);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(64, 50); ctx.bezierCurveTo(54, 62, 55, 72, 64, 76);
+      ctx.bezierCurveTo(73, 72, 74, 62, 64, 50); ctx.stroke();
+      return;
+    }
+    if (type === 'outlet_appliance') {
+      // Generic dedicated appliance: front-loading drum in a machine cabinet.
+      ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(64, 68, 13, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(50, 47, 2, 0, Math.PI * 2); ctx.fillStyle = '#334155'; ctx.fill();
+      return;
+    }
     // Default: outlet — Type E circular recessed well, upper earth pin, two contacts.
     ctx.beginPath(); ctx.arc(64, 67, 28, 0, Math.PI * 2);
     ctx.fillStyle = '#e5e7eb'; ctx.fill();
@@ -1626,7 +1680,11 @@ export function setupMR(view, project, getFootprint) {
   // LEVEL cycles floors. Session-level (persists across mode switches). Extend the list
   // for new fixture types; each also needs a markerFace() branch, a
   // marker.<type> i18n key, and serialize already round-trips the type.
-  const MARKER_TYPES = ['outlet', 'switch', 'light', 'ethernet'];
+  const MARKER_TYPES = [
+    'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
+    'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
+    'switch', 'light', 'ethernet',
+  ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
   // ADD action instead of separate zone modes. ROOM adds; every other semantic
