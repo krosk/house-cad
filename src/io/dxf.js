@@ -39,6 +39,7 @@ const LAYERS = [
   ['MARKER_OUTLET_OVEN', 7, 'CONTINUOUS'],
   ['MARKER_OUTLET_WATER_HEATER', 7, 'CONTINUOUS'],
   ['MARKER_OUTLET_APPLIANCE', 7, 'CONTINUOUS'],
+  ['MARKER_INTERCOM', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
@@ -343,11 +344,13 @@ function writeMarker(w, marker) {
     w.line(layer, x + r * 0.58, y - r * 0.5, x + r * 0.58, y + r * 0.45);
     w.line(layer, x + r * 0.58, y + r * 0.45, x + r * 0.4, y + r * 0.22);
   } else if (marker.type === 'outlet_aircon') {
-    w.circle(layer, x, y, r);
     for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
-      const dx = Math.cos(angle) * r * 0.68, dy = Math.sin(angle) * r * 0.68;
-      w.line(layer, x - dx, y - dy, x + dx, y + dy);
+      const dx = Math.cos(angle) * r * 0.58, dy = Math.sin(angle) * r * 0.58;
+      w.line(layer, x - dx, y + r * 0.18 - dy, x + dx, y + r * 0.18 + dy);
     }
+    w.line(layer, x, y - r * 0.4, x, y - r * 0.82);
+    w.line(layer, x, y - r * 0.82, x + r * 0.5, y - r * 0.82);
+    w.circle(layer, x + r * 0.67, y - r * 0.82, r * 0.17);
   } else if (marker.type === 'outlet_cooktop') {
     w.circle(layer, x, y, r);
     for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
@@ -361,7 +364,15 @@ function writeMarker(w, marker) {
     w.circle(layer, x, y - r * 0.08, r * 0.34);
   } else if (marker.type === 'outlet_appliance') {
     w.polyline(layer, [[x - r * 0.72, y - r * 0.82], [x + r * 0.72, y - r * 0.82], [x + r * 0.72, y + r * 0.82], [x - r * 0.72, y + r * 0.82]]);
-    w.circle(layer, x, y - r * 0.18, r * 0.46);
+    w.circle(layer, x, y, r * 0.5);
+    w.circle(layer, x - r * 0.2, y - r * 0.08, r * 0.1);
+    w.circle(layer, x + r * 0.2, y - r * 0.08, r * 0.1);
+    w.circle(layer, x, y + r * 0.3, r * 0.09);
+  } else if (marker.type === 'intercom') {
+    w.polyline(layer, [[x - r * 0.68, y - r], [x + r * 0.68, y - r], [x + r * 0.68, y + r], [x - r * 0.68, y + r]]);
+    w.polyline(layer, [[x - r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.72], [x - r * 0.48, y + r * 0.72]]);
+    for (const dx of [-0.42, -0.14, 0.14, 0.42]) w.circle(layer, x + r * dx, y - r * 0.34, r * 0.055);
+    w.circle(layer, x + r * 0.38, y - r * 0.7, r * 0.14);
   } else {
     // French Type E outlet: socket, line/neutral contacts, and earth pin.
     w.circle(layer, x, y, r);

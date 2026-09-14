@@ -79,8 +79,8 @@ const C_ZONE = '#111';       // architectural zone symbols
 const MARKER_LABELS = {
   outlet: 'Outlet', outlet_shutter: 'Shutter', outlet_aircon: 'Aircon',
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
-  outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance',
-  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', wire: 'Wire',
+  outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
+  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', intercom: 'Intercom', wire: 'Wire',
 };
 const MARKER_RECOMMENDED_AMPS = {
   outlet_cooktop: 32,
@@ -661,12 +661,15 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.line(cx + r * 0.58, cy + r * 0.45, cx + r * 0.4, cy + r * 0.22,
       { stroke: C_MARK, width: 0.16 });
   } else if (type === 'outlet_aircon') {
-    // Circular outlet family outline with a six-arm snowflake for HVAC supply.
-    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    // Fixed HVAC feed: snowflake with a cable tail and terminal, without the
+    // circular outline used by socket markers.
     for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
-      const dx = Math.cos(angle) * r * 0.68, dy = Math.sin(angle) * r * 0.68;
-      be.line(cx - dx, cy - dy, cx + dx, cy + dy, { stroke: C_MARK, width: 0.17 });
+      const dx = Math.cos(angle) * r * 0.58, dy = Math.sin(angle) * r * 0.58;
+      be.line(cx - dx, cy - r * 0.18 - dy, cx + dx, cy - r * 0.18 + dy, { stroke: C_MARK, width: 0.17 });
     }
+    be.line(cx, cy + r * 0.4, cx, cy + r * 0.82, { stroke: C_MARK, width: 0.17 });
+    be.line(cx, cy + r * 0.82, cx + r * 0.5, cy + r * 0.82, { stroke: C_MARK, width: 0.17 });
+    be.circle(cx + r * 0.67, cy + r * 0.82, r * 0.17, { fill: '#fff', stroke: C_MARK, width: 0.15 });
   } else if (type === 'outlet_cooktop') {
     be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
@@ -681,9 +684,19 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.line(cx, cy - r * 0.45, cx - r * 0.2, cy, { stroke: C_MARK, width: 0.14 });
     be.line(cx - r * 0.2, cy, cx, cy + r * 0.28, { stroke: C_MARK, width: 0.14 });
   } else if (type === 'outlet_appliance') {
+    // Dedicated appliance outlet: unmistakable socket contacts within a square
+    // circuit frame, rather than a drawing of the connected appliance.
     be.rect(cx - r * 0.72, cy - r * 0.82, r * 1.44, r * 1.64, { fill: '#fff', stroke: C_MARK, width: 0.18 });
-    be.circle(cx, cy + r * 0.18, r * 0.46, { fill: '#fff', stroke: C_MARK, width: 0.16 });
-    be.circle(cx - r * 0.48, cy - r * 0.53, r * 0.08, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
+    be.circle(cx, cy, r * 0.5, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+    be.circle(cx - r * 0.2, cy + r * 0.08, r * 0.1, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
+    be.circle(cx + r * 0.2, cy + r * 0.08, r * 0.1, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
+    be.circle(cx, cy - r * 0.3, r * 0.09, { fill: '#fff', stroke: C_MARK, width: 0.12 });
+  } else if (type === 'intercom') {
+    be.rect(cx - r * 0.68, cy - r, r * 1.36, r * 2, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    be.rect(cx - r * 0.48, cy - r * 0.72, r * 0.96, r * 0.68, { fill: '#fff', stroke: C_MARK, width: 0.14 });
+    for (const dx of [-0.42, -0.14, 0.14, 0.42])
+      be.circle(cx + r * dx, cy + r * 0.34, r * 0.055, { fill: C_MARK, stroke: C_MARK, width: 0.06 });
+    be.circle(cx + r * 0.38, cy + r * 0.7, r * 0.14, { fill: '#fff', stroke: C_MARK, width: 0.13 });
   } else { // outlet (default): French Type E — round socket, two round contacts, top earth pin
     be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.circle(cx - r * 0.42, cy + r * 0.12, r * 0.2, { fill: C_MARK, stroke: C_MARK, width: 0.1 }); // line
@@ -1170,6 +1183,7 @@ function drawStrip(be, L, floor, opts) {
     (kind !== 'furniture' || layers.furniture)
     && floor.rectangles.some((rect) => zoneKind(rect) === kind));
   const markerName = opts.markerLabel || ((t) => MARKER_LABELS[t] || t);
+  const markerNote = opts.markerLegendNote || ((t) => t === 'outlet_aircon' ? 'Dedicated circuit' : '');
   const zoneName = opts.zoneLabel || ((t) => ZONE_LABELS[t] || t);
 
   if (zoneTypes.length) {
@@ -1188,7 +1202,7 @@ function drawStrip(be, L, floor, opts) {
   if (markerTypes.length) {
     const entries = markerTypes.map((t) => ({
       t,
-      label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : ''}`,
+      label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : markerNote(t) ? ` · ${markerNote(t)}` : ''}`,
     }));
     const widths = entries.map((e) => 4.4 + be.measure(e.label, 2.4) + 3);
     let x = page.w - MARGIN - widths.reduce((a, b) => a + b, 0);

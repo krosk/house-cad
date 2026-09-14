@@ -279,8 +279,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors
 - [ ] Grip is inert here (no delete/undo); leaving EXPORT keeps the active-floor companion visible
 - [ ] Marker legend names switch with LANG (outlet/switch localized)
-- [ ] Shutter and air-conditioning outlets retain normal marker constraint/stack behavior but use distinct glyphs in AR, sheets, legends, and detailed DXF
+- [ ] Shutter outlets and air-conditioning supplies retain normal marker constraint/stack behavior but use distinct glyphs in AR, sheets, legends, and detailed DXF; aircon is shown as a dedicated cable feed rather than a socket
 - [ ] Cooktop, oven, water-heater, and appliance outlets have distinct glyphs in AR, sheets, and detailed DXF; the sheet legend shows 32 A for cooktop and 20 A for the other three
+- [ ] Intercom has a distinct screen/speaker glyph in AR, sheets, legends, and detailed DXF, without an amperage recommendation
 - [ ] Zone legend names switch with LANG (insulation/door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
 - [ ] COOHOM DXF contains only 2D LINE entities on WALL/WINDOW layers in millimetre model space; doors are empty wall gaps

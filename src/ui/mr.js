@@ -437,6 +437,7 @@ export function setupMR(view, project, getFootprint) {
         targetPx: 2048,
         layers: getOutputSettings(),
         markerLabel: (ty) => t(`marker.${ty}`),
+        markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
         zoneLabel: (kind) => t(`mode.${kind}`),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
@@ -1455,12 +1456,16 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'outlet_aircon') {
-      // Snowflake/HVAC mark, deliberately large enough to identify at a glance.
+      // Fixed HVAC supply: snowflake plus cable termination, deliberately not
+      // drawn as a general-purpose socket.
       ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 4; ctx.lineCap = 'round';
       for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
-        const dx = Math.cos(angle) * 26, dy = Math.sin(angle) * 26;
-        ctx.beginPath(); ctx.moveTo(64 - dx, 64 - dy); ctx.lineTo(64 + dx, 64 + dy); ctx.stroke();
+        const dx = Math.cos(angle) * 20, dy = Math.sin(angle) * 20;
+        ctx.beginPath(); ctx.moveTo(62 - dx, 58 - dy); ctx.lineTo(62 + dx, 58 + dy); ctx.stroke();
       }
+      ctx.strokeStyle = '#334155';
+      ctx.beginPath(); ctx.moveTo(62, 78); ctx.lineTo(62, 89); ctx.lineTo(82, 89); ctx.stroke();
+      ctx.beginPath(); ctx.arc(88, 89, 6, 0, Math.PI * 2); ctx.stroke();
       ctx.lineCap = 'butt';
       return;
     }
@@ -1487,11 +1492,30 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'outlet_appliance') {
-      // Generic dedicated appliance: front-loading drum in a machine cabinet.
+      // Dedicated appliance outlet: a Type E socket inside a square circuit
+      // frame, deliberately not an illustration of the connected appliance.
       ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
       ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
-      ctx.beginPath(); ctx.arc(64, 68, 13, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(50, 47, 2, 0, Math.PI * 2); ctx.fillStyle = '#334155'; ctx.fill();
+      ctx.beginPath(); ctx.arc(64, 65, 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#334155';
+      ctx.beginPath(); ctx.arc(56, 69, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(72, 69, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(64, 53, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
+      return;
+    }
+    if (type === 'intercom') {
+      // Wall intercom: display, call key, and speaker grille.
+      ctx.beginPath(); ctx.roundRect(43, 35, 42, 58, 6);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(49, 42, 30, 22, 3);
+      ctx.fillStyle = '#94a3b8'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#334155';
+      for (const [x, y] of [[52, 72], [58, 72], [64, 72], [70, 72]]) {
+        ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(76, 81, 4, 0, Math.PI * 2); ctx.stroke();
       return;
     }
     // Default: outlet — Type E circular recessed well, upper earth pin, two contacts.
@@ -1683,7 +1707,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = [
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
-    'switch', 'light', 'ethernet',
+    'switch', 'light', 'ethernet', 'intercom',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
@@ -2670,6 +2694,7 @@ export function setupMR(view, project, getFootprint) {
         page: 'a4',
         layers: settings,
         markerLabel: (ty) => t(`marker.${ty}`),
+        markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
         zoneLabel: (kind) => t(`mode.${kind}`),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),

@@ -77,7 +77,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
   type** (standard/specialized outlets, switch, light, and ethernet) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
-  (including Type E, shutter, aircon, cooktop, oven, water-heater, and appliance symbols) and a
+  (including Type E, shutter, dedicated aircon supply, cooktop, oven, water-heater, dedicated-appliance-outlet, and intercom symbols) and a
   `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
   unreachable to tip-capture); other types capture z from the tip. The mode breadcrumb remains
   `MARKER · EDIT`; the separate prominent readout shows `TYPE · <type>` and is the only label
