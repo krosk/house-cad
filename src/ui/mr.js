@@ -1441,6 +1441,41 @@ export function setupMR(view, project, getFootprint) {
       }
       return;
     }
+    if (type === 'ethernet_dual') {
+      // Two adjacent RJ45 apertures, each retaining contacts and a latch notch.
+      ctx.strokeStyle = '#64748b';
+      for (const cx of [50, 78]) {
+        ctx.beginPath(); ctx.roundRect(cx - 12, 44, 24, 38, 4);
+        ctx.fillStyle = '#e5e7eb'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 8, 50); ctx.lineTo(cx + 8, 50); ctx.lineTo(cx + 8, 69);
+        ctx.lineTo(cx + 5, 69); ctx.lineTo(cx + 5, 77); ctx.lineTo(cx - 5, 77);
+        ctx.lineTo(cx - 5, 69); ctx.lineTo(cx - 8, 69); ctx.closePath();
+        ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          const x = cx - 6 + i * 4;
+          ctx.beginPath(); ctx.moveTo(x, 53); ctx.lineTo(x, 60); ctx.stroke();
+        }
+      }
+      return;
+    }
+    if (type === 'patch_panel') {
+      // Compact rack patch panel: two banks of RJ45 ports with status/index dots.
+      ctx.beginPath(); ctx.roundRect(35, 43, 58, 42, 5);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      for (const y of [54, 72]) {
+        for (const x of [45, 57, 69, 81]) {
+          ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 8, 8, 1);
+          ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+        }
+      }
+      ctx.fillStyle = '#334155';
+      ctx.beginPath(); ctx.arc(39, 64, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(89, 64, 2, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
     if (type === 'outlet_shutter') {
       // Roller shutter: framed slats plus a vertical travel arrow.
       ctx.beginPath(); ctx.roundRect(42, 40, 38, 44, 5);
@@ -1478,8 +1513,11 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'outlet_oven') {
-      ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
+      ctx.beginPath(); ctx.arc(64, 64, 29, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill();
       ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
+      ctx.lineWidth = 3; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(46, 50); ctx.lineTo(82, 50); ctx.stroke();
       ctx.beginPath(); ctx.arc(64, 69, 12, 0, Math.PI * 2); ctx.stroke();
       return;
@@ -1492,16 +1530,15 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'outlet_appliance') {
-      // Dedicated appliance outlet: a Type E socket inside a square circuit
-      // frame, deliberately not an illustration of the connected appliance.
-      ctx.beginPath(); ctx.roundRect(43, 39, 42, 50, 4);
+      // Circular outlet family outline with a generic appliance/drum inside.
+      ctx.beginPath(); ctx.arc(64, 64, 29, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill();
       ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
-      ctx.beginPath(); ctx.arc(64, 65, 16, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#334155';
-      ctx.beginPath(); ctx.arc(56, 69, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(72, 69, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(64, 53, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(48, 44, 32, 40, 3);
+      ctx.lineWidth = 3; ctx.stroke();
+      ctx.beginPath(); ctx.arc(64, 66, 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(53, 51, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#334155'; ctx.fill();
       return;
     }
     if (type === 'intercom') {
@@ -1707,7 +1744,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = [
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
-    'switch', 'light', 'ethernet', 'intercom',
+    'switch', 'light', 'ethernet', 'ethernet_dual', 'patch_panel', 'intercom',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one

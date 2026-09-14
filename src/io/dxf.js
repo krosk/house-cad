@@ -43,6 +43,8 @@ const LAYERS = [
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
+  ['MARKER_ETHERNET_DUAL', 7, 'CONTINUOUS'],
+  ['MARKER_PATCH_PANEL', 7, 'CONTINUOUS'],
   ['MARKER_WIRE', 7, 'CONTINUOUS'],
   ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
 ];
@@ -331,6 +333,26 @@ function writeMarker(w, marker) {
       w.line(layer, px, y - r * 0.4, px, y - r * 0.08);
     }
     w.polyline(layer, [[x - r * 0.38, y + r * 0.15], [x + r * 0.38, y + r * 0.15], [x + r * 0.38, y + r * 0.48], [x - r * 0.38, y + r * 0.48]]);
+  } else if (marker.type === 'ethernet_dual') {
+    for (const dx of [-0.52, 0.52]) {
+      const px = x + r * dx;
+      w.polyline(layer, [[px - r * 0.44, y - r * 0.7], [px + r * 0.44, y - r * 0.7], [px + r * 0.44, y + r * 0.7], [px - r * 0.44, y + r * 0.7]]);
+      w.polyline(layer, [[px - r * 0.3, y + r * 0.42], [px + r * 0.3, y + r * 0.42], [px + r * 0.3, y - r * 0.22], [px + r * 0.16, y - r * 0.22], [px + r * 0.16, y - r * 0.48], [px - r * 0.16, y - r * 0.48], [px - r * 0.16, y - r * 0.22], [px - r * 0.3, y - r * 0.22]]);
+      for (let i = 0; i < 4; i++) {
+        const contactX = px - r * 0.2 + i * (r * 0.4 / 3);
+        w.line(layer, contactX, y + r * 0.34, contactX, y + r * 0.08);
+      }
+    }
+  } else if (marker.type === 'patch_panel') {
+    w.polyline(layer, [[x - r, y - r * 0.68], [x + r, y - r * 0.68], [x + r, y + r * 0.68], [x - r, y + r * 0.68]]);
+    for (const dy of [-0.3, 0.3]) {
+      for (const dx of [-0.6, -0.2, 0.2, 0.6]) {
+        const px = x + r * dx, py = y + r * dy, pr = r * 0.13;
+        w.polyline(layer, [[px - pr, py - pr], [px + pr, py - pr], [px + pr, py + pr], [px - pr, py + pr]]);
+      }
+    }
+    w.circle(layer, x - r * 0.88, y, r * 0.06);
+    w.circle(layer, x + r * 0.88, y, r * 0.06);
   } else if (marker.type === 'wire') {
     w.circle(layer, x, y, r);
     w.line(layer, x - r * 0.65, y, x - r * 0.2, y + r * 0.45);
@@ -356,18 +378,18 @@ function writeMarker(w, marker) {
     for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
       w.circle(layer, x + r * dx, y + r * dy, r * 0.22);
   } else if (marker.type === 'outlet_oven') {
-    w.polyline(layer, [[x - r * 0.72, y - r * 0.82], [x + r * 0.72, y - r * 0.82], [x + r * 0.72, y + r * 0.82], [x - r * 0.72, y + r * 0.82]]);
-    w.line(layer, x - r * 0.62, y + r * 0.48, x + r * 0.62, y + r * 0.48);
-    w.circle(layer, x, y - r * 0.2, r * 0.42);
+    w.circle(layer, x, y, r);
+    w.polyline(layer, [[x - r * 0.55, y - r * 0.68], [x + r * 0.55, y - r * 0.68], [x + r * 0.55, y + r * 0.68], [x - r * 0.55, y + r * 0.68]]);
+    w.line(layer, x - r * 0.48, y + r * 0.4, x + r * 0.48, y + r * 0.4);
+    w.circle(layer, x, y - r * 0.18, r * 0.32);
   } else if (marker.type === 'outlet_water_heater') {
     w.polyline(layer, [[x - r * 0.55, y - r * 0.88], [x + r * 0.55, y - r * 0.88], [x + r * 0.55, y + r * 0.88], [x - r * 0.55, y + r * 0.88]]);
     w.circle(layer, x, y - r * 0.08, r * 0.34);
   } else if (marker.type === 'outlet_appliance') {
-    w.polyline(layer, [[x - r * 0.72, y - r * 0.82], [x + r * 0.72, y - r * 0.82], [x + r * 0.72, y + r * 0.82], [x - r * 0.72, y + r * 0.82]]);
-    w.circle(layer, x, y, r * 0.5);
-    w.circle(layer, x - r * 0.2, y - r * 0.08, r * 0.1);
-    w.circle(layer, x + r * 0.2, y - r * 0.08, r * 0.1);
-    w.circle(layer, x, y + r * 0.3, r * 0.09);
+    w.circle(layer, x, y, r);
+    w.polyline(layer, [[x - r * 0.52, y - r * 0.65], [x + r * 0.52, y - r * 0.65], [x + r * 0.52, y + r * 0.65], [x - r * 0.52, y + r * 0.65]]);
+    w.circle(layer, x, y - r * 0.12, r * 0.34);
+    w.circle(layer, x - r * 0.34, y + r * 0.42, r * 0.07);
   } else if (marker.type === 'intercom') {
     w.polyline(layer, [[x - r * 0.68, y - r], [x + r * 0.68, y - r], [x + r * 0.68, y + r], [x - r * 0.68, y + r]]);
     w.polyline(layer, [[x - r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.72], [x - r * 0.48, y + r * 0.72]]);

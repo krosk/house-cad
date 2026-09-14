@@ -262,6 +262,8 @@ const STRINGS = {
   'marker.switch':   { en: 'switch',   fr: 'interrupteur', zh: '开关' },
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
+  'marker.ethernet_dual': { en: 'dual ethernet', fr: 'double réseau', zh: '双网口' },
+  'marker.patch_panel': { en: 'patch panel', fr: 'panneau de brassage', zh: '配线架' },
   'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
   'link.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
   'link.pickLight':  { en: 'PICK LIGHT',  fr: 'CHOISIR LUMINAIRE',    zh: '选择灯具' },

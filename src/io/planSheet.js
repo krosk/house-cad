@@ -82,7 +82,8 @@ const MARKER_LABELS = {
   outlet: 'Outlet', outlet_shutter: 'Shutter', outlet_aircon: 'Aircon',
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
-  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', intercom: 'Intercom', wire: 'Wire',
+  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
+  patch_panel: 'Patch panel', intercom: 'Intercom', wire: 'Wire',
 };
 const MARKER_RECOMMENDED_AMPS = {
   outlet_cooktop: 32,
@@ -650,6 +651,35 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
       const x = cx - r * 0.56 + i * (r * 1.12 / 7);
       be.line(x, cy - r * 0.36, x, cy - r * 0.05, { stroke: C_MARK, width: 0.1 });
     }
+  } else if (type === 'ethernet_dual') {
+    // Two RJ45 faces in a single fixture glyph.
+    for (const dx of [-0.52, 0.52]) {
+      const px = cx + r * dx;
+      be.rect(px - r * 0.44, cy - r * 0.72, r * 0.88, r * 1.4,
+        { fill: '#fff', stroke: C_MARK, width: 0.16 });
+      be.poly([
+        [px - r * 0.3, cy - r * 0.42], [px + r * 0.3, cy - r * 0.42],
+        [px + r * 0.3, cy + r * 0.22], [px + r * 0.16, cy + r * 0.22],
+        [px + r * 0.16, cy + r * 0.48], [px - r * 0.16, cy + r * 0.48],
+        [px - r * 0.16, cy + r * 0.22], [px - r * 0.3, cy + r * 0.22],
+      ], { fill: '#fff', stroke: C_MARK, width: 0.12 });
+      for (let i = 0; i < 4; i++) {
+        const contactX = px - r * 0.2 + i * (r * 0.4 / 3);
+        be.line(contactX, cy - r * 0.34, contactX, cy - r * 0.08,
+          { stroke: C_MARK, width: 0.08 });
+      }
+    }
+  } else if (type === 'patch_panel') {
+    // Rack patch panel with two compact banks of ports.
+    be.rect(cx - r, cy - r * 0.68, size, r * 1.36, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    for (const dy of [-0.3, 0.3]) {
+      for (const dx of [-0.6, -0.2, 0.2, 0.6]) {
+        be.rect(cx + r * dx - r * 0.13, cy + r * dy - r * 0.13, r * 0.26, r * 0.26,
+          { fill: '#fff', stroke: C_MARK, width: 0.1 });
+      }
+    }
+    be.circle(cx - r * 0.88, cy, r * 0.06, { fill: C_MARK, stroke: C_MARK, width: 0.05 });
+    be.circle(cx + r * 0.88, cy, r * 0.06, { fill: C_MARK, stroke: C_MARK, width: 0.05 });
   } else if (type === 'outlet_shutter') {
     // Circular outlet family outline containing unmistakable shutter slats and
     // a travel arrow. It remains legible in compact stacked-marker boxes.
@@ -677,22 +707,21 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
       be.circle(cx + r * dx, cy + r * dy, r * 0.22, { fill: '#fff', stroke: C_MARK, width: 0.15 });
   } else if (type === 'outlet_oven') {
-    be.rect(cx - r * 0.72, cy - r * 0.82, r * 1.44, r * 1.64, { fill: '#fff', stroke: C_MARK, width: 0.18 });
-    be.line(cx - r * 0.62, cy - r * 0.48, cx + r * 0.62, cy - r * 0.48, { stroke: C_MARK, width: 0.14 });
-    be.circle(cx, cy + r * 0.2, r * 0.42, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    be.rect(cx - r * 0.55, cy - r * 0.68, r * 1.1, r * 1.36, { fill: '#fff', stroke: C_MARK, width: 0.15 });
+    be.line(cx - r * 0.48, cy - r * 0.4, cx + r * 0.48, cy - r * 0.4, { stroke: C_MARK, width: 0.12 });
+    be.circle(cx, cy + r * 0.18, r * 0.32, { fill: '#fff', stroke: C_MARK, width: 0.14 });
   } else if (type === 'outlet_water_heater') {
     be.rect(cx - r * 0.55, cy - r * 0.88, r * 1.1, r * 1.76, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     be.circle(cx, cy + r * 0.08, r * 0.34, { fill: '#fff', stroke: C_MARK, width: 0.16 });
     be.line(cx, cy - r * 0.45, cx - r * 0.2, cy, { stroke: C_MARK, width: 0.14 });
     be.line(cx - r * 0.2, cy, cx, cy + r * 0.28, { stroke: C_MARK, width: 0.14 });
   } else if (type === 'outlet_appliance') {
-    // Dedicated appliance outlet: unmistakable socket contacts within a square
-    // circuit frame, rather than a drawing of the connected appliance.
-    be.rect(cx - r * 0.72, cy - r * 0.82, r * 1.44, r * 1.64, { fill: '#fff', stroke: C_MARK, width: 0.18 });
-    be.circle(cx, cy, r * 0.5, { fill: '#fff', stroke: C_MARK, width: 0.16 });
-    be.circle(cx - r * 0.2, cy + r * 0.08, r * 0.1, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
-    be.circle(cx + r * 0.2, cy + r * 0.08, r * 0.1, { fill: C_MARK, stroke: C_MARK, width: 0.08 });
-    be.circle(cx, cy - r * 0.3, r * 0.09, { fill: '#fff', stroke: C_MARK, width: 0.12 });
+    // Circular outlet convention; the inset machine/drum communicates its use.
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    be.rect(cx - r * 0.52, cy - r * 0.65, r * 1.04, r * 1.3, { fill: '#fff', stroke: C_MARK, width: 0.14 });
+    be.circle(cx, cy + r * 0.12, r * 0.34, { fill: '#fff', stroke: C_MARK, width: 0.14 });
+    be.circle(cx - r * 0.34, cy - r * 0.42, r * 0.07, { fill: C_MARK, stroke: C_MARK, width: 0.06 });
   } else if (type === 'intercom') {
     be.rect(cx - r * 0.68, cy - r, r * 1.36, r * 2, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     be.rect(cx - r * 0.48, cy - r * 0.72, r * 0.96, r * 0.68, { fill: '#fff', stroke: C_MARK, width: 0.14 });
