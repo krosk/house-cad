@@ -17,7 +17,7 @@ import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOp
 import { floorToDxf } from './io/dxf.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
-import { localizedFloorName } from './core/i18n.js';
+import { t, localizedFloorName } from './core/i18n.js';
 
 const project = new Project();
 
@@ -492,6 +492,12 @@ function sheetDownloadName(floor, extension, now = new Date()) {
   return `plan-${safeName(floor.name)}-${stamp}.${extension}`;
 }
 
+const localizedSheetOptions = () => ({
+  floorLabel: localizedFloorName,
+  generatedLabel: t('sheet.generated'),
+  buildLabel: t('sheet.build'),
+});
+
 function printSheets(svgs) {
   // Every SVG in a shared print set has the same physical page dimensions. Feed
   // those dimensions to @page so the browser does not silently rotate/scale a
@@ -540,13 +546,13 @@ function printSheets(svgs) {
           const f = project.activeFloor;
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
-          const sheetOpts = sharedScaleSheetOptions(project.floors, { floorLabel: localizedFloorName });
+          const sheetOpts = sharedScaleSheetOptions(project.floors, localizedSheetOptions());
           const name = sheetDownloadName(f, 'svg');
           download(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded ${name}`);
         } else if (b.dataset.print === 'png') {
           const f = project.activeFloor;
-          const sheetOpts = sharedScaleSheetOptions(project.floors, { floorLabel: localizedFloorName });
+          const sheetOpts = sharedScaleSheetOptions(project.floors, localizedSheetOptions());
           const blob = await floorToPngBlob(f, sheetOpts);
           const name = sheetDownloadName(f, 'png');
           download(name, blob, 'image/png');
@@ -557,7 +563,7 @@ function printSheets(svgs) {
           download(name, floorToDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — millimeters, 1:1 CAD scale.`);
         } else {
-          printSheets(floorsToSharedScaleSvgs(project.floors, { floorLabel: localizedFloorName }));
+          printSheets(floorsToSharedScaleSvgs(project.floors, localizedSheetOptions()));
           sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');
         }
       } catch (err) {

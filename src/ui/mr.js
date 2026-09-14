@@ -440,6 +440,7 @@ export function setupMR(view, project, getFootprint) {
         zoneLabel: (kind) => t(`mode.${kind}`),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
+        buildLabel: t('sheet.build'),
       });
       floorToCanvas(floor, canvas, sheetOpts);
       if (canvas.width !== oldWidth || canvas.height !== oldHeight) {
@@ -2602,6 +2603,7 @@ export function setupMR(view, project, getFootprint) {
         zoneLabel: (kind) => t(`mode.${kind}`),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
+        buildLabel: t('sheet.build'),
       });
       if (extension === 'png') {
         data = await floorToPngBlob(f, sheetOpts);

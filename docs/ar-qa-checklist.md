@@ -206,6 +206,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Editing or grip-moving a dimension refreshes the companion sheet without stalling tracking
 - [ ] Footprint, dimensions, markers + legend, scale bar, `1:N · unit` caption, floor name all present
 - [ ] Generation timestamp is present as local `YYYY-MM-DD HH:mm` and matches across every page in one print run
+- [ ] The generating software build id (Git revision + UTC build stamp) appears beside the timestamp
 - [ ] Door diagonal, window glazing, stair treads/arrow, and cabinet cross render over their authored cutouts
 - [ ] Each door/window/stairs/cabinet type present on the floor has one matching zone-legend entry
 - [ ] The panel initially shows SVG with PLAN DIMS, MARKER DIMS, MARKER ICONS, and AREA checked; FURNITURE unchecked

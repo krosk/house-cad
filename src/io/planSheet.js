@@ -23,6 +23,10 @@ import { zoneKind } from '../core/zoneColors.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
+// Injected by Vite as the source revision + UTC build time. The fallback keeps
+// direct module tests and non-Vite tooling usable.
+const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
+
 // True when a distance rounds to zero AT THE CURRENT DISPLAY PRECISION — such
 // dimensions (coincident edges, a marker sitting on its wall) read as "0.00" and
 // are pure clutter, so they are not drawn.
@@ -974,7 +978,9 @@ function drawStrip(be, L, floor, opts) {
   const floorName = opts.floorLabel?.(floor.name) || floor.name || 'Floor';
   be.text(floorName, MARGIN, yBase + 4, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
   const generatedLabel = opts.generatedLabel || 'Generated';
-  be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)}`, MARGIN, yBase + 8,
+  const buildLabel = opts.buildLabel || 'Build';
+  const buildId = opts.buildId || BUILD_ID;
+  be.text(`${generatedLabel}: ${localGenerationTime(opts.generatedAt)} · ${buildLabel}: ${buildId}`, MARGIN, yBase + 8,
     { fill: '#444', size: 2.1, baseline: 'top' });
 
   // Scale bar (left, below the name): a divided bar of a round metric length.

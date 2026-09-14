@@ -314,7 +314,8 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   an isolated marker with a zero-distance constraint to a real edge applies the same four-side room
   test to its height chip. Unconstrained isolated markers retain the conventional chip below.
   and a **scale bar + `1:N · unit` caption + floor name + local `YYYY-MM-DD HH:mm` generation
-  timestamp**. A shared print set captures the generation time once, so every page agrees.
+  timestamp + software build id**. The build id is the Git revision and UTC build stamp injected
+  by Vite. A shared print set captures the generation time once, so every page agrees.
   Marker/legend names come from
   `opts.markerLabel` (desktop = English; AR passes `t('marker.<type>')`).
 - **Sheets are fully monochrome**: footprint, dimensions, marker pins, conflict dimensions,

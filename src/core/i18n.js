@@ -54,6 +54,7 @@ const STRINGS = {
 
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
+  'sheet.build': { en: 'Build', fr: 'Version', zh: '构建版本' },
   'floor.ground': { en: 'Ground floor', fr: 'Rez-de-chaussée', zh: '底层' },
   'floor.upper': { en: 'Upper floor', fr: 'Étage', zh: '上层' },
   'floor.basement': { en: 'Basement', fr: 'Sous-sol', zh: '地下室' },
