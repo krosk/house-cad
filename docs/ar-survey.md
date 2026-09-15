@@ -146,7 +146,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   Every export gets a millisecond timestamp in its filename. Chromium may gate a second synthetic
   download from one immersive session regardless of its name; after the first direct download,
   AR therefore uses Android Web Share (when file sharing is supported) for subsequent exports.
-  The share sheet is an intentional user-confirmed delivery step around that browser restriction.
+  The share sheet is an intentional user-confirmed delivery step around that browser restriction;
+  if Quest advertises Web Share but rejects it from immersive mode, delivery retries as a uniquely
+  named direct download rather than discarding the generated document.
   JSON uses `serializeProject` and contains the whole multi-floor persistent model; output-layer
   toggles do not filter or mutate this debugging snapshot.
   The panel is absent

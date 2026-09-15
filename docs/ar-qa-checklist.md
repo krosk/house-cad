@@ -274,6 +274,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Every export receives a distinct timestamped filename
 - [ ] After one direct AR download, a later export opens Android's share sheet and can save/share
       another floor or format instead of being blocked by Chromium's multi-download gate
+- [ ] If Web Share is advertised but rejected from immersive mode, the same export falls back to a uniquely named direct download instead of being lost
 - [ ] PNG is a sharp 4096-pixel-long-edge raster matching the SVG sheet content and output filters
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
 - [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors

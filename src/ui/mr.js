@@ -2675,14 +2675,27 @@ export function setupMR(view, project, getFootprint) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
     const file = new File([blob], filename, { type: mime });
     const shareData = { files: [file], title: filename };
-    if (directExportCount > 0 && navigator.share
-      && (!navigator.canShare || navigator.canShare(shareData))) {
-      await navigator.share(shareData);
-      return { ok: true, delivery: 'share' };
+    let canShare = false;
+    try {
+      canShare = directExportCount > 0 && !!navigator.share
+        && (!navigator.canShare || navigator.canShare(shareData));
+    } catch (error) {
+      rlog('output share capability check failed', String(error?.message || error));
+    }
+    if (canShare) {
+      try {
+        await navigator.share(shareData);
+        return { ok: true, delivery: 'share' };
+      } catch (error) {
+        // Quest Browser can expose Web Share yet reject it from an immersive XR
+        // select event. Do not let that capability mismatch consume the export:
+        // retry through DownloadManager using the already-unique filename.
+        rlog('output share unavailable; falling back to download', String(error?.message || error));
+      }
     }
     const ok = downloadBlob(filename, blob, mime);
     if (ok) directExportCount += 1;
-    return { ok, delivery: 'download' };
+    return { ok, delivery: directExportCount > 1 ? 'download-fallback' : 'download' };
   }
 
   // Android's download layer may reject a second write to the same destination
