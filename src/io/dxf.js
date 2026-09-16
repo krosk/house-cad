@@ -8,7 +8,8 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
+import { electricalRoutePoints } from '../core/electrical.js';
+import { conduitNetworkSegments, wireRouteSegments } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 const MM = 1000;
@@ -46,11 +47,11 @@ const LAYERS = [
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET_DUAL', 7, 'CONTINUOUS'],
   ['MARKER_PATCH_PANEL', 7, 'CONTINUOUS'],
-  ['MARKER_WIRE', 7, 'CONTINUOUS'],
   ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_WALL', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_CEILING', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_FLOOR', 4, 'DOTTED'],
+  ['CONDUIT', 8, 'DASHED'],
 ];
 
 const cleanNumber = (value) => {
@@ -357,11 +358,6 @@ function writeMarker(w, marker) {
     }
     w.circle(layer, x - r * 0.88, y, r * 0.06);
     w.circle(layer, x + r * 0.88, y, r * 0.06);
-  } else if (marker.type === 'wire') {
-    w.circle(layer, x, y, r);
-    w.line(layer, x - r * 0.65, y, x - r * 0.2, y + r * 0.45);
-    w.line(layer, x - r * 0.2, y + r * 0.45, x + r * 0.2, y - r * 0.45);
-    w.line(layer, x + r * 0.2, y - r * 0.45, x + r * 0.65, y);
   } else if (marker.type === 'outlet_shutter') {
     w.circle(layer, x, y, r);
     for (const dy of [-0.42, -0.12, 0.18, 0.48]) {
@@ -422,20 +418,29 @@ const WIRE_SURFACE_LAYER = {
 
 function writeElectricalLinks(w, floor) {
   for (const link of floor.electricalLinks || []) {
-    // As-built wires split onto per-surface layers (wall/ceiling/floor) so the
-    // inferred run location survives into CAD; control links stay on one route
-    // layer. Both are true-3D LINE entities, so a top view shows the plan run.
-    if ((link.kind || 'control') === 'wire') {
-      for (const seg of electricalRouteSegments(floor, link)) {
-        const layer = WIRE_SURFACE_LAYER[seg.surface] || 'ELECTRICAL_ROUTE_WALL';
-        w.line3d(layer, seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DOTTED');
-      }
-      continue;
-    }
+    if ((link.kind || 'control') !== 'control') continue; // only logical switch→light legs
     const route = electricalRoutePoints(floor, link);
     for (let i = 1; i < route.length; i++) {
       const a = route[i - 1], b = route[i];
       w.line3d('ELECTRICAL_ROUTE', a.x, a.y, a.z, b.x, b.y, b.z, 'DOTTED');
+    }
+  }
+}
+
+// The shared conduit network as true-3D LINE entities on one CONDUIT layer.
+function writeConduits(w, floor) {
+  for (const seg of conduitNetworkSegments(floor)) {
+    w.line3d('CONDUIT', seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DASHED');
+  }
+}
+
+// Wires routed over the conduits, split onto per-surface layers (wall/ceiling/floor)
+// so the inferred run location survives into CAD. True-3D, so a top view shows plan.
+function writeRoutedWires(w, floor) {
+  for (const wire of floor.wires || []) {
+    for (const seg of wireRouteSegments(floor, wire)) {
+      const layer = WIRE_SURFACE_LAYER[seg.surface] || 'ELECTRICAL_ROUTE_WALL';
+      w.line3d(layer, seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DOTTED');
     }
   }
 }
@@ -467,6 +472,8 @@ export function floorToDxf(floor, opts = {}) {
   if (layers.markerDims) writeMarkerDimensions(w, floor);
   if (layers.markerIcons) {
     for (const marker of floor.markers || []) writeMarker(w, marker);
+    writeConduits(w, floor);
+    writeRoutedWires(w, floor);
     writeElectricalLinks(w, floor);
   }
 

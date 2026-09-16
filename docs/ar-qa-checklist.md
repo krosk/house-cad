@@ -286,20 +286,18 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Dual Ethernet is selectable independently from Ethernet and renders as two adjacent RJ45 ports in AR, sheets, legends, and detailed DXF
 - [ ] Patch panel is selectable as a marker and renders as a rack-style bank of ports in AR, sheets, legends, and detailed DXF
 - [ ] Panel/consumer-unit is selectable as a marker and renders as a breaker-bank enclosure in AR, sheets, legends, and detailed DXF (`MARKER_PANEL`)
-- [ ] MARKER · WIRE: trigger a marker to start (turns amber), trigger the surface to drop waypoints (live amber preview follows the tip, readout counts them), trigger a second marker to commit; the wire persists and redraws
-- [ ] WIRE grip removes the last waypoint step by step, then clears the start marker; readout returns to PICK START
-- [ ] A committed wire's segments are dashed by inferred surface in AR — ceiling cyan, wall amber, floor slab green — and follow both endpoint markers when they are moved
-- [ ] Wires round-trip through SAVE/LOAD (kind, waypoints, surface inference) and floor copy/paste; retyping an endpoint keeps the wire, deleting an endpoint removes it
-- [ ] Sheet draws the wire's plan projection with per-surface dash patterns plus a "Wire · in wall/ceiling/floor" legend key; DXF writes segments on `ELECTRICAL_ROUTE_WALL` / `_CEILING` / `_FLOOR`
-- [ ] Routes appear in LINK (control links only), WIRE, and WIRE EDIT modes and stay hidden elsewhere
-- [ ] MARKER · WIRE EDIT: trigger a wire to select it; its waypoints appear as sphere handles and the wire brightens
-- [ ] Trigger a handle to select it (amber); on a vertical wall drop, repeated triggers cycle the stacked waypoints top-to-bottom
-- [ ] Grip-drag a handle with the controller tip NEAR it carries the waypoint 1:1 in full 3D (direct grab); the wire redraws following the hand and release persists it
-- [ ] Grip-drag a handle with the tip FAR from it (remote grab) moves only X/Y via the floor reticle while the height holds; a moved segment reclassifies its wall/ceiling/floor dash/color if it crosses a plane
-- [ ] Selecting a waypoint opens a height pad; typing a value + ENTER sets that waypoint's z (keeps it selected), and DEL on the pad removes the waypoint
-- [ ] With a waypoint selected, grip aimed away from any handle deletes it; with none selected, grip deselects the wire
-- [ ] Triggering the selected wire between two handles inserts a new waypoint on that leg at the reticle (z from the tip) and selects it
-- [ ] Trigger empty space backs out one level: waypoint selection first, then the wire; edits round-trip through SAVE/LOAD and floor copy/paste
+### CONDUIT + WIRE (two-layer model, replaces the removed per-wire-waypoint lane)  ⬜ NEW — build-verified only
+- [ ] MARKER · CONDUIT: trigger a marker/node to start the pen (readout START PEN→RUN CONDUIT); trigger empty space drops a junction + runs a segment; trigger another node joins/branches/loops; grip lifts the pen (no deletion)
+- [ ] The live network draws in `conduitGroup` colored per inferred surface, with a node sphere per vertex (marker-bound dimmer); the pen node is amber, hover yellow, and a preview runs pen→tip
+- [ ] CONDUIT · EDIT: trigger a free junction selects it and opens a height pad; trigger a segment between nodes splits it with a new junction at the reticle and selects it; trigger empty space deselects
+- [ ] Grip-drag a node NEAR the tip carries it 1:1 in full 3D (direct); FAR moves only X/Y via the floor reticle while z holds (remote); release persists; height pad typing + ENTER sets a free junction's z
+- [ ] A marker-bound node cannot be moved (follows its device) and opens no pad; grip away from a selected node deletes the node + its segments and drops `via` references to it
+- [ ] MARKER · WIRE: trigger two device markers to define a wire (readout PICK START→PICK END→VIA·n); its route draws instantly as the auto shortest path through the conduits, per-surface colored
+- [ ] With a wire selected, triggering conduit nodes forces the route through them (via override, existing vias read cyan); grip pops the last via, and with none left deletes the wire
+- [ ] An unroutable wire (no conduit path) draws nothing but is retained; trigger an existing wire to re-select it; trigger empty space to deselect
+- [ ] Wires + conduits round-trip through SAVE/LOAD and floor copy/paste (node/segment/wire ids remapped, marker-bound nodes + `via` rebound); deleting an endpoint marker drops its bound node + incident segments + terminating wires
+- [ ] Sheet draws the conduit network (one dash + node rings) beneath per-surface-dashed routed wires, with "Conduit" + "Wire · in wall/ceiling/floor" legend keys; DXF writes `CONDUIT` (dashed) + routed wires on `ELECTRICAL_ROUTE_WALL`/`_CEILING`/`_FLOOR`
+- [ ] Conduit network + routed wires show only in the CONDUIT/CONDUIT EDIT/WIRE modes; control links still show only in LINK
 - [ ] A floor containing many marker/zone types wraps its legend within the printable page instead of extending beyond either margin
 - [ ] Zone legend names switch with LANG (insulation/door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers

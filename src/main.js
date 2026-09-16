@@ -15,6 +15,7 @@ import {
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
+import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
 import { t, localizedFloorName } from './core/i18n.js';
@@ -529,34 +530,85 @@ function printSheets(svgs) {
 (() => {
   const btn = document.getElementById('print-btn');
   const pop = document.getElementById('print-pop');
+  const baselineSel = document.getElementById('print-baseline');
   const close = () => { pop.hidden = true; };
 
-  btn.addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; });
+  // The 6 AR save slots (house-cad:slot:0..5) double as change-map baselines. Read
+  // one as {savedAt, data} | null (bad/absent/foreign JSON -> null).
+  const SLOT_COUNT = 6;
+  const readSlot = (i) => {
+    try {
+      const o = JSON.parse(localStorage.getItem(`house-cad:slot:${i}`));
+      return o && o.data && Array.isArray(o.data.floors) ? o : null;
+    } catch { return null; }
+  };
+
+  // Rebuild the baseline dropdown from the slots present now, preserving the
+  // current selection when it still exists.
+  const refreshBaselines = () => {
+    const prev = baselineSel.value;
+    baselineSel.innerHTML = '<option value="">No comparison</option>';
+    let any = false;
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const o = readSlot(i);
+      if (!o) continue;
+      any = true;
+      const rects = o.data.floors.reduce((n, f) => n + (f.rectangles?.length || 0), 0);
+      const when = o.savedAt ? new Date(o.savedAt).toLocaleString() : 'saved';
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `Slot ${i + 1} — ${when} (${rects})`;
+      baselineSel.appendChild(opt);
+    }
+    baselineSel.value = readSlot(Number(prev)) ? prev : '';
+    document.getElementById('print-baseline-row').style.display = any ? '' : 'none';
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.hidden = !pop.hidden;
+    if (!pop.hidden) refreshBaselines();
+  });
   pop.addEventListener('click', (e) => e.stopPropagation());
   document.addEventListener('click', close);
 
   const anyGeometry = () => project.floors.some((f) => f.rectangles.length > 0);
+
+  // The selected baseline slot's per-floor diff Map (floorId -> diff), or null for
+  // no comparison / an unreadable slot. Plan sheets (Print/SVG/PNG) read this;
+  // CAD exports (DXF/Coohom) ignore it.
+  const currentChangeMap = () => {
+    const sel = baselineSel.value;
+    if (sel === '') return null;
+    const o = readSlot(Number(sel));
+    if (!o) return null;
+    try { return diffAgainstSnapshot(project, o.data); }
+    catch (err) { sketch.onStatus?.(`Change map skipped: ${err.message}`); return null; }
+  };
 
   pop.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', async () => {
       close();
       if (!anyGeometry()) { sketch.onStatus?.('Nothing to print — the plan is empty.'); return; }
       try {
+        // Plan sheets carry the change map when a baseline slot is chosen; the CAD
+        // (DXF/Coohom) exports never do. Computed once so a print set is consistent.
+        const changeMap = currentChangeMap();
         if (b.dataset.print === 'svg') {
           const f = project.activeFloor;
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
-          const sheetOpts = sharedScaleSheetOptions(project.floors, localizedSheetOptions());
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions()), changeMap };
           const name = sheetDownloadName(f, 'svg');
           download(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
-          sketch.onStatus?.(`Downloaded ${name}`);
+          sketch.onStatus?.(`Downloaded ${name}${changeMap ? ' — with change map' : ''}`);
         } else if (b.dataset.print === 'png') {
           const f = project.activeFloor;
-          const sheetOpts = sharedScaleSheetOptions(project.floors, localizedSheetOptions());
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions()), changeMap };
           const blob = await floorToPngBlob(f, sheetOpts);
           const name = sheetDownloadName(f, 'png');
           download(name, blob, 'image/png');
-          sketch.onStatus?.(`Downloaded ${name}`);
+          sketch.onStatus?.(`Downloaded ${name}${changeMap ? ' — with change map' : ''}`);
         } else if (b.dataset.print === 'dxf') {
           const f = project.activeFloor;
           const name = sheetDownloadName(f, 'dxf');
@@ -568,8 +620,8 @@ function printSheets(svgs) {
           download(name, floorToCoohomDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — simplified Coohom recognition geometry.`);
         } else {
-          printSheets(floorsToSharedScaleSvgs(project.floors, localizedSheetOptions()));
-          sketch.onStatus?.('Opening print dialog — choose Save as PDF, print at 100%.');
+          printSheets(floorsToSharedScaleSvgs(project.floors, { ...localizedSheetOptions(), changeMap }));
+          sketch.onStatus?.(`Opening print dialog — choose Save as PDF, print at 100%.${changeMap ? ' Change map included.' : ''}`);
         }
       } catch (err) {
         alert(`Print failed:\n${err.message}`);

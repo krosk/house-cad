@@ -16,12 +16,13 @@ height-ordered fixture-stack callouts: vertical stacks require strictly identica
 while horizontal stacks require exact height equality and follow connected 8 cm-inclusive plan
 neighbors; 8 cm-inclusive 3D
 height neighbors share horizontal/vertical white boxes,
-while more distant height groups keep separate boxes on the shared leader. **As-built wire tracing
-(`MARKER · WIRE`) and the `panel`/consumer-unit type now close out the "manual route waypoints" item:
-a wire connects any two markers, stores hand-traced waypoints, and infers the wall/ceiling/floor
-surface of each segment from geometry.** Openings (category 2) remain
-deferred. See `.claude/handoff.md` → Next step B and `docs/ar-survey.md` for the current build. The
-design rationale below still governs; treat "we build first / not started" phrasing as historical.
+while more distant height groups keep separate boxes on the shared leader. **Electrical is now a
+two-layer CONDUIT-network + wires-as-routes model** (`src/core/conduit.js`): author the shared conduit
+graph (`MARKER · CONDUIT`), edit it (`CONDUIT · EDIT`), and define wires that auto-route over it with
+optional `via` overrides (`MARKER · WIRE`). This REPLACED the old per-wire-waypoint tracing +
+`WIRE EDIT` lane, which has been removed. The `panel`/consumer-unit type stays. Openings (category 2)
+remain deferred. See `.claude/handoff.md` and `docs/ar-survey.md` for the current build. The design
+rationale below still governs; treat "we build first / not started" phrasing as historical.
 
 ## Goal in one paragraph
 
@@ -58,12 +59,15 @@ feature.**
     origin), so it lives in the same space as everything else and survives RECAL/anchor drift.
   - `z`: **height above the floor** (meters). This is the new third scalar. Enter it numerically
     (reuse the SIZE numpad) or capture it from the tip height at drop time.
-- **Electrical controls AND as-built wires** are separate per-floor `electricalLinks`, not marker
-  types. A `kind:'control'` link stores switch/light ids and derives a switch→ceiling→light polyline
-  from live marker positions. A `kind:'wire'` link connects ANY two markers and stores manual
-  `route.waypoints`; its full path is `from → waypoints → to` (endpoints stay live) and each segment's
-  wall/ceiling/floor surface is inferred, not stored. Shared derivation lives in `src/core/electrical.js`
-  (`electricalRoutePoints`, `electricalRouteSegments`, `segmentSurface`).
+- **Electrical is two layers.** (1) **Control links** are per-floor `electricalLinks` (`kind:'control'`,
+  switch/light ids) that derive a switch→ceiling→light polyline from live marker positions
+  (`src/core/electrical.js`: `electricalRoutePoints`, `segmentSurface`). (2) The **conduit network** +
+  **wires** live in per-floor `conduitNodes` / `conduitSegments` / `wires`: a wire is
+  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` whose physical path is DERIVED as the shortest route
+  through the conduit graph (Dijkstra, threading the ordered `via` overrides), never stored. Graph +
+  routing live in `src/core/conduit.js`; each segment's wall/ceiling/floor surface is inferred via
+  `segmentSurface`. This REPLACED the old per-wire-waypoint `kind:'wire'` model (removed with its
+  `MARKER · WIRE`-trace + `WIRE EDIT` AR lane).
 - `z` is an **independent scalar** — keep the constraint solver 2-axis. If constrained placement is
   ever wanted, add a trivial 1-D pin later; do NOT fold z into the X/Y solver.
 
@@ -124,9 +128,11 @@ feature.**
   rough REGISTER→ROOM→EDGE→SIZE→LEVEL→LANG pass on device before/while building markers, so two
   unknowns aren't debugged at once. See `.claude/handoff.md` → Next step A.
 - **B — Markers vertical slice.** Outlet/switch/light/ethernet, automatic switch-to-light ceiling
-  routes, as-built wire tracing (`MARKER · WIRE`, any→any + `panel` type, manual waypoints, inferred
-  surface), AND waypoint editing (`MARKER · WIRE EDIT`: select wire → select/move/delete/insert
-  waypoints) are all implemented. **The electrical slice is feature-complete pending on-device QA.**
+  routes, and the **two-layer conduit-network + wires-as-routes** electrical model — conduit authoring
+  (`MARKER · CONDUIT`), conduit editing (`CONDUIT · EDIT`: move/split/delete nodes with the dual-move
+  + height pad), and routed wires (`MARKER · WIRE`: two markers → auto shortest route + `via`
+  overrides) — plus sheet/DXF output for both — are all implemented; the legacy per-wire-waypoint lane
+  is removed. **The electrical slice is feature-complete pending on-device QA.**
 - **C — Openings (windows/doors): DEFERRED, separate effort.** Needs its own design pass on
   whether to give up single-extrusion or do face-level cuts. Not part of the markers slice —
   keep it out so the markers lane stays clean.
@@ -136,10 +142,11 @@ feature.**
   path? Untested; decide on device (holding a controller at outlet height vs typing 0.3 m).
 - **Type picker UX** — cycle types within one mode (B/Y, like LEVEL floors) vs one mode per type.
   Unresolved; lean on what feels right on device.
-- **Manual route authoring** — DONE. Placement in `MARKER · WIRE` (trigger start marker, trigger
-  surface to drop waypoints, trigger end marker; grip undoes) and editing in `MARKER · WIRE EDIT`
-  (select wire → select/move/delete/insert waypoints). Surface stays inferred, not tagged. OPEN only:
-  whether to ever let the user override an inferred surface (currently geometry alone decides).
+- **Route authoring** — DONE, re-architected. Wires no longer store per-wire waypoints; they route
+  over a shared **conduit network** (`MARKER · CONDUIT` pen + `CONDUIT · EDIT`) and derive the
+  shortest path, with `via` node overrides in `MARKER · WIRE`. Surface stays inferred, not tagged.
+  OPEN: whether to ever let the user override an inferred surface (currently geometry alone decides);
+  the direct/remote grab threshold `WAYPOINT_GRAB_M`=0.14 m needs on-device tuning.
 - **Desktop parity** — markers are AR-first, but the desktop 2D editor exists. Whether/how markers
   render/edit in 2D is open (memory `ar-2d-parity`). Not required for the AR slice.
 - **Do markers belong to a floor or span floors?** Assumed per-floor (like rectangles). A wire

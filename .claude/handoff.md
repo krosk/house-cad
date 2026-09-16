@@ -13,12 +13,14 @@
   electrical re-architecture + its decisions. Don't duplicate them here.
 
 **Date:** 2026-09-16 (session 19)
-**Status:** Quest APK path WORKING. **LIVE EFFORT: re-architecting electrical wiring into a two-layer
-CONDUIT-network + wires-as-routes model** (memory `conduit-wiring-model`). Slice 1 (data model +
-`src/core/conduit.js` routing + persistence) and Slice 2 (`MARKER · CONDUIT` pen-authoring) are
-committed + pushed (`514da9f`, WIP); build-green, routing/persistence Node-smoke-tested, AR
-build-verified only. **The old standalone-waypoint wire system (`973f105`) still coexists and is torn
-out in a later slice** — see Next step A.
+**Status:** Quest APK path WORKING. **Electrical re-architecture COMPLETE** — the two-layer
+CONDUIT-network + wires-as-routes model (memory `conduit-wiring-model`) is fully implemented across all
+5 slices, build-green + Node-smoke-tested, AR build-verified only. Slices 3 (`CONDUIT · EDIT`), 4
+(`MARKER · WIRE` redefined = auto-route + `via` override), and 5 (sheet/DXF output for conduits +
+routed wires, THEN full teardown of the legacy per-wire-waypoint system + `createWire`→`addWire`
+rename) landed this turn on top of slices 1–2 (`514da9f`). **The legacy standalone-waypoint wire
+system (`973f105`) is GONE.** These changes are NOT yet committed (owner commits when ready). Next:
+on-device QA of the whole conduit lane — see Next step A.
 
 ## Where things stand in one paragraph
 
@@ -54,14 +56,24 @@ links unchanged**). Landed this session:
    (`electricalLinks` kind:'wire'), `MARKER · WIRE` trace + `WIRE EDIT` (dual-move: direct 3D carry
    vs remote floor-reticle + numpad height). Its `panel` marker type and per-surface AR/sheet/DXF
    drawing stay; the per-wire-waypoint mechanism is replaced by conduits (torn out in Next step A).
-2. **(`514da9f`, WIP) conduit foundation + authoring.** `src/core/conduit.js`: node/segment graph,
+2. **(`514da9f`) conduit foundation + authoring.** `src/core/conduit.js`: node/segment graph,
    Dijkstra `shortestConduitPath` (threads ordered `via`), `wireRoutePoints`/`wireRouteSegments`,
-   `conduitNetworkSegments`; surface still inferred via `segmentSurface` (`electrical.js`). Model:
-   per-floor `conduitNodes`/`conduitSegments`/`wires` + add/move/remove/split node+segment,
-   `createWire`/`addWireVia`/`popWireVia`, marker-delete cleanup, floor-move/clear/copy-paste. AR
-   `MARKER · CONDUIT` pen authoring (trigger device/node to start; empty space drops a junction +
-   runs a segment; another node joins/branches/loops; grip lifts the pen) with live surface-colored
-   network + node handles + tip preview. Node-smoke-tested (`scratchpad/conduit-smoke.mjs`).
+   `conduitNetworkSegments`; surface inferred via `segmentSurface` (`electrical.js`). Model:
+   per-floor `conduitNodes`/`conduitSegments`/`wires`. AR `MARKER · CONDUIT` pen authoring.
+3. **(uncommitted, this turn) slices 3–5 — re-architecture complete.**
+   - **Slice 3 `CONDUIT · EDIT`** (`conduit_edit` mode): flat node selection (nodes always drawn),
+     free-junction height pad, segment-split on trigger, dual-move grip (direct vs remote by
+     `WAYPOINT_GRAB_M`), grip-away deletes node+segments; marker-bound nodes immovable.
+   - **Slice 4 `MARKER · WIRE` redefined**: two markers → `addWire` (auto shortest route drawn at
+     once); select a wire → trigger conduit nodes = `addWireVia` (override), grip = `popWireVia` / (no
+     vias) delete wire. Draws in a new `routedWireGroup`; conduit network shown for via-picking.
+   - **Slice 5 output + teardown**: `planSheet.js` + `dxf.js` draw the conduit network (`CONDUIT`
+     layer / one dash + node rings) and routed wires (per-surface dash / `ELECTRICAL_ROUTE_*` layers),
+     with legend keys. THEN the legacy wire lane was removed: model `*WireWaypoint`/old `addWire`, AR
+     `marker_wire_edit` mode + `wireHandleGroup`/waypoint-pad/`applyWaypointGripDrag` helpers,
+     `dxf`/`planSheet` `kind:'wire'` + `MARKER_WIRE` layer, and `electrical.js` `electricalRouteSegments`
+     + waypoint branch — and `createWire` → `addWire`. Smoke-tested (scratchpad `conduit-edit-smoke.mjs`,
+     `output-smoke.mjs` → sheet rsvg-eyeballed). Docs + memory updated.
 
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
@@ -186,18 +198,13 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
 
 ## Next step
 
-- **A — FINISH THE CONDUIT RE-ARCHITECTURE (the live effort).** Remaining slices, in order:
-  **(3) `CONDUIT · EDIT`** — select node → move/insert/delete; **reuse the WIRE EDIT dual-move (direct
-  vs remote) + height pad wholesale** on conduit nodes (marker-bound nodes follow their marker, don't
-  move); grip-away deletes a node (+ its segments), split a segment by triggering it.
-  **(4) redefine `MARKER · WIRE`** — trigger two device markers → `createWire` (auto shortest route
-  drawn instantly); while a wire is selected, trigger conduit nodes to `addWireVia` (override), grip
-  `popWireVia`. **(5) output + teardown** — sheet/DXF draw the conduit network (one style) + routed
-  wires (per-surface dash/layer, reuse `wireRouteSegments`); THEN remove the legacy wire system
-  (model `addWire`(waypoints)/`moveWireWaypoint`/`insertWireWaypoint`/`removeWireWaypoint`, mr.js
-  `marker_wire`/`marker_wire_edit` modes + helpers, dxf/planSheet `kind:'wire'` drawing, electrical.js
-  wire branch) and **rename `createWire` → `addWire`**. Keep build green each slice. Then update
-  `docs/ar-survey.md`, `docs/markers-plan.md`, `docs/ar-qa-checklist.md`.
+- **A — CONDUIT RE-ARCHITECTURE: DONE (all 5 slices), build-green, uncommitted.** ~~(3) CONDUIT·EDIT,
+  (4) MARKER·WIRE redefine, (5) output + legacy teardown + `createWire`→`addWire`~~ all landed this
+  turn; docs (`ar-survey.md`, `markers-plan.md`, `ar-qa-checklist.md`, `CLAUDE.md`) + memory updated.
+  **REMAINING: commit + push** (owner's call — every push publishes), then **on-device QA of the whole
+  conduit lane** (pen feel, node picking by floor projection, branch/loop, CONDUIT·EDIT dual-move +
+  split + delete, WIRE auto-route + via override on a real house graph). Owner-flagged: the
+  `WAYPOINT_GRAB_M`=0.14 m direct/remote grab threshold needs tuning on device.
 - **B — FINISH ON-DEVICE QA (tracked in `docs/ar-qa-checklist.md`).** Still never walked: **LEVEL**
   (floor seed/cycle/height/stacking); **MARKER EDIT** (drop/height/3D-drag/delete/`markerAtPoint`-
   first, switch glyph); **MARKER DIMS** remainder — commit+render is now proven (s16), but

@@ -25,7 +25,7 @@ npm run preview  # serve the production build
 
 ## Core architecture
 
-The whole app is a one-way pipeline driven by a change bus. `Project` (in `src/core/model.js`) holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks`, and `height`, and exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
+The whole app is a one-way pipeline driven by a change bus. `Project` (in `src/core/model.js`) holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks` (switch→light control links), the `conduitNodes`/`conduitSegments`/`wires` electrical network (wires route over conduits; path derived in `src/core/conduit.js`, never stored), and `height`, and exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
 
 ```
 rectangles (add/subtract, ordered)
@@ -58,7 +58,7 @@ before the solver runs once, preserving all relative dimensions and marker pins.
 
 ### Persistence
 
-`src/io/serialize.js` serializes the parametric definition (rectangles + constraints + markers + electrical links + height) to JSON; the footprint/mesh is always recomputed, never stored. Missing `electricalLinks` default to `[]`, so older saves remain compatible. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`), and paste replaces the selected floor's authored plan with collision-free rectangle/constraint/marker/link ids plus remapped references. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
+`src/io/serialize.js` serializes the parametric definition (rectangles + constraints + markers + electrical links + conduit nodes/segments + wires + height) to JSON; the footprint/mesh is always recomputed, never stored. Missing `electricalLinks` default to `[]`, so older saves remain compatible. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`), and paste replaces the selected floor's authored plan with collision-free rectangle/constraint/marker/link ids plus remapped references. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
 
 ### Plan sheets (printing / SVG export)
 
@@ -96,7 +96,8 @@ Desktop Print creates one page per floor; print at 100% for true scale. Full AR 
 importers such as Coohom. It is model-space CAD, not a paper sheet: one meter becomes 1000 DXF
 units and `$INSUNITS=4` declares millimeters. Separate layers retain `FOOTPRINT`, enabled semantic
 zone kinds, enabled structural and marker-pin dimensions/markers, room areas, true 3D
-`ELECTRICAL_ROUTE` switch legs, and `ORIGIN`.
+`ELECTRICAL_ROUTE` switch legs, the `CONDUIT` network, per-surface routed wires
+(`ELECTRICAL_ROUTE_WALL`/`_CEILING`/`_FLOOR`), and `ORIGIN`.
 The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
 **PROJECT · EXPORT** always targets the active LEVEL floor. Right thumbstick up/down switches SVG/DXF;
 a ray-picked panel toggles plan dims, marker dims, marker icons, furniture, and room area, while a separate

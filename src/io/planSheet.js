@@ -20,7 +20,8 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
+import { electricalRoutePoints } from '../core/electrical.js';
+import { conduitNetworkSegments, wireRouteSegments } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 // Injected by Vite as the source revision + UTC build time. The fallback keeps
@@ -84,6 +85,8 @@ const WIRE_SURFACE_DASH = {
   floor: [0.2, 0.5, 1.1, 0.5], // dot-dash
 };
 const WIRE_SURFACE_LABEL = { ceiling: 'in ceiling', wall: 'in wall', floor: 'in floor' };
+const C_CONDUIT = '#888';        // the shared conduit network (physical channels)
+const CONDUIT_DASH = [2.2, 1.0]; // one style for every channel; wires above read by surface dash
 const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
@@ -91,7 +94,7 @@ const MARKER_LABELS = {
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
   switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
-  patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel', wire: 'Wire',
+  patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
 };
 const MARKER_RECOMMENDED_AMPS = {
   outlet_cooktop: 32,
@@ -1156,23 +1159,45 @@ function drawMarkers(be, L, floor, footprint) {
 // electrical control never reads as wall or structural dimension geometry.
 function drawElectricalLinks(be, L, floor) {
   for (const link of floor.electricalLinks || []) {
-    // As-built wires project per segment with a surface-specific dash so wall,
-    // ceiling, and floor runs are distinguishable on the monochrome sheet.
-    if ((link.kind || 'control') === 'wire') {
-      for (const seg of electricalRouteSegments(floor, link)) {
-        if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue; // vertical rise/drop collapses in plan
-        be.line(L.X(seg.a.x), L.Y(seg.a.y), L.X(seg.b.x), L.Y(seg.b.y), {
-          stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[seg.surface] || WIRE_SURFACE_DASH.wall, cap: 'round',
-        });
-      }
-      continue;
-    }
+    if ((link.kind || 'control') !== 'control') continue; // only logical switch→light legs here
     const route = electricalRoutePoints(floor, link);
     for (let i = 1; i < route.length; i++) {
       const a = route[i - 1], b = route[i];
       if (a.x === b.x && a.y === b.y) continue; // vertical rise/drop collapses in plan
       be.line(L.X(a.x), L.Y(a.y), L.X(b.x), L.Y(b.y), {
         stroke: C_ELECTRICAL, width: 0.28, dash: [0.35, 0.9], cap: 'round',
+      });
+    }
+  }
+}
+
+// The shared conduit network — the physical channels drilled into walls/floors/
+// ceilings. One dash style for every channel (surface is carried by the wires that
+// run through it); node positions get a small ring so junctions read on the sheet.
+function drawConduits(be, L, floor) {
+  for (const seg of conduitNetworkSegments(floor)) {
+    if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue; // vertical drop collapses in plan
+    be.line(L.X(seg.a.x), L.Y(seg.a.y), L.X(seg.b.x), L.Y(seg.b.y), {
+      stroke: C_CONDUIT, width: 0.3, dash: CONDUIT_DASH, cap: 'round',
+    });
+  }
+  for (const node of floor.conduitNodes || []) {
+    const p = node.markerId
+      ? (floor.markers || []).find((m) => m.id === node.markerId)
+      : node;
+    if (!p) continue;
+    be.circle(L.X(p.x), L.Y(p.y), 0.5, { fill: '#fff', stroke: C_CONDUIT, width: 0.18 });
+  }
+}
+
+// Wires routed over the conduit network, drawn per derived-route segment with a
+// surface-specific dash so wall/ceiling/floor runs are distinguishable in mono.
+function drawRoutedWires(be, L, floor) {
+  for (const wire of floor.wires || []) {
+    for (const seg of wireRouteSegments(floor, wire)) {
+      if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue; // vertical rise/drop collapses in plan
+      be.line(L.X(seg.a.x), L.Y(seg.a.y), L.X(seg.b.x), L.Y(seg.b.y), {
+        stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[seg.surface] || WIRE_SURFACE_DASH.wall, cap: 'round',
       });
     }
   }
@@ -1281,26 +1306,29 @@ function drawStrip(be, L, floor, opts) {
       x += entry.width;
     }
   }
-  // As-built wire key: one dashed sample per surface actually present, so the
-  // wall/ceiling/floor dash patterns on the plan can be read back. Shares the
-  // markerIcons gate with the routes themselves.
+  // Conduit + routed-wire key: a conduit sample (when the network exists) plus one
+  // dashed wire sample per surface actually drawn, so the plan's dash patterns can
+  // be read back. Shares the markerIcons gate with the routes themselves.
   if (layers.markerIcons) {
+    const hasConduit = (floor.conduitSegments || []).length > 0;
     // Key only surfaces that actually draw a line in plan — a pure vertical
     // rise/drop collapses to a point, so it contributes no visible dash to explain.
-    const wireSurfaces = [...new Set((floor.electricalLinks || [])
-      .filter((link) => (link.kind || 'control') === 'wire')
-      .flatMap((link) => electricalRouteSegments(floor, link))
+    const wireSurfaces = [...new Set((floor.wires || [])
+      .flatMap((wire) => wireRouteSegments(floor, wire))
       .filter((s) => s.a.x !== s.b.x || s.a.y !== s.b.y)
       .map((s) => s.surface))]
       .sort();
-    const wireEntries = wireSurfaces.map((s) => ({ s, label: `Wire · ${WIRE_SURFACE_LABEL[s] || s}` }));
-    for (const row of wrapRows(wireEntries, (entry) => 9 + be.measure(entry.label, 2.4) + 3)) {
+    const entries = [
+      ...(hasConduit ? [{ kind: 'conduit', label: 'Conduit' }] : []),
+      ...wireSurfaces.map((s) => ({ kind: 'wire', s, label: `Wire · ${WIRE_SURFACE_LABEL[s] || s}` })),
+    ];
+    for (const row of wrapRows(entries, (entry) => 9 + be.measure(entry.label, 2.4) + 3)) {
       let x = page.w - MARGIN - row.width;
       const y = yBase + 4 + legendRow++ * 6;
       for (const entry of row.entries) {
-        be.line(x, y, x + 7, y, {
-          stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[entry.s] || WIRE_SURFACE_DASH.wall, cap: 'round',
-        });
+        be.line(x, y, x + 7, y, entry.kind === 'conduit'
+          ? { stroke: C_CONDUIT, width: 0.3, dash: CONDUIT_DASH, cap: 'round' }
+          : { stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[entry.s] || WIRE_SURFACE_DASH.wall, cap: 'round' });
         be.text(entry.label, x + 9, y, { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
         x += entry.width;
       }
@@ -1316,6 +1344,151 @@ function drawStrip(be, L, floor, opts) {
  * Issue every draw call for one floor's sheet to a backend, in page mm.
  * Returns the layout (page size + chosen scale) so callers can size the output.
  */
+// ---------------------------------------------------------------------------
+// Change map — revision clouds + numbered delta tags vs a baseline snapshot.
+// Monochrome by design (matches the sheet); the caller passes a per-floor diff
+// (src/core/planDiff.js) in opts.changeMap. Everything below is in PAGE MM.
+// ---------------------------------------------------------------------------
+const C_REV = '#000';       // revision markup is monochrome, drawn a touch bolder
+const C_GHOST = '#999';     // vanished (removed) geometry, drawn faint
+const CLOUD_R = 1.6;        // scallop radius on paper (mm), a fixed annotation size
+const CLOUD_OUTSET = 1.4;   // clouds sit just outside the changed region (mm)
+const REV_TAG = 3.6;        // revision-triangle side (mm)
+
+// Quadratic bezier sample (the backends have no arc primitive; sampling as short
+// line segments keeps the SVG and canvas outputs pixel-identical).
+function quadPt(ax, ay, cx, cy, bx, by, t) {
+  const u = 1 - t;
+  return { x: u * u * ax + 2 * u * t * cx + t * t * bx, y: u * u * ay + 2 * u * t * cy + t * t * by };
+}
+
+// One outward-bulging scallop from a→b, its control apex pushed away from the
+// region center so every bump faces outward (the revision-cloud look).
+function scallop(be, ax, ay, bx, by, ctrX, ctrY, style) {
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  let nx = -dy / len, ny = dx / len;
+  if ((mx - ctrX) * nx + (my - ctrY) * ny < 0) { nx = -nx; ny = -ny; } // face outward
+  const cx = mx + nx * len * 0.9, cy = my + ny * len * 0.9;
+  let px = ax, py = ay;
+  for (let i = 1; i <= 5; i++) {
+    const p = quadPt(ax, ay, cx, cy, bx, by, i / 5);
+    be.line(px, py, p.x, p.y, style); px = p.x; py = p.y;
+  }
+}
+
+// A revision cloud around a page-mm box; outset a little, then scallop each side.
+function drawCloud(be, x0, y0, x1, y1) {
+  x0 -= CLOUD_OUTSET; y0 -= CLOUD_OUTSET; x1 += CLOUD_OUTSET; y1 += CLOUD_OUTSET;
+  const ctrX = (x0 + x1) / 2, ctrY = (y0 + y1) / 2;
+  const pts = [];
+  const edge = (ax, ay, bx, by) => {
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / (2 * CLOUD_R)));
+    for (let i = 0; i < n; i++) pts.push([ax + (bx - ax) * i / n, ay + (by - ay) * i / n]);
+  };
+  edge(x0, y0, x1, y0); edge(x1, y0, x1, y1); edge(x1, y1, x0, y1); edge(x0, y1, x0, y0);
+  const style = { stroke: C_REV, width: 0.3 };
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    scallop(be, a[0], a[1], b[0], b[1], ctrX, ctrY, style);
+  }
+}
+
+// A numbered revision triangle (delta) at page-mm (x,y), keyed to the legend.
+function drawRevTag(be, x, y, n) {
+  const s = REV_TAG;
+  be.poly([[x, y - s * 0.6], [x - s * 0.55, y + s * 0.5], [x + s * 0.55, y + s * 0.5]],
+    { fill: '#fff', stroke: C_REV, width: 0.3 });
+  be.text(String(n), x, y + s * 0.12, { fill: C_REV, size: 2.2, weight: 'bold', align: 'center', baseline: 'middle' });
+}
+
+// Plan-space anchor for a dimension's tag: the label midpoint along the measured
+// span, at the outer edge line. Null when an endpoint has no drawable edge.
+function dimAnchor(floor, c) {
+  const la = edgeLineWorld(c.a, floor.rectangles);
+  const lb = edgeLineWorld(c.b, floor.rectangles);
+  if (!la || !lb) return null;
+  return c.axis === 'x'
+    ? { x: dimLabelCoord(c, la.coord, lb.coord), y: Math.max(la.p1.y, lb.p1.y) }
+    : { x: Math.max(la.p1.x, lb.p1.x), y: dimLabelCoord(c, la.coord, lb.coord) };
+}
+
+// A boxed, numbered revision legend at the top-left — the minimum a numbered tag
+// needs to mean something. White-filled so it sits cleanly over any geometry.
+function drawRevLegend(be, rows) {
+  const size = 2.4, lh = 4.2, pad = 2.4;
+  const title = 'REV — CHANGES';
+  const w = Math.max(be.measure(title, 2.6), ...rows.map((r) => 7 + be.measure(r.label, size))) + pad * 2;
+  const h = pad * 2 + 6 + rows.length * lh;
+  const x = MARGIN, y = MARGIN + 8;
+  be.rect(x, y, w, h, { fill: '#fff', stroke: C_REV, width: 0.3 });
+  be.text(title, x + pad, y + pad + 1, { fill: C_REV, size: 2.6, weight: 'bold', baseline: 'top' });
+  rows.forEach((r, i) => {
+    const ry = y + pad + 7 + i * lh;
+    be.text(`△${r.n}`, x + pad, ry, { fill: C_REV, size, weight: 'bold', baseline: 'middle' });
+    be.text(r.label, x + pad + 7, ry, { fill: C_REV, size, baseline: 'middle' });
+  });
+}
+
+// Draw the whole change map for one floor: clouds + tags over changed geometry,
+// then the keyed legend. Numbering is assigned here so tags and legend agree.
+function drawChangeMap(be, L, floor, diff) {
+  if (!diff) return;
+  const rows = [];
+  let n = 0;
+  const kindLabel = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Zone');
+  const markerLabel = (type) => MARKER_LABELS[type] || 'Marker';
+  const cloudBox = (b, label) => {
+    const px0 = L.X(b.x0), px1 = L.X(b.x1), py0 = L.Y(b.y1), py1 = L.Y(b.y0); // Y flips
+    drawCloud(be, px0, py0, px1, py1);
+    n += 1; drawRevTag(be, px1 + CLOUD_OUTSET + 2, py0 - CLOUD_OUTSET, n);
+    rows.push({ n, label });
+  };
+  const cloudPoint = (x, y, label) => {
+    const r = 3, px = L.X(x), py = L.Y(y);
+    drawCloud(be, px - r, py - r, px + r, py + r);
+    n += 1; drawRevTag(be, px + r + 2, py - r, n);
+    rows.push({ n, label });
+  };
+
+  // Removed zones first: a faint ghost of the vanished footprint, then a cloud.
+  for (const { base } of diff.rects.removed) {
+    const b = base.bounds;
+    be.rect(L.X(b.x0), L.Y(b.y1), (b.x1 - b.x0) * L.mmPerM, (b.y1 - b.y0) * L.mmPerM,
+      { stroke: C_GHOST, width: 0.3 });
+    cloudBox(b, `Zone removed (${kindLabel(base.kind)})`);
+  }
+  for (const { cur } of diff.rects.added) cloudBox(cur.bounds, `Zone added (${kindLabel(cur.kind)})`);
+  for (const { cur, base, change } of diff.rects.changed) {
+    const label = change === 'retyped' ? `Zone ${kindLabel(base.kind)}→${kindLabel(cur.kind)}`
+      : change === 'resized' ? 'Zone resized' : change === 'moved' ? 'Zone moved' : 'Zone changed';
+    cloudBox(cur.bounds, label);
+  }
+
+  for (const { cur } of diff.markers.added) cloudPoint(cur.x, cur.y, `${markerLabel(cur.type)} added`);
+  for (const { base } of diff.markers.removed) cloudPoint(base.x, base.y, `${markerLabel(base.type)} removed`);
+  for (const { cur, base, change } of diff.markers.changed) {
+    cloudPoint(cur.x, cur.y, change === 'retyped'
+      ? `${markerLabel(base.type)}→${markerLabel(cur.type)}` : `${markerLabel(cur.type)} moved`);
+  }
+
+  // Dimension value changes: tag at the edge-midpoint, from→to in the legend.
+  const u = unitLabel();
+  for (const { cur, from, to } of diff.dims.changed) {
+    const a = dimAnchor(floor, cur); n += 1;
+    if (a) drawRevTag(be, L.X(a.x), L.Y(a.y), n);
+    rows.push({ n, label: `Dim ${fmtSheetDim(from)}→${fmtSheetDim(to)} ${u}` });
+  }
+  for (const { cur } of diff.dims.added) {
+    const a = dimAnchor(floor, cur); n += 1;
+    if (a) drawRevTag(be, L.X(a.x), L.Y(a.y), n);
+    rows.push({ n, label: `Dim added ${fmtSheetDim(cur.value)} ${u}` });
+  }
+  for (const _ of diff.dims.removed) { n += 1; rows.push({ n, label: 'Dim removed' }); }
+
+  if (rows.length) drawRevLegend(be, rows);
+}
+
 function renderFloor(be, floor, opts = {}) {
   const layers = resolveOutputLayers(opts);
   const footprint = computeFootprint(printableRectangles(floor, layers));
@@ -1338,11 +1511,19 @@ function renderFloor(be, floor, opts = {}) {
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
   drawZones(be, L, floor, layers); // semantic fixed-zone/furniture symbols over the footprint
-  if (layers.markerIcons) drawElectricalLinks(be, L, floor); // links have no meaning without their endpoint glyphs
+  if (layers.markerIcons) { // routes/channels have no meaning without their endpoint glyphs
+    drawConduits(be, L, floor);       // the shared network, beneath the wires that use it
+    drawRoutedWires(be, L, floor);    // wires routed over the conduits, per-surface dash
+    drawElectricalLinks(be, L, floor); // logical switch→light control legs
+  }
   if (layers.planDims) drawDimensions(be, L, floor);
   if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);
   if (layers.markerIcons) drawMarkers(be, L, floor, footprint); // contextual room-side callouts stay foremost
+  // Revision clouds sit above the drawing but below the strip. opts.changeMap is a
+  // Map<floorId, diff> (shared across a multi-floor set), so pick this floor's diff.
+  const diff = opts.changeMap instanceof Map ? opts.changeMap.get(floor.id) : null;
+  if (diff) drawChangeMap(be, L, floor, diff);
   drawStrip(be, L, floor, opts);
   return L;
 }

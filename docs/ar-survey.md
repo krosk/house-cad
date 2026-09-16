@@ -15,7 +15,7 @@ editor (`ar-2d-parity` memory).
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · ADD → EDGE → EDIT → TRANSLATE → DIMS
-MARKER   · EDIT → LINK → WIRE → WIRE EDIT → DIMS
+MARKER   · EDIT → LINK → CONDUIT → CONDUIT EDIT → WIRE → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
 
@@ -23,7 +23,7 @@ The headset label and help header show the localized `GROUP · TOOL` breadcrumb.
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_wire`, `marker_wire_edit`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_conduit`, `conduit_edit`, `marker_wire`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
 `move_down`, `save`, `load`, `export`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -106,43 +106,40 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
   light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted
   plan projection and DXF writes their true 3D segments on `ELECTRICAL_ROUTE`.
-- **MARKER · WIRE** (`id: marker_wire`) — as-built physical wire tracing between ANY two markers
-  (including the `panel`/consumer-unit type). Trigger a marker to start the run; trigger the real
-  surface along the wire's path to drop each waypoint (X/Y from the floor reticle, z from the
-  controller tip height); trigger a second marker to finish and store the wire (`project.addWire`).
-  Grip removes the last waypoint, or clears the start marker before the second end. The start marker
-  is amber, the hovered endpoint yellow, and a live amber preview threads start → waypoints → tip;
-  the separate readout shows `PICK START`, then `TRACE · END · <n>`. Wires persist per floor in
-  `electricalLinks` as `kind:'wire'` with `route:{mode:'manual', waypoints}`; the two endpoints stay
-  live so marker/storey edits keep the run attached. **The wall/ceiling/floor surface of each segment
-  is INFERRED from geometry** (`segmentSurface`), never stored: a level run near the ceiling plane is
-  ceiling, near the floor slab is floor, and any vertical rise/drop or mid-height level run is behind
-  a wall. In AR each wire segment is dashed by inferred surface (ceiling cyan, wall amber, floor
-  green); the monochrome sheet distinguishes them by dash pattern with a per-surface legend key
-  (collapsed vertical drops draw nothing in plan and are omitted from the key); DXF writes each
-  segment on `ELECTRICAL_ROUTE_WALL` / `_CEILING` / `_FLOOR`. Routes show in both LINK (control only)
-  and WIRE (wires) modes. Manual waypoints and the `panel` type are the close-out of the electrical
-  slice's "manual surface-anchored routing" future work.
-- **MARKER · WIRE EDIT** (`id: marker_wire_edit`) — edit an existing wire's waypoints, using the
-  exact MARKER · EDIT grammar (trigger = select, grip-on = move, grip-away = delete) at two levels.
-  Trigger a wire (nearest drawable segment within `WIRE_PICK_M`) to **select** it; its waypoints then
-  appear as draggable sphere **handles** (`wireHandleGroup`, a rebuilt-on-demand sibling of
-  `markerGroup`). Trigger a handle to select that waypoint — repeated triggers **cycle** waypoints that
-  share one floor point (a vertical wall drop), like stacked markers. **Grip-drag a handle moves it**,
-  in one of two modes chosen at grip-press by the real 3D distance from the controller tip to the
-  handle (`WAYPOINT_GRAB_M`): **direct** (tip within reach) carries the waypoint 1:1 with the tip in
-  full 3D; **remote** (tip far, e.g. a ceiling run) has the floor reticle drive X/Y while z is held.
-  For a remote point, z is typed on the reused numpad — selecting any waypoint opens a height pad
-  (`activateWaypointPad` / `commitWaypointHeight`, mirroring the marker height pad; DEL removes the
-  waypoint, ENTER commits z and keeps it selected). Both drag modes use `moveWireWaypoint` with
-  `emit:false`, committed once on release. **Grip away from a handle deletes the selected waypoint**
-  (`onReset` → `removeWireWaypoint`).
-  Triggering the selected wire between handles **inserts** a waypoint on the nearest drawable segment
-  at the reticle, z from the tip (`insertWireWaypoint`, splice index = segment index). Trigger empty
-  space to deselect the waypoint, then the wire. Handles recolor selected amber / hovered yellow /
-  idle white, and the wire under consideration brightens. Endpoints stay markers — moved in
-  MARKER · EDIT, not here. Editing an existing wire is the only remaining electrical increment; it is
-  now done except for on-device QA.
+- **MARKER · CONDUIT** (`id: marker_conduit`) — author the shared **conduit network**: a per-floor
+  graph of `conduitNodes` (bare junctions, or nodes bound to a device `markerId` that follow the live
+  marker) joined by `conduitSegments`. Pen model: `penNodeId` is the growing end. Trigger a device
+  marker or an existing node to start the pen there; trigger empty space to drop a junction (X/Y from
+  the floor reticle, z from the tip) and run a segment to it; trigger another node to join/branch/loop.
+  Grip lifts the pen (no deletion). The network is drawn live in `conduitGroup` colored per inferred
+  segment surface (`conduitNetworkSegments` + `segmentSurface`), with a node sphere per vertex
+  (marker-bound dimmer). Readout: `START PEN`, then `RUN CONDUIT`.
+- **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are
+  always drawn, so no wire-select step). Trigger a node to **select** it; a free (bare) junction opens
+  a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad — DEL removes
+  the node + its segments, ENTER commits z and keeps it selected). Trigger a **segment** between nodes
+  to **split** it with a new junction at the reticle (`splitConduitSegment`). Trigger empty space to
+  deselect. **Grip-drag a node moves it**, direct vs remote chosen at grip-press by the real 3D
+  distance from the tip to the node sphere (`WAYPOINT_GRAB_M`): **direct** (in reach) carries it 1:1
+  in full 3D; **remote** (far) has the floor reticle drive X/Y while z is held and typed on the pad.
+  Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
+  immovable** (they follow their device) and have no pad — selecting one just arms it. **Grip away
+  from a node deletes the selected node + its segments** (`onReset` → `removeConduitNode`; `via`
+  references to it are dropped). Readout: `PICK NODE`, then `EDIT NODE`.
+- **MARKER · WIRE** (`id: marker_wire`) — define **wires routed over the conduit network**. A wire is
+  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` in the per-floor `wires` array; its physical path is
+  **DERIVED** as the shortest route through the conduits (Dijkstra, threading the ordered `via` nodes),
+  never stored — an unroutable wire simply draws nothing. Trigger two device markers to define one
+  (`project.addWire`, auto shortest route drawn at once); the created wire becomes selected. While a
+  wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
+  override); grip **pops the last via** (`popWireVia`), or with no vias left **deletes the wire**
+  (`removeWire`). Trigger an existing wire to re-select it; trigger empty space to deselect. The
+  conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
+  `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green). A
+  live amber preview threads the pending pair (first endpoint → hovered marker/tip). Readout:
+  `PICK START`, `PICK END`, then `VIA · <n>`. The wall/ceiling/floor surface of each segment is
+  **inferred** from geometry (`segmentSurface`), never stored. This REPLACES the removed
+  per-wire-waypoint model (`MARKER · WIRE`-trace + `WIRE EDIT`); routing lives in `src/core/conduit.js`.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
@@ -480,7 +477,8 @@ teleport reticle; no last-active routing remains.
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
 | `src/core/translate.js` | atomic rigid floor translation; preserves relative constraints and moves origin locks + authored dimension-label placements coherently |
 | `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints + markers + electrical links + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
-| `src/core/electrical.js` | Shared validation + derived switch→ceiling→light route points consumed by AR, sheets, and DXF |
+| `src/core/electrical.js` | Shared validation + derived switch→ceiling→light control-route points + `segmentSurface` classifier, consumed by AR, sheets, DXF, and conduit routing |
+| `src/core/conduit.js` | Conduit-network graph + Dijkstra `shortestConduitPath` (threads `via`); `wireRouteSegments`/`wireRoutePoints`/`conduitNetworkSegments` — wires route over conduits, path derived not stored |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
 | `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |

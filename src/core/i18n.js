@@ -43,7 +43,7 @@ const STRINGS = {
   'mode.marker_link': { en: 'LINK', fr: 'LIER',     zh: '连接' },
   'mode.marker_wire': { en: 'WIRE', fr: 'CÂBLE',    zh: '布线' },
   'mode.marker_conduit': { en: 'CONDUIT', fr: 'GAINE', zh: '管路' },
-  'mode.marker_wire_edit': { en: 'WIRE EDIT', fr: 'MODIF. CÂBLE', zh: '编辑布线' },
+  'mode.conduit_edit': { en: 'CONDUIT EDIT', fr: 'MODIF. GAINE', zh: '编辑管路' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -71,6 +71,9 @@ const STRINGS = {
   'export.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
   'export.area': { en: 'AREA', fr: 'SURFACE', zh: '面积' },
   'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
+  'export.compare': { en: 'COMPARE', fr: 'COMPARER', zh: '对比' },
+  'export.baselineNone': { en: 'none', fr: 'aucun', zh: '无' },
+  'export.slot': { en: 'Slot', fr: 'Empl.', zh: '槽位' },
 
   // --- per-mode help boxes (key = help.<id>) ----------------------------------
   'help.floor': {
@@ -124,19 +127,19 @@ const STRINGS = {
     zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
   },
   'help.marker_wire': {
-    en: 'Trace an as-built wire. Trigger a marker to start, trigger the surface along its path to drop each waypoint, then trigger a second marker to finish. Grip removes the last point, or clears the run before the second end. The wall/ceiling/floor of each segment is inferred.',
-    fr: 'Tracez un câble tel que posé. Gâchette sur un marqueur pour commencer, gâchette sur la surface le long du trajet pour poser chaque point, puis gâchette sur un second marqueur pour terminer. La poignée retire le dernier point, ou annule le tracé avant la seconde extrémité. Le mur/plafond/sol de chaque segment est déduit.',
-    zh: '记录实际布线路径。扣动扳机选择起点标记，沿走线在墙面依次扣动扳机放置各路径点，再扣动扳机选择终点标记完成。按握把删除上一个点，或在选择终点前清除该走线。每段所在的墙/天花板/地板会自动推断。',
+    en: 'Route a wire over the conduit network. Trigger two device markers to define it — its path is the automatic shortest route through the conduits, drawn at once. Trigger the wire to select it, then trigger conduit nodes to force the route through them (a via override); grip pops the last override, or (with none) deletes the selected wire. The wall/ceiling/floor of each segment is inferred.',
+    fr: 'Faites cheminer un câble dans le réseau de gaines. Gâchette sur deux marqueurs d’appareil pour le définir — son trajet est la route la plus courte à travers les gaines, tracée aussitôt. Gâchette sur le câble pour le sélectionner, puis gâchette sur des nœuds de gaine pour l’y forcer (dérivation via) ; la poignée retire la dernière dérivation, ou (sans aucune) supprime le câble choisi. Le mur/plafond/sol de chaque segment est déduit.',
+    zh: '让线路沿管路网络走线。对两个设备标记扣动扳机即可定义——其路径为经管路的最短路线，立即绘出。对线路扣动扳机选中它，再对管路节点扣动扳机可强制经由该节点（via 覆盖）；按握把撤销最后一个覆盖，或（在没有覆盖时）删除所选线路。每段所在的墙/天花板/地板会自动推断。',
   },
   'help.marker_conduit': {
     en: 'Build the conduit network. Trigger a device or an existing node to start the pen there, trigger empty space to drop a junction and run a conduit to it, or trigger another node to connect (branch/loop). Grip lifts the pen; lift then start elsewhere to branch. Wires route through these conduits later.',
     fr: 'Construisez le réseau de gaines. Gâchette sur un appareil ou un nœud existant pour démarrer le stylo, gâchette dans le vide pour poser une jonction et y tirer une gaine, ou gâchette sur un autre nœud pour relier (dérivation/boucle). La poignée lève le stylo ; levez puis repartez d’un autre nœud pour dériver. Les câbles emprunteront ces gaines ensuite.',
     zh: '构建管路网络。对设备或已有节点扣动扳机以在此落笔，对空处扣动扳机放置接头并连一段管路，或对另一节点扣动扳机进行连接（分支/环路）。握把抬笔；抬笔后从另一节点重新开始即可分支。之后线路将在这些管路中走线。',
   },
-  'help.marker_wire_edit': {
-    en: 'Edit a traced wire. Trigger the wire to select it; its waypoints show as handles. Trigger a handle to select it (repeat to cycle stacked ones), grip-drag a handle to move it in 3D, or grip away to delete the selected waypoint. Trigger the wire between handles to insert a point; trigger empty space to deselect.',
-    fr: 'Modifiez un câble tracé. Gâchette sur le câble pour le sélectionner ; ses points apparaissent comme poignées. Gâchette sur une poignée pour la choisir (répétez pour parcourir les points empilés), poignée-glisser pour la déplacer en 3D, ou poignée à l’écart pour supprimer le point choisi. Gâchette sur le câble entre deux poignées pour insérer un point ; gâchette dans le vide pour désélectionner.',
-    zh: '编辑已记录的布线。扣动扳机选择线路，其路径点显示为手柄。扣动扳机选择手柄（重复以循环选择重叠点），按住握把拖动可在三维中移动，或将握把移开以删除所选路径点。在两个手柄之间对线路扣动扳机可插入新点；对空处扣动扳机取消选择。',
+  'help.conduit_edit': {
+    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height), or grip away to delete the selected node and its segments. Trigger a segment between nodes to split it with a new junction. Marker-bound nodes follow their device.',
+    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie), ou poignée à l’écart pour supprimer le nœud choisi et ses segments. Gâchette sur un segment entre nœuds pour le scinder par une nouvelle jonction. Les nœuds liés à un appareil suivent celui-ci.',
+    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度），或将握把移开以删除所选节点及其段。对两节点间的某段扣动扳机可用新接头将其分割。绑定到设备的节点跟随该设备。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
@@ -287,12 +290,13 @@ const STRINGS = {
   'link.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
   'link.pickLight':  { en: 'PICK LIGHT',  fr: 'CHOISIR LUMINAIRE',    zh: '选择灯具' },
   'wire.pickStart':  { en: 'PICK START',  fr: 'CHOISIR DÉBUT',        zh: '选择起点' },
-  'wire.trace':      { en: 'TRACE · END', fr: 'TRACER · FIN',         zh: '走线·终点' },
-  'wire.pickWire':   { en: 'PICK WIRE',  fr: 'CHOISIR CÂBLE',        zh: '选择线路' },
-  'wire.editPoints': { en: 'EDIT POINTS', fr: 'MODIF. POINTS',       zh: '编辑路径点' },
-  'wire.point':      { en: 'waypoint',   fr: 'point',                zh: '路径点' },
+  'wire.pickEnd':    { en: 'PICK END',    fr: 'CHOISIR FIN',          zh: '选择终点' },
+  'wire.override':   { en: 'VIA',         fr: 'VIA',                  zh: '经由' },
   'conduit.pickStart': { en: 'START PEN', fr: 'DÉBUT TRACÉ',        zh: '落笔' },
   'conduit.run':     { en: 'RUN CONDUIT', fr: 'TIRER GAINE',        zh: '布管' },
+  'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },
+  'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
+  'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
 };
 
 let current = 'en';

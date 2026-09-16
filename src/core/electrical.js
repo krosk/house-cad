@@ -1,44 +1,29 @@
 // Electrical control topology and derived routing shared by AR, sheets, and DXF.
-// Two kinds of link live in `floor.electricalLinks`:
-//   - kind 'control' — a logical switch→light relationship. Its physical path is
-//     DERIVED (switch → ceiling → light) so it never needs stored coordinates.
-//   - kind 'wire' — an as-built run traced on site between ANY two markers. It
-//     stores manual waypoints; the two endpoints still come from live markers so
-//     moving a marker keeps the wire attached. The surface each segment runs on
-//     (wall / ceiling / floor) is INFERRED from the 3D geometry, not stored.
-// Coordinates are always derived from live markers + floor height, so marker and
-// storey edits cannot leave stale wire geometry behind.
+// One kind of link lives in `floor.electricalLinks`: kind 'control' — a logical
+// switch→light relationship whose physical path is DERIVED (switch → ceiling →
+// light), so it never needs stored coordinates. Coordinates come from live markers
+// + floor height, so marker and storey edits cannot leave stale geometry behind.
+// (As-built runs are now modeled as wires routed over the conduit network — see
+// src/core/conduit.js — which reuses segmentSurface below for classification.)
 
-// Endpoints for a control link require compatible fixtures; a wire accepts any
-// two existing markers.
+// A control link's endpoints require compatible fixtures (switch → light).
 export function electricalLinkEndpoints(floor, link) {
   const markers = floor?.markers || [];
   const from = markers.find((m) => m.id === link?.fromMarkerId);
   const to = markers.find((m) => m.id === link?.toMarkerId);
   if (!from || !to) return null;
-  if ((link?.kind || 'control') === 'control') {
-    return from.type === 'switch' && to.type === 'light' ? { from, to } : null;
-  }
-  return { from, to };
+  return from.type === 'switch' && to.type === 'light' ? { from, to } : null;
 }
 
-// Points use model coordinates {x, y, z}: x/y are plan axes and z is height
-// above the floor. The first and last points are always the live marker positions.
-// A 'wire' with manual waypoints threads them between the endpoints; a 'control'
-// link (or a wire lacking waypoints) falls back to the derived ceiling route.
+// Points use model coordinates {x, y, z}: x/y are plan axes and z is height above
+// the floor. The derived ceiling route rises from the switch to the storey ceiling,
+// crosses, then drops to the light.
 export function electricalRoutePoints(floor, link) {
   const endpoints = electricalLinkEndpoints(floor, link);
   if (!endpoints) return [];
   const { from, to } = endpoints;
   const start = { x: from.x, y: from.y, z: from.z || 0 };
   const end = { x: to.x, y: to.y, z: to.z || 0 };
-  const waypoints = link?.route?.mode === 'manual' && Array.isArray(link.route.waypoints)
-    ? link.route.waypoints
-    : null;
-  if (waypoints && waypoints.length) {
-    return [start, ...waypoints.map((p) => ({ x: p.x, y: p.y, z: p.z || 0 })), end];
-  }
-  // Derived ceiling route: rise to the storey ceiling, cross, then drop.
   const ceiling = Math.max(Number(floor.height) || 0, start.z, end.z);
   return [
     start,
@@ -61,15 +46,4 @@ export function segmentSurface(a, b, height) {
   if (level && CEILING_H > 0 && avgZ >= CEILING_H - PLANE_TOL) return 'ceiling';
   if (level && avgZ <= PLANE_TOL) return 'floor';
   return 'wall';
-}
-
-// Route as classified segments for surface-aware output (per-surface dash on the
-// monochrome sheet, per-surface DXF layers, per-surface color in AR).
-export function electricalRouteSegments(floor, link) {
-  const pts = electricalRoutePoints(floor, link);
-  const segments = [];
-  for (let i = 1; i < pts.length; i++) {
-    segments.push({ a: pts[i - 1], b: pts[i], surface: segmentSurface(pts[i - 1], pts[i], floor?.height) });
-  }
-  return segments;
 }
