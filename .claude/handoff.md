@@ -9,14 +9,16 @@
 - `packaging/quest-apk.md` — Quest APK runbook (read before any packaging work).
 - `docs/markers-plan.md` — the vertical-elements (markers) design + follow-on roadmap.
 - Claude memory (auto-loads): `phase5-xr-intent`, `multi-floor-design`, `ar-2d-parity`,
-  `quest-guardian-limitation` — Phase-5 rationale and XR gotchas. Don't duplicate them here.
+  `quest-guardian-limitation` — Phase-5 rationale and XR gotchas; `conduit-wiring-model` — the live
+  electrical re-architecture + its decisions. Don't duplicate them here.
 
-**Date:** 2026-09-13 (session 18)
-**Status:** Quest APK path WORKING. On-device QA: SETUP + PLAN + PROJECT(save/load/lang) passed
-(s14); MARKER · DIMS commit + floor dim-line render verified on device (s16). **The repo was 12
-commits ahead of where the s16 handoff was frozen** — sessions after s16 shipped a lot without
-updating this file, so those commits are reconstructed from `git log` below, not from live session
-notes. **Sessions 17–18 then added the refinements and electrical-link work below.**
+**Date:** 2026-09-16 (session 19)
+**Status:** Quest APK path WORKING. **LIVE EFFORT: re-architecting electrical wiring into a two-layer
+CONDUIT-network + wires-as-routes model** (memory `conduit-wiring-model`). Slice 1 (data model +
+`src/core/conduit.js` routing + persistence) and Slice 2 (`MARKER · CONDUIT` pen-authoring) are
+committed + pushed (`514da9f`, WIP); build-green, routing/persistence Node-smoke-tested, AR
+build-verified only. **The old standalone-waypoint wire system (`973f105`) still coexists and is torn
+out in a later slice** — see Next step A.
 
 ## Where things stand in one paragraph
 
@@ -24,131 +26,43 @@ The desktop parametric 2.5D CAD tool (vanilla JS + Vite + Three.js) is deployed 
 **https://krosk.github.io/house-cad/** and is also a sideloaded Quest 3 APK (`com.krosk.housecad`,
 Bubblewrap/TWA, immersive) that launches straight into passthrough AR. **The goal is Phase 5: an
 on-site MR survey tool** (read `phase5-xr-intent` before planning), multi-storey, authored entirely
-in AR. **Proven on device:** APK installs/verifies/enters AR; SETUP + PLAN + PROJECT save/load/lang
-(s14); and **MARKER · DIMS pinning an outlet to an edge → the orange dashed floor dim commits and
-renders** (s16, both X and Y pins). **Build-verified only (never walked):** LEVEL (multi-floor); the
-rest of the MARKER lane (EDIT drop/height/drag/delete/retype, the s15 switch glyph, LINK
-switch-to-light controls/automatic ceiling routes, DIMS
-white-when-pinned / hover-outline / one-way-pin); cross-cutting HUD/input; accuracy — the checklist
-is the only record. Markers are a **parallel annotation lane**: wall-anchored points that never touch
-the footprint/boolean/extrude pipeline; the solver stays 2-axis. Before planning marker or dimension
-work, read `docs/ar-survey.md`.
+in AR. Markers are a **parallel annotation lane** (wall-anchored points — outlets/switches/lights/
+network/panel — that never touch the footprint/boolean/extrude pipeline; the solver stays 2-axis).
+**The current goal is electrical:** a shared **conduit network** (graph of nodes + segments drilled
+into walls/floors/ceilings, surface inferred per segment) with **wires routed over it** (each wire =
+two device markers + optional `via` overrides; path DERIVED by shortest route, never stored). This
+REPLACES the just-shipped per-wire-waypoint model. **On device (proven):** APK installs/enters AR;
+SETUP + PLAN + PROJECT save/load/lang (s14); MARKER · DIMS pin→floor-dim commit+render (s16).
+**Everything else is build-verified only** — the whole marker lane, LEVEL, and all electrical work
+(WIRE/WIRE EDIT/CONDUIT) have never been walked; `docs/ar-qa-checklist.md` is the only record.
+Before planning marker/dimension/electrical work, read `docs/ar-survey.md` (kept current) and
+`docs/markers-plan.md`.
 
-## What landed since the s16 handoff (`0d13f0c` → `28a9868`)
-> Reconstructed from `git log` by session 17 — the sessions that shipped these did not keep this
-> file current, so there are no live session notes, only commit messages + code. Next agent: fold
-> live constraints into `docs/ar-survey.md` (stable) or "Standing decisions", delete the narrative.
+## What changed in session 19 (conduit re-architecture, in progress)
+> Next agent: as you add your own section, fold live constraints into "Standing decisions"/"Findings"
+> and delete narrative. The pre-s19 feature changelog was compressed away — those features
+> (plan sheets, zone vocabulary incl. insulation/furniture, DXF+Coohom export, PNG/JSON export,
+> monochrome sheets, fixture stacks, floor translate, the full marker glyph set incl. panel, and the
+> now-superseded WIRE/WIRE EDIT) are all SHIPPED and documented in `CLAUDE.md`, `docs/ar-survey.md`,
+> and `docs/markers-plan.md`. Use `git log` for the per-commit history.
 
-Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exact order):
+The wiring model is being rebuilt in slices (memory `conduit-wiring-model`; decisions: auto
+shortest-path **+ manual via override**, **bare junction nodes allowed**, switch→light **control
+links unchanged**). Landed this session:
 
-1. **Plan sheets — the CLAUDE.md "Plan sheets" section is the outcome.** `f98d85c` printable
-   to-scale sheets (one per floor, dual SVG+canvas backend so desktop print/download and the in-AR
-   preview can't diverge; new `src/core/dimline.js` shared `edgeLineWorld`; new AR **PROJECT·SHEET**
-   mode). Then `274d502` refine sheets + marker editing, `28a9868` align floor print sheets,
-   `d56f688` allow dimension labels beyond endpoints.
-2. **Zone vocabulary expanded** (add/subtract is no longer the whole story): `b38ab05` door zones,
-   `cff5dbb` window, `44b5ada` stairs + cabinet. `991c3cf` show connected room areas.
-3. **AR / multi-floor:** `d048228` teleport + dimension-label placement; `339cfb7` move Quest floor
-   plans between storeys; `1334f20` read-only all-floors AR view.
-4. **Closed prior "Next step" items:** `b38ab05` **AR unit selector** (parity gap D — unit switch in
-   AR); `0226cbd` **confirm Quest save overwrites** (parity gap D); `15dc9c0` **copy floors between
-   saved projects** (item C — desktop↔APK model transfer, advanced).
-5. **`1b49b36` (s17) RJ45/ethernet marker glyph** redrawn as a real network port (framed socket +
-   8 contacts + centered latch recess), consistent across `src/io/planSheet.js` (sheet symbol) and
-   `src/ui/mr.js` (AR canvas glyph). Build-clean; both surfaces eyeballed via rsvg render (sheet
-   symbol + AR faceplate) — reads clearly as a jack. Pushed; on-device raster still unwalked.
-6. **(s17) dimension-leader fix — sheet + AR.** The s16 "labels beyond endpoints" feature
-   (`d56f688`) let `labelT` fall outside 0..1 but the dim LINE was still drawn only endpoint-to-
-   endpoint, so a value box dragged past an end printed/rendered floating with nothing connecting it.
-   Added `drawLabelLeader` (planSheet, all 4 draw spots) + `pushLeader` (mr.js, all 6) to continue
-   the line from the nearer endpoint out to the label. planSheet verified by rsvg render of a
-   labelT=1.5 dim (leader draws to the outside box); mr.js build-verified only.
-7. **(s18, `7e4d43c`) semantic plan-sheet symbols.** Door, window, stairs, and cabinet
-   rectangles now retain their identity on SVG/print and the live left-controller sheet instead of
-   reading as anonymous footprint cutouts. Each uses distinct black-and-white linework and appears
-   in its own per-floor zone legend row; AR preview labels follow LANG. Production build clean;
-   focused SVG check confirms all 4 symbols + labels with finite geometry. Paper/Quest visual QA
-   remains.
-8. **(s18, `7e4d43c`) one shared sheet transform everywhere.** `sharedScaleSheetOptions`
-   computes the maximized project-wide scale/orientation/origin once per rendition, rounding the
-   fitted ratio denominator upward to a whole number (`1:56.7` → `1:57`) so content still fits. Print All,
-   active-floor desktop SVG, AR preview, and AR SVG download now all use it, so a single-floor sheet
-   exactly matches its page in the multi-floor set and can be physically superposed without scaling.
-9. **(s18, `57d4848`) sheet generation timestamp.** The title strip includes an unambiguous
-   local `YYYY-MM-DD HH:mm`. Shared sheet options capture the time once so every floor page in a
-   print run agrees; the AR canvas label follows LANG.
-10. **(s18, `ee3b628`) stable sheet orientation + Quest texture refresh.** Shared orientation
-    is selected from authored rectangles/markers, excluding movable dimension annotations; dragging
-    a label can reduce scale but cannot rotate the pages. If a legitimate geometry edit does change
-    orientation, the left-panel CanvasTexture is recreated after the canvas dimensions swap, avoiding
-    Quest's stale/squeezed prior texture and ensuring right-controller sheet changes appear.
-11. **(s18, `f29d6b3`) compact whole dimensions.** Structural and marker-pin values whose
-    formatted fractional part is all zeros print as integers (`3.00` → `3`, `300.0` → `300`) to
-    narrow their white value boxes; fractional values keep normal unit precision.
-12. **(s18, `f29d6b3`) active-floor DXF export.** The desktop Print menu now downloads an
-    ASCII AutoCAD 2000 DXF in millimeters at 1:1 model scale. `src/io/dxf.js` preserves computed
-    footprint, authored room/wall/door/window/stairs/cabinet rectangles and symbols, structural and
-    marker dimensions, room areas, origin, marker glyphs/heights, and semantic layers for Coohom.
-13. **(s18, `492da88`) AR DXF action.** `PROJECT · DXF` reuses the optional left-controller
-    floor preview. RIGHT thumbstick up/down selects any floor without changing the active floor;
-    RIGHT trigger downloads that floor as the same layered 1:1 millimeter DXF used on desktop.
-14. **(s18, `e2459fd`) fixed PLAN EDIT label.** The controller mode breadcrumb stays
-    `PLAN · EDIT` when a zone is selected or retyped. Only the separate prominent
-    `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout changes with thumbstick up/down.
-15. **(s18, `e2459fd`) fixed MARKER EDIT label.** The same UI separation now applies to
-    markers: the breadcrumb stays `MARKER · EDIT`, while a persistent separate
-    `TYPE · OUTLET/SWITCH/LIGHT/ETHERNET` readout shows the selected marker type or next drop type.
-16. **(s18, `e2459fd`) PLAN ADD + separate type.** The former contextual `PLAN · ROOM/WALL/...`
-    label is now the fixed `PLAN · ADD` action. Its separate persistent
-    `TYPE · ROOM/WALL/DOOR/WINDOW/STAIRS/CABINET` readout alone changes with thumbstick up/down.
-17. **(s18, `e2459fd`) origin DIMS after teleport.** PLAN DIMS now hit-tests the origin at
-    plan-space `(0,0)` instead of raw `planPos`. The selectable target therefore follows the visible
-    origin gizmo when `navOffset` moves the whole plan through TELEPORT.
-18. **(s18, `38f03d5`) electrical switch-to-light links.** New `MARKER · LINK`: trigger a
-    switch source, then trigger lights to toggle pairwise control links; grip clears the source.
-    AR shows derived dotted switch→ceiling→light routes only in LINK, with source/target outlines.
-    Per-floor `electricalLinks` persist through old-save-compatible load, copy/paste id remapping,
-    marker cleanup, and floor moves. SHEET/SVG draws the dotted plan projection; DXF emits true 3D
-    route segments on `ELECTRICAL_ROUTE`. Manual wall/floor/ceiling waypoints remain future work.
-19. **(s18, `26564d1`) any-storey FLOOR calibration + fixture-stack sheets.** FLOOR derives the
-    shared ground datum from the selected storey's touch and modeled elevation. Co-located markers
-    print in bracketed, height-aware white boxes shared by SVG and the LEFT-controller preview.
-20. **(s18, pending commit) FURNITURE plan type.** Added to desktop and AR ADD/EDIT cycling,
-    persistence, orange semantic color, and output support. Furniture and its constraints remain active in the
-    model but are omitted by default from sheet footprint/legend/scale/drawing. Furniture subtracts
-    also do not reduce the connected-room area; fixed subtract kinds still do.
-21. **(s18, pending commit) marker-dimension sheet values are black.** Superseded by item 26:
-    the complete printed marker dimension and all other sheet content are now monochrome.
-22. **(s18, pending commit) unified AR output panel.** `PROJECT · EXPORT` replaces separate SHEET
-    and DXF modes. It always targets the active LEVEL floor; thumbstick up/down switches SVG/DXF.
-    Ray-triggered device-local toggles control plan dims, marker dims, marker icons, furniture, and area,
-    and only a separate EXPORT button downloads. The optional LEFT sheet previews these choices
-    immediately. Preferences use `house-cad:output:v1` and never enter project saves. Furniture
-    constraints remain excluded even when furniture geometry is enabled in SVG/DXF.
-23. **(s18, pending commit) room-aware fixture callouts.** Sheet stacks retain horizontal layout
-    for equal-height fixtures and vertical layout for differing heights, but their complete callout
-    now evaluates left/right/above/below against the printable footprint and chooses the room side.
-    Page containment remains the fallback for isolated markers.
-24. **(s18, pending commit) room-aware isolated-marker heights.** A single marker with a zero-distance
-    constraint to a real edge now places its height chip on the room side using the same four-way
-    footprint scoring. Unconstrained singles retain the conventional chip below the glyph.
-25. **(s18, pending commit) transitive fixture-box grouping.** Full-3D white boxes now use
-    connected-neighbor clustering rather than requiring every pair to be within 80 mm. Therefore
-    117/109/101 cm is one vertical box via two inclusive 80 mm links, while 24 cm remains separate.
-    Plan-position callouts retain mutual-distance grouping to avoid long horizontal chains.
-26. **(s18, pending commit) monochrome sheets.** Removed the remaining amber marker-pin, cyan
-    electrical-route, and red conflict colors from SVG/print/LEFT preview output. Black/gray/white
-    linework now relies on dashed/dotted patterns and weight for domain distinction; AR interaction
-    overlays keep their colors.
-27. **(s18, pending commit) strict vertical-stack coordinates.** A vertical fixture callout now
-    requires exact equality of both plan coordinates. Different-height markers on opposite faces of
-    a 70 mm wall therefore remain separate. Horizontal fixtures require strict height equality and
-    now follow connected 80 mm-inclusive plan-neighbor links; exact-position height chains retain
-    connected-neighbor box grouping.
-28. **(s18, pending commit) vertical box columns + compact heights.** Separate boxes within one
-    fixture callout are now always arranged in a high-to-low vertical column, including when the
-    room-aware side is above/below the marker. Round marker heights use the same compact formatter
-    as dimensions (`107.0` → `107`, `24.0` → `24`).
+1. **(`973f105`) as-built wire tracing + editing — NOW SUPERSEDED.** Standalone per-wire waypoints
+   (`electricalLinks` kind:'wire'), `MARKER · WIRE` trace + `WIRE EDIT` (dual-move: direct 3D carry
+   vs remote floor-reticle + numpad height). Its `panel` marker type and per-surface AR/sheet/DXF
+   drawing stay; the per-wire-waypoint mechanism is replaced by conduits (torn out in Next step A).
+2. **(`514da9f`, WIP) conduit foundation + authoring.** `src/core/conduit.js`: node/segment graph,
+   Dijkstra `shortestConduitPath` (threads ordered `via`), `wireRoutePoints`/`wireRouteSegments`,
+   `conduitNetworkSegments`; surface still inferred via `segmentSurface` (`electrical.js`). Model:
+   per-floor `conduitNodes`/`conduitSegments`/`wires` + add/move/remove/split node+segment,
+   `createWire`/`addWireVia`/`popWireVia`, marker-delete cleanup, floor-move/clear/copy-paste. AR
+   `MARKER · CONDUIT` pen authoring (trigger device/node to start; empty space drops a junction +
+   runs a segment; another node joins/branches/loops; grip lifts the pen) with live surface-colored
+   network + node handles + tip preview. Node-smoke-tested (`scratchpad/conduit-smoke.mjs`).
+
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -211,8 +125,14 @@ Grouped by theme (newest first within each; see `git log 0d13f0c..HEAD` for exac
 
 ## Commits (substantive only; doc-only omitted — `git log` has all)
 
-HEAD moves with each push; `git log` has the full list.
+HEAD moves with each push; `git log` has the full list. All pushed to `origin/main`; every push
+auto-deploys to Pages.
 
+- `514da9f` (s19, WIP) conduit network foundation (`src/core/conduit.js` graph + Dijkstra routing) +
+  model/serialize integration + `MARKER · CONDUIT` pen-authoring. Old wire system still coexists.
+- `973f105` (s19) as-built wire tracing + `WIRE EDIT` (dual-move + height pad) + `panel` marker type +
+  per-surface AR/sheet/DXF. The per-wire-waypoint mechanism is superseded by `514da9f`; panel + surface
+  drawing stay.
 - `26564d1` (s18) FLOOR calibration works from any selected real storey by deriving the
   shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
 - `26564d1` (s18) introduced plan-sheet fixture stacks; the current rule requires identical plan
@@ -266,34 +186,50 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
 
 ## Next step
 
-- **A — FINISH ON-DEVICE QA (tracked in `docs/ar-qa-checklist.md`).** Still never walked: **LEVEL**
+- **A — FINISH THE CONDUIT RE-ARCHITECTURE (the live effort).** Remaining slices, in order:
+  **(3) `CONDUIT · EDIT`** — select node → move/insert/delete; **reuse the WIRE EDIT dual-move (direct
+  vs remote) + height pad wholesale** on conduit nodes (marker-bound nodes follow their marker, don't
+  move); grip-away deletes a node (+ its segments), split a segment by triggering it.
+  **(4) redefine `MARKER · WIRE`** — trigger two device markers → `createWire` (auto shortest route
+  drawn instantly); while a wire is selected, trigger conduit nodes to `addWireVia` (override), grip
+  `popWireVia`. **(5) output + teardown** — sheet/DXF draw the conduit network (one style) + routed
+  wires (per-surface dash/layer, reuse `wireRouteSegments`); THEN remove the legacy wire system
+  (model `addWire`(waypoints)/`moveWireWaypoint`/`insertWireWaypoint`/`removeWireWaypoint`, mr.js
+  `marker_wire`/`marker_wire_edit` modes + helpers, dxf/planSheet `kind:'wire'` drawing, electrical.js
+  wire branch) and **rename `createWire` → `addWire`**. Keep build green each slice. Then update
+  `docs/ar-survey.md`, `docs/markers-plan.md`, `docs/ar-qa-checklist.md`.
+- **B — FINISH ON-DEVICE QA (tracked in `docs/ar-qa-checklist.md`).** Still never walked: **LEVEL**
   (floor seed/cycle/height/stacking); **MARKER EDIT** (drop/height/3D-drag/delete/`markerAtPoint`-
   first, switch glyph); **MARKER DIMS** remainder — commit+render is now proven (s16), but
   white-when-both-pinned, the hover bold-outline linking icon↔glyph, and one-way pin (marker moves,
   not the wall) are still unchecked; the **marker-inert cross-checks** in PLAN EDIT/DIMS; **markers
   round-trip in SAVE/LOAD**; cross-cutting HUD; accuracy. Debug via the plain Quest Browser (`?ar=1`)
   — the release TWA has no console.
-- **B — Markers: next increments** (`docs/markers-plan.md`). ~~switch + type picker~~ **DONE (s15).**
-  ~~light / ethernet types~~ **DONE**. ~~logical switch-to-light links + automatic ceiling routes~~
-  **DONE (s18, `38f03d5`)**. Remaining: manual surface-anchored wall/floor/ceiling waypoints.
-- **C — Model transfer desktop→APK.** `15dc9c0` added copy-floors-between-saved-projects; still
+- **C — Markers: next increments** (`docs/markers-plan.md`). ~~switch/type picker, light/ethernet,
+  switch-to-light links + ceiling routes~~ **DONE**. ~~manual surface-anchored waypoints~~ **DONE then
+  SUPERSEDED by the conduit model (Next step A)**. Openings (windows/doors, category 2) still deferred.
+- **D — Model transfer desktop→APK.** `15dc9c0` added copy-floors-between-saved-projects; still
   open: desktop autosave (`house-cad:autosave:v1`) vs AR slots (`house-cad:slot:<i>`) use different
   localStorage keys — verify the TWA sees Quest-Browser storage and decide if LOAD should surface the
   desktop autosave as a slot.
-- **D — Remaining parity gaps** (`ar-2d-parity` memory): ~~unit switch in AR~~ DONE (`b38ab05`);
+- **E — Remaining parity gaps** (`ar-2d-parity` memory): ~~unit switch in AR~~ DONE (`b38ab05`);
   ~~overwrite-confirm~~ DONE (`0226cbd`); still open: slot naming/delete; LEVEL's inert SWAP/DEL keys
   could be hidden.
-- **E — On-device QA of the s16→s17 features.** Plan sheets (including the persistent enlarged
-  LEFT-controller live preview) + SVG download while immersive, the new zone types
-  (door/window/stairs/cabinet/furniture), teleport, move-plans-between-
-  storeys, all-floors AR view, AR unit selector — all **build-verified only**. The committed Ethernet
-  glyph still needs a visual check on both surfaces.
+- **F — On-device QA of the shipped-but-unwalked features.** Plan sheets (incl. the enlarged LEFT
+  live preview) + SVG/PNG/DXF export while immersive, all zone types (incl. insulation/furniture),
+  teleport, move-plans-between-storeys, all-floors AR view, AR unit selector, the full marker glyph
+  set (incl. panel), and the WIRE/WIRE EDIT electrical lane — all **build-verified only**.
 - ~~marker-DIMS commit/render bug~~ — FIXED (`0e98d02`, s16). ~~RECAL corner-select reticle~~ — DONE
   (`5560020`, s13). ~~subtract/dim ops/save-load/in-AR floors/first markers/plan-marker split/
   ROOM+WALL merge~~ — DONE. ~~Store distribution~~ — out of scope.
 
 ## Known open questions
 
+- **The conduit lane is entirely unwalked** (build-verified only): pen-authoring feel, node picking
+  by floor projection, branching, the live preview. And once slices 3–5 land: node grab (the direct
+  vs remote threshold `WAYPOINT_GRAB_M`=0.14 m may need tuning — owner flagged this), auto-route
+  correctness on a real house graph, whether surface should ever be manually overridable (currently
+  geometry-only), and whether wires ever need to span floors (assumed per-floor).
 - **Most of the MARKER lane + LEVEL + cross-cutting HUD/input + accuracy are still build-verified
   only.** No runtime/XR guard exists — the checklist is the only record. The s16 bug is a reminder
   that a build pass hides real XR-only crashes.
