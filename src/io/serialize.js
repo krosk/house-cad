@@ -5,7 +5,9 @@
 
 import {
   Floor, Rectangle, nextMarkerId, nextElectricalLinkId,
+  nextConduitNodeId, nextConduitSegmentId, nextWireId,
   syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter, syncElectricalLinkIdCounter,
+  syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter,
 } from '../core/model.js';
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
@@ -44,6 +46,15 @@ function serializeElectricalLink(link) {
     route: serializeRoute(link.route),
   };
 }
+function serializeConduitNode(n) {
+  return { id: n.id, x: n.x, y: n.y, z: n.z || 0, markerId: n.markerId || null };
+}
+function serializeConduitSegment(s) {
+  return { id: s.id, a: s.a, b: s.b };
+}
+function serializeWire(w) {
+  return { id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])] };
+}
 
 export function serializeFloor(f) {
   return {
@@ -54,6 +65,9 @@ export function serializeFloor(f) {
     constraints: f.constraints.map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
     electricalLinks: (f.electricalLinks || []).map(serializeElectricalLink),
+    conduitNodes: (f.conduitNodes || []).map(serializeConduitNode),
+    conduitSegments: (f.conduitSegments || []).map(serializeConduitSegment),
+    wires: (f.wires || []).map(serializeWire),
   };
 }
 
@@ -154,11 +168,36 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       route: serializeRoute(link.route),
     }];
   });
+  // Conduit network + wires: remap node/segment ids, rebind marker-bound nodes and
+  // wire endpoints/vias to the copied markers/nodes. Drop anything that loses a ref.
+  const nodeIds = new Map();
+  const conduitNodes = (source.conduitNodes || []).flatMap((n) => {
+    const markerId = n.markerId ? markerIds.get(n.markerId) : null;
+    if (n.markerId && !markerId) return []; // its device didn't come across
+    const copy = { id: nextConduitNodeId(), x: n.x, y: n.y, z: n.z || 0, markerId: markerId || null };
+    nodeIds.set(n.id, copy.id);
+    return [copy];
+  });
+  const conduitSegments = (source.conduitSegments || []).flatMap((s) => {
+    const a = nodeIds.get(s.a), b = nodeIds.get(s.b);
+    if (!a || !b) return [];
+    return [{ id: nextConduitSegmentId(), a, b }];
+  });
+  const wires = (source.wires || []).flatMap((w) => {
+    const fromMarkerId = markerIds.get(w.fromMarkerId);
+    const toMarkerId = markerIds.get(w.toMarkerId);
+    if (!fromMarkerId || !toMarkerId) return [];
+    const via = (w.via || []).map((v) => nodeIds.get(v)).filter(Boolean);
+    return [{ id: nextWireId(), fromMarkerId, toMarkerId, via }];
+  });
 
   target.rectangles = rectangles;
   target.constraints = constraints;
   target.markers = markers;
   target.electricalLinks = electricalLinks;
+  target.conduitNodes = conduitNodes;
+  target.conduitSegments = conduitSegments;
+  target.wires = wires;
   project.activeFloorId = target.id;
   project._emit();
   return target;
@@ -249,6 +288,15 @@ export function deserializeInto(project, data) {
       toMarkerId: link.toMarkerId,
       route: serializeRoute(link.route),
     })),
+    conduitNodes: (f.conduitNodes || []).map((n) => ({
+      id: n.id || nextConduitNodeId(), x: n.x, y: n.y, z: n.z || 0, markerId: n.markerId || null,
+    })),
+    conduitSegments: (f.conduitSegments || []).map((s) => ({
+      id: s.id || nextConduitSegmentId(), a: s.a, b: s.b,
+    })),
+    wires: (f.wires || []).map((w) => ({
+      id: w.id || nextWireId(), fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])],
+    })),
   }));
 
   project.floors = floors;
@@ -263,6 +311,9 @@ export function deserializeInto(project, data) {
   syncConstraintIdCounter(floors.flatMap((f) => f.constraints.map((c) => c.id)));
   syncMarkerIdCounter(floors.flatMap((f) => f.markers.map((m) => m.id)));
   syncElectricalLinkIdCounter(floors.flatMap((f) => f.electricalLinks.map((link) => link.id)));
+  syncConduitNodeIdCounter(floors.flatMap((f) => f.conduitNodes.map((n) => n.id)));
+  syncConduitSegmentIdCounter(floors.flatMap((f) => f.conduitSegments.map((s) => s.id)));
+  syncWireIdCounter(floors.flatMap((f) => f.wires.map((w) => w.id)));
 
   project._emit();
 }

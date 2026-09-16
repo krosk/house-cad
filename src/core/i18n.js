@@ -42,6 +42,7 @@ const STRINGS = {
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker_link': { en: 'LINK', fr: 'LIER',     zh: '连接' },
   'mode.marker_wire': { en: 'WIRE', fr: 'CÂBLE',    zh: '布线' },
+  'mode.marker_conduit': { en: 'CONDUIT', fr: 'GAINE', zh: '管路' },
   'mode.marker_wire_edit': { en: 'WIRE EDIT', fr: 'MODIF. CÂBLE', zh: '编辑布线' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -126,6 +127,11 @@ const STRINGS = {
     en: 'Trace an as-built wire. Trigger a marker to start, trigger the surface along its path to drop each waypoint, then trigger a second marker to finish. Grip removes the last point, or clears the run before the second end. The wall/ceiling/floor of each segment is inferred.',
     fr: 'Tracez un câble tel que posé. Gâchette sur un marqueur pour commencer, gâchette sur la surface le long du trajet pour poser chaque point, puis gâchette sur un second marqueur pour terminer. La poignée retire le dernier point, ou annule le tracé avant la seconde extrémité. Le mur/plafond/sol de chaque segment est déduit.',
     zh: '记录实际布线路径。扣动扳机选择起点标记，沿走线在墙面依次扣动扳机放置各路径点，再扣动扳机选择终点标记完成。按握把删除上一个点，或在选择终点前清除该走线。每段所在的墙/天花板/地板会自动推断。',
+  },
+  'help.marker_conduit': {
+    en: 'Build the conduit network. Trigger a device or an existing node to start the pen there, trigger empty space to drop a junction and run a conduit to it, or trigger another node to connect (branch/loop). Grip lifts the pen; lift then start elsewhere to branch. Wires route through these conduits later.',
+    fr: 'Construisez le réseau de gaines. Gâchette sur un appareil ou un nœud existant pour démarrer le stylo, gâchette dans le vide pour poser une jonction et y tirer une gaine, ou gâchette sur un autre nœud pour relier (dérivation/boucle). La poignée lève le stylo ; levez puis repartez d’un autre nœud pour dériver. Les câbles emprunteront ces gaines ensuite.',
+    zh: '构建管路网络。对设备或已有节点扣动扳机以在此落笔，对空处扣动扳机放置接头并连一段管路，或对另一节点扣动扳机进行连接（分支/环路）。握把抬笔；抬笔后从另一节点重新开始即可分支。之后线路将在这些管路中走线。',
   },
   'help.marker_wire_edit': {
     en: 'Edit a traced wire. Trigger the wire to select it; its waypoints show as handles. Trigger a handle to select it (repeat to cycle stacked ones), grip-drag a handle to move it in 3D, or grip away to delete the selected waypoint. Trigger the wire between handles to insert a point; trigger empty space to deselect.',
@@ -285,6 +291,8 @@ const STRINGS = {
   'wire.pickWire':   { en: 'PICK WIRE',  fr: 'CHOISIR CÂBLE',        zh: '选择线路' },
   'wire.editPoints': { en: 'EDIT POINTS', fr: 'MODIF. POINTS',       zh: '编辑路径点' },
   'wire.point':      { en: 'waypoint',   fr: 'point',                zh: '路径点' },
+  'conduit.pickStart': { en: 'START PEN', fr: 'DÉBUT TRACÉ',        zh: '落笔' },
+  'conduit.run':     { en: 'RUN CONDUIT', fr: 'TIRER GAINE',        zh: '布管' },
 };
 
 let current = 'en';

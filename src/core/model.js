@@ -47,6 +47,26 @@ export function syncElectricalLinkIdCounter(ids) {
   }
 }
 
+// Conduit network (shared physical channels) + wires routed over it. Nodes are
+// graph vertices (bare junctions, or bound to a device marker); segments are the
+// drilled conduit runs; a wire references its two device markers plus optional
+// ordered `via` nodes and derives its path by shortest route through the graph.
+let _cnid = 0;
+export const nextConduitNodeId = () => `cn${++_cnid}`;
+export function syncConduitNodeIdCounter(ids) {
+  for (const id of ids) { const m = /^cn(\d+)$/.exec(id); if (m) _cnid = Math.max(_cnid, Number(m[1])); }
+}
+let _csid = 0;
+export const nextConduitSegmentId = () => `cs${++_csid}`;
+export function syncConduitSegmentIdCounter(ids) {
+  for (const id of ids) { const m = /^cs(\d+)$/.exec(id); if (m) _csid = Math.max(_csid, Number(m[1])); }
+}
+let _wid = 0;
+export const nextWireId = () => `w${++_wid}`;
+export function syncWireIdCounter(ids) {
+  for (const id of ids) { const m = /^w(\d+)$/.exec(id); if (m) _wid = Math.max(_wid, Number(m[1])); }
+}
+
 let _fid = 0;
 const nextFloorId = () => `f${++_fid}`;
 
@@ -94,7 +114,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], conduitNodes = [], conduitSegments = [], wires = [], height = 2.8, elevation = 0 } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -108,6 +128,15 @@ export class Floor {
     // the ceiling, so moving either marker keeps the displayed wire attached.
     // {id, kind:'control', fromMarkerId, toMarkerId, route:{mode:'ceiling'}}
     this.electricalLinks = electricalLinks;
+    // Conduit network: `conduitNodes` = graph vertices {id, x, y, z, markerId?}
+    // (markerId-bound nodes derive their position from the live marker). `conduitSegments`
+    // = {id, a, b} node-id edges. `wires` = {id, fromMarkerId, toMarkerId, via:[nodeId]}
+    // whose physical path is DERIVED as the shortest route through the graph (through the
+    // ordered `via` nodes when set) — see src/core/conduit.js. Nothing here touches the
+    // footprint/extrude pipeline; it is a parallel lane like markers.
+    this.conduitNodes = conduitNodes;
+    this.conduitSegments = conduitSegments;
+    this.wires = wires;
     this.height = height; // storey height, meters
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
   }
@@ -137,6 +166,12 @@ export class Project {
   set markers(v) { this.activeFloor.markers = v; }
   get electricalLinks() { return this.activeFloor.electricalLinks; }
   set electricalLinks(v) { this.activeFloor.electricalLinks = v; }
+  get conduitNodes() { return this.activeFloor.conduitNodes; }
+  set conduitNodes(v) { this.activeFloor.conduitNodes = v; }
+  get conduitSegments() { return this.activeFloor.conduitSegments; }
+  set conduitSegments(v) { this.activeFloor.conduitSegments = v; }
+  get wires() { return this.activeFloor.wires; }
+  set wires(v) { this.activeFloor.wires = v; }
   get height() { return this.activeFloor.height; }
   set height(v) { this.activeFloor.height = v; }
 
@@ -222,7 +257,8 @@ export class Project {
     const source = this.floors.find((f) => f.id === sourceId);
     const target = this.floors.find((f) => f.id === targetId);
     if (!source || !target || source === target) return { ok: false, reason: 'invalid' };
-    const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length || f.electricalLinks.length;
+    const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length
+      || f.electricalLinks.length || f.conduitNodes.length || f.wires.length;
     if (!hasContent(source)) return { ok: false, reason: 'empty' };
     if (hasContent(target)) return { ok: false, reason: 'occupied' };
 
@@ -230,10 +266,16 @@ export class Project {
     target.constraints = source.constraints;
     target.markers = source.markers;
     target.electricalLinks = source.electricalLinks;
+    target.conduitNodes = source.conduitNodes;
+    target.conduitSegments = source.conduitSegments;
+    target.wires = source.wires;
     source.rectangles = [];
     source.constraints = [];
     source.markers = [];
     source.electricalLinks = [];
+    source.conduitNodes = [];
+    source.conduitSegments = [];
+    source.wires = [];
     this.activeFloorId = target.id;
     this._emit();
     return { ok: true, source, target };
@@ -278,6 +320,9 @@ export class Project {
     this.constraints = [];
     this.markers = [];
     this.electricalLinks = [];
+    this.conduitNodes = [];
+    this.conduitSegments = [];
+    this.wires = [];
     this._emit();
   }
 
@@ -304,6 +349,15 @@ export class Project {
       this.electricalLinks = this.electricalLinks.filter(
         (link) => link.fromMarkerId !== id && link.toMarkerId !== id,
       );
+      // Detach the marker from the conduit network: drop its bound node + incident
+      // segments, and remove wires that terminated at it (vias to the gone node too).
+      const goneNodeIds = new Set(this.conduitNodes.filter((n) => n.markerId === id).map((n) => n.id));
+      if (goneNodeIds.size) {
+        this.conduitNodes = this.conduitNodes.filter((n) => !goneNodeIds.has(n.id));
+        this.conduitSegments = this.conduitSegments.filter((s) => !goneNodeIds.has(s.a) && !goneNodeIds.has(s.b));
+      }
+      this.wires = this.wires.filter((w) => w.fromMarkerId !== id && w.toMarkerId !== id);
+      for (const w of this.wires) w.via = (w.via || []).filter((v) => !goneNodeIds.has(v));
       this._emit();
     }
   }
@@ -422,6 +476,121 @@ export class Project {
     const [link] = this.electricalLinks.splice(i, 1);
     this._emit();
     return { ok: true, link };
+  }
+
+  // ---- Conduit network (shared physical channels) --------------------------
+  // A node is either a bare junction (x,y,z) or bound to a device marker
+  // (markerId set → position follows the live marker). Segments join two nodes.
+  addConduitNode({ x = 0, y = 0, z = 0, markerId = null } = {}) {
+    const node = { id: nextConduitNodeId(), x, y, z: z || 0, markerId };
+    this.conduitNodes.push(node);
+    this._emit();
+    return node;
+  }
+
+  // The conduit node bound to a marker, creating one if absent (so a conduit can
+  // terminate at that device box). New nodes seed their position from the marker.
+  ensureConduitNodeAtMarker(markerId) {
+    let node = this.conduitNodes.find((n) => n.markerId === markerId);
+    if (node) return node;
+    const m = this.markers.find((mk) => mk.id === markerId);
+    node = { id: nextConduitNodeId(), x: m?.x ?? 0, y: m?.y ?? 0, z: m?.z ?? 0, markerId };
+    this.conduitNodes.push(node);
+    return node; // caller emits
+  }
+
+  // Join two nodes with a conduit segment (idempotent — one segment per node pair).
+  addConduitSegment(aNodeId, bNodeId) {
+    if (!aNodeId || !bNodeId || aNodeId === bNodeId) return null;
+    const existing = this.conduitSegments.find((s) =>
+      (s.a === aNodeId && s.b === bNodeId) || (s.a === bNodeId && s.b === aNodeId));
+    if (existing) return existing;
+    const seg = { id: nextConduitSegmentId(), a: aNodeId, b: bNodeId };
+    this.conduitSegments.push(seg);
+    this._emit();
+    return seg;
+  }
+
+  // Move a bare junction node. Marker-bound nodes follow their marker and ignore this.
+  moveConduitNode(id, { x, y, z }, { emit = true } = {}) {
+    const n = this.conduitNodes.find((n) => n.id === id);
+    if (!n || n.markerId) return;
+    n.x = x; n.y = y; n.z = z || 0;
+    if (emit) this._emit();
+  }
+
+  // Remove a conduit segment. Wires derive their path live, so nothing else needs
+  // patching — a wire that relied on it simply reroutes (or becomes unroutable).
+  removeConduitSegment(id) {
+    const i = this.conduitSegments.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    this.conduitSegments.splice(i, 1);
+    this._emit();
+  }
+
+  // Remove a node and its incident segments; drop any `via` references to it. A
+  // bare junction disappears entirely; a marker-bound node just detaches the marker
+  // from the network (the marker itself is untouched).
+  removeConduitNode(id) {
+    if (!this.conduitNodes.some((n) => n.id === id)) return;
+    this.conduitNodes = this.conduitNodes.filter((n) => n.id !== id);
+    this.conduitSegments = this.conduitSegments.filter((s) => s.a !== id && s.b !== id);
+    for (const w of this.wires) w.via = (w.via || []).filter((v) => v !== id);
+    this._emit();
+  }
+
+  // Split a segment with a new junction node at p, replacing it with two segments.
+  splitConduitSegment(id, { x, y, z = 0 }) {
+    const seg = this.conduitSegments.find((s) => s.id === id);
+    if (!seg) return null;
+    const node = { id: nextConduitNodeId(), x, y, z: z || 0, markerId: null };
+    this.conduitNodes.push(node);
+    this.conduitSegments = this.conduitSegments.filter((s) => s.id !== id);
+    this.conduitSegments.push({ id: nextConduitSegmentId(), a: seg.a, b: node.id });
+    this.conduitSegments.push({ id: nextConduitSegmentId(), a: node.id, b: seg.b });
+    this._emit();
+    return node;
+  }
+
+  // ---- Wires (routed over the conduit network) -----------------------------
+  // A wire connects two device markers; its path is DERIVED as the shortest route
+  // through the conduits (via src/core/conduit.js), so it needs no stored geometry.
+  // NOTE: named createWire during the transition (the legacy waypoint-based addWire
+  // is removed with the old AR wire modes next slice, then this becomes addWire).
+  createWire(fromMarkerId, toMarkerId) {
+    const from = this.markers.find((m) => m.id === fromMarkerId);
+    const to = this.markers.find((m) => m.id === toMarkerId);
+    if (!from || !to || fromMarkerId === toMarkerId) return { ok: false, reason: 'incompatible' };
+    const wire = { id: nextWireId(), fromMarkerId, toMarkerId, via: [] };
+    this.wires.push(wire);
+    this._emit();
+    return { ok: true, wire };
+  }
+
+  removeWire(id) {
+    const i = this.wires.findIndex((w) => w.id === id);
+    if (i < 0) return { ok: false };
+    const [wire] = this.wires.splice(i, 1);
+    this._emit();
+    return { ok: true, wire };
+  }
+
+  // Force a wire's route through an extra conduit node (manual override). Appends
+  // to the ordered via list; the derived path then threads it.
+  addWireVia(wireId, nodeId) {
+    const wire = this.wires.find((w) => w.id === wireId);
+    if (!wire || !this.conduitNodes.some((n) => n.id === nodeId)) return;
+    wire.via = wire.via || [];
+    wire.via.push(nodeId);
+    this._emit();
+  }
+
+  // Undo the last manual via on a wire (back toward the automatic shortest path).
+  popWireVia(wireId) {
+    const wire = this.wires.find((w) => w.id === wireId);
+    if (!wire || !(wire.via || []).length) return;
+    wire.via.pop();
+    this._emit();
   }
 
   // Move a marker while preserving its pin relationships. A pin's signed value

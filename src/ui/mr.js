@@ -30,6 +30,7 @@ import {
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
+import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker } from '../core/conduit.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
 
@@ -919,6 +920,11 @@ export function setupMR(view, project, getFootprint) {
   const wireHandleGroup = new THREE.Group();
   wireHandleGroup.visible = false;
   planGroup.add(wireHandleGroup);
+  // The conduit network (segments + node handles), drawn in the CONDUIT modes.
+  // Rebuilt on demand like the groups above, not by clearPlanGeometry.
+  const conduitGroup = new THREE.Group();
+  conduitGroup.visible = false;
+  planGroup.add(conduitGroup);
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1274,7 +1280,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup || child === electricalGroup || child === wireHandleGroup) continue; // rebuilt separately below
+      if (child === markerGroup || child === electricalGroup || child === wireHandleGroup || child === conduitGroup) continue; // rebuilt separately below
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -1852,6 +1858,45 @@ export function setupMR(view, project, getFootprint) {
     if (handle) handle.position.set(nx, nz, -ny);
   }
 
+  // ---- Conduit network rendering + picking ---------------------------------
+  const conduitNodeGeom = new THREE.SphereGeometry(0.022, 12, 12);
+  // Draw every conduit segment (dashed, colored by inferred surface) and a small
+  // sphere per node (marker-bound nodes dimmer than free junctions). Rebuilt on
+  // any topology change; node spheres carry userData for picking/handles.
+  function buildConduits(floor = project.activeFloor) {
+    for (const child of [...conduitGroup.children]) {
+      conduitGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+    }
+    conduitPreviewLine = null; // recreated on demand in the render branch
+    for (const seg of conduitNetworkSegments(floor)) {
+      const line = makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b);
+      line.userData.conduitSegmentId = seg.id;
+      conduitGroup.add(line);
+    }
+    for (const node of floor.conduitNodes || []) {
+      const p = conduitNodePos(floor, node);
+      const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
+        color: node.markerId ? 0x94a3b8 : 0xffffff,
+        depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
+      }));
+      mesh.position.set(p.x, p.z, -p.y);
+      mesh.renderOrder = 16;
+      mesh.userData.conduitNodeId = node.id;
+      conduitGroup.add(mesh);
+    }
+  }
+
+  // Nearest conduit node under the reticle, by floor projection.
+  function conduitNodeAtFloorPoint(px, py) {
+    let best = null, bestD = RETICLE_OUTER;
+    for (const node of project.conduitNodes) {
+      const p = conduitNodePos(project.activeFloor, node);
+      const d = Math.hypot(px - p.x, py - p.y);
+      if (d < bestD) { bestD = d; best = node; }
+    }
+    return best;
+  }
+
   // Read-only building overview: every independent plan stays aligned to the shared
   // origin and is lifted by its derived elevation. Dimensions and both marker glyphs
   // remain visible for reference, but none are published to the edit pickers.
@@ -1948,6 +1993,10 @@ export function setupMR(view, project, getFootprint) {
   let selectedWaypointIndex = null;
   let hoverWire = null;
   let hoverWaypointIndex = null;
+  // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
+  let penNodeId = null;
+  let hoverConduitNode = null;
+  let conduitPreviewLine = null; // live pen preview (pen node → tip), lives in conduitGroup
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
   let waypointBuffer = '';   // WIRE EDIT height pad: the selected waypoint's z (for remote/out-of-reach points)
@@ -3801,6 +3850,31 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'marker_conduit', color: 0x22d3ee, // build the shared conduit network (a graph)
+      // Pen model: penNodeId is the growing end. Trigger a device/existing node to
+      // start (or connect) there; trigger empty space to drop a junction + run a
+      // conduit segment to it; trigger another node to join/branch/loop. Grip lifts
+      // the pen. See help.marker_conduit.
+      onTouch: (pos) => {
+        if (!placed) return;
+        // Prefer an existing conduit node, then a device marker, then empty space.
+        let targetNodeId = hoverConduitNode?.id || null;
+        if (!targetNodeId && hoverMarker) {
+          targetNodeId = project.ensureConduitNodeAtMarker(hoverMarker.id).id;
+        }
+        if (!targetNodeId) {
+          const { px, py } = worldToPlan(pos);
+          const z = Math.max(0, pos.y - overlayY());
+          targetNodeId = project.addConduitNode({ x: px, y: py, z }).id;
+        }
+        if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId);
+        penNodeId = targetNodeId;
+        project.touch(); // ensureConduitNodeAtMarker doesn't emit on its own
+        buildConduits(); buildPlan(); applyPlanMatrix();
+        rlog('conduit pen', { node: penNodeId });
+      },
+    },
+    {
       id: 'marker_wire', color: 0xf59e0b, // as-built physical wire tracing (any marker → any marker)
       // Trigger a marker to start the run, then trigger the surface along the wire's
       // real path to drop each waypoint (z captured from the tip), then trigger a
@@ -4010,12 +4084,12 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'translate', 'plan_dims',
-    'marker', 'marker_link', 'marker_wire', 'marker_wire_edit', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
+    'marker', 'marker_link', 'marker_conduit', 'marker_wire', 'marker_wire_edit', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', translate: 'plan', plan_dims: 'plan',
-    marker: 'marker', marker_link: 'marker', marker_wire: 'marker', marker_wire_edit: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', marker_wire: 'marker', marker_wire_edit: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
   };
@@ -4072,6 +4146,7 @@ export function setupMR(view, project, getFootprint) {
     selectedWire = null; selectedWaypointIndex = null; // ...and any wire-edit selection
     if (wireHandleGroup.children.length) clearWireHandles();
     wireHandleGroup.visible = false;
+    penNodeId = null; // ...and lift the conduit pen
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
@@ -4093,6 +4168,8 @@ export function setupMR(view, project, getFootprint) {
     else hideExportMenu();
     if (isSheetExportMode(m.id)) showSheet(); // refresh active-floor preview on entry
     else hideSheet();
+    if (m.id === 'marker_conduit') buildConduits(); // show the network to author against
+    conduitGroup.visible = m.id === 'marker_conduit';
   }
 
   // In the read-only building overview, mode traversal jumps across both editing
@@ -4476,6 +4553,12 @@ export function setupMR(view, project, getFootprint) {
       selectedLinkSwitch = null;
       return;
     }
+    if (mode.id === 'marker_conduit') {
+      // Grip lifts the pen (stops the current run) without deleting geometry;
+      // node/segment deletion belongs to CONDUIT EDIT.
+      if (penNodeId) { rlog('conduit pen lift', { node: penNodeId }); penNodeId = null; }
+      return;
+    }
     if (mode.id === 'marker_wire') {
       // Grip backs out one step: drop the last waypoint, else clear the start marker.
       if (wireWaypoints.length) { wireWaypoints.pop(); rlog('wire waypoint undo', { n: wireWaypoints.length }); return; }
@@ -4693,6 +4776,8 @@ export function setupMR(view, project, getFootprint) {
       ? (wireFromMarker ? `${t('wire.trace')} · ${wireWaypoints.length}` : t('wire.pickStart'))
       : modes[currentMode].id === 'marker_wire_edit'
       ? (selectedWire ? `${t('wire.editPoints')} · ${selectedWire.route?.waypoints?.length || 0}` : t('wire.pickWire'))
+      : modes[currentMode].id === 'marker_conduit'
+      ? (penNodeId ? t('conduit.run') : t('conduit.pickStart'))
       : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
@@ -4703,7 +4788,8 @@ export function setupMR(view, project, getFootprint) {
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || wireStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
-      : wireStatus ? 0xf59e0b : exportStatus ? C_EXPORT : 0x38bdf8;
+      : wireStatus ? (modes[currentMode].id === 'marker_conduit' ? 0x22d3ee : 0xf59e0b)
+      : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
@@ -5155,6 +5241,56 @@ export function setupMR(view, project, getFootprint) {
         if (line.userData.kind !== 'wire') continue;
         const active = line.userData.electricalLinkId === (hoverWire?.id || selectedWire?.id);
         line.material.opacity = active ? 1 : 0.5;
+      }
+    } else if (modeId === 'marker_conduit') {
+      // CONDUIT authoring: aim the floor reticle. A conduit node under it wins over a
+      // device marker (both are valid pen targets). The pen node is amber, hover yellow;
+      // a live preview runs from the pen node to the tip.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = editCtl;
+      if (penNodeId && !project.conduitNodes.some((n) => n.id === penNodeId)) penNodeId = null;
+      hoverConduitNode = null; hoverMarker = null;
+      const hit = rayFloorHit(source);
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        hoverConduitNode = conduitNodeAtFloorPoint(px, py);
+        if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
+      } else {
+        reticle.visible = false;
+      }
+      // Recolor node spheres: pen amber, hovered yellow, else by kind.
+      for (const child of conduitGroup.children) {
+        const id = child.userData.conduitNodeId;
+        if (!id || child === conduitPreviewLine) continue;
+        const node = project.conduitNodes.find((n) => n.id === id);
+        const color = id === penNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
+          : node?.markerId ? 0x94a3b8 : 0xffffff;
+        child.material.color.setHex(color);
+        child.scale.setScalar(id === penNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
+      }
+      outlineMarker(hoverMarker, 'floor', 0xffe14d);
+      outlineMarker(hoverMarker, 'wall', 0xffe14d);
+      // Pen preview: pen node → current tip.
+      if (!conduitPreviewLine) {
+        conduitPreviewLine = makeRouteLine([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], 0x22d3ee);
+        conduitPreviewLine.frustumCulled = false;
+        conduitPreviewLine.renderOrder = 15;
+        conduitGroup.add(conduitPreviewLine);
+      }
+      const penNode = penNodeId && project.conduitNodes.find((n) => n.id === penNodeId);
+      const tipW = tipPosition(source);
+      if (penNode && tipW) {
+        const from = conduitNodePos(project.activeFloor, penNode);
+        const { px, py } = worldToPlan(tipW);
+        const to = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
+        conduitPreviewLine.visible = true;
+        conduitPreviewLine.geometry.setFromPoints([from, to].map((p) => new THREE.Vector3(p.x, p.z, -p.y)));
+        conduitPreviewLine.computeLineDistances();
+      } else {
+        conduitPreviewLine.visible = false;
       }
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
