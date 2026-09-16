@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { electricalRoutePoints } from '../core/electrical.js';
+import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 const MM = 1000;
@@ -40,6 +40,7 @@ const LAYERS = [
   ['MARKER_OUTLET_WATER_HEATER', 7, 'CONTINUOUS'],
   ['MARKER_OUTLET_APPLIANCE', 7, 'CONTINUOUS'],
   ['MARKER_INTERCOM', 7, 'CONTINUOUS'],
+  ['MARKER_PANEL', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
@@ -47,6 +48,9 @@ const LAYERS = [
   ['MARKER_PATCH_PANEL', 7, 'CONTINUOUS'],
   ['MARKER_WIRE', 7, 'CONTINUOUS'],
   ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
+  ['ELECTRICAL_ROUTE_WALL', 4, 'DOTTED'],
+  ['ELECTRICAL_ROUTE_CEILING', 4, 'DOTTED'],
+  ['ELECTRICAL_ROUTE_FLOOR', 4, 'DOTTED'],
 ];
 
 const cleanNumber = (value) => {
@@ -390,6 +394,9 @@ function writeMarker(w, marker) {
     w.polyline(layer, [[x - r * 0.52, y - r * 0.65], [x + r * 0.52, y - r * 0.65], [x + r * 0.52, y + r * 0.65], [x - r * 0.52, y + r * 0.65]]);
     w.circle(layer, x, y - r * 0.12, r * 0.34);
     w.circle(layer, x - r * 0.34, y + r * 0.42, r * 0.07);
+  } else if (marker.type === 'panel') {
+    w.polyline(layer, [[x - r * 0.82, y - r * 0.7], [x + r * 0.82, y - r * 0.7], [x + r * 0.82, y + r * 0.7], [x - r * 0.82, y + r * 0.7]]);
+    for (const bx of [-0.42, 0, 0.42]) w.polyline(layer, [[x + r * bx - r * 0.08, y - r * 0.28], [x + r * bx + r * 0.08, y - r * 0.28], [x + r * bx + r * 0.08, y + r * 0.28], [x + r * bx - r * 0.08, y + r * 0.28]]);
   } else if (marker.type === 'intercom') {
     w.polyline(layer, [[x - r * 0.68, y - r], [x + r * 0.68, y - r], [x + r * 0.68, y + r], [x - r * 0.68, y + r]]);
     w.polyline(layer, [[x - r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.04], [x + r * 0.48, y + r * 0.72], [x - r * 0.48, y + r * 0.72]]);
@@ -407,11 +414,25 @@ function writeMarker(w, marker) {
   }
 }
 
+const WIRE_SURFACE_LAYER = {
+  wall: 'ELECTRICAL_ROUTE_WALL',
+  ceiling: 'ELECTRICAL_ROUTE_CEILING',
+  floor: 'ELECTRICAL_ROUTE_FLOOR',
+};
+
 function writeElectricalLinks(w, floor) {
   for (const link of floor.electricalLinks || []) {
+    // As-built wires split onto per-surface layers (wall/ceiling/floor) so the
+    // inferred run location survives into CAD; control links stay on one route
+    // layer. Both are true-3D LINE entities, so a top view shows the plan run.
+    if ((link.kind || 'control') === 'wire') {
+      for (const seg of electricalRouteSegments(floor, link)) {
+        const layer = WIRE_SURFACE_LAYER[seg.surface] || 'ELECTRICAL_ROUTE_WALL';
+        w.line3d(layer, seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DOTTED');
+      }
+      continue;
+    }
     const route = electricalRoutePoints(floor, link);
-    // Three true-3D LINE entities retain the vertical switch rise, ceiling run,
-    // and optional drop to the luminaire. A top view naturally shows the run.
     for (let i = 1; i < route.length; i++) {
       const a = route[i - 1], b = route[i];
       w.line3d('ELECTRICAL_ROUTE', a.x, a.y, a.z, b.x, b.y, b.z, 'DOTTED');

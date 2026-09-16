@@ -323,11 +323,13 @@ export class Project {
     const m = this.markers.find((m) => m.id === id);
     if (!m) return;
     m.type = type;
-    // Retyping an endpoint to an incompatible fixture removes its controls rather
-    // than retaining hidden/dangling electrical data.
+    // Retyping an endpoint to an incompatible fixture removes its logical CONTROLS
+    // rather than retaining hidden/dangling data. As-built wires connect any marker
+    // and therefore survive retyping untouched.
     this.electricalLinks = this.electricalLinks.filter((link) =>
-      (link.fromMarkerId !== id || type === 'switch') &&
-      (link.toMarkerId !== id || type === 'light'));
+      (link.kind || 'control') !== 'control' ||
+      ((link.fromMarkerId !== id || type === 'switch') &&
+       (link.toMarkerId !== id || type === 'light')));
     this._emit();
   }
 
@@ -356,6 +358,70 @@ export class Project {
     this.electricalLinks.push(link);
     this._emit();
     return { ok: true, linked: true, link };
+  }
+
+  // Record an as-built wire traced on site between any two markers. Waypoints are
+  // the intermediate {x,y,z} points captured along the real surface; the endpoints
+  // stay live (derived from the markers), so the run follows marker/storey edits.
+  // The wall/ceiling/floor surface of each segment is inferred, never stored.
+  addWire(fromMarkerId, toMarkerId, waypoints = []) {
+    const from = this.markers.find((m) => m.id === fromMarkerId);
+    const to = this.markers.find((m) => m.id === toMarkerId);
+    if (!from || !to || fromMarkerId === toMarkerId) {
+      return { ok: false, reason: 'incompatible' };
+    }
+    const link = {
+      id: nextElectricalLinkId(),
+      kind: 'wire',
+      fromMarkerId,
+      toMarkerId,
+      route: {
+        mode: 'manual',
+        waypoints: waypoints.map((p) => ({ x: p.x, y: p.y, z: p.z || 0 })),
+      },
+    };
+    this.electricalLinks.push(link);
+    this._emit();
+    return { ok: true, link };
+  }
+
+  // Move one waypoint of an as-built wire. Like moveMarker, continuous XR drags pass
+  // { emit:false } and commit once with touch() on release; waypoints do not enter the
+  // solver, so this only rewrites coordinates.
+  moveWireWaypoint(linkId, index, { x, y, z }, { emit = true } = {}) {
+    const link = this.electricalLinks.find((l) => l.id === linkId && l.kind === 'wire');
+    const wp = link?.route?.waypoints?.[index];
+    if (!wp) return;
+    wp.x = x; wp.y = y; wp.z = z || 0;
+    if (emit) this._emit();
+  }
+
+  // Insert a waypoint into a wire's path. `segmentIndex` is the segment being split
+  // (0 = from→first, N = last→to), which equals the array position of the new point.
+  insertWireWaypoint(linkId, segmentIndex, { x, y, z }) {
+    const link = this.electricalLinks.find((l) => l.id === linkId && l.kind === 'wire');
+    if (!link?.route?.waypoints) return null;
+    const i = Math.max(0, Math.min(segmentIndex, link.route.waypoints.length));
+    link.route.waypoints.splice(i, 0, { x, y, z: z || 0 });
+    this._emit();
+    return i;
+  }
+
+  // Remove one waypoint of an as-built wire by array index.
+  removeWireWaypoint(linkId, index) {
+    const link = this.electricalLinks.find((l) => l.id === linkId && l.kind === 'wire');
+    if (!link?.route?.waypoints || index < 0 || index >= link.route.waypoints.length) return;
+    link.route.waypoints.splice(index, 1);
+    this._emit();
+  }
+
+  // Remove one electrical link (control or wire) by id.
+  removeElectricalLink(id) {
+    const i = this.electricalLinks.findIndex((link) => link.id === id);
+    if (i < 0) return { ok: false };
+    const [link] = this.electricalLinks.splice(i, 1);
+    this._emit();
+    return { ok: true, link };
   }
 
   // Move a marker while preserving its pin relationships. A pin's signed value

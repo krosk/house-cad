@@ -285,6 +285,21 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Intercom has a distinct screen/speaker glyph in AR, sheets, legends, and detailed DXF, without an amperage recommendation
 - [ ] Dual Ethernet is selectable independently from Ethernet and renders as two adjacent RJ45 ports in AR, sheets, legends, and detailed DXF
 - [ ] Patch panel is selectable as a marker and renders as a rack-style bank of ports in AR, sheets, legends, and detailed DXF
+- [ ] Panel/consumer-unit is selectable as a marker and renders as a breaker-bank enclosure in AR, sheets, legends, and detailed DXF (`MARKER_PANEL`)
+- [ ] MARKER · WIRE: trigger a marker to start (turns amber), trigger the surface to drop waypoints (live amber preview follows the tip, readout counts them), trigger a second marker to commit; the wire persists and redraws
+- [ ] WIRE grip removes the last waypoint step by step, then clears the start marker; readout returns to PICK START
+- [ ] A committed wire's segments are dashed by inferred surface in AR — ceiling cyan, wall amber, floor slab green — and follow both endpoint markers when they are moved
+- [ ] Wires round-trip through SAVE/LOAD (kind, waypoints, surface inference) and floor copy/paste; retyping an endpoint keeps the wire, deleting an endpoint removes it
+- [ ] Sheet draws the wire's plan projection with per-surface dash patterns plus a "Wire · in wall/ceiling/floor" legend key; DXF writes segments on `ELECTRICAL_ROUTE_WALL` / `_CEILING` / `_FLOOR`
+- [ ] Routes appear in LINK (control links only), WIRE, and WIRE EDIT modes and stay hidden elsewhere
+- [ ] MARKER · WIRE EDIT: trigger a wire to select it; its waypoints appear as sphere handles and the wire brightens
+- [ ] Trigger a handle to select it (amber); on a vertical wall drop, repeated triggers cycle the stacked waypoints top-to-bottom
+- [ ] Grip-drag a handle with the controller tip NEAR it carries the waypoint 1:1 in full 3D (direct grab); the wire redraws following the hand and release persists it
+- [ ] Grip-drag a handle with the tip FAR from it (remote grab) moves only X/Y via the floor reticle while the height holds; a moved segment reclassifies its wall/ceiling/floor dash/color if it crosses a plane
+- [ ] Selecting a waypoint opens a height pad; typing a value + ENTER sets that waypoint's z (keeps it selected), and DEL on the pad removes the waypoint
+- [ ] With a waypoint selected, grip aimed away from any handle deletes it; with none selected, grip deselects the wire
+- [ ] Triggering the selected wire between two handles inserts a new waypoint on that leg at the reticle (z from the tip) and selects it
+- [ ] Trigger empty space backs out one level: waypoint selection first, then the wire; edits round-trip through SAVE/LOAD and floor copy/paste
 - [ ] A floor containing many marker/zone types wraps its legend within the printable page instead of extending beyond either margin
 - [ ] Zone legend names switch with LANG (insulation/door/window/stairs/cabinet localized)
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers

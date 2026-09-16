@@ -29,7 +29,7 @@ import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
-import { electricalRoutePoints } from '../core/electrical.js';
+import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
 import { rlog } from './remoteLog.js';
 
@@ -914,6 +914,11 @@ export function setupMR(view, project, getFootprint) {
   const electricalGroup = new THREE.Group();
   electricalGroup.visible = false;
   planGroup.add(electricalGroup);
+  // Draggable waypoint handles for MARKER · WIRE EDIT. Like markerGroup/electricalGroup
+  // it shares the plan transform but is rebuilt on demand, not by clearPlanGeometry.
+  const wireHandleGroup = new THREE.Group();
+  wireHandleGroup.visible = false;
+  planGroup.add(wireHandleGroup);
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1269,7 +1274,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup || child === electricalGroup) continue; // rebuilt separately below
+      if (child === markerGroup || child === electricalGroup || child === wireHandleGroup) continue; // rebuilt separately below
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -1541,6 +1546,18 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillStyle = '#334155'; ctx.fill();
       return;
     }
+    if (type === 'panel') {
+      // Consumer unit / distribution board: enclosure with a row of breakers.
+      ctx.beginPath(); ctx.roundRect(38, 40, 52, 48, 4);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+      ctx.lineWidth = 3; ctx.fillStyle = '#94a3b8';
+      for (const bx of [46, 58, 70]) {
+        ctx.beginPath(); ctx.rect(bx, 48, 8, 14); ctx.fill(); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(44, 74); ctx.lineTo(84, 74); ctx.stroke();
+      return;
+    }
     if (type === 'intercom') {
       // Wall intercom: display, call key, and speaker grille.
       ctx.beginPath(); ctx.roundRect(43, 35, 42, 58, 6);
@@ -1661,30 +1678,178 @@ export function setupMR(view, project, getFootprint) {
       child.geometry?.dispose();
       child.material?.dispose();
     }
+    wirePreviewLine = null; // the live WIRE preview lives here too; recreated on demand
   }
 
-  // V1 physical routing: rise vertically from the switch to the storey ceiling,
-  // cross the ceiling directly, then drop to the light if it is below that plane.
+  // Per-surface colors for as-built wires (inferred, not stored): a run inside the
+  // ceiling reads cyan, inside a wall amber, inside the floor slab green.
+  const WIRE_SURFACE_COLOR = { ceiling: 0x38bdf8, wall: 0xf59e0b, floor: 0x34d399 };
+
+  // Build one dashed line from a list of model points {x,y,z} → world.
+  function makeRouteLine(points, color) {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points.map((p) =>
+      new THREE.Vector3(p.x, p.z, -p.y)));
+    const material = new THREE.LineDashedMaterial({
+      color, dashSize: 0.035, gapSize: 0.035,
+      transparent: true, opacity: 0.92, depthTest: false, depthWrite: false,
+    });
+    const line = new THREE.Line(geometry, material);
+    line.computeLineDistances();
+    line.renderOrder = 14;
+    return line;
+  }
+
+  // Two link kinds render here:
+  //  - 'control' (switch→light): one dashed line following the DERIVED ceiling
+  //    route; LINK mode recolors these by source switch.
+  //  - 'wire': the as-built run, drawn as one dashed line PER SEGMENT colored by
+  //    the inferred wall/ceiling/floor surface of that segment.
   // The path is derived from live marker positions so edits never detach its ends.
   function buildElectricalLinks(floor = project.activeFloor) {
     clearElectricalLinks();
     for (const link of floor.electricalLinks || []) {
+      if ((link.kind || 'control') === 'wire') {
+        for (const seg of electricalRouteSegments(floor, link)) {
+          const line = makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b);
+          line.userData.electricalLinkId = link.id;
+          line.userData.kind = 'wire';
+          line.userData.surface = seg.surface;
+          electricalGroup.add(line);
+        }
+        continue;
+      }
       const route = electricalRoutePoints(floor, link);
       if (!route.length) continue;
-      const geometry = new THREE.BufferGeometry().setFromPoints(route.map((p, i) =>
-        new THREE.Vector3(p.x, p.z + (i === 1 || i === 2 ? 0.012 : 0), -p.y)));
-      const material = new THREE.LineDashedMaterial({
-        color: 0x38bdf8, dashSize: 0.035, gapSize: 0.035,
-        transparent: true, opacity: 0.92, depthTest: false, depthWrite: false,
-      });
-      const line = new THREE.Line(geometry, material);
-      line.computeLineDistances();
-      line.renderOrder = 14;
+      // Lift the ceiling run slightly so it reads above the overlay.
+      const line = makeRouteLine(route.map((p, i) =>
+        (i === 1 || i === 2) ? { x: p.x, y: p.y, z: p.z + 0.012 } : p), 0x38bdf8);
       line.userData.electricalLinkId = link.id;
+      line.userData.kind = 'control';
       line.userData.fromMarkerId = link.fromMarkerId;
       line.userData.toMarkerId = link.toMarkerId;
       electricalGroup.add(line);
     }
+  }
+
+  // ---- MARKER · WIRE EDIT geometry helpers -------------------------------------
+  // Plan distance from (px,py) to the segment a→b (both plan-space {x,y}).
+  function planPointToSegment(px, py, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return Math.hypot(px - a.x, py - a.y);
+    let t = ((px - a.x) * dx + (py - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+  }
+
+  // Nearest wire (kind:'wire' link) whose plan projection passes within WIRE_PICK_M
+  // of the reticle. Only drawable (non-collapsed) segments count as pickable.
+  const WIRE_PICK_M = 0.12; // m; a little wider than the reticle for a thin line
+  const WAYPOINT_GRAB_M = 0.14; // m; tip within this of a handle → direct 3D carry, else remote
+  function wireAtFloorPoint(px, py) {
+    let best = null, bestD = WIRE_PICK_M;
+    for (const link of project.electricalLinks) {
+      if ((link.kind || 'control') !== 'wire') continue;
+      for (const seg of electricalRouteSegments(project.activeFloor, link)) {
+        if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue; // vertical: no plan extent
+        const d = planPointToSegment(px, py, seg.a, seg.b);
+        if (d < bestD) { bestD = d; best = link; }
+      }
+    }
+    return best;
+  }
+
+  // Nearest waypoint HANDLE of `wire` under the reticle (by floor projection). When
+  // several share one floor point (a vertical wall drop), repeated picks cycle them
+  // top-to-bottom from the current selection — mirrors stacked-marker picking.
+  function waypointHandleAtFloorPoint(wire, px, py) {
+    const wps = wire?.route?.waypoints || [];
+    let nearest = -1, bestD = RETICLE_OUTER;
+    for (let i = 0; i < wps.length; i++) {
+      const d = Math.hypot(px - wps[i].x, py - wps[i].y);
+      if (d < bestD) { bestD = d; nearest = i; }
+    }
+    if (nearest < 0) return null;
+    const coincident = wps
+      .map((w, i) => ({ w, i }))
+      .filter(({ w }) => w.x === wps[nearest].x && w.y === wps[nearest].y)
+      .sort((a, b) => (b.w.z || 0) - (a.w.z || 0) || a.i - b.i)
+      .map(({ i }) => i);
+    if (coincident.length < 2) return nearest;
+    const at = coincident.indexOf(selectedWaypointIndex);
+    return coincident[at < 0 ? 0 : (at + 1) % coincident.length];
+  }
+
+  // Segment (== waypoint insert index) of `wire` nearest the reticle, ignoring
+  // collapsed vertical segments; used to splice a new waypoint on the right leg.
+  function nearestDrawableSegmentIndex(wire, px, py) {
+    const segs = electricalRouteSegments(project.activeFloor, wire);
+    let best = null, bestD = WIRE_PICK_M;
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (s.a.x === s.b.x && s.a.y === s.b.y) continue;
+      const d = planPointToSegment(px, py, s.a, s.b);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  function clearWireHandles() {
+    for (const child of [...wireHandleGroup.children]) {
+      wireHandleGroup.remove(child);
+      child.geometry?.dispose();
+      child.material?.dispose();
+    }
+  }
+
+  // One small sphere per waypoint of the selected wire, at its true 3D position.
+  // The active waypoint is amber, the rest white; picking is by floor projection.
+  const wireHandleGeom = new THREE.SphereGeometry(0.02, 12, 12);
+  function buildWireHandles() {
+    clearWireHandles();
+    if (!selectedWire) { wireHandleGroup.visible = false; return; }
+    wireHandleGroup.visible = true;
+    const wps = selectedWire.route?.waypoints || [];
+    wps.forEach((w, i) => {
+      const mat = new THREE.MeshBasicMaterial({
+        color: i === selectedWaypointIndex ? 0xfbbf24 : 0xffffff,
+        depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
+      });
+      const mesh = new THREE.Mesh(wireHandleGeom, mat);
+      mesh.position.set(w.x, w.z || 0, -w.y);
+      mesh.renderOrder = 16;
+      mesh.userData.waypointIndex = i;
+      wireHandleGroup.add(mesh);
+    });
+  }
+
+  // Live waypoint drag, in one of two modes chosen at grip-press by real proximity:
+  //  - 'direct': the waypoint sticks to the controller TIP and moves in full 3D
+  //    (for points within arm's reach — floor runs, outlet height).
+  //  - 'remote': the floor RETICLE drives X/Y while z is held (out-of-reach points —
+  //    e.g. a ceiling run); z is set separately by typing on the height pad.
+  // Either way, redraw the wire + reposition the handle each frame; commit on release.
+  function applyWaypointGripDrag(inputSource) {
+    if (gripDrag?.kind !== 'waypoint') return;
+    if (!selectedWire || !project.electricalLinks.includes(selectedWire)) return;
+    const wp = selectedWire.route?.waypoints?.[gripDrag.index];
+    if (!wp) return;
+    let nx = wp.x, ny = wp.y, nz = wp.z || 0;
+    if (gripDrag.mode === 'direct') {
+      const tip = tipPosition(inputSource);
+      if (!tip) return;
+      const plan = worldToPlan(tip);
+      nx = plan.px; ny = plan.py; nz = Math.max(0, tip.y - overlayY());
+    } else {
+      const hit = rayFloorHit(inputSource);
+      if (!hit) return;
+      const plan = worldToPlan(hit);
+      nx = plan.px; ny = plan.py; // z stays put; the pad owns height for remote points
+    }
+    project.moveWireWaypoint(selectedWire.id, gripDrag.index, { x: nx, y: ny, z: nz }, { emit: false });
+    buildElectricalLinks();
+    const handle = wireHandleGroup.children.find((h) => h.userData.waypointIndex === gripDrag.index);
+    if (handle) handle.position.set(nx, nz, -ny);
   }
 
   // Read-only building overview: every independent plan stays aligned to the shared
@@ -1745,6 +1910,7 @@ export function setupMR(view, project, getFootprint) {
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
     'switch', 'light', 'ethernet', 'ethernet_dual', 'patch_panel', 'intercom',
+    'panel',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
@@ -1771,8 +1937,21 @@ export function setupMR(view, project, getFootprint) {
   let selectedMarker = null; // OUTLET mode: marker being height-edited
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
+  // MARKER · WIRE authoring: the run's start marker and the waypoints captured so
+  // far ({x,y,z} model coords). A live preview line threads start → waypoints → tip.
+  let wireFromMarker = null;
+  let wireWaypoints = [];
+  let wirePreviewLine = null;
+  // MARKER · WIRE EDIT: the selected wire link + which of its waypoints is active,
+  // plus the per-frame hover targets (a waypoint handle wins over the wire body).
+  let selectedWire = null;
+  let selectedWaypointIndex = null;
+  let hoverWire = null;
+  let hoverWaypointIndex = null;
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
+  let waypointBuffer = '';   // WIRE EDIT height pad: the selected waypoint's z (for remote/out-of-reach points)
+  let waypointPristine = false;
 
   // Shared state for the two hard-separated dimension domains. PLAN DIMS accepts
   // edge<->edge and edge<->origin pairs. OUTLET DIMS requires an outlet floor icon
@@ -2453,6 +2632,66 @@ export function setupMR(view, project, getFootprint) {
     // The mode breadcrumb deliberately stays MARKER · EDIT. The dedicated TYPE
     // readout is the sole UI label that changes with the marker type.
     rlog('marker type', { type: currentMarkerType });
+  }
+
+  // ---- WIRE EDIT waypoint height: for a REMOTE (out-of-reach) waypoint, X/Y follow
+  // the floor reticle during a grip and z is typed here on the reused numpad. A
+  // DIRECT (in-reach) grab sets all three from the controller tip instead.
+  const selectedWaypoint = () => selectedWire?.route?.waypoints?.[selectedWaypointIndex];
+  const waypointPadTitle = () => `${t('wire.point')}  ·  ${t('marker.height')}`;
+  const redrawWaypointPad = () => numpad.draw(waypointPadTitle(), waypointBuffer, hoverKey);
+
+  function refreshWaypointPad() {
+    const wp = selectedWaypoint();
+    waypointBuffer = wp ? fmt(wp.z || 0) : '';
+    waypointPristine = true;
+    redrawWaypointPad();
+  }
+
+  function activateWaypointPad() {
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    refreshWaypointPad();
+  }
+
+  // Select a waypoint of the current wire and open its height pad. Shared by the
+  // trigger picker and both grip grabs so the pad always tracks the active point.
+  function selectWaypoint(index) {
+    selectedWaypointIndex = index;
+    buildWireHandles();
+    if (index != null) activateWaypointPad();
+    else deactivateNumpad();
+  }
+
+  function commitWaypointHeight() {
+    const wp = selectedWaypoint();
+    if (!wp) return;
+    const val = parseFloat(waypointBuffer);
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
+    project.moveWireWaypoint(selectedWire.id, selectedWaypointIndex, { x: wp.x, y: wp.y, z: toMeters(val) });
+    rlog('wire waypoint height', { index: selectedWaypointIndex, m: +toMeters(val).toFixed(3) });
+    buildElectricalLinks(); buildWireHandles();
+    refreshWaypointPad(); // keep the point selected so it can be repositioned again
+  }
+
+  function pressWaypointKey(k) {
+    if (k === 'enter') { commitWaypointHeight(); return; }
+    if (k === 'swap') return; // no role when entering a height
+    if (k === 'del') { // DEL removes the waypoint, mirroring the marker pad's delete
+      if (selectedWire && selectedWaypointIndex != null) {
+        project.removeWireWaypoint(selectedWire.id, selectedWaypointIndex);
+        rlog('wire waypoint delete (pad)', { index: selectedWaypointIndex });
+        selectWaypoint(null);
+        buildElectricalLinks();
+      }
+      return;
+    }
+    if (waypointPristine && k !== 'back') waypointBuffer = '';
+    waypointPristine = false;
+    if (k === 'back') waypointBuffer = waypointBuffer.slice(0, -1);
+    else if (k === '.') { if (!waypointBuffer.includes('.')) waypointBuffer += '.'; }
+    else if (waypointBuffer.replace('.', '').length < 6) waypointBuffer += k;
+    redrawWaypointPad();
   }
 
   // PLAN · ADD thumbstick-y: pick which kind the next trigger places. All non-room
@@ -3562,6 +3801,88 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'marker_wire', color: 0xf59e0b, // as-built physical wire tracing (any marker → any marker)
+      // Trigger a marker to start the run, then trigger the surface along the wire's
+      // real path to drop each waypoint (z captured from the tip), then trigger a
+      // second marker to finish and store the wire. The endpoints stay live; each
+      // segment's wall/ceiling/floor surface is inferred from its geometry. Grip
+      // removes the last waypoint, or clears the start before the second end.
+      onTouch: (pos) => {
+        if (!placed) return;
+        if (!wireFromMarker) {
+          if (hoverMarker) {
+            wireFromMarker = hoverMarker;
+            wireWaypoints = [];
+            rlog('wire from', { id: hoverMarker.id });
+          }
+          return;
+        }
+        if (hoverMarker && hoverMarker.id !== wireFromMarker.id) {
+          const result = project.addWire(wireFromMarker.id, hoverMarker.id, wireWaypoints);
+          if (result.ok) {
+            rlog('wire commit', {
+              from: wireFromMarker.id, to: hoverMarker.id,
+              waypoints: wireWaypoints.length, linkId: result.link?.id,
+            });
+            wireFromMarker = null; wireWaypoints = [];
+            buildPlan(); applyPlanMatrix();
+          }
+          return;
+        }
+        // Empty space (or the start marker again): drop a waypoint at the tip.
+        const { px, py } = worldToPlan(pos);
+        const z = Math.max(0, pos.y - overlayY());
+        wireWaypoints.push({ x: px, y: py, z });
+        rlog('wire waypoint', { px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3), n: wireWaypoints.length });
+      },
+    },
+    {
+      id: 'marker_wire_edit', color: 0xf59e0b, // edit an existing as-built wire's waypoints
+      // Two-level selection mirroring MARKER · EDIT. Trigger the wire to select it
+      // (its waypoints become handles); trigger a handle to select it (repeat cycles
+      // stacked ones); trigger the wire between handles to insert a waypoint; trigger
+      // empty space to deselect (waypoint first, then wire). Grip-drag a handle moves
+      // it in 3D (onSqueezeStart); grip away from a handle deletes the selected
+      // waypoint (onReset). Endpoints are markers and are edited in MARKER · EDIT.
+      onTouch: (pos) => {
+        if (!placed) return;
+        // A selected waypoint opens the height pad; aiming at it, a trigger types a key.
+        if (selectedWaypoint() && numpad.group.visible && hoverKey) { pressWaypointKey(hoverKey); return; }
+        if (!selectedWire) {
+          if (hoverWire) {
+            selectedWire = hoverWire; selectWaypoint(null);
+            rlog('wire edit select', { id: selectedWire.id });
+          }
+          return;
+        }
+        if (hoverWaypointIndex != null) { // select / cycle a waypoint handle (opens the pad)
+          selectWaypoint(hoverWaypointIndex);
+          rlog('wire waypoint select', { index: selectedWaypointIndex });
+          return;
+        }
+        if (hoverWire && hoverWire.id !== selectedWire.id) { // switch to another wire
+          selectedWire = hoverWire; selectWaypoint(null);
+          rlog('wire edit reselect', { id: selectedWire.id });
+          return;
+        }
+        if (hoverWire && hoverWire.id === selectedWire.id) { // on the selected wire (off a handle) → insert
+          const { px, py } = worldToPlan(pos);
+          const seg = nearestDrawableSegmentIndex(selectedWire, px, py);
+          if (seg != null) {
+            const z = Math.max(0, pos.y - overlayY());
+            const i = project.insertWireWaypoint(selectedWire.id, seg, { x: px, y: py, z });
+            buildElectricalLinks(); selectWaypoint(i);
+            rlog('wire waypoint insert', { seg, index: i });
+          }
+          return;
+        }
+        // Empty space: back out one level — the waypoint, then the wire.
+        if (selectedWaypointIndex != null) { selectWaypoint(null); return; }
+        selectedWire = null; buildWireHandles();
+        rlog('wire edit deselect');
+      },
+    },
+    {
       id: 'recal', color: C_RECAL, // label/help via i18n: mode.recal / help.recal
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
       // corner apex needn't be reachable. First SELECT a corner — point so the reticle
@@ -3689,12 +4010,12 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'recal', 'teleport', 'level',
     'drop', 'edge', 'edit', 'translate', 'plan_dims',
-    'marker', 'marker_link', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
+    'marker', 'marker_link', 'marker_wire', 'marker_wire_edit', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', translate: 'plan', plan_dims: 'plan',
-    marker: 'marker', marker_link: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', marker_wire: 'marker', marker_wire_edit: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
   };
@@ -3747,6 +4068,10 @@ export function setupMR(view, project, getFootprint) {
     lastHudAt = -Infinity;
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedLinkSwitch = null; // ...and any electrical-link source switch
+    wireFromMarker = null; wireWaypoints = []; // ...and any partially-traced wire
+    selectedWire = null; selectedWaypointIndex = null; // ...and any wire-edit selection
+    if (wireHandleGroup.children.length) clearWireHandles();
+    wireHandleGroup.visible = false;
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
@@ -4053,6 +4378,19 @@ export function setupMR(view, project, getFootprint) {
       gripDrag = { kind: 'marker', markerId: hoverMarker.id, distance };
       rlog('grip-drag marker', { id: hoverMarker.id });
     }
+    if (id === 'marker_wire_edit' && selectedWire && hoverWaypointIndex != null) {
+      const handle = wireHandleGroup.children.find((h) => h.userData.waypointIndex === hoverWaypointIndex);
+      if (!handle) return;
+      // Choose the move mode by REAL 3D proximity of the controller tip to the
+      // waypoint: close enough → carry it directly in 3D; otherwise remote (floor
+      // reticle drives X/Y, pad drives z).
+      const tip = tipPosition(event.data);
+      handle.getWorldPosition(_dp);
+      const near = tip && tip.distanceTo(_dp) < WAYPOINT_GRAB_M;
+      selectWaypoint(hoverWaypointIndex); // grabbing also selects (and opens the height pad)
+      gripDrag = { kind: 'waypoint', index: hoverWaypointIndex, mode: near ? 'direct' : 'remote' };
+      rlog('grip-drag waypoint', { index: hoverWaypointIndex, mode: gripDrag.mode });
+    }
   }
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
@@ -4065,6 +4403,9 @@ export function setupMR(view, project, getFootprint) {
       // Edge and marker drags use a lightweight live visual; rebuild once so all
       // dimensions, marker lock colors, and canonical geometry return on release.
       if (rebuild) { buildPlan(); applyPlanMatrix(); }
+      // A waypoint drag only touched the wire route: redraw its segments + handles,
+      // and refresh the height pad since a direct 3D carry also changed z.
+      if (gripDrag.kind === 'waypoint') { buildElectricalLinks(); buildWireHandles(); if (numpad.group.visible) refreshWaypointPad(); }
     }
     gripDrag = null;
   }
@@ -4133,6 +4474,26 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'marker_link') {
       if (selectedLinkSwitch) rlog('link switch cleared', { id: selectedLinkSwitch.id });
       selectedLinkSwitch = null;
+      return;
+    }
+    if (mode.id === 'marker_wire') {
+      // Grip backs out one step: drop the last waypoint, else clear the start marker.
+      if (wireWaypoints.length) { wireWaypoints.pop(); rlog('wire waypoint undo', { n: wireWaypoints.length }); return; }
+      if (wireFromMarker) { rlog('wire from cleared', { id: wireFromMarker.id }); wireFromMarker = null; }
+      return;
+    }
+    if (mode.id === 'marker_wire_edit') {
+      // Grip away from a handle deletes the selected waypoint; with none selected it
+      // deselects the wire. (A grip ON a handle became a drag and never reaches here.)
+      if (selectedWire && selectedWaypointIndex != null) {
+        project.removeWireWaypoint(selectedWire.id, selectedWaypointIndex);
+        rlog('wire waypoint delete', { index: selectedWaypointIndex });
+        selectWaypoint(null); // clears selection + closes the height pad
+        buildElectricalLinks();
+      } else if (selectedWire) {
+        selectedWire = null; buildWireHandles(); deactivateNumpad();
+        rlog('wire edit deselect (grip)');
+      }
       return;
     }
     if (mode.id === 'marker' && selectedMarker) {
@@ -4328,6 +4689,11 @@ export function setupMR(view, project, getFootprint) {
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
       ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
+    const wireStatus = modes[currentMode].id === 'marker_wire'
+      ? (wireFromMarker ? `${t('wire.trace')} · ${wireWaypoints.length}` : t('wire.pickStart'))
+      : modes[currentMode].id === 'marker_wire_edit'
+      ? (selectedWire ? `${t('wire.editPoints')} · ${selectedWire.route?.waypoints?.length || 0}` : t('wire.pickWire'))
+      : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
       : null;
@@ -4335,9 +4701,9 @@ export function setupMR(view, project, getFootprint) {
       ? `${t('export.format')} · ${getOutputSettings().format === 'coohom'
         ? 'COOHOM DXF' : getOutputSettings().format.toUpperCase()}` : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || wireStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
-      : exportStatus ? C_EXPORT : 0x38bdf8;
+      : wireStatus ? 0xf59e0b : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;
       readouts[i].sprite.visible = on;
@@ -4392,7 +4758,20 @@ export function setupMR(view, project, getFootprint) {
       if (visual.userData.markerRole.endsWith('-outline')) visual.visible = false;
     }
     const modeId = modes[currentMode].id;
-    electricalGroup.visible = modeId === 'marker_link';
+    // Routes show in LINK (control links only), WIRE, and WIRE EDIT (as-built wires).
+    // Per-child visibility is set by kind so each mode shows its lane.
+    const wireMode = modeId === 'marker_wire' || modeId === 'marker_wire_edit';
+    electricalGroup.visible = modeId === 'marker_link' || wireMode;
+    if (electricalGroup.visible) {
+      for (const line of electricalGroup.children) {
+        // The live trace preview belongs to WIRE only; the marker_wire branch drives
+        // its geometry/visibility, so keep it hidden everywhere else.
+        if (line === wirePreviewLine) { line.visible = modeId === 'marker_wire'; continue; }
+        line.visible = wireMode || line.userData.kind === 'control';
+      }
+    }
+    // Waypoint handles belong to WIRE EDIT only.
+    wireHandleGroup.visible = modeId === 'marker_wire_edit' && !!selectedWire;
     if (modeId === 'teleport') {
       // Dedicated locomotion target. Trigger brings the pointed plan coordinate
       // beneath the headset; no geometry or survey-registration state is edited.
@@ -4672,12 +5051,111 @@ export function setupMR(view, project, getFootprint) {
       // All routes remain visible in cyan; the selected switch's routes brighten
       // amber so the one-to-many control set is immediately readable.
       for (const line of electricalGroup.children) {
+        if (line.userData.kind !== 'control') continue;
         line.material.color.setHex(line.userData.fromMarkerId === selectedLinkSwitch?.id ? 0xfbbf24 : 0x38bdf8);
       }
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
       outlineMarker(selectedLinkSwitch, 'floor', 0xfbbf24);
       outlineMarker(selectedLinkSwitch, 'wall', 0xfbbf24);
+    } else if (modeId === 'marker_wire') {
+      // As-built WIRE tracing: aim the floor reticle; any marker under it is the
+      // hover endpoint (start, then finish). A live amber preview threads the chosen
+      // start through the captured waypoints to the current tip until a second
+      // marker commits the run. Committed wires are drawn per-segment by surface.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = editCtl;
+      const hit = rayFloorHit(source);
+      hoverMarker = null;
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        hoverMarker = markerAtFloorPoint(px, py);
+      } else {
+        reticle.visible = false;
+      }
+      if (wireFromMarker && !project.markers.includes(wireFromMarker)) {
+        wireFromMarker = null; wireWaypoints = [];
+      }
+      if (!wirePreviewLine) {
+        wirePreviewLine = makeRouteLine([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], 0xf59e0b);
+        wirePreviewLine.frustumCulled = false; // its vertices are rewritten every frame
+        wirePreviewLine.renderOrder = 15;
+        electricalGroup.add(wirePreviewLine);
+      }
+      if (wireFromMarker) {
+        const pts = [{ x: wireFromMarker.x, y: wireFromMarker.y, z: wireFromMarker.z || 0 }, ...wireWaypoints];
+        const tipW = tipPosition(source);
+        if (tipW) {
+          const { px, py } = worldToPlan(tipW);
+          pts.push({ x: px, y: py, z: Math.max(0, tipW.y - overlayY()) });
+        }
+        wirePreviewLine.visible = pts.length >= 2;
+        if (wirePreviewLine.visible) {
+          wirePreviewLine.geometry.setFromPoints(pts.map((p) => new THREE.Vector3(p.x, p.z, -p.y)));
+          wirePreviewLine.computeLineDistances();
+        }
+      } else {
+        wirePreviewLine.visible = false;
+      }
+      outlineMarker(hoverMarker, 'floor', 0xffe14d);
+      outlineMarker(hoverMarker, 'wall', 0xffe14d);
+      outlineMarker(wireFromMarker, 'floor', 0xf59e0b);
+      outlineMarker(wireFromMarker, 'wall', 0xf59e0b);
+    } else if (modeId === 'marker_wire_edit') {
+      // WIRE EDIT: aim the floor reticle. A waypoint handle of the selected wire wins
+      // over the wire body; otherwise pick a wire for selection. Handles recolor by
+      // selection state; a live drag is applied here so the wire follows the hand.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = editCtl;
+      if (selectedWire && !project.electricalLinks.includes(selectedWire)) {
+        selectedWire = null; selectWaypoint(null);
+      }
+      // When a waypoint's height pad is open and under the ray, it owns the pointer
+      // (type z); otherwise the floor reticle picks wires/handles.
+      if (selectedWaypoint() && numpad.group.visible) {
+        const panelHit = rayPanelHit(source);
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
+      if (gripDrag?.kind === 'waypoint') applyWaypointGripDrag(source);
+      hoverWire = null; hoverWaypointIndex = null;
+      if (hoverKey) {
+        reticle.visible = false; // the pad owns the ray this frame
+      } else {
+        const hit = rayFloorHit(source);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          // A waypoint handle wins over the wire body; only look for a wire when the
+          // reticle is not on a handle of the already-selected wire.
+          if (selectedWire) hoverWaypointIndex = waypointHandleAtFloorPoint(selectedWire, px, py);
+          if (hoverWaypointIndex == null) hoverWire = wireAtFloorPoint(px, py);
+        } else {
+          reticle.visible = false;
+        }
+      }
+      if (selectedWaypoint() && hoverKey !== prevHoverKey) { redrawWaypointPad(); prevHoverKey = hoverKey; }
+      // Recolor handles: selected amber, hovered yellow, rest white.
+      for (const handle of wireHandleGroup.children) {
+        const i = handle.userData.waypointIndex;
+        const color = i === selectedWaypointIndex ? 0xfbbf24 : i === hoverWaypointIndex ? 0xffe14d : 0xffffff;
+        handle.material.color.setHex(color);
+        handle.scale.setScalar(i === hoverWaypointIndex || i === selectedWaypointIndex ? 1.5 : 1);
+      }
+      // Brighten the wire under consideration (hovered for select, or the selected one).
+      for (const line of electricalGroup.children) {
+        if (line.userData.kind !== 'wire') continue;
+        const active = line.userData.electricalLinkId === (hoverWire?.id || selectedWire?.id);
+        line.material.opacity = active ? 1 : 0.5;
+      }
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
       // (markerAtFloorPoint), a stable plan-space target vs. the floating wall billboard —

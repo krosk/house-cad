@@ -15,7 +15,7 @@ editor (`ar-2d-parity` memory).
 ```text
 SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
 PLAN     · ADD → EDGE → EDIT → TRANSLATE → DIMS
-MARKER   · EDIT → LINK → DIMS
+MARKER   · EDIT → LINK → WIRE → WIRE EDIT → DIMS
 PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
 
@@ -23,7 +23,7 @@ The headset label and help header show the localized `GROUP · TOOL` breadcrumb.
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_wire`, `marker_wire_edit`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
 `move_down`, `save`, `load`, `export`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -77,7 +77,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
   type** (standard/specialized outlets, switch, light, and ethernet) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
-  (including Type E, shutter, dedicated aircon supply, cooktop, oven, water-heater, dedicated-appliance-outlet, single/dual Ethernet, patch panel, and intercom symbols) and a
+  (including Type E, shutter, dedicated aircon supply, cooktop, oven, water-heater, dedicated-appliance-outlet, single/dual Ethernet, patch panel, intercom, and consumer-unit panel symbols) and a
   `marker.<type>` i18n key. A **light drops with z defaulted to the storey height** (ceiling —
   unreachable to tip-capture); other types capture z from the tip. The mode breadcrumb remains
   `MARKER · EDIT`; the separate prominent readout shows `TYPE · <type>` and is the only label
@@ -106,6 +106,43 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
   light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted
   plan projection and DXF writes their true 3D segments on `ELECTRICAL_ROUTE`.
+- **MARKER · WIRE** (`id: marker_wire`) — as-built physical wire tracing between ANY two markers
+  (including the `panel`/consumer-unit type). Trigger a marker to start the run; trigger the real
+  surface along the wire's path to drop each waypoint (X/Y from the floor reticle, z from the
+  controller tip height); trigger a second marker to finish and store the wire (`project.addWire`).
+  Grip removes the last waypoint, or clears the start marker before the second end. The start marker
+  is amber, the hovered endpoint yellow, and a live amber preview threads start → waypoints → tip;
+  the separate readout shows `PICK START`, then `TRACE · END · <n>`. Wires persist per floor in
+  `electricalLinks` as `kind:'wire'` with `route:{mode:'manual', waypoints}`; the two endpoints stay
+  live so marker/storey edits keep the run attached. **The wall/ceiling/floor surface of each segment
+  is INFERRED from geometry** (`segmentSurface`), never stored: a level run near the ceiling plane is
+  ceiling, near the floor slab is floor, and any vertical rise/drop or mid-height level run is behind
+  a wall. In AR each wire segment is dashed by inferred surface (ceiling cyan, wall amber, floor
+  green); the monochrome sheet distinguishes them by dash pattern with a per-surface legend key
+  (collapsed vertical drops draw nothing in plan and are omitted from the key); DXF writes each
+  segment on `ELECTRICAL_ROUTE_WALL` / `_CEILING` / `_FLOOR`. Routes show in both LINK (control only)
+  and WIRE (wires) modes. Manual waypoints and the `panel` type are the close-out of the electrical
+  slice's "manual surface-anchored routing" future work.
+- **MARKER · WIRE EDIT** (`id: marker_wire_edit`) — edit an existing wire's waypoints, using the
+  exact MARKER · EDIT grammar (trigger = select, grip-on = move, grip-away = delete) at two levels.
+  Trigger a wire (nearest drawable segment within `WIRE_PICK_M`) to **select** it; its waypoints then
+  appear as draggable sphere **handles** (`wireHandleGroup`, a rebuilt-on-demand sibling of
+  `markerGroup`). Trigger a handle to select that waypoint — repeated triggers **cycle** waypoints that
+  share one floor point (a vertical wall drop), like stacked markers. **Grip-drag a handle moves it**,
+  in one of two modes chosen at grip-press by the real 3D distance from the controller tip to the
+  handle (`WAYPOINT_GRAB_M`): **direct** (tip within reach) carries the waypoint 1:1 with the tip in
+  full 3D; **remote** (tip far, e.g. a ceiling run) has the floor reticle drive X/Y while z is held.
+  For a remote point, z is typed on the reused numpad — selecting any waypoint opens a height pad
+  (`activateWaypointPad` / `commitWaypointHeight`, mirroring the marker height pad; DEL removes the
+  waypoint, ENTER commits z and keeps it selected). Both drag modes use `moveWireWaypoint` with
+  `emit:false`, committed once on release. **Grip away from a handle deletes the selected waypoint**
+  (`onReset` → `removeWireWaypoint`).
+  Triggering the selected wire between handles **inserts** a waypoint on the nearest drawable segment
+  at the reticle, z from the tip (`insertWireWaypoint`, splice index = segment index). Trigger empty
+  space to deselect the waypoint, then the wire. Handles recolor selected amber / hovered yellow /
+  idle white, and the wire under consideration brightens. Endpoints stay markers — moved in
+  MARKER · EDIT, not here. Editing an existing wire is the only remaining electrical increment; it is
+  now done except for on-device QA.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.

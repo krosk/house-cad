@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { electricalRoutePoints } from '../core/electrical.js';
+import { electricalRoutePoints, electricalRouteSegments } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 // Injected by Vite as the source revision + UTC build time. The fallback keeps
@@ -76,6 +76,14 @@ const C_DIM_BAD = '#111';    // conflicting dimension (stronger black, no color)
 const C_MARK = '#111';       // marker glyphs
 const C_PIN = '#111';        // marker floor-pin dimension; dashed pattern identifies the domain
 const C_ELECTRICAL = '#555'; // dotted switch-to-light route
+// As-built wires are monochrome; the inferred wall/ceiling/floor surface of each
+// run is distinguished by dash pattern alone (the sheet uses no route color).
+const WIRE_SURFACE_DASH = {
+  ceiling: [0.35, 0.9],        // fine dots — same lane as the control ceiling route
+  wall: [1.4, 0.6],            // long dashes
+  floor: [0.2, 0.5, 1.1, 0.5], // dot-dash
+};
+const WIRE_SURFACE_LABEL = { ceiling: 'in ceiling', wall: 'in wall', floor: 'in floor' };
 const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
@@ -83,7 +91,7 @@ const MARKER_LABELS = {
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
   switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
-  patch_panel: 'Patch panel', intercom: 'Intercom', wire: 'Wire',
+  patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel', wire: 'Wire',
 };
 const MARKER_RECOMMENDED_AMPS = {
   outlet_cooktop: 32,
@@ -722,6 +730,11 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.rect(cx - r * 0.52, cy - r * 0.65, r * 1.04, r * 1.3, { fill: '#fff', stroke: C_MARK, width: 0.14 });
     be.circle(cx, cy + r * 0.12, r * 0.34, { fill: '#fff', stroke: C_MARK, width: 0.14 });
     be.circle(cx - r * 0.34, cy - r * 0.42, r * 0.07, { fill: C_MARK, stroke: C_MARK, width: 0.06 });
+  } else if (type === 'panel') {
+    // Consumer unit: enclosure with a row of breaker modules.
+    be.rect(cx - r * 0.82, cy - r * 0.7, r * 1.64, r * 1.4, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    for (const dx of [-0.42, 0, 0.42])
+      be.rect(cx + r * dx - r * 0.08, cy - r * 0.28, r * 0.16, r * 0.56, { fill: '#fff', stroke: C_MARK, width: 0.1 });
   } else if (type === 'intercom') {
     be.rect(cx - r * 0.68, cy - r, r * 1.36, r * 2, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     be.rect(cx - r * 0.48, cy - r * 0.72, r * 0.96, r * 0.68, { fill: '#fff', stroke: C_MARK, width: 0.14 });
@@ -1143,6 +1156,17 @@ function drawMarkers(be, L, floor, footprint) {
 // electrical control never reads as wall or structural dimension geometry.
 function drawElectricalLinks(be, L, floor) {
   for (const link of floor.electricalLinks || []) {
+    // As-built wires project per segment with a surface-specific dash so wall,
+    // ceiling, and floor runs are distinguishable on the monochrome sheet.
+    if ((link.kind || 'control') === 'wire') {
+      for (const seg of electricalRouteSegments(floor, link)) {
+        if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue; // vertical rise/drop collapses in plan
+        be.line(L.X(seg.a.x), L.Y(seg.a.y), L.X(seg.b.x), L.Y(seg.b.y), {
+          stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[seg.surface] || WIRE_SURFACE_DASH.wall, cap: 'round',
+        });
+      }
+      continue;
+    }
     const route = electricalRoutePoints(floor, link);
     for (let i = 1; i < route.length; i++) {
       const a = route[i - 1], b = route[i];
@@ -1255,6 +1279,31 @@ function drawStrip(be, L, floor, opts) {
       be.text(entry.label, x + 4.4, y,
         { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
       x += entry.width;
+    }
+  }
+  // As-built wire key: one dashed sample per surface actually present, so the
+  // wall/ceiling/floor dash patterns on the plan can be read back. Shares the
+  // markerIcons gate with the routes themselves.
+  if (layers.markerIcons) {
+    // Key only surfaces that actually draw a line in plan — a pure vertical
+    // rise/drop collapses to a point, so it contributes no visible dash to explain.
+    const wireSurfaces = [...new Set((floor.electricalLinks || [])
+      .filter((link) => (link.kind || 'control') === 'wire')
+      .flatMap((link) => electricalRouteSegments(floor, link))
+      .filter((s) => s.a.x !== s.b.x || s.a.y !== s.b.y)
+      .map((s) => s.surface))]
+      .sort();
+    const wireEntries = wireSurfaces.map((s) => ({ s, label: `Wire · ${WIRE_SURFACE_LABEL[s] || s}` }));
+    for (const row of wrapRows(wireEntries, (entry) => 9 + be.measure(entry.label, 2.4) + 3)) {
+      let x = page.w - MARGIN - row.width;
+      const y = yBase + 4 + legendRow++ * 6;
+      for (const entry of row.entries) {
+        be.line(x, y, x + 7, y, {
+          stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[entry.s] || WIRE_SURFACE_DASH.wall, cap: 'round',
+        });
+        be.text(entry.label, x + 9, y, { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
+        x += entry.width;
+      }
     }
   }
 }

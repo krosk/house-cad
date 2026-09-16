@@ -16,8 +16,10 @@ height-ordered fixture-stack callouts: vertical stacks require strictly identica
 while horizontal stacks require exact height equality and follow connected 8 cm-inclusive plan
 neighbors; 8 cm-inclusive 3D
 height neighbors share horizontal/vertical white boxes,
-while more distant height groups keep separate boxes on the shared leader. Remaining: manual
-wall/floor/ceiling route waypoints; openings (category 2) still
+while more distant height groups keep separate boxes on the shared leader. **As-built wire tracing
+(`MARKER · WIRE`) and the `panel`/consumer-unit type now close out the "manual route waypoints" item:
+a wire connects any two markers, stores hand-traced waypoints, and infers the wall/ceiling/floor
+surface of each segment from geometry.** Openings (category 2) remain
 deferred. See `.claude/handoff.md` → Next step B and `docs/ar-survey.md` for the current build. The
 design rationale below still governs; treat "we build first / not started" phrasing as historical.
 
@@ -56,9 +58,12 @@ feature.**
     origin), so it lives in the same space as everything else and survives RECAL/anchor drift.
   - `z`: **height above the floor** (meters). This is the new third scalar. Enter it numerically
     (reuse the SIZE numpad) or capture it from the tip height at drop time.
-- **Electrical controls** are separate per-floor `electricalLinks`, not marker types. Each stores
-  switch/light ids and a route mode. V1 derives a switch→ceiling→light polyline from live marker
-  positions; future manual routing can add surface-anchored waypoints without changing link identity.
+- **Electrical controls AND as-built wires** are separate per-floor `electricalLinks`, not marker
+  types. A `kind:'control'` link stores switch/light ids and derives a switch→ceiling→light polyline
+  from live marker positions. A `kind:'wire'` link connects ANY two markers and stores manual
+  `route.waypoints`; its full path is `from → waypoints → to` (endpoints stay live) and each segment's
+  wall/ceiling/floor surface is inferred, not stored. Shared derivation lives in `src/core/electrical.js`
+  (`electricalRoutePoints`, `electricalRouteSegments`, `segmentSurface`).
 - `z` is an **independent scalar** — keep the constraint solver 2-axis. If constrained placement is
   ever wanted, add a trivial 1-D pin later; do NOT fold z into the X/Y solver.
 
@@ -118,8 +123,10 @@ feature.**
   a marker-capture surface stacks *more* unverified surface on an unverified base. Do at least a
   rough REGISTER→ROOM→EDGE→SIZE→LEVEL→LANG pass on device before/while building markers, so two
   unknowns aren't debugged at once. See `.claude/handoff.md` → Next step A.
-- **B — Markers vertical slice.** Outlet/switch/light/ethernet and automatic switch-to-light
-  ceiling routes are implemented. Next increment is manual surface-anchored route waypoints.
+- **B — Markers vertical slice.** Outlet/switch/light/ethernet, automatic switch-to-light ceiling
+  routes, as-built wire tracing (`MARKER · WIRE`, any→any + `panel` type, manual waypoints, inferred
+  surface), AND waypoint editing (`MARKER · WIRE EDIT`: select wire → select/move/delete/insert
+  waypoints) are all implemented. **The electrical slice is feature-complete pending on-device QA.**
 - **C — Openings (windows/doors): DEFERRED, separate effort.** Needs its own design pass on
   whether to give up single-extrusion or do face-level cuts. Not part of the markers slice —
   keep it out so the markers lane stays clean.
@@ -129,8 +136,10 @@ feature.**
   path? Untested; decide on device (holding a controller at outlet height vs typing 0.3 m).
 - **Type picker UX** — cycle types within one mode (B/Y, like LEVEL floors) vs one mode per type.
   Unresolved; lean on what feels right on device.
-- **Manual route authoring** — automatic ceiling paths are implemented; wall/floor/ceiling waypoint
-  placement and editing still need an AR interaction design.
+- **Manual route authoring** — DONE. Placement in `MARKER · WIRE` (trigger start marker, trigger
+  surface to drop waypoints, trigger end marker; grip undoes) and editing in `MARKER · WIRE EDIT`
+  (select wire → select/move/delete/insert waypoints). Surface stays inferred, not tagged. OPEN only:
+  whether to ever let the user override an inferred surface (currently geometry alone decides).
 - **Desktop parity** — markers are AR-first, but the desktop 2D editor exists. Whether/how markers
   render/edit in 2D is open (memory `ar-2d-parity`). Not required for the AR slice.
 - **Do markers belong to a floor or span floors?** Assumed per-floor (like rectangles). A wire

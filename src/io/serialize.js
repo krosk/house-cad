@@ -27,13 +27,21 @@ function serializeConstraint(c) {
 function serializeMarker(m) {
   return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
 }
+function serializeRoute(route) {
+  const mode = route?.mode || 'ceiling';
+  const out = { mode };
+  if (mode === 'manual' && Array.isArray(route.waypoints)) {
+    out.waypoints = route.waypoints.map((p) => ({ x: p.x, y: p.y, z: p.z || 0 }));
+  }
+  return out;
+}
 function serializeElectricalLink(link) {
   return {
     id: link.id,
     kind: link.kind || 'control',
     fromMarkerId: link.fromMarkerId,
     toMarkerId: link.toMarkerId,
-    route: { mode: link.route?.mode || 'ceiling' },
+    route: serializeRoute(link.route),
   };
 }
 
@@ -143,7 +151,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       kind: link.kind || 'control',
       fromMarkerId,
       toMarkerId,
-      route: { mode: link.route?.mode || 'ceiling' },
+      route: serializeRoute(link.route),
     }];
   });
 
@@ -239,7 +247,7 @@ export function deserializeInto(project, data) {
       kind: link.kind || 'control',
       fromMarkerId: link.fromMarkerId,
       toMarkerId: link.toMarkerId,
-      route: { mode: link.route?.mode || 'ceiling' },
+      route: serializeRoute(link.route),
     })),
   }));
 

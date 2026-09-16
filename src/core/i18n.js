@@ -41,6 +41,8 @@ const STRINGS = {
   'mode.translate': { en: 'TRANSLATE', fr: 'TRANSLATION', zh: '平移' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker_link': { en: 'LINK', fr: 'LIER',     zh: '连接' },
+  'mode.marker_wire': { en: 'WIRE', fr: 'CÂBLE',    zh: '布线' },
+  'mode.marker_wire_edit': { en: 'WIRE EDIT', fr: 'MODIF. CÂBLE', zh: '编辑布线' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -119,6 +121,16 @@ const STRINGS = {
     en: 'Link electrical controls. Trigger a switch, then trigger lights to add or remove their connection. Grip clears the selected switch. Routes rise to the ceiling automatically.',
     fr: 'Reliez les commandes électriques. Gâchette sur un interrupteur, puis sur les luminaires pour ajouter ou retirer leur liaison. La poignée efface l’interrupteur choisi. Le chemin monte automatiquement au plafond.',
     zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
+  },
+  'help.marker_wire': {
+    en: 'Trace an as-built wire. Trigger a marker to start, trigger the surface along its path to drop each waypoint, then trigger a second marker to finish. Grip removes the last point, or clears the run before the second end. The wall/ceiling/floor of each segment is inferred.',
+    fr: 'Tracez un câble tel que posé. Gâchette sur un marqueur pour commencer, gâchette sur la surface le long du trajet pour poser chaque point, puis gâchette sur un second marqueur pour terminer. La poignée retire le dernier point, ou annule le tracé avant la seconde extrémité. Le mur/plafond/sol de chaque segment est déduit.',
+    zh: '记录实际布线路径。扣动扳机选择起点标记，沿走线在墙面依次扣动扳机放置各路径点，再扣动扳机选择终点标记完成。按握把删除上一个点，或在选择终点前清除该走线。每段所在的墙/天花板/地板会自动推断。',
+  },
+  'help.marker_wire_edit': {
+    en: 'Edit a traced wire. Trigger the wire to select it; its waypoints show as handles. Trigger a handle to select it (repeat to cycle stacked ones), grip-drag a handle to move it in 3D, or grip away to delete the selected waypoint. Trigger the wire between handles to insert a point; trigger empty space to deselect.',
+    fr: 'Modifiez un câble tracé. Gâchette sur le câble pour le sélectionner ; ses points apparaissent comme poignées. Gâchette sur une poignée pour la choisir (répétez pour parcourir les points empilés), poignée-glisser pour la déplacer en 3D, ou poignée à l’écart pour supprimer le point choisi. Gâchette sur le câble entre deux poignées pour insérer un point ; gâchette dans le vide pour désélectionner.',
+    zh: '编辑已记录的布线。扣动扳机选择线路，其路径点显示为手柄。扣动扳机选择手柄（重复以循环选择重叠点），按住握把拖动可在三维中移动，或将握把移开以删除所选路径点。在两个手柄之间对线路扣动扳机可插入新点；对空处扣动扳机取消选择。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
@@ -259,6 +271,7 @@ const STRINGS = {
   'marker.outlet_water_heater': { en: 'water heater', fr: 'chauffe-eau', zh: '热水器' },
   'marker.outlet_appliance': { en: 'appliance outlet', fr: 'prise électroménager', zh: '家电专用插座' },
   'marker.intercom': { en: 'intercom', fr: 'interphone', zh: '对讲机' },
+  'marker.panel':    { en: 'panel',    fr: 'tableau',      zh: '配电箱' },
   'marker.switch':   { en: 'switch',   fr: 'interrupteur', zh: '开关' },
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
@@ -267,6 +280,11 @@ const STRINGS = {
   'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
   'link.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
   'link.pickLight':  { en: 'PICK LIGHT',  fr: 'CHOISIR LUMINAIRE',    zh: '选择灯具' },
+  'wire.pickStart':  { en: 'PICK START',  fr: 'CHOISIR DÉBUT',        zh: '选择起点' },
+  'wire.trace':      { en: 'TRACE · END', fr: 'TRACER · FIN',         zh: '走线·终点' },
+  'wire.pickWire':   { en: 'PICK WIRE',  fr: 'CHOISIR CÂBLE',        zh: '选择线路' },
+  'wire.editPoints': { en: 'EDIT POINTS', fr: 'MODIF. POINTS',       zh: '编辑路径点' },
+  'wire.point':      { en: 'waypoint',   fr: 'point',                zh: '路径点' },
 };
 
 let current = 'en';
