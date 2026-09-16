@@ -177,6 +177,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   as SVG. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
   a separate **EXPORT** button downloads the selected format to the headset. These choices persist
   locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
+  The panel also has a **COMPARE** row: the **change-map baseline**, cycling `none` → each saved slot
+  (`house-cad:slot:i`). Cycle it by flicking the RIGHT **thumbstick** while pointing the ray at that
+  row (so it does not clash with format cycling), or by tapping the row. When a slot is chosen, the
+  sheet — LEFT preview and the SVG/PNG export — is drawn with revision clouds + numbered delta tags +
+  a `REV — CHANGES` legend for everything that changed since that snapshot (see `planDiff.js` /
+  `drawChangeMap`). Change maps are sheet-only: DXF/Coohom/JSON ignore the baseline. The selection is
+  session-only (slot contents are volatile), and only slots saved in THIS browser appear, since
+  `localStorage` is per-device. **Build-verified only — not yet walked on device.**
   Every export gets a millisecond timestamp in its filename. Chromium may gate a second synthetic
   download from one immersive session regardless of its name; after the first direct download,
   AR therefore uses Android Web Share (when file sharing is supported) for subsequent exports.
@@ -481,6 +489,7 @@ teleport reticle; no last-active routing remains.
 | `src/core/conduit.js` | Conduit-network graph + Dijkstra `shortestConduitPath` (threads `via`); `wireRouteSegments`/`wireRoutePoints`/`conduitNetworkSegments` — wires route over conduits, path derived not stored |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
+| `src/core/planDiff.js` | Change-map diff: id-matched, solved-geometry diff of zones/markers/dimensions between a saved-slot baseline and the live project (`diffAgainstSnapshot`); rendered as revision clouds by `planSheet.js`, sheet-only |
 | `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

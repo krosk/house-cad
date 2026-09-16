@@ -90,6 +90,25 @@ form a vertical column ordered high-to-low, regardless of which room side receiv
 Desktop Print creates one page per floor; print at 100% for true scale. Full AR details are in
 `docs/ar-survey.md`.
 
+### Change map (revision clouds vs a saved slot)
+
+`src/core/planDiff.js` diffs a **baseline snapshot** (a saved slot's serialized project) against the
+live project so a revised sheet shows a contractor what changed. Everything is matched by **stable id**
+(rectangles, markers, constraints all keep ids across revisions of one lineage), never geometrically,
+and compares **solved** geometry — `diffAgainstSnapshot()` deserializes the baseline into a throwaway
+`Project` (which solves on load via `_emit`) and returns `Map<floorId, floorDiff>` classifying zones
+(added/removed/moved/resized/retyped), markers (added/removed/moved/retyped), and structural dimensions
+(added/removed/value-changed) with a 1 mm tolerance. It is pure model data — labels/units/numbering are
+composed by the sheet.
+`planSheet.js` draws it (`drawChangeMap`, gated by `opts.changeMap` = that `Map`): monochrome revision
+clouds (scalloped, sampled as line segments since the backends have no arc) + numbered revision-triangle
+tags + a keyed `REV — CHANGES` legend, drawn over the sheet but under the strip. Because all sheet
+outputs funnel through `renderFloor`, the same overlay appears in desktop Print/SVG/PNG **and** the AR
+preview/export. Change maps are **sheet-only** — DXF/Coohom/JSON never carry them. Baseline = one of the
+6 AR save slots (`house-cad:slot:i`); desktop reads them via the Print popup's "Change map vs" picker,
+AR via the EXPORT `COMPARE` row (see `docs/ar-survey.md`). `localStorage` is per-device, so the baseline
+only lists slots saved in that same browser.
+
 ### DXF export
 
 `src/io/dxf.js` exports the active floor as ASCII AutoCAD 2000 DXF (`AC1015`) for CAD/floor-plan
@@ -100,9 +119,11 @@ zone kinds, enabled structural and marker-pin dimensions/markers, room areas, tr
 (`ELECTRICAL_ROUTE_WALL`/`_CEILING`/`_FLOOR`), and `ORIGIN`.
 The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
 **PROJECT · EXPORT** always targets the active LEVEL floor. Right thumbstick up/down switches SVG/DXF;
-a ray-picked panel toggles plan dims, marker dims, marker icons, furniture, and room area, while a separate
-EXPORT button downloads. The profile persists locally (`house-cad:output:v1`), outside project saves,
-and the optional left-controller preview updates immediately.
+a ray-picked panel toggles plan dims, marker dims, marker icons, furniture, and room area, plus a
+`COMPARE` row that cycles the change-map baseline (none → each saved slot) — flick the thumbstick while
+pointing at that row, or tap it — while a separate EXPORT button downloads. The layer profile persists
+locally (`house-cad:output:v1`), outside project saves; the baseline selection is session-only. The
+optional left-controller preview updates immediately, including the change-map clouds.
 
 ## Conventions
 

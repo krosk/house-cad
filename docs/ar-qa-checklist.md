@@ -303,6 +303,18 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Desktop DXF opens as AC1015 at 1:1 millimeter scale and exposes the expected semantic layers
 - [ ] COOHOM DXF contains only 2D LINE entities on WALL/WINDOW layers in millimetre model space; doors are empty wall gaps
 - [ ] Coohom recognizes the COOHOM DXF wall/door/window geometry after an AutoCAD save-as round trip if required
+### CHANGE MAP (revision clouds vs a saved slot)  ⬜ NEW — build-verified only
+- [ ] The EXPORT panel shows a **COMPARE** row (below FORMAT, above the layer toggles) reading `none` by default; the taller panel no longer clips the EXPORT button
+- [ ] Pointing the ray at COMPARE and flicking the **thumbstick** cycles `none` → each saved slot → `none`; a **tap** on the row also advances it
+- [ ] Thumbstick still cycles FORMAT when NOT pointing at COMPARE (no clash)
+- [ ] Only slots saved in this browser appear; a chosen slot that no longer exists drops back to `none`
+- [ ] With a slot chosen, the LEFT preview draws revision clouds + numbered △ tags + a `REV — CHANGES` legend for zones/markers/dimensions changed since the snapshot
+- [ ] Added/moved/resized/retyped zones cloud around the current geometry; a removed zone shows a faint ghost outline + cloud
+- [ ] Added/removed/moved/retyped markers get a small cloud + tag; a dimension whose value changed tags at its edge midpoint with `from→to` in the legend
+- [ ] Editing the plan refreshes the clouds in the preview (diff recomputes on the throttled redraw)
+- [ ] EXPORT SVG/PNG bakes the change map in; DXF/COOHOM/JSON never carry it
+- [ ] The change map does not affect sheet scale-fitting (clouds are paper-fixed annotations)
+- [ ] Leaving and re-entering EXPORT keeps the selected baseline for the session; it is not written to any save
 
 ## PROJECT · UNIT (`unit`)  ⬜ NEW — build-verified only
 - [ ] Thumbstick up/down cycles m / cm / mm and the active row remains highlighted
