@@ -619,4 +619,14 @@ export class Project {
   touch() {
     this._emit();
   }
+
+  // Re-solve every floor's constraints IN PLACE but skip the listener cascade —
+  // for continuous render-loop drags (e.g. the AR edge grab) that need live,
+  // fully-solved geometry each frame yet must NOT fire the whole desktop pipeline
+  // (3D re-extrude, 2D canvas redraw, DOM panel rebuilds) 60+ times a second. The
+  // caller updates its own view directly and commits once with touch() on release.
+  solveSilently() {
+    this._recomputeElevations();
+    for (const f of this.floors) { solve(f); solveMarkers(f); }
+  }
 }

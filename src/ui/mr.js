@@ -1063,6 +1063,13 @@ export function setupMR(view, project, getFootprint) {
   // is echoed big on the controller). Rebuilt with the plan each edit.
   let dimSprites = [];
 
+  // Every planGroup child produced by the active-floor buildDimensions pass (dashed
+  // line meshes + value sprites). Tracked so a dim grip-drag can rebuild ONLY the
+  // dimensions (see rebuildDimsOnly) instead of the whole plan — dragging a value box
+  // is purely presentational, so the footprint boolean, zone fills, edge strips,
+  // marker textures, and electrical routes never need to be recomputed per frame.
+  let dimObjects = [];
+
   // Cache dim-label textures by their content (text+color). buildPlan rebuilds every
   // label sprite on each change, but a label's canvas only depends on text+color, so
   // reusing the CanvasTexture avoids a fresh canvas draw + GPU upload per rebuild. This
@@ -1104,7 +1111,7 @@ export function setupMR(view, project, getFootprint) {
   function buildDimensions(floor = project.activeFloor, elevation = 0, selectable = true) {
     const segs = [];        // {ax,ay,bx,by,conflict,marker?} strips to build
     const floorDimSprites = [];
-    if (selectable) dimSprites = []; // value labels, for hover pick in edit modes
+    if (selectable) { dimSprites = []; dimObjects = []; } // value labels for hover pick + rebuild-dims-only tracking
     // A dim value label carries its constraint id + both refs, so ray-hovering it can
     // highlight that constraint's edges and selecting it loads the constraint to edit.
     const endpointToRef = (ep) => ep.marker
@@ -1255,11 +1262,29 @@ export function setupMR(view, project, getFootprint) {
       m.position.y = elevation + 0.008; // above this floor's edge strips
       m.renderOrder = 12;
       planGroup.add(m);
+      if (selectable) dimObjects.push(m);
     }
     for (const s of floorDimSprites) {
       s.position.y += elevation;
       planGroup.add(s);
+      if (selectable) dimObjects.push(s);
     }
+  }
+
+  // Rebuild ONLY the active floor's dimensions in place — the cheap path for a live
+  // dim grip-drag. Removes the tracked dim meshes/sprites (line geometry is per-build,
+  // so dispose it; sprite .map is the shared dimTexCache, so never dispose it here)
+  // and re-runs buildDimensions, leaving the footprint/strips/markers/electrical
+  // untouched. sheetDirty is set so the optional left-hand sheet still refreshes.
+  function rebuildDimsOnly() {
+    for (const o of dimObjects) {
+      planGroup.remove(o);
+      if (o.isSprite) o.material.dispose(); // per-build SpriteMaterial; its .map is the shared cache — leave it
+      else o.geometry?.dispose();
+    }
+    dimObjects = [];
+    buildDimensions(project.activeFloor);
+    sheetDirty = true;
   }
 
   // Edges whose axis is FULLY pinned — both edges on that axis connect to the plan
@@ -2449,12 +2474,18 @@ export function setupMR(view, project, getFootprint) {
       if (!c) return;
       setDimOffset(c, px, py);
       setDimLabelPosition(c, px, py);
-      buildPlan(); applyPlanMatrix(); // presentational; no re-solve needed
+      // Presentational: no re-solve, and geometry/markers/electrical are unchanged, so
+      // rebuild only the dimensions (not the whole plan). The group transform is also
+      // unchanged, so applyPlanMatrix is unnecessary.
+      rebuildDimsOnly();
     } else if (gripDrag.kind === 'edge') {
       const rect = project.rectangles.find((r) => r.id === gripDrag.rectId);
       if (!rect) return;
       setEdge(rect, gripDrag.edge, px, py);
-      project.touch(); // edge moved in place -> re-solve + rebuild
+      // Re-solve for live feedback WITHOUT the full desktop listener cascade (3D
+      // re-extrude / 2D redraw / DOM), which is invisible in AR and tanks the frame
+      // rate. onSqueezeEnd commits once via project.touch() so the desktop catches up.
+      project.solveSilently();
       buildPlan(false); applyPlanMatrix(); // skip dim-label textures while dragging (restored on release)
     }
   }
@@ -4070,17 +4101,22 @@ export function setupMR(view, project, getFootprint) {
   // Canonical controller-menu order. Keep the implementation blocks grouped by
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
-    'register', 'floor', 'recal', 'teleport', 'level',
-    'drop', 'edge', 'edit', 'translate', 'plan_dims',
-    'marker', 'marker_link', 'marker_conduit', 'conduit_edit', 'marker_wire', 'outlet_dims', 'copy_floor', 'paste_floor', 'move_up', 'move_down', 'save', 'load', 'export', 'unit', 'lang',
+    'register', 'floor', 'level', 'recal', 'teleport',
+    'drop', 'edge', 'plan_dims', 'edit',
+    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_edit', 'marker_wire',
+    'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
-    drop: 'plan', edge: 'plan', edit: 'plan', translate: 'plan', plan_dims: 'plan',
+    drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_edit: 'marker', marker_wire: 'marker', outlet_dims: 'marker',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
-    save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
+    translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
   };
+  // These project tools stay defined and fully functional (SAVE/LOAD can still be
+  // driven programmatically) but are removed from the RIGHT thumbstick cycle so the
+  // list stays short. Un-hide by deleting the id here — nothing else needs to change.
+  const MODE_HIDDEN = new Set(['copy_floor', 'paste_floor', 'move_up', 'move_down']);
   const modeRank = new Map(MODE_ORDER.map((id, i) => [id, i]));
   modes.sort((a, b) => modeRank.get(a.id) - modeRank.get(b.id));
   let currentMode = 0;
@@ -4168,8 +4204,13 @@ export function setupMR(view, project, getFootprint) {
   // categories as a unit. SETUP and PROJECT remain available (including LEVEL,
   // which is how the user returns to a real floor).
   const modeAvailable = (index) => {
-    const group = MODE_GROUP[modes[index].id];
-    return !allFloorsView || (group !== 'plan' && group !== 'marker');
+    const id = modes[index].id;
+    if (MODE_HIDDEN.has(id)) return false; // parked tools: never a cycle stop
+    const group = MODE_GROUP[id];
+    // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
+    // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
+    if (allFloorsView && (group === 'plan' || group === 'marker' || id === 'translate')) return false;
+    return true;
   };
   function stepMode(direction) {
     let index = currentMode;
