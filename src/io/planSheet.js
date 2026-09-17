@@ -1408,8 +1408,10 @@ function drawCloud(be, x0, y0, x1, y1) {
 }
 
 // Union-find clustering of page-mm boxes [x0,y0,x1,y1] (x0<x1, y0<y1) that overlap
-// or sit within `gap` mm of each other. Returns one bounding box per cluster, so a
-// dense group of nearby changes draws as a single cloud instead of a scalloped mess.
+// or sit within `gap` mm of each other. Returns { bbox, members } per cluster, where
+// members are input indices — so a dense group (e.g. a vertical marker stack sharing
+// one plan point) draws as ONE cloud AND collapses to one tag + one grouped legend
+// entry instead of a pile of overlapping triangles.
 function clusterBoxes(boxes, gap) {
   const parent = boxes.map((_, i) => i);
   const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
@@ -1420,8 +1422,12 @@ function clusterBoxes(boxes, gap) {
   const groups = new Map();
   boxes.forEach((box, i) => {
     const r = find(i), g = groups.get(r);
-    if (!g) groups.set(r, [...box]);
-    else { g[0] = Math.min(g[0], box[0]); g[1] = Math.min(g[1], box[1]); g[2] = Math.max(g[2], box[2]); g[3] = Math.max(g[3], box[3]); }
+    if (!g) groups.set(r, { bbox: [...box], members: [i] });
+    else {
+      const b = g.bbox;
+      b[0] = Math.min(b[0], box[0]); b[1] = Math.min(b[1], box[1]); b[2] = Math.max(b[2], box[2]); b[3] = Math.max(b[3], box[3]);
+      g.members.push(i);
+    }
   });
   return [...groups.values()];
 }
@@ -1445,22 +1451,30 @@ function dimAnchor(floor, c) {
     : { x: Math.max(la.p1.x, lb.p1.x), y: dimLabelCoord(c, la.coord, lb.coord) };
 }
 
-// A boxed, numbered revision legend flush to the sheet's right edge — the minimum a
-// numbered tag needs to mean something. Kept off the drawing's top-left so it can't
-// obstruct the plan itself. White-filled so it sits cleanly over any geometry.
+// A boxed revision legend flush to the sheet's right edge — the minimum a numbered
+// tag needs to mean something. Kept off the drawing's top-left so it can't obstruct
+// the plan. Each row is one location: its △N is printed once, then every change at
+// that location is listed under it (so a co-located stack reads as one grouped block
+// instead of repeated numbers). White-filled so it sits cleanly over any geometry.
 function drawRevLegend(be, rows, pageW) {
   const size = 2.4, lh = 4.2, pad = 2.4;
   const title = 'REV — CHANGES';
-  const w = Math.max(be.measure(title, 2.6), ...rows.map((r) => 7 + be.measure(r.label, size))) + pad * 2;
-  const h = pad * 2 + 6 + rows.length * lh;
+  const labels = rows.flatMap((r) => r.labels);
+  const w = Math.max(be.measure(title, 2.6), ...labels.map((label) => 7 + be.measure(label, size))) + pad * 2;
+  const lines = labels.length; // one line per individual change, grouped under its tag
+  const h = pad * 2 + 6 + lines * lh;
   const x = pageW - w, y = MARGIN + 8; // right edge: x + w == pageW
   be.rect(x, y, w, h, { fill: '#fff', stroke: C_REV, width: 0.3 });
   be.text(title, x + pad, y + pad + 1, { fill: C_REV, size: 2.6, weight: 'bold', baseline: 'top' });
-  rows.forEach((r, i) => {
-    const ry = y + pad + 7 + i * lh;
-    be.text(`△${r.n}`, x + pad, ry, { fill: C_REV, size, weight: 'bold', baseline: 'middle' });
-    be.text(r.label, x + pad + 7, ry, { fill: C_REV, size, baseline: 'middle' });
-  });
+  let line = 0;
+  for (const r of rows) {
+    r.labels.forEach((label, i) => {
+      const ry = y + pad + 7 + line * lh;
+      if (i === 0) be.text(`△${r.n}`, x + pad, ry, { fill: C_REV, size, weight: 'bold', baseline: 'middle' }); // number once per location
+      be.text(label, x + pad + 7, ry, { fill: C_REV, size, baseline: 'middle' });
+      line += 1;
+    });
+  }
 }
 
 // Draw the whole change map for one floor: clouds + tags over changed geometry,
@@ -1473,17 +1487,16 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
   // is layer-gated, so its edits stay off a sheet that omits furniture.
   const zoneShown = (kind) => kind !== 'furniture' || layers.furniture;
 
-  // Collect every change as an item, layer-filtered, BEFORE drawing so overlapping
-  // clouds can be merged. box = page-mm cloud region (null for dims, which get a tag
-  // only); tag = page-mm tag anchor (null when off-sheet); ghost = model bounds of a
-  // vanished zone to outline faintly. Numbering follows this push order.
+  // Collect every change as an item, layer-filtered, BEFORE drawing so co-located
+  // changes can be clustered. box = page-mm cloud region (null for dims, which carry a
+  // tag only); tag = page-mm tag anchor (dims only; box items are tagged per cluster);
+  // ghost = model bounds of a vanished zone to outline faintly.
   const items = [];
   const zoneBox = (b) => [L.X(b.x0), L.Y(b.y1), L.X(b.x1), L.Y(b.y0)]; // Y flips: y0<y1 in page mm
-  const boxTag = (box) => [box[2] + CLOUD_OUTSET + 2, box[1] - CLOUD_OUTSET];
-  const pushZone = (b, label, ghost = null) => { const box = zoneBox(b); items.push({ box, tag: boxTag(box), label, ghost }); };
+  const pushZone = (b, label, ghost = null) => items.push({ box: zoneBox(b), label, ghost });
   const pushPoint = (x, y, label) => {
     const r = 3, px = L.X(x), py = L.Y(y);
-    items.push({ box: [px - r, py - r, px + r, py + r], tag: [px + r + 2, py - r], label });
+    items.push({ box: [px - r, py - r, px + r, py + r], label });
   };
   const pushDim = (anchor, label) => items.push({ box: null, tag: anchor ? [L.X(anchor.x), L.Y(anchor.y)] : null, label });
 
@@ -1520,16 +1533,28 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
     if (!b) continue;
     be.rect(L.X(b.x0), L.Y(b.y1), (b.x1 - b.x0) * L.mmPerM, (b.y1 - b.y0) * L.mmPerM, { stroke: C_GHOST, width: 0.3 });
   }
-  // One merged cloud per cluster of overlapping/near boxes (dims carry no box).
-  for (const c of clusterBoxes(items.filter((it) => it.box).map((it) => it.box), CLOUD_MERGE_GAP))
-    drawCloud(be, c[0], c[1], c[2], c[3]);
-  // Per-change numbered tags + legend rows keep each edit individually identifiable.
+
+  // Cluster the boxed changes: each cluster is ONE location, so it draws one cloud,
+  // one numbered tag, and one grouped legend entry (its members' labels together).
+  // This is what stops a co-located stack from piling up overlapping tags.
+  const boxItems = items.filter((it) => it.box);
   const rows = [];
-  items.forEach((it, i) => {
-    const n = i + 1;
+  let n = 0;
+  for (const cluster of clusterBoxes(boxItems.map((it) => it.box), CLOUD_MERGE_GAP)) {
+    const [x0, y0, x1, y1] = cluster.bbox;
+    drawCloud(be, x0, y0, x1, y1);
+    n += 1;
+    drawRevTag(be, x1 + CLOUD_OUTSET + 2, y0 - CLOUD_OUTSET, n); // one tag at the cluster corner
+    rows.push({ n, labels: cluster.members.map((mi) => boxItems[mi].label) });
+  }
+  // Dimension changes carry no cloud box and rarely co-locate, so each keeps its own
+  // tag at its edge anchor and its own single-label legend entry.
+  for (const it of items) {
+    if (it.box) continue;
+    n += 1;
     if (it.tag) drawRevTag(be, it.tag[0], it.tag[1], n);
-    rows.push({ n, label: it.label });
-  });
+    rows.push({ n, labels: [it.label] });
+  }
   drawRevLegend(be, rows, L.page.w);
 }
 
