@@ -94,7 +94,7 @@ const MARKER_LABELS = {
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
   switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
-  camera_ethernet: 'Network camera',
+  camera_ethernet: 'Camera Ethernet',
   patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
 };
 const MARKER_RECOMMENDED_AMPS = {
