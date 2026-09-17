@@ -94,6 +94,7 @@ const MARKER_LABELS = {
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
   switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
+  camera_ethernet: 'Network camera',
   patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
 };
 const MARKER_RECOMMENDED_AMPS = {
@@ -680,6 +681,14 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
           { stroke: C_MARK, width: 0.08 });
       }
     }
+  } else if (type === 'camera_ethernet') {
+    // Network (PoE/IP) camera: a bullet-camera body with a front lens and a short
+    // ethernet cable tail with an RJ45 plug, so it reads as a camera on the network.
+    be.rect(cx - r * 0.7, cy - r * 0.4, r * 1.2, r * 0.8, { fill: '#fff', stroke: C_MARK, width: 0.18 }); // body
+    be.circle(cx + r * 0.5, cy, r * 0.34, { fill: '#fff', stroke: C_MARK, width: 0.16 });                 // lens
+    be.circle(cx + r * 0.5, cy, r * 0.14, { fill: C_MARK, stroke: C_MARK, width: 0.08 });                 // aperture
+    be.line(cx - r * 0.2, cy + r * 0.4, cx - r * 0.2, cy + r * 0.82, { stroke: C_MARK, width: 0.14 });    // cable tail
+    be.rect(cx - r * 0.34, cy + r * 0.82, r * 0.28, r * 0.22, { fill: '#fff', stroke: C_MARK, width: 0.1 }); // RJ45 plug
   } else if (type === 'patch_panel') {
     // Rack patch panel with two compact banks of ports.
     be.rect(cx - r, cy - r * 0.68, size, r * 1.36, { fill: '#fff', stroke: C_MARK, width: 0.18 });
@@ -704,8 +713,9 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.line(cx + r * 0.58, cy + r * 0.45, cx + r * 0.4, cy + r * 0.22,
       { stroke: C_MARK, width: 0.16 });
   } else if (type === 'outlet_aircon') {
-    // Fixed HVAC feed: snowflake with a cable tail and terminal, without the
-    // circular outline used by socket markers.
+    // Fixed HVAC supply: a SQUARE housing (never the round socket outline) marks it as
+    // a service point rather than a power outlet; snowflake + cable tail inside.
+    be.rect(cx - r, cy - r, size, size, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
       const dx = Math.cos(angle) * r * 0.58, dy = Math.sin(angle) * r * 0.58;
       be.line(cx - dx, cy - r * 0.18 - dy, cx + dx, cy - r * 0.18 + dy, { stroke: C_MARK, width: 0.17 });

@@ -1551,17 +1551,33 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (type === 'outlet_aircon') {
-      // Fixed HVAC supply: snowflake plus cable termination, deliberately not
-      // drawn as a general-purpose socket.
+      // Fixed HVAC supply: a SQUARE housing (not the round socket) marks it as a
+      // service point, not a power outlet. Snowflake inside, cable tail exiting below.
+      ctx.strokeStyle = '#64748b'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(41, 40, 46, 40, 6); ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
       ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 4; ctx.lineCap = 'round';
       for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
-        const dx = Math.cos(angle) * 20, dy = Math.sin(angle) * 20;
-        ctx.beginPath(); ctx.moveTo(62 - dx, 58 - dy); ctx.lineTo(62 + dx, 58 + dy); ctx.stroke();
+        const dx = Math.cos(angle) * 15, dy = Math.sin(angle) * 15;
+        ctx.beginPath(); ctx.moveTo(64 - dx, 60 - dy); ctx.lineTo(64 + dx, 60 + dy); ctx.stroke();
       }
-      ctx.strokeStyle = '#334155';
-      ctx.beginPath(); ctx.moveTo(62, 78); ctx.lineTo(62, 89); ctx.lineTo(82, 89); ctx.stroke();
-      ctx.beginPath(); ctx.arc(88, 89, 6, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineCap = 'butt';
+      ctx.strokeStyle = '#334155'; ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(64, 80); ctx.lineTo(64, 90); ctx.lineTo(80, 90); ctx.stroke();
+      ctx.beginPath(); ctx.arc(85, 90, 5, 0, Math.PI * 2); ctx.stroke();
+      return;
+    }
+    if (type === 'camera_ethernet') {
+      // Network (PoE/IP) camera: a bullet-camera body with a front lens, plus a short
+      // ethernet cable tail ending in an RJ45 plug — a camera that lives on the network.
+      ctx.strokeStyle = '#334155'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(40, 50, 34, 24, 5); // body
+      ctx.fillStyle = '#e5e7eb'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(78, 62, 11, 0, Math.PI * 2); // lens housing (front)
+      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(78, 62, 5, 0, Math.PI * 2); // aperture
+      ctx.fillStyle = '#1f2937'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(50, 74); ctx.lineTo(50, 86); ctx.stroke(); // cable tail
+      ctx.beginPath(); ctx.rect(44, 86, 12, 9); // RJ45 plug
+      ctx.fillStyle = '#e5e7eb'; ctx.fill(); ctx.stroke();
       return;
     }
     if (type === 'outlet_cooktop') {
@@ -1954,7 +1970,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = [
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
-    'switch', 'light', 'ethernet', 'ethernet_dual', 'patch_panel', 'intercom',
+    'switch', 'light', 'ethernet', 'ethernet_dual', 'camera_ethernet', 'patch_panel', 'intercom',
     'panel',
   ];
   let currentMarkerType = MARKER_TYPES[0];

@@ -273,7 +273,7 @@ const STRINGS = {
   // --- markers (wall-anchored annotations) ------------------------------------
   'marker.outlet':   { en: 'outlet',   fr: 'prise',        zh: '插座' },
   'marker.outlet_shutter': { en: 'shutter outlet', fr: 'prise volet', zh: '卷帘插座' },
-  'marker.outlet_aircon': { en: 'aircon supply', fr: 'alimentation clim.', zh: '空调专用电源' },
+  'marker.outlet_aircon': { en: 'aircon supply', fr: 'alimentation clim.', zh: '空调供应' },
   'marker.dedicatedCircuit': { en: 'dedicated circuit', fr: 'circuit dédié', zh: '专用回路' },
   'marker.outlet_cooktop': { en: 'cooktop', fr: 'plaque de cuisson', zh: '灶台' },
   'marker.outlet_oven': { en: 'oven', fr: 'four', zh: '烤箱' },
@@ -285,6 +285,7 @@ const STRINGS = {
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
   'marker.ethernet_dual': { en: 'dual ethernet', fr: 'double réseau', zh: '双网口' },
+  'marker.camera_ethernet': { en: 'network camera', fr: 'caméra réseau', zh: '网络摄像头' },
   'marker.patch_panel': { en: 'patch panel', fr: 'panneau de brassage', zh: '配线架' },
   'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
   'link.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },

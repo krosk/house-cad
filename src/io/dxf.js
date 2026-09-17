@@ -46,6 +46,7 @@ const LAYERS = [
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET_DUAL', 7, 'CONTINUOUS'],
+  ['MARKER_CAMERA_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_PATCH_PANEL', 7, 'CONTINUOUS'],
   ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_WALL', 4, 'DOTTED'],
@@ -366,6 +367,8 @@ function writeMarker(w, marker) {
     w.line(layer, x + r * 0.58, y - r * 0.5, x + r * 0.58, y + r * 0.45);
     w.line(layer, x + r * 0.58, y + r * 0.45, x + r * 0.4, y + r * 0.22);
   } else if (marker.type === 'outlet_aircon') {
+    // Square housing (not the round socket) marks an HVAC service point, not an outlet.
+    w.polyline(layer, [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]);
     for (const angle of [0, Math.PI / 3, 2 * Math.PI / 3]) {
       const dx = Math.cos(angle) * r * 0.58, dy = Math.sin(angle) * r * 0.58;
       w.line(layer, x - dx, y + r * 0.18 - dy, x + dx, y + r * 0.18 + dy);
@@ -373,6 +376,13 @@ function writeMarker(w, marker) {
     w.line(layer, x, y - r * 0.4, x, y - r * 0.82);
     w.line(layer, x, y - r * 0.82, x + r * 0.5, y - r * 0.82);
     w.circle(layer, x + r * 0.67, y - r * 0.82, r * 0.17);
+  } else if (marker.type === 'camera_ethernet') {
+    // Network (PoE/IP) camera: body + front lens, plus an ethernet cable tail + RJ45 plug.
+    w.polyline(layer, [[x - r * 0.7, y - r * 0.4], [x + r * 0.5, y - r * 0.4], [x + r * 0.5, y + r * 0.4], [x - r * 0.7, y + r * 0.4]]);
+    w.circle(layer, x + r * 0.5, y, r * 0.34);
+    w.circle(layer, x + r * 0.5, y, r * 0.14);
+    w.line(layer, x - r * 0.2, y - r * 0.4, x - r * 0.2, y - r * 0.82);
+    w.polyline(layer, [[x - r * 0.34, y - r * 0.82], [x - r * 0.06, y - r * 0.82], [x - r * 0.06, y - r * 1.04], [x - r * 0.34, y - r * 1.04]]);
   } else if (marker.type === 'outlet_cooktop') {
     w.circle(layer, x, y, r);
     for (const [dx, dy] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]])
