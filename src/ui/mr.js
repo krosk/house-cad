@@ -1318,10 +1318,12 @@ export function setupMR(view, project, getFootprint) {
     return white;
   }
 
-  // `withDims=false` skips buildDimensions — the per-frame dimension rebuild creates
-  // a CanvasTexture per label, which is the dominant cost. During a live edge drag we
-  // pass false (edge strip + fill still update for feedback); a full rebuild on the
-  // drag release (onSqueezeEnd) brings the dims back correct.
+  // `withDims=false` skips buildDimensions AND buildMarkers/buildElectricalLinks — the
+  // per-frame marker/electrical rebuild creates a CanvasTexture per glyph, the dominant
+  // cost. The live edge drag passes false to freeze those (their groups aren't cleared
+  // here, so they stay visible at their pre-drag spots) but then re-runs buildDimensions
+  // itself, so dimensions stay live and cheap (constant values => cached label textures).
+  // onSqueezeEnd's full rebuild brings markers/electrical back to their solved positions.
   function clearPlanGeometry() {
     // Clear any previous geometry. Dispose per-rebuild materials; do NOT dispose the
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
@@ -2486,7 +2488,15 @@ export function setupMR(view, project, getFootprint) {
       // re-extrude / 2D redraw / DOM), which is invisible in AR and tanks the frame
       // rate. onSqueezeEnd commits once via project.touch() so the desktop catches up.
       project.solveSilently();
-      buildPlan(false); applyPlanMatrix(); // skip dim-label textures while dragging (restored on release)
+      // buildPlan(false) rebuilds the changed geometry (fill/strips/zone fills) and
+      // skips buildDimensions; markers + electrical persist in their own uncleared
+      // groups. Re-add the dimensions so they stay LIVE (following the moving edge)
+      // instead of vanishing during the drag — cheap, because dragging an edge never
+      // changes a constraint's value, so every label texture is a cache hit and only
+      // the dashed line geometry moves.
+      buildPlan(false);
+      buildDimensions(project.activeFloor);
+      applyPlanMatrix();
     }
   }
 
