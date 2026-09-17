@@ -18,7 +18,7 @@ import { connectedRoomComponent } from '../core/geometry2d.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
-import { t, localizedFloorName, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
+import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
@@ -441,6 +441,7 @@ export function setupMR(view, project, getFootprint) {
         markerLabel: (ty) => t(`marker.${ty}`),
         markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
         zoneLabel: (kind) => t(`mode.${kind}`),
+        revLabels: revLabels(),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
         buildLabel: t('sheet.build'),
@@ -3097,6 +3098,7 @@ export function setupMR(view, project, getFootprint) {
         markerLabel: (ty) => t(`marker.${ty}`),
         markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
         zoneLabel: (kind) => t(`mode.${kind}`),
+        revLabels: revLabels(),
         floorLabel: localizedFloorName,
         generatedLabel: t('sheet.generated'),
         buildLabel: t('sheet.build'),

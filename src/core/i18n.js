@@ -60,6 +60,23 @@ const STRINGS = {
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
   'sheet.build': { en: 'Build', fr: 'Version', zh: '构建版本' },
+
+  // --- change map (revision clouds) — templates; {kind}/{name}/{from}/{to}/{value}/{unit}
+  //     are interpolated by planSheet.js (which owns unit display).
+  'rev.title':        { en: 'REV — CHANGES', fr: 'RÉV — CHANGEMENTS', zh: '修订 — 变更' },
+  'rev.zoneAdded':    { en: 'Zone added ({kind})',   fr: 'Zone ajoutée ({kind})',   zh: '新增区域（{kind}）' },
+  'rev.zoneRemoved':  { en: 'Zone removed ({kind})', fr: 'Zone supprimée ({kind})', zh: '删除区域（{kind}）' },
+  'rev.zoneRetyped':  { en: 'Zone {from}→{to}',      fr: 'Zone {from}→{to}',        zh: '区域 {from}→{to}' },
+  'rev.zoneResized':  { en: 'Zone resized',          fr: 'Zone redimensionnée',     zh: '区域尺寸变更' },
+  'rev.zoneMoved':    { en: 'Zone moved',            fr: 'Zone déplacée',           zh: '区域移动' },
+  'rev.zoneChanged':  { en: 'Zone changed',          fr: 'Zone modifiée',           zh: '区域变更' },
+  'rev.markerAdded':  { en: '{name} added',          fr: '{name} ajouté',           zh: '新增{name}' },
+  'rev.markerRemoved':{ en: '{name} removed',        fr: '{name} supprimé',         zh: '删除{name}' },
+  'rev.markerMoved':  { en: '{name} moved',          fr: '{name} déplacé',          zh: '{name}移动' },
+  'rev.markerRetyped':{ en: '{from}→{to}',           fr: '{from}→{to}',             zh: '{from}→{to}' },
+  'rev.dimChanged':   { en: 'Dim {from}→{to} {unit}', fr: 'Cote {from}→{to} {unit}', zh: '尺寸 {from}→{to} {unit}' },
+  'rev.dimAdded':     { en: 'Dim added {value} {unit}', fr: 'Cote ajoutée {value} {unit}', zh: '新增尺寸 {value} {unit}' },
+  'rev.dimRemoved':   { en: 'Dim removed',           fr: 'Cote supprimée',          zh: '删除尺寸' },
   'floor.ground': { en: 'Ground floor', fr: 'Rez-de-chaussée', zh: '底层' },
   'floor.upper': { en: 'Upper floor', fr: 'Étage', zh: '上层' },
   'floor.basement': { en: 'Basement', fr: 'Sous-sol', zh: '地下室' },
@@ -335,6 +352,16 @@ export function onLangChange(fn) {
 export function t(key) {
   const e = STRINGS[key];
   return (e && (e[current] ?? e.en)) ?? key;
+}
+
+// The change-map legend/label templates for the current language, as a plain object
+// the (i18n-agnostic) plan sheet interpolates. Pass as opts.revLabels so the diff
+// text follows the UI language in Print/SVG/PNG and the AR preview alike.
+export function revLabels() {
+  const keys = ['title', 'zoneAdded', 'zoneRemoved', 'zoneRetyped', 'zoneResized', 'zoneMoved',
+    'zoneChanged', 'markerAdded', 'markerRemoved', 'markerMoved', 'markerRetyped',
+    'dimChanged', 'dimAdded', 'dimRemoved'];
+  return Object.fromEntries(keys.map((k) => [k, t(`rev.${k}`)]));
 }
 
 // Built-in floor names remain stable model data for save compatibility. Translate

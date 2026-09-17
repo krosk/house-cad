@@ -18,7 +18,7 @@ import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS } from './core/zoneColors.js';
-import { t, localizedFloorName } from './core/i18n.js';
+import { t, localizedFloorName, revLabels } from './core/i18n.js';
 
 const project = new Project();
 
@@ -497,6 +497,10 @@ const localizedSheetOptions = () => ({
   floorLabel: localizedFloorName,
   generatedLabel: t('sheet.generated'),
   buildLabel: t('sheet.build'),
+  markerLabel: (ty) => t(`marker.${ty}`),
+  markerLegendNote: (ty) => (ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : ''),
+  zoneLabel: (kind) => t(`mode.${kind}`),
+  revLabels: revLabels(),
 });
 
 function printSheets(svgs) {

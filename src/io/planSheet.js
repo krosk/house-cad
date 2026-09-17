@@ -1367,6 +1367,16 @@ const REV_TAG = 3.6;        // revision-triangle side (mm)
 // Changed regions whose (outset) clouds would overlap or nearly touch are merged
 // into one cloud for readability; this is that proximity threshold in page mm.
 const CLOUD_MERGE_GAP = 2 * CLOUD_OUTSET + CLOUD_R;
+// English fallback for the change-map label templates. Callers pass a localized set
+// as opts.revLabels (see revLabels() in i18n.js); planSheet interpolates the
+// {kind}/{name}/{from}/{to}/{value}/{unit} placeholders since it owns unit display.
+const REV_TEXT_EN = {
+  title: 'REV — CHANGES',
+  zoneAdded: 'Zone added ({kind})', zoneRemoved: 'Zone removed ({kind})', zoneRetyped: 'Zone {from}→{to}',
+  zoneResized: 'Zone resized', zoneMoved: 'Zone moved', zoneChanged: 'Zone changed',
+  markerAdded: '{name} added', markerRemoved: '{name} removed', markerMoved: '{name} moved', markerRetyped: '{from}→{to}',
+  dimChanged: 'Dim {from}→{to} {unit}', dimAdded: 'Dim added {value} {unit}', dimRemoved: 'Dim removed',
+};
 
 // Quadratic bezier sample (the backends have no arc primitive; sampling as short
 // line segments keeps the SVG and canvas outputs pixel-identical).
@@ -1456,9 +1466,8 @@ function dimAnchor(floor, c) {
 // the plan. Each row is one location: its △N is printed once, then every change at
 // that location is listed under it (so a co-located stack reads as one grouped block
 // instead of repeated numbers). White-filled so it sits cleanly over any geometry.
-function drawRevLegend(be, rows, pageW) {
+function drawRevLegend(be, rows, pageW, title = 'REV — CHANGES') {
   const size = 2.4, lh = 4.2, pad = 2.4;
-  const title = 'REV — CHANGES';
   const labels = rows.flatMap((r) => r.labels);
   const w = Math.max(be.measure(title, 2.6), ...labels.map((label) => 7 + be.measure(label, size))) + pad * 2;
   const lines = labels.length; // one line per individual change, grouped under its tag
@@ -1479,10 +1488,14 @@ function drawRevLegend(be, rows, pageW) {
 
 // Draw the whole change map for one floor: clouds + tags over changed geometry,
 // then the keyed legend. Numbering is assigned here so tags and legend agree.
-function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
+function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers(), opts = {}) {
   if (!diff) return;
-  const kindLabel = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Zone');
-  const markerLabel = (type) => MARKER_LABELS[type] || 'Marker';
+  // Localized label templates + name lookups (English fallbacks keep this usable
+  // standalone). fill() interpolates {placeholder} tokens per the current language.
+  const R = { ...REV_TEXT_EN, ...(opts.revLabels || {}) };
+  const fill = (tmpl, vars) => tmpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+  const kindLabel = (k) => opts.zoneLabel?.(k) || (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Zone');
+  const markerLabel = (type) => opts.markerLabel?.(type) || MARKER_LABELS[type] || 'Marker';
   // A zone kind is only worth flagging when the sheet actually draws it — furniture
   // is layer-gated, so its edits stay off a sheet that omits furniture.
   const zoneShown = (kind) => kind !== 'furniture' || layers.furniture;
@@ -1501,29 +1514,30 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
   const pushDim = (anchor, label) => items.push({ box: null, tag: anchor ? [L.X(anchor.x), L.Y(anchor.y)] : null, label });
 
   for (const { base } of diff.rects.removed)
-    if (zoneShown(base.kind)) pushZone(base.bounds, `Zone removed (${kindLabel(base.kind)})`, base.bounds);
+    if (zoneShown(base.kind)) pushZone(base.bounds, fill(R.zoneRemoved, { kind: kindLabel(base.kind) }), base.bounds);
   for (const { cur } of diff.rects.added)
-    if (zoneShown(cur.kind)) pushZone(cur.bounds, `Zone added (${kindLabel(cur.kind)})`);
+    if (zoneShown(cur.kind)) pushZone(cur.bounds, fill(R.zoneAdded, { kind: kindLabel(cur.kind) }));
   for (const { cur, base, change } of diff.rects.changed) {
     if (!zoneShown(cur.kind) && !zoneShown(base.kind)) continue; // a retype touching a shown kind still counts
-    const label = change === 'retyped' ? `Zone ${kindLabel(base.kind)}→${kindLabel(cur.kind)}`
-      : change === 'resized' ? 'Zone resized' : change === 'moved' ? 'Zone moved' : 'Zone changed';
+    const label = change === 'retyped' ? fill(R.zoneRetyped, { from: kindLabel(base.kind), to: kindLabel(cur.kind) })
+      : change === 'resized' ? R.zoneResized : change === 'moved' ? R.zoneMoved : R.zoneChanged;
     pushZone(cur.bounds, label);
   }
 
   if (layers.markerIcons) { // no glyph on the sheet → its add/move/retype means nothing to the reader
-    for (const { cur } of diff.markers.added) pushPoint(cur.x, cur.y, `${markerLabel(cur.type)} added`);
-    for (const { base } of diff.markers.removed) pushPoint(base.x, base.y, `${markerLabel(base.type)} removed`);
+    for (const { cur } of diff.markers.added) pushPoint(cur.x, cur.y, fill(R.markerAdded, { name: markerLabel(cur.type) }));
+    for (const { base } of diff.markers.removed) pushPoint(base.x, base.y, fill(R.markerRemoved, { name: markerLabel(base.type) }));
     for (const { cur, base, change } of diff.markers.changed)
       pushPoint(cur.x, cur.y, change === 'retyped'
-        ? `${markerLabel(base.type)}→${markerLabel(cur.type)}` : `${markerLabel(cur.type)} moved`);
+        ? fill(R.markerRetyped, { from: markerLabel(base.type), to: markerLabel(cur.type) })
+        : fill(R.markerMoved, { name: markerLabel(cur.type) }));
   }
 
   if (layers.planDims) { // structural dimensions aren't drawn → don't flag their deltas
     const u = unitLabel();
-    for (const { cur, from, to } of diff.dims.changed) pushDim(dimAnchor(floor, cur), `Dim ${fmtSheetDim(from)}→${fmtSheetDim(to)} ${u}`);
-    for (const { cur } of diff.dims.added) pushDim(dimAnchor(floor, cur), `Dim added ${fmtSheetDim(cur.value)} ${u}`);
-    for (const _ of diff.dims.removed) pushDim(null, 'Dim removed');
+    for (const { cur, from, to } of diff.dims.changed) pushDim(dimAnchor(floor, cur), fill(R.dimChanged, { from: fmtSheetDim(from), to: fmtSheetDim(to), unit: u }));
+    for (const { cur } of diff.dims.added) pushDim(dimAnchor(floor, cur), fill(R.dimAdded, { value: fmtSheetDim(cur.value), unit: u }));
+    for (const _ of diff.dims.removed) pushDim(null, R.dimRemoved);
   }
 
   if (!items.length) return; // nothing survived the layer filter: no clouds, tags, or legend
@@ -1555,7 +1569,7 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
     if (it.tag) drawRevTag(be, it.tag[0], it.tag[1], n);
     rows.push({ n, labels: [it.label] });
   }
-  drawRevLegend(be, rows, L.page.w);
+  drawRevLegend(be, rows, L.page.w, R.title);
 }
 
 function renderFloor(be, floor, opts = {}) {
@@ -1592,7 +1606,7 @@ function renderFloor(be, floor, opts = {}) {
   // Revision clouds sit above the drawing but below the strip. opts.changeMap is a
   // Map<floorId, diff> (shared across a multi-floor set), so pick this floor's diff.
   const diff = opts.changeMap instanceof Map ? opts.changeMap.get(floor.id) : null;
-  if (diff) drawChangeMap(be, L, floor, diff, layers); // clouds/tags honor the same layer gating as the sheet
+  if (diff) drawChangeMap(be, L, floor, diff, layers, opts); // clouds/tags honor the same layer gating + localized labels
   drawStrip(be, L, floor, opts);
   return L;
 }
