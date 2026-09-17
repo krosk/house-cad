@@ -154,9 +154,9 @@ const STRINGS = {
     zh: '构建管路网络。对设备或已有节点扣动扳机以在此落笔，对空处扣动扳机放置接头并连一段管路，或对另一节点扣动扳机进行连接（分支/环路）。握把抬笔；抬笔后从另一节点重新开始即可分支。之后线路将在这些管路中走线。',
   },
   'help.conduit_edit': {
-    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height), or grip away to delete the selected node and its segments. Trigger a segment between nodes to split it with a new junction. Marker-bound nodes follow their device.',
-    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie), ou poignée à l’écart pour supprimer le nœud choisi et ses segments. Gâchette sur un segment entre nœuds pour le scinder par une nouvelle jonction. Les nœuds liés à un appareil suivent celui-ci.',
-    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度），或将握把移开以删除所选节点及其段。对两节点间的某段扣动扳机可用新接头将其分割。绑定到设备的节点跟随该设备。',
+    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height), or grip away to delete the selected node and its segments. Trigger a segment (highlights yellow) to split it with a new junction, or grip it to delete just that segment. Marker-bound nodes follow their device.',
+    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie), ou poignée à l’écart pour supprimer le nœud choisi et ses segments. Gâchette sur un segment (surligné en jaune) pour le scinder par une nouvelle jonction, ou poignée dessus pour supprimer ce seul segment. Les nœuds liés à un appareil suivent celui-ci.',
+    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度），或将握把移开以删除所选节点及其段。对某段（高亮为黄色）扣动扳机可用新接头将其分割，或按住握把仅删除该段。绑定到设备的节点跟随该设备。',
   },
   'help.recal': {
     en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',

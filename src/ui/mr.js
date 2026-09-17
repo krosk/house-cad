@@ -1818,8 +1818,10 @@ export function setupMR(view, project, getFootprint) {
     }
     conduitPreviewLine = null; // recreated on demand in the render branch
     for (const seg of conduitNetworkSegments(floor)) {
-      const line = makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b);
+      const baseColor = WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b;
+      const line = makeRouteLine([seg.a, seg.b], baseColor);
       line.userData.conduitSegmentId = seg.id;
+      line.userData.baseColor = baseColor; // restored when un-hovered (CONDUIT EDIT recolors the hover target)
       conduitGroup.add(line);
     }
     for (const node of floor.conduitNodes || []) {
@@ -4620,6 +4622,15 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (mode.id === 'conduit_edit') {
+      // Grip on a hovered segment deletes that ONE segment (leaves its end nodes) — the
+      // way to drop one leg of a branch without nuking the whole node. Takes precedence
+      // over the node delete below so aiming at a segment is unambiguous.
+      if (hoverConduitSegmentId) {
+        rlog('conduit segment delete', { id: hoverConduitSegmentId });
+        project.removeConduitSegment(hoverConduitSegmentId);
+        buildConduits();
+        return;
+      }
       // Grip away from a node deletes the selected node + its segments. (A grip ON a
       // node became a drag and never reaches here.)
       if (selectedConduitNodeId) {
@@ -5371,11 +5382,14 @@ export function setupMR(view, project, getFootprint) {
         child.material.color.setHex(color);
         child.scale.setScalar(id === selectedConduitNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
       }
-      // Brighten the hovered segment (split target) above the idle network.
+      // Highlight the hovered segment (trigger=split / grip=delete target): recolor it
+      // yellow like a hovered node — an 8% opacity nudge was too subtle to target by.
       for (const child of conduitGroup.children) {
         const segId = child.userData.conduitSegmentId;
         if (!segId) continue;
-        child.material.opacity = segId === hoverConduitSegmentId ? 1 : 0.92;
+        const hovered = segId === hoverConduitSegmentId;
+        child.material.color.setHex(hovered ? 0xffe14d : child.userData.baseColor);
+        child.material.opacity = hovered ? 1 : 0.92;
       }
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
