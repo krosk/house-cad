@@ -12,16 +12,18 @@
   `quest-guardian-limitation` — Phase-5 rationale and XR gotchas; `conduit-wiring-model` — the live
   electrical re-architecture + its decisions. Don't duplicate them here.
 
-**Date:** 2026-09-16 (session 20)
-**Status:** Quest APK path WORKING. Two features **COMMITTED + PUSHED** this session as `fb4bb80`
-(published to Pages): (1) **Electrical re-architecture COMPLETE** — the two-layer CONDUIT-network +
-wires-as-routes model (memory `conduit-wiring-model`), all 5 slices (`CONDUIT · EDIT`, `MARKER · WIRE`
-redefined = auto-route + `via` override, sheet/DXF output, and full teardown of the legacy
-per-wire-waypoint system + `createWire`→`addWire`) on top of `514da9f`; the old standalone-waypoint
-wire system (`973f105`) is GONE. (2) **Change map** — revision clouds on the plan sheet diffing the live
-project vs a saved-slot baseline (`src/core/planDiff.js` + `drawChangeMap`), wired into desktop Print
-and AR PROJECT · EXPORT (COMPARE row). Both are build-green + Node-smoke-tested, **AR build-verified
-only**. Next: on-device QA of both lanes — see Next steps A + G.
+**Date:** 2026-09-17 (session 21)
+**Status:** Quest APK path WORKING. Session 21 shipped **7 commits, all pushed** (HEAD `aaaba08` =
+`origin/main`), and the **owner confirmed this session's work running on device**: (1) **AR grip-drag
+performance** — edge & dim/panel drags no longer rebuild the whole plan or fire the desktop
+listener-cascade per frame (`Project.solveSilently()` + `rebuildDimsOnly()`), and dims now stay live
+while dragging an edge; (2) **AR mode-cycle reorder** + four PROJECT floor-ops hidden from the cycle
+(`MODE_HIDDEN`, kept functional); (3) **change-map polish** — layer-aware filtering, merged
+overlapping clouds, one tag + grouped legend per location, right-edge legend, and full
+**localization** (en/fr/zh); (4) **markers** — new `camera_ethernet` ("Camera Ethernet") type, aircon
+glyph boxed in a square, aircon zh label corrected. The owner also did a **first on-device pass of the
+conduit lane** (previously entirely unwalked) — a first try, not full QA. Next: finish conduit QA
+(Next step A) and confirm the change-map polish on device (Next step G).
 
 ## Where things stand in one paragraph
 
@@ -31,41 +33,49 @@ Bubblewrap/TWA, immersive) that launches straight into passthrough AR. **The goa
 on-site MR survey tool** (read `phase5-xr-intent` before planning), multi-storey, authored entirely
 in AR. Markers are a **parallel annotation lane** (wall-anchored points — outlets/switches/lights/
 network/panel — that never touch the footprint/boolean/extrude pipeline; the solver stays 2-axis).
-**Electrical is now SHIPPED** (committed `fb4bb80`): a shared **conduit network** (graph of nodes +
-segments drilled into walls/floors/ceilings, surface inferred per segment) with **wires routed over
-it** (each wire = two device markers + optional `via` overrides; path DERIVED by shortest route, never
-stored). Also shipped this session: the **change map** (plan-sheet revision clouds vs a saved-slot
-baseline). **On device (proven):** APK installs/enters AR; SETUP + PLAN + PROJECT save/load/lang (s14);
-MARKER · DIMS pin→floor-dim commit+render (s16). **Everything else is build-verified only** — the whole
-marker lane, LEVEL, all electrical (CONDUIT / CONDUIT EDIT / WIRE), and the change map have never been
-walked; `docs/ar-qa-checklist.md` is the only record. Before planning marker/dimension/electrical work,
+**Electrical is SHIPPED** (`fb4bb80`): a shared **conduit network** (graph of nodes + segments drilled
+into walls/floors/ceilings, surface inferred per segment) with **wires routed over it** (each wire = two
+device markers + optional `via` overrides; path DERIVED by shortest route, never stored). The **change
+map** (plan-sheet revision clouds vs a saved-slot baseline) is shipped and was substantially polished in
+s21 (see below). **On device (proven):** APK installs/enters AR; SETUP + PLAN + PROJECT save/load/lang
+(s14); MARKER · DIMS pin→floor-dim commit+render (s16); **s21 owner-confirmed** the grip-drag perf,
+reordered mode cycle, change-map, and marker changes; **conduit lane had a first (partial) on-device
+pass**. Still build-verified only: most of the MARKER lane, LEVEL, and the deeper conduit/change-map
+interactions; `docs/ar-qa-checklist.md` is the record. Before planning marker/dimension/electrical work,
 read `docs/ar-survey.md` (kept current) and `docs/markers-plan.md`.
 
-## What changed (s19 conduit re-architecture + s20 change map — both committed `fb4bb80`)
+## What changed in session 21 (7 commits, all pushed)
 > Next agent: as you add your own section, fold live constraints into "Standing decisions"/"Findings"
-> and delete narrative. The pre-s19 feature changelog was compressed away — those features
-> (plan sheets, zone vocabulary incl. insulation/furniture, DXF+Coohom export, PNG/JSON export,
-> monochrome sheets, fixture stacks, floor translate, the full marker glyph set incl. panel, and the
-> now-superseded WIRE/WIRE EDIT) are all SHIPPED and documented in `CLAUDE.md`, `docs/ar-survey.md`,
-> and `docs/markers-plan.md`. Use `git log` for the per-commit history.
+> and delete this narrative. Prior feature changelogs were compressed away — the conduit
+> re-architecture (`fb4bb80`, memory `conduit-wiring-model`) and all pre-s21 features (plan sheets,
+> zone vocabulary, DXF+Coohom, PNG/JSON, fixture stacks, floor translate, full marker glyph set) are
+> SHIPPED and documented in `CLAUDE.md`, `docs/ar-survey.md`, `docs/markers-plan.md`. `git log` has all.
 
-**Conduit re-architecture — DONE + committed `fb4bb80`** (memory `conduit-wiring-model` has the full
-design + decisions: auto shortest-path **+ manual via override**, **bare junction nodes allowed**,
-switch→light **control links unchanged**). The old per-wire-waypoint lane (`973f105`) is entirely torn
-out; its `panel` marker type + per-surface surface-inference stay. Now shipped:
-`MARKER · CONDUIT` pen authoring, `CONDUIT · EDIT` (node select / dual-move by `WAYPOINT_GRAB_M` /
-segment-split / delete; marker-bound nodes immovable), `MARKER · WIRE` (two markers → `addWire` auto
-shortest route; conduit nodes = `addWireVia` overrides; grip pops via / deletes wire), and sheet+DXF
-output (`CONDUIT` layer + per-surface routed wires). Structural detail in `docs/ar-survey.md`.
-
-**Change map — DONE + committed `fb4bb80`** (this session). Plan-sheet revision clouds diffing the live
-project vs a saved-slot baseline. `src/core/planDiff.js` id-matches SOLVED geometry (zones/markers/
-structural-dimension-values, 1 mm tol; label placement + electrical deliberately NOT diffed);
-`drawChangeMap` in `planSheet.js` renders clouds + numbered △ tags + a `REV — CHANGES` legend, gated by
-`opts.changeMap` = `Map<floorId,diff>`. Entry points: desktop Print "Change map vs" slot picker; AR
-`PROJECT · EXPORT` `COMPARE` row (thumbstick-when-pointed / tap; live in LEFT preview + baked into
-SVG/PNG). Sheet-only — DXF/JSON ignore it. Full detail in `CLAUDE.md` + `docs/ar-survey.md`.
-
+1. **AR grip-drag performance** (`5b6a3cf`, `b45629d`). Owner-reported: edge & dim/panel drags tanked.
+   Root cause — edge drag called `project.touch()` per frame (solve ALL floors + full desktop
+   listener cascade: 3D re-extrude, 2D canvas redraw, DOM rebuilds, all invisible in AR) then rebuilt
+   the footprint again; dim/panel drag ran a full `buildPlan()` though only presentation changed. Fixes:
+   `Project.solveSilently()` (solve in place, no listener cascade — edge drag uses it, commits once via
+   `touch()` on release); `rebuildDimsOnly()` in `mr.js` (dim drag rebuilds only the tracked dim objects).
+   Then dims kept LIVE during edge drag by re-running `buildDimensions` each frame — cheap because a
+   drag never changes a constraint's value, so label textures are cache hits. Markers/electrical stay
+   frozen in their uncleared groups during the drag, snap back on release.
+2. **AR mode-cycle reorder + hidden floor-ops** (`5b6a3cf`). New order: SETUP = ORIGIN/FLOOR/LEVEL/
+   RECAL/TELEPORT; PLAN = ADD/EDGE/DIMS/EDIT (TRANSLATE moved to PROJECT, kept out of ALL-FLOORS view);
+   MARKER = EDIT/DIMS/LINK/CONDUIT/CONDUIT EDIT/WIRE; PROJECT leads with EXPORT before SAVE. `MODE_HIDDEN`
+   removes COPY/PASTE FLOOR + MOVE UP/DOWN from the thumbstick cycle (still defined + functional).
+3. **Change-map polish** (`940e2e9`, `9e11744`, `aaaba08`). (a) Layer-aware: `drawChangeMap` takes the
+   sheet's resolved `layers` and only flags categories actually drawn (dim deltas iff `planDims`; marker
+   deltas iff `markerIcons`; furniture-zone deltas iff `furniture`). (b) Overlapping clouds merged:
+   `clusterBoxes` union-finds change boxes within `CLOUD_MERGE_GAP`; each cluster = one cloud + one △ tag
+   + one grouped legend entry (fixes co-located marker-stack tag pile-up). (c) `REV — CHANGES` legend
+   moved flush to the sheet's right edge. (d) Localized: `rev.*` i18n templates + `revLabels()`; planSheet
+   interpolates `{kind}/{name}/{from}/{to}/{value}/{unit}`; desktop `localizedSheetOptions` now also
+   passes `markerLabel`/`zoneLabel` (its marker/zone legend was English before too).
+4. **Markers** (`5e9aff8`, `4f19b06`). New `camera_ethernet` type ("Camera Ethernet" — stresses a wired
+   pull) across AR glyph / sheet glyph+label / DXF glyph+layer / i18n. Aircon glyph now boxed in a SQUARE
+   (AR + sheet + DXF) to read as a service point, not a power outlet; aircon zh label `空调专用电源` →
+   `空调供应` (generic supply, not electric).
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -93,6 +103,18 @@ SVG/PNG). Sheet-only — DXF/JSON ignore it. Full detail in `CLAUDE.md` + `docs/
   the rect solve. z is **inherent** (typed in MARKER EDIT), never a constraint axis. "Fully pinned /
   white" = X and Y pinned. One pin per (marker, axis); re-picking a wall re-anchors. A marker pin's
   constraint endpoint is `{marker}` (no `.rect`) — see the Sketch2D trap below.
+- **Continuous AR drags must NOT run the full `_emit` cascade per frame.** `project.touch()` →
+  `_emit()` solves all floors AND notifies every desktop listener (3D re-extrude, 2D canvas redraw, DOM
+  panels) — invisible in AR and frame-rate-killing. Patterns: marker drag uses `moveMarker(...,{emit:
+  false})`; edge drag uses `project.solveSilently()` (solve in place, no listeners); dim/panel drag is
+  pure presentation → `rebuildDimsOnly()`. Each commits once via `touch()` on release. During a drag,
+  markers/electrical stay frozen (their groups are skipped by `clearPlanGeometry`); dims can be rebuilt
+  cheaply because a drag never changes a constraint value (label textures are cache hits).
+- **Change map is layer-gated, clustered, and localized.** `drawChangeMap(be,L,floor,diff,layers,opts)`
+  only flags categories the sheet draws (dims⇔`planDims`, markers⇔`markerIcons`, furniture-zones⇔
+  `furniture`); `clusterBoxes` merges co-located changes into one cloud + one △ tag + one grouped legend
+  entry; labels come from `opts.revLabels` (`revLabels()` in i18n) + `opts.markerLabel`/`zoneLabel`, with
+  English fallbacks. All sheet backends + AR preview funnel through it, so changes land everywhere.
 - **Git: commit + push directly on `main`, no feature branches. Every push auto-deploys to Pages
   = publishes** — only push when asked. No `gh` CLI; deploy check:
   `curl -s "https://api.github.com/repos/krosk/house-cad/actions/runs?per_page=1"`.
@@ -129,54 +151,22 @@ SVG/PNG). Sheet-only — DXF/JSON ignore it. Full detail in `CLAUDE.md` + `docs/
 ## Commits (substantive only; doc-only omitted — `git log` has all)
 
 HEAD moves with each push; `git log` has the full list. All pushed to `origin/main`; every push
-auto-deploys to Pages.
+auto-deploys to Pages. **s21 (`d674321..aaaba08`):**
 
-- `fb4bb80` (s20) conduit re-architecture slices 3–5 (CONDUIT·EDIT + WIRE auto-route/via + sheet/DXF
-  output + legacy per-wire-waypoint teardown, `createWire`→`addWire`) AND the change-map feature
-  (`src/core/planDiff.js` + `drawChangeMap` + desktop/AR entry points). One commit: the two efforts
-  share `mr.js`/`planSheet.js`/`i18n.js` and couldn't be split at file granularity.
-- `514da9f` (s19, WIP) conduit network foundation (`src/core/conduit.js` graph + Dijkstra routing) +
-  model/serialize integration + `MARKER · CONDUIT` pen-authoring. Old wire system still coexists.
-- `973f105` (s19) as-built wire tracing + `WIRE EDIT` (dual-move + height pad) + `panel` marker type +
-  per-surface AR/sheet/DXF. The per-wire-waypoint mechanism is superseded by `514da9f`; panel + surface
-  drawing stay.
-- `26564d1` (s18) FLOOR calibration works from any selected real storey by deriving the
-  shared ground datum as `touchY - activeElevation`; Upper/Basement no longer reject the touch.
-- `26564d1` (s18) introduced plan-sheet fixture stacks; the current rule requires identical plan
-  coordinates for vertical stacks and allows same-height horizontal fixtures within 80 mm inclusive.
-  Within a callout, full-3D 80 mm-inclusive neighbors share an outlined white box: horizontal + one height
-  when level, vertical + per-glyph heights when not. Distant height groups keep separate boxes on
-  the same leader. Shared by print/SVG and the live LEFT-controller canvas preview.
-- (s17) zone area readout: `connectedRoomComponents` (geometry2d) now deducts subtract cutouts
-  (net area, not gross union) — flows to the AR EDIT info-panel `area:` line AND the plan sheet.
-  mr.js `selectedZoneArea` broadens the readout to ANY selected zone (room = net connected-room
-  area; other = own footprint), relabeled `room:` → `area:`. NOTE: user reported not seeing the
-  area on device; no code bug found for a selected room (compute + display condition both correct,
-  multiPolygonArea always finite) — suspected stale device build (check the `build:` HUD stamp). If
-  a fresh build still shows nothing, add rlog to the EDIT selection path (only way to debug XR here).
-- (s17) zone color coding: new shared palette `src/core/zoneColors.js` (room=blue, wall=red,
-  door=green, window=cyan, stairs=yellow, cabinet=purple, furniture=orange; kind encodes op,
-  blue=only add). Desktop
-  sketch2d `_drawRect` = faint kind fill + kind outline (red subtract-hatch removed). AR mr.js =
-  per-kind edge outlines + zebra + faint per-subtract-zone fills over the room footprint fill, plus
-  DROP chip / HUD readouts / selected-outline. Build-clean + palette swatch verified; **AR visuals
-  build-verified only (not walked on device).**
-- `fad10a2` (s17) extend dimension line to labels dragged past endpoints (sheet + AR).
-- `1b49b36` (s17) redraw ethernet marker as RJ45 jack (sheet + AR in sync).
-- `28a9868` align floor print sheets · `d56f688` dim labels beyond endpoints · `991c3cf` connected
-  room areas · `cff5dbb` window zone · `44b5ada` stairs+cabinet zones · `1334f20` all-floors AR view ·
-  `15dc9c0` copy floors between projects · `b38ab05` door zones + AR unit selector · `0226cbd`
-  confirm Quest save overwrites · `339cfb7` move Quest plans between storeys · `d048228` teleport +
-  dim-label placement · `274d502` refine sheets/markers · `f98d85c` printable plan sheets (s16→s17).
-- `0e98d02` (s16) fix: 2D editor no longer crashes the change bus on marker pins (the marker-DIMS
-  commit/render bug).
-- `bb8eb1d` (s16) fix: unify mode label + help via `setModeInfo()` (the s15 info-panel fix).
-- `aa364e2` (s15) AR markers (switch) + thumbstick pickers/retype + merged PLAN·DROP + input
-  consolidation (B/Y no-cycle) + ORIGIN/RECAL color fixes + docs + `ar-qa-checklist.md`.
-- `262beb3` (s12) AR markers (outlet) — parallel annotation lane + revert world-vertical HUD stack.
-- Session 13 (plan/marker split): `c9a8fe5`, `36e068e`, `c201de9`, `20de9df`, `21fb9ef`, `7706cb5`,
-  `5560020`, `c5726e5` (Codex `AGENTS.md`).
-- `ef24512` (s11) in-headset multi-floor (LEVEL); `5bb8e1a` (s11) HUD edge size/battery/help + perf.
+- `aaaba08` localize change-map text (`rev.*` i18n + `revLabels()`; desktop also gains marker/zone
+  legend localization).
+- `9e11744` change map: one △ tag + grouped legend per location (fixes co-located tag pile-up).
+- `4f19b06` rename the new marker to "Camera Ethernet".
+- `5e9aff8` new `camera_ethernet` marker + aircon square icon + aircon zh label fix.
+- `940e2e9` change map: layer-aware filtering + merged clouds + right-edge legend.
+- `b45629d` keep dimensions live during AR edge grip-drag.
+- `5b6a3cf` speed up AR edge/dim grip-drags (`solveSilently`/`rebuildDimsOnly`) + reorder AR mode cycle.
+
+**Earlier (shipped; behaviors are in `CLAUDE.md`/`docs`, so only the pointer is kept):** `fb4bb80`
+conduit re-architecture + change-map v1 · `514da9f`/`973f105` conduit foundation + old wire teardown ·
+`26564d1` FLOOR-from-any-storey + fixture stacks · s17 zone areas/colors, sheet dim-label extension,
+RJ45 ethernet glyph · s15–s17 sheets/zones/DXF/markers · `0e98d02` marker-pin change-bus fix · earlier
+LEVEL/HUD/markers. Use `git log` for the full per-commit history.
 
 ## Resuming from a clean checkout
 
@@ -193,20 +183,18 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
 
 ## Next step
 
-- **A — CONDUIT RE-ARCHITECTURE: DONE + COMMITTED (`fb4bb80`).** All 5 slices landed, docs + memory
-  updated. **REMAINING: on-device QA of the whole conduit lane** (pen feel, node picking by floor
+- **A — CONDUIT LANE: FINISH ON-DEVICE QA (first pass done s21).** The owner did a first on-device try
+  this session (previously entirely unwalked). Still to confirm: pen feel, node picking by floor
   projection, branch/loop, CONDUIT·EDIT dual-move + split + delete, WIRE auto-route + via override on a
-  real house graph). Owner-flagged: the `WAYPOINT_GRAB_M`=0.14 m direct/remote grab threshold needs
-  tuning on device.
-- **G — CHANGE MAP: DONE + COMMITTED (`fb4bb80`).** Revision clouds vs a saved-slot baseline on the
-  plan sheet — `src/core/planDiff.js` (id-matched, solved-geometry diff), `drawChangeMap` in
-  `planSheet.js` (clouds + △ tags + `REV — CHANGES` legend, `opts.changeMap` = `Map<floorId,diff>`),
-  desktop Print "Change map vs" picker, AR EXPORT `COMPARE` row (thumbstick-when-pointed / tap; live in
-  LEFT preview + baked into SVG/PNG). Sheet-only (DXF/JSON ignore it). **REMAINING: on-device QA**
-  (checklist "CHANGE MAP" section). Deferred: electrical/conduit/wire deltas aren't diffed yet;
-  tag/legend collision-avoidance; a floor emptied entirely since baseline early-returns before drawing
-  its all-removed deltas. Perf note: the diff deserializes+solves the baseline on each throttled preview
-  redraw when a baseline is set — watch on device.
+  real house graph. Owner-flagged: the `WAYPOINT_GRAB_M`=0.14 m direct/remote grab threshold likely
+  needs tuning on device. Structural detail: `docs/ar-survey.md`; design: memory `conduit-wiring-model`.
+- **G — CHANGE MAP: POLISHED s21; CONFIRM ON DEVICE.** s21 added layer-aware filtering, cloud merging,
+  one-tag-per-location + grouped legend, right-edge legend, and localization (all owner-confirmed on the
+  desktop side). **REMAINING: confirm the AR preview** shows the same (COMPARE-row cycling, live cloud
+  refresh, per-redraw diff cost — the baseline is deserialized+solved on each throttled preview redraw).
+  Still deferred: electrical/conduit/wire deltas aren't diffed; a floor emptied entirely since baseline
+  early-returns before drawing its all-removed deltas; localized (longer, e.g. French) legend labels
+  auto-size the right-edge box width — eyeball they still fit.
 - **B — FINISH ON-DEVICE QA (tracked in `docs/ar-qa-checklist.md`).** Still never walked: **LEVEL**
   (floor seed/cycle/height/stacking); **MARKER EDIT** (drop/height/3D-drag/delete/`markerAtPoint`-
   first, switch glyph); **MARKER DIMS** remainder — commit+render is now proven (s16), but
@@ -235,13 +223,14 @@ for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), assetlinks repo
 
 ## Known open questions
 
-- **The conduit lane is entirely unwalked** (build-verified only): pen-authoring feel, node picking
-  by floor projection, branching, the live preview, node grab (the direct vs remote threshold
-  `WAYPOINT_GRAB_M`=0.14 m may need tuning — owner flagged this), auto-route correctness on a real
-  house graph, whether surface should ever be manually overridable (currently geometry-only), and
-  whether wires ever need to span floors (assumed per-floor).
-- **The change map is unwalked** (build-verified only): COMPARE-row cycling feel, live-preview cloud
-  refresh, and the per-redraw diff cost when a baseline is set (deserialize+solve; watch on device).
+- **The conduit lane had only a first on-device pass** (s21): pen-authoring feel, node picking by floor
+  projection, branching, the live preview, node grab (the direct vs remote threshold `WAYPOINT_GRAB_M`=
+  0.14 m may need tuning — owner flagged this), auto-route correctness on a real house graph, whether
+  surface should ever be manually overridable (currently geometry-only), and whether wires ever need to
+  span floors (assumed per-floor) all still need confirming.
+- **The change map's AR preview is unconfirmed** (desktop side owner-confirmed s21): COMPARE-row cycling
+  feel, live-preview cloud refresh, and the per-redraw diff cost when a baseline is set (deserialize+
+  solve each throttled redraw; watch on device).
 - **Most of the MARKER lane + LEVEL + cross-cutting HUD/input + accuracy are still build-verified
   only.** No runtime/XR guard exists — the checklist is the only record. The s16 bug is a reminder
   that a build pass hides real XR-only crashes.
