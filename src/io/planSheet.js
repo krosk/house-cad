@@ -1354,6 +1354,9 @@ const C_GHOST = '#999';     // vanished (removed) geometry, drawn faint
 const CLOUD_R = 1.6;        // scallop radius on paper (mm), a fixed annotation size
 const CLOUD_OUTSET = 1.4;   // clouds sit just outside the changed region (mm)
 const REV_TAG = 3.6;        // revision-triangle side (mm)
+// Changed regions whose (outset) clouds would overlap or nearly touch are merged
+// into one cloud for readability; this is that proximity threshold in page mm.
+const CLOUD_MERGE_GAP = 2 * CLOUD_OUTSET + CLOUD_R;
 
 // Quadratic bezier sample (the backends have no arc primitive; sampling as short
 // line segments keeps the SVG and canvas outputs pixel-identical).
@@ -1394,6 +1397,25 @@ function drawCloud(be, x0, y0, x1, y1) {
   }
 }
 
+// Union-find clustering of page-mm boxes [x0,y0,x1,y1] (x0<x1, y0<y1) that overlap
+// or sit within `gap` mm of each other. Returns one bounding box per cluster, so a
+// dense group of nearby changes draws as a single cloud instead of a scalloped mess.
+function clusterBoxes(boxes, gap) {
+  const parent = boxes.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const near = (a, b) => a[0] - gap <= b[2] && b[0] - gap <= a[2] && a[1] - gap <= b[3] && b[1] - gap <= a[3];
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      if (near(boxes[i], boxes[j])) parent[find(i)] = find(j);
+  const groups = new Map();
+  boxes.forEach((box, i) => {
+    const r = find(i), g = groups.get(r);
+    if (!g) groups.set(r, [...box]);
+    else { g[0] = Math.min(g[0], box[0]); g[1] = Math.min(g[1], box[1]); g[2] = Math.max(g[2], box[2]); g[3] = Math.max(g[3], box[3]); }
+  });
+  return [...groups.values()];
+}
+
 // A numbered revision triangle (delta) at page-mm (x,y), keyed to the legend.
 function drawRevTag(be, x, y, n) {
   const s = REV_TAG;
@@ -1413,14 +1435,15 @@ function dimAnchor(floor, c) {
     : { x: Math.max(la.p1.x, lb.p1.x), y: dimLabelCoord(c, la.coord, lb.coord) };
 }
 
-// A boxed, numbered revision legend at the top-left — the minimum a numbered tag
-// needs to mean something. White-filled so it sits cleanly over any geometry.
-function drawRevLegend(be, rows) {
+// A boxed, numbered revision legend flush to the sheet's right edge — the minimum a
+// numbered tag needs to mean something. Kept off the drawing's top-left so it can't
+// obstruct the plan itself. White-filled so it sits cleanly over any geometry.
+function drawRevLegend(be, rows, pageW) {
   const size = 2.4, lh = 4.2, pad = 2.4;
   const title = 'REV — CHANGES';
   const w = Math.max(be.measure(title, 2.6), ...rows.map((r) => 7 + be.measure(r.label, size))) + pad * 2;
   const h = pad * 2 + 6 + rows.length * lh;
-  const x = MARGIN, y = MARGIN + 8;
+  const x = pageW - w, y = MARGIN + 8; // right edge: x + w == pageW
   be.rect(x, y, w, h, { fill: '#fff', stroke: C_REV, width: 0.3 });
   be.text(title, x + pad, y + pad + 1, { fill: C_REV, size: 2.6, weight: 'bold', baseline: 'top' });
   rows.forEach((r, i) => {
@@ -1432,61 +1455,72 @@ function drawRevLegend(be, rows) {
 
 // Draw the whole change map for one floor: clouds + tags over changed geometry,
 // then the keyed legend. Numbering is assigned here so tags and legend agree.
-function drawChangeMap(be, L, floor, diff) {
+function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers()) {
   if (!diff) return;
-  const rows = [];
-  let n = 0;
   const kindLabel = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Zone');
   const markerLabel = (type) => MARKER_LABELS[type] || 'Marker';
-  const cloudBox = (b, label) => {
-    const px0 = L.X(b.x0), px1 = L.X(b.x1), py0 = L.Y(b.y1), py1 = L.Y(b.y0); // Y flips
-    drawCloud(be, px0, py0, px1, py1);
-    n += 1; drawRevTag(be, px1 + CLOUD_OUTSET + 2, py0 - CLOUD_OUTSET, n);
-    rows.push({ n, label });
-  };
-  const cloudPoint = (x, y, label) => {
-    const r = 3, px = L.X(x), py = L.Y(y);
-    drawCloud(be, px - r, py - r, px + r, py + r);
-    n += 1; drawRevTag(be, px + r + 2, py - r, n);
-    rows.push({ n, label });
-  };
+  // A zone kind is only worth flagging when the sheet actually draws it — furniture
+  // is layer-gated, so its edits stay off a sheet that omits furniture.
+  const zoneShown = (kind) => kind !== 'furniture' || layers.furniture;
 
-  // Removed zones first: a faint ghost of the vanished footprint, then a cloud.
-  for (const { base } of diff.rects.removed) {
-    const b = base.bounds;
-    be.rect(L.X(b.x0), L.Y(b.y1), (b.x1 - b.x0) * L.mmPerM, (b.y1 - b.y0) * L.mmPerM,
-      { stroke: C_GHOST, width: 0.3 });
-    cloudBox(b, `Zone removed (${kindLabel(base.kind)})`);
-  }
-  for (const { cur } of diff.rects.added) cloudBox(cur.bounds, `Zone added (${kindLabel(cur.kind)})`);
+  // Collect every change as an item, layer-filtered, BEFORE drawing so overlapping
+  // clouds can be merged. box = page-mm cloud region (null for dims, which get a tag
+  // only); tag = page-mm tag anchor (null when off-sheet); ghost = model bounds of a
+  // vanished zone to outline faintly. Numbering follows this push order.
+  const items = [];
+  const zoneBox = (b) => [L.X(b.x0), L.Y(b.y1), L.X(b.x1), L.Y(b.y0)]; // Y flips: y0<y1 in page mm
+  const boxTag = (box) => [box[2] + CLOUD_OUTSET + 2, box[1] - CLOUD_OUTSET];
+  const pushZone = (b, label, ghost = null) => { const box = zoneBox(b); items.push({ box, tag: boxTag(box), label, ghost }); };
+  const pushPoint = (x, y, label) => {
+    const r = 3, px = L.X(x), py = L.Y(y);
+    items.push({ box: [px - r, py - r, px + r, py + r], tag: [px + r + 2, py - r], label });
+  };
+  const pushDim = (anchor, label) => items.push({ box: null, tag: anchor ? [L.X(anchor.x), L.Y(anchor.y)] : null, label });
+
+  for (const { base } of diff.rects.removed)
+    if (zoneShown(base.kind)) pushZone(base.bounds, `Zone removed (${kindLabel(base.kind)})`, base.bounds);
+  for (const { cur } of diff.rects.added)
+    if (zoneShown(cur.kind)) pushZone(cur.bounds, `Zone added (${kindLabel(cur.kind)})`);
   for (const { cur, base, change } of diff.rects.changed) {
+    if (!zoneShown(cur.kind) && !zoneShown(base.kind)) continue; // a retype touching a shown kind still counts
     const label = change === 'retyped' ? `Zone ${kindLabel(base.kind)}→${kindLabel(cur.kind)}`
       : change === 'resized' ? 'Zone resized' : change === 'moved' ? 'Zone moved' : 'Zone changed';
-    cloudBox(cur.bounds, label);
+    pushZone(cur.bounds, label);
   }
 
-  for (const { cur } of diff.markers.added) cloudPoint(cur.x, cur.y, `${markerLabel(cur.type)} added`);
-  for (const { base } of diff.markers.removed) cloudPoint(base.x, base.y, `${markerLabel(base.type)} removed`);
-  for (const { cur, base, change } of diff.markers.changed) {
-    cloudPoint(cur.x, cur.y, change === 'retyped'
-      ? `${markerLabel(base.type)}→${markerLabel(cur.type)}` : `${markerLabel(cur.type)} moved`);
+  if (layers.markerIcons) { // no glyph on the sheet → its add/move/retype means nothing to the reader
+    for (const { cur } of diff.markers.added) pushPoint(cur.x, cur.y, `${markerLabel(cur.type)} added`);
+    for (const { base } of diff.markers.removed) pushPoint(base.x, base.y, `${markerLabel(base.type)} removed`);
+    for (const { cur, base, change } of diff.markers.changed)
+      pushPoint(cur.x, cur.y, change === 'retyped'
+        ? `${markerLabel(base.type)}→${markerLabel(cur.type)}` : `${markerLabel(cur.type)} moved`);
   }
 
-  // Dimension value changes: tag at the edge-midpoint, from→to in the legend.
-  const u = unitLabel();
-  for (const { cur, from, to } of diff.dims.changed) {
-    const a = dimAnchor(floor, cur); n += 1;
-    if (a) drawRevTag(be, L.X(a.x), L.Y(a.y), n);
-    rows.push({ n, label: `Dim ${fmtSheetDim(from)}→${fmtSheetDim(to)} ${u}` });
+  if (layers.planDims) { // structural dimensions aren't drawn → don't flag their deltas
+    const u = unitLabel();
+    for (const { cur, from, to } of diff.dims.changed) pushDim(dimAnchor(floor, cur), `Dim ${fmtSheetDim(from)}→${fmtSheetDim(to)} ${u}`);
+    for (const { cur } of diff.dims.added) pushDim(dimAnchor(floor, cur), `Dim added ${fmtSheetDim(cur.value)} ${u}`);
+    for (const _ of diff.dims.removed) pushDim(null, 'Dim removed');
   }
-  for (const { cur } of diff.dims.added) {
-    const a = dimAnchor(floor, cur); n += 1;
-    if (a) drawRevTag(be, L.X(a.x), L.Y(a.y), n);
-    rows.push({ n, label: `Dim added ${fmtSheetDim(cur.value)} ${u}` });
-  }
-  for (const _ of diff.dims.removed) { n += 1; rows.push({ n, label: 'Dim removed' }); }
 
-  if (rows.length) drawRevLegend(be, rows);
+  if (!items.length) return; // nothing survived the layer filter: no clouds, tags, or legend
+
+  // Faint ghosts of vanished zones, under the clouds.
+  for (const { ghost: b } of items) {
+    if (!b) continue;
+    be.rect(L.X(b.x0), L.Y(b.y1), (b.x1 - b.x0) * L.mmPerM, (b.y1 - b.y0) * L.mmPerM, { stroke: C_GHOST, width: 0.3 });
+  }
+  // One merged cloud per cluster of overlapping/near boxes (dims carry no box).
+  for (const c of clusterBoxes(items.filter((it) => it.box).map((it) => it.box), CLOUD_MERGE_GAP))
+    drawCloud(be, c[0], c[1], c[2], c[3]);
+  // Per-change numbered tags + legend rows keep each edit individually identifiable.
+  const rows = [];
+  items.forEach((it, i) => {
+    const n = i + 1;
+    if (it.tag) drawRevTag(be, it.tag[0], it.tag[1], n);
+    rows.push({ n, label: it.label });
+  });
+  drawRevLegend(be, rows, L.page.w);
 }
 
 function renderFloor(be, floor, opts = {}) {
@@ -1523,7 +1557,7 @@ function renderFloor(be, floor, opts = {}) {
   // Revision clouds sit above the drawing but below the strip. opts.changeMap is a
   // Map<floorId, diff> (shared across a multi-floor set), so pick this floor's diff.
   const diff = opts.changeMap instanceof Map ? opts.changeMap.get(floor.id) : null;
-  if (diff) drawChangeMap(be, L, floor, diff);
+  if (diff) drawChangeMap(be, L, floor, diff, layers); // clouds/tags honor the same layer gating as the sheet
   drawStrip(be, L, floor, opts);
   return L;
 }
