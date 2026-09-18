@@ -2780,8 +2780,12 @@ export function setupMR(view, project, getFootprint) {
     // (after the solve, so edgeLine reflects final geometry — same baseline the dim draws at).
     if (!existing && dimOffsetPt) setDimOffset(c, dimOffsetPt.px, dimOffsetPt.py);
     rlog('dim set', { a: refLabel(dimRefA), b: refLabel(dimRefB), meters: +meters.toFixed(3) });
+    const wasNode = isNodeConstraint(c);
     resetDim();
     buildPlan();       // solver changed geometry; refresh the MR view
+    // A node pin moved the junction, but buildPlan doesn't touch the mode-gated conduit
+    // group — redraw it so the node sphere snaps to its new (pinned) position.
+    if (wasNode) buildConduits();
     applyPlanMatrix();
     redrawNumpad();
   }
@@ -2793,10 +2797,12 @@ export function setupMR(view, project, getFootprint) {
     if (!dimRefA || !dimRefB) return;
     const c = editingId ? project.constraints.find((k) => k.id === editingId)
                         : findConstraintForRefs(dimRefA, dimRefB);
+    const wasNode = c && isNodeConstraint(c);
     if (c) { project.removeConstraint(c.id); rlog('dim delete', { id: c.id }); }
     else rlog('dim cancel (no constraint)');
     resetDim();
     buildPlan();
+    if (wasNode) buildConduits(); // refresh the freed junction's node sphere / highlight state
     applyPlanMatrix();
     redrawNumpad();
   }
