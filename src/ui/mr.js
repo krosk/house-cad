@@ -1821,9 +1821,10 @@ export function setupMR(view, project, getFootprint) {
   // Build a flat ribbon quad between two model points {x,y,z} → world, so a conduit
   // segment reads as a WIDE band rather than a hairline. A THREE.Line renders 1px on
   // the Quest regardless of `linewidth`, so a hover recolor on it is nearly invisible;
-  // a ribbon makes both the base run and the yellow hover obvious. The width axis is
-  // the horizontal perpendicular to the run (so a horizontal run lies flat); a
-  // near-vertical run (riser) falls back to a fixed-horizontal band so it stays visible.
+  // a ribbon makes both the base run and the yellow hover obvious. The band always
+  // stands VERTICAL ("flat on a wall") for every run — floor, ceiling, or wall — so it
+  // stays visible from a standing viewpoint rather than lying edge-on. A near-vertical
+  // run (riser) falls back to a fixed horizontal axis so its band doesn't degenerate.
   const CONDUIT_RIBBON_W = 0.03; // m; band width (~realistic conduit gauge, clearly hoverable)
   function makeConduitRibbon(a, b, color) {
     const A = new THREE.Vector3(a.x, a.z, -a.y);
@@ -1831,8 +1832,10 @@ export function setupMR(view, project, getFootprint) {
     const dir = new THREE.Vector3().subVectors(B, A);
     if (dir.lengthSq() < 1e-9) dir.set(1, 0, 0);
     dir.normalize();
-    const perp = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
-    if (perp.lengthSq() < 1e-6) perp.set(1, 0, 0); // vertical run → face a fixed horizontal
+    // Width axis = world-up projected perpendicular to the run: the most-vertical
+    // direction ⟂ the run, so the band is a vertical plane for any horizontal run.
+    const perp = new THREE.Vector3(0, 1, 0).addScaledVector(dir, -dir.y);
+    if (perp.lengthSq() < 1e-6) perp.set(1, 0, 0); // run is vertical (riser) → horizontal axis
     perp.normalize().multiplyScalar(CONDUIT_RIBBON_W / 2);
     const c0 = new THREE.Vector3().subVectors(A, perp);
     const c1 = new THREE.Vector3().addVectors(A, perp);
@@ -4396,12 +4399,15 @@ export function setupMR(view, project, getFootprint) {
         if (!targetNodeId) {
           const { px, py } = worldToPlan(pos);
           const z = Math.max(0, pos.y - overlayY());
-          targetNodeId = project.addConduitNode({ x: px, y: py, z }).id;
+          targetNodeId = project.addConduitNode({ x: px, y: py, z, emit: false }).id;
         }
-        if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId);
+        if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId, { emit: false });
         penNodeId = targetNodeId;
-        project.touch(); // ensureConduitNodeAtMarker doesn't emit on its own
-        buildConduits(); buildAdjacentTargets('marker_conduit'); buildPlan(); applyPlanMatrix();
+        // One solve + notify for the whole pen step (node + segment + any marker bind),
+        // instead of an _emit per mutation. A conduit node touches no plan geometry, so
+        // skip the costly buildPlan()/dimension rebuild — only the conduit layer changed.
+        project.touch();
+        buildConduits(); buildAdjacentTargets('marker_conduit');
         rlog('conduit pen', { node: penNodeId, riser: !!hoverAdjacent });
       },
     },
@@ -5385,7 +5391,8 @@ export function setupMR(view, project, getFootprint) {
       : modes[currentMode].id === 'marker_conduit'
       ? (penNodeId ? t('conduit.run') : t('conduit.pickStart'))
       : modes[currentMode].id === 'conduit_edit'
-      ? (selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickNode'))
+      ? (hoverConduitSegmentId ? t('conduit.editSeg')
+        : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickNode'))
       : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')

@@ -468,10 +468,10 @@ export class Project {
   // floor) or bound to a device marker (markerId set → position + floor follow the live
   // marker). Segments join two nodes; one whose ends resolve to different floors is a
   // riser. `floorId` defaults to the active floor for a bare junction.
-  addConduitNode({ x = 0, y = 0, z = 0, floorId = this.activeFloorId, markerId = null } = {}) {
+  addConduitNode({ x = 0, y = 0, z = 0, floorId = this.activeFloorId, markerId = null, emit = true } = {}) {
     const node = { id: nextConduitNodeId(), x, y, z: z || 0, floorId, markerId };
     this.conduitNodes.push(node);
-    this._emit();
+    if (emit) this._emit();
     return node;
   }
 
@@ -489,14 +489,14 @@ export class Project {
   }
 
   // Join two nodes with a conduit segment (idempotent — one segment per node pair).
-  addConduitSegment(aNodeId, bNodeId) {
+  addConduitSegment(aNodeId, bNodeId, { emit = true } = {}) {
     if (!aNodeId || !bNodeId || aNodeId === bNodeId) return null;
     const existing = this.conduitSegments.find((s) =>
       (s.a === aNodeId && s.b === bNodeId) || (s.a === bNodeId && s.b === aNodeId));
     if (existing) return existing;
     const seg = { id: nextConduitSegmentId(), a: aNodeId, b: bNodeId };
     this.conduitSegments.push(seg);
-    this._emit();
+    if (emit) this._emit();
     return seg;
   }
 

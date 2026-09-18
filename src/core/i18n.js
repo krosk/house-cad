@@ -334,6 +334,7 @@ const STRINGS = {
   'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },
   'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
   'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
+  'conduit.editSeg':  { en: 'SEGMENT — SPLIT / GRIP DEL', fr: 'SEGMENT — DIVISER / SAISIR SUPPR', zh: '管段 — 分割 / 握把删除' },
 };
 
 let current = 'en';
