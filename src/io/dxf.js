@@ -9,7 +9,7 @@ import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
 import { electricalRoutePoints } from '../core/electrical.js';
-import { conduitNetworkSegments, wireRouteSegments } from '../core/conduit.js';
+import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 const MM = 1000;
@@ -52,7 +52,9 @@ const LAYERS = [
   ['ELECTRICAL_ROUTE_WALL', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_CEILING', 4, 'DOTTED'],
   ['ELECTRICAL_ROUTE_FLOOR', 4, 'DOTTED'],
+  ['ELECTRICAL_ROUTE_RISER', 4, 'DOTTED'], // routed wire crossing a slab (riser)
   ['CONDUIT', 8, 'DASHED'],
+  ['CONDUIT_RISER', 8, 'DASHED'],          // conduit crossing a slab (riser)
 ];
 
 const cleanNumber = (value) => {
@@ -424,7 +426,15 @@ const WIRE_SURFACE_LAYER = {
   wall: 'ELECTRICAL_ROUTE_WALL',
   ceiling: 'ELECTRICAL_ROUTE_CEILING',
   floor: 'ELECTRICAL_ROUTE_FLOOR',
+  riser: 'ELECTRICAL_ROUTE_RISER',
 };
+
+// A riser glyph on a floor's plan: a small circle at the slab-penetration point plus a
+// UP/DN tag toward the connected storey. Drawn in plan (2D), like all sheet symbols.
+function writeRiserGlyph(w, layer, r) {
+  w.circle(layer, r.x, r.y, 0.07);
+  w.text(layer, r.dir === 'up' ? 'UP' : 'DN', r.x + 0.09, r.y - 0.05, 0.1);
+}
 
 function writeElectricalLinks(w, floor) {
   for (const link of floor.electricalLinks || []) {
@@ -437,29 +447,39 @@ function writeElectricalLinks(w, floor) {
   }
 }
 
-// The shared conduit network as true-3D LINE entities on one CONDUIT layer.
-function writeConduits(w, floor) {
-  for (const seg of conduitNetworkSegments(floor)) {
-    w.line3d('CONDUIT', seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DASHED');
+// The whole-house conduit network filtered to one floor: intra-floor runs as true-3D
+// LINEs at storey-LOCAL Z (elevation subtracted, matching the control routes/markers on
+// this sheet), and slab-piercing risers as plan glyphs on the CONDUIT_RISER layer.
+function writeConduits(w, project, floor) {
+  const dz = floor.elevation || 0;
+  const { runs, risers } = segmentsForFloor(floor, conduitNetworkSegments(project));
+  for (const s of runs) {
+    w.line3d('CONDUIT', s.a.x, s.a.y, s.a.z - dz, s.b.x, s.b.y, s.b.z - dz, 'DASHED');
   }
+  for (const r of risers) writeRiserGlyph(w, 'CONDUIT_RISER', r);
 }
 
-// Wires routed over the conduits, split onto per-surface layers (wall/ceiling/floor)
-// so the inferred run location survives into CAD. True-3D, so a top view shows plan.
-function writeRoutedWires(w, floor) {
-  for (const wire of floor.wires || []) {
-    for (const seg of wireRouteSegments(floor, wire)) {
-      const layer = WIRE_SURFACE_LAYER[seg.surface] || 'ELECTRICAL_ROUTE_WALL';
-      w.line3d(layer, seg.a.x, seg.a.y, seg.a.z, seg.b.x, seg.b.y, seg.b.z, 'DOTTED');
-    }
+// Wires routed over the conduits, split onto per-surface layers (wall/ceiling/floor/
+// riser) so the inferred run location survives into CAD. Filtered per floor: intra-floor
+// legs are true-3D at local Z; slab crossings become riser glyphs.
+function writeRoutedWires(w, project, floor) {
+  const dz = floor.elevation || 0;
+  const worldSegs = (project.wires || []).flatMap((wire) => wireRouteSegments(project, wire));
+  const { runs, risers } = segmentsForFloor(floor, worldSegs);
+  for (const s of runs) {
+    const layer = WIRE_SURFACE_LAYER[s.surface] || 'ELECTRICAL_ROUTE_WALL';
+    w.line3d(layer, s.a.x, s.a.y, s.a.z - dz, s.b.x, s.b.y, s.b.z - dz, 'DOTTED');
   }
+  for (const r of risers) writeRiserGlyph(w, 'ELECTRICAL_ROUTE_RISER', r);
 }
 
 /**
  * Export one floor as an ASCII AutoCAD 2000 DXF in millimeters.
  * Geometry is full-size (1 model meter = 1000 DXF units), never paper-scaled.
+ * `project` supplies the whole-house conduit network + wires (they span floors);
+ * only the parts touching `floor` are drawn, with slab crossings as riser glyphs.
  */
-export function floorToDxf(floor, opts = {}) {
+export function floorToDxf(project, floor, opts = {}) {
   const layers = resolveOutputLayers(opts);
   const rectangles = floor.rectangles.filter((rect) => layers.furniture || zoneKind(rect) !== 'furniture');
   const w = new DxfWriter();
@@ -482,8 +502,10 @@ export function floorToDxf(floor, opts = {}) {
   if (layers.markerDims) writeMarkerDimensions(w, floor);
   if (layers.markerIcons) {
     for (const marker of floor.markers || []) writeMarker(w, marker);
-    writeConduits(w, floor);
-    writeRoutedWires(w, floor);
+    if (layers.wiring) { // conduit network + routed wires are an opt-in layer (default off)
+      writeConduits(w, project, floor);
+      writeRoutedWires(w, project, floor);
+    }
     writeElectricalLinks(w, floor);
   }
 

@@ -23,7 +23,7 @@ The headset label and help header show the localized `GROUP · TOOL` breadcrumb.
 navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_conduit`, `conduit_edit`, `marker_wire`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
+`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_conduit`, `conduit_dims`, `conduit_edit`, `marker_wire`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
 `move_down`, `save`, `load`, `export`, `unit`, `lang`.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
@@ -106,14 +106,19 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   legs: vertical rise from the switch, a direct ceiling run at storey height, then a drop if the
   light is below the ceiling. Routes are visible only in LINK mode; the sheet draws their dotted
   plan projection and DXF writes their true 3D segments on `ELECTRICAL_ROUTE`.
-- **MARKER · CONDUIT** (`id: marker_conduit`) — author the shared **conduit network**: a per-floor
-  graph of `conduitNodes` (bare junctions, or nodes bound to a device `markerId` that follow the live
-  marker) joined by `conduitSegments`. Pen model: `penNodeId` is the growing end. Trigger a device
-  marker or an existing node to start the pen there; trigger empty space to drop a junction (X/Y from
-  the floor reticle, z from the tip) and run a segment to it; trigger another node to join/branch/loop.
-  Grip lifts the pen (no deletion). The network is drawn live in `conduitGroup` colored per inferred
-  segment surface (`conduitNetworkSegments` + `segmentSurface`), with a node sphere per vertex
-  (marker-bound dimmer). Readout: `START PEN`, then `RUN CONDUIT`.
+- **MARKER · CONDUIT** (`id: marker_conduit`) — author the **whole-house conduit network** (on
+  `Project`, not a floor): a graph of `conduitNodes` (bare junctions carrying `{x,y,z,floorId}`, or
+  nodes bound to a device `markerId` that follow the live marker) joined by `conduitSegments`. Pen
+  model: `penNodeId` is the growing end. Trigger a device marker or an existing node to start the pen
+  there; trigger empty space to drop a junction (X/Y from the floor reticle, z from the tip, floorId =
+  active floor) and run a segment to it; trigger another node to join/branch/loop. Grip lifts the pen
+  (no deletion). **Cross-floor risers:** the floor directly above/below is drawn dimmed (`adjacentGroup`)
+  at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
+  yellow); triggering one runs a segment across the slab — a **riser**. The network is drawn live in
+  `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`), colored per inferred surface
+  (`conduitNetworkSegments` + `segmentSurface`; risers violet), showing only segments touching the
+  active floor, with a node sphere per active-floor vertex (marker-bound dimmer). Readout: `START PEN`,
+  then `RUN CONDUIT`.
 - **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are
   always drawn, so no wire-select step). Trigger a node to **select** it; a free (bare) junction opens
   a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad — DEL removes
@@ -126,16 +131,31 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   immovable** (they follow their device) and have no pad — selecting one just arms it. **Grip away
   from a node deletes the selected node + its segments** (`onReset` → `removeConduitNode`; `via`
   references to it are dropped). Readout: `PICK NODE`, then `EDIT NODE`.
+- **CONDUIT · DIMS** (`id: conduit_dims`) — dimension a **bare junction to a wall** so it tracks that
+  wall on every edit. It shares the DIMS numpad machinery with PLAN/OUTLET DIMS via a third
+  ref kind, `node` (see the `modeDomain`/`dimDomain` helpers): first trigger a bare junction
+  (`conduitNodeAtFloorPoint`, marker-bound nodes excluded), then a wall edge; the numpad sets the
+  distance (B/Y flips the pair). Commit builds a `{node}` distance constraint (`makeNodeDistance`) in
+  the node's own floor, resolved ONE-WAY in `solveConduitNodes` (the junction follows, the wall never
+  moves) — exactly the marker-pin model. At most one pin per (node, axis); re-picking a wall re-anchors.
+  Pin X and Y separately for a full lock (`node._full`). Marker-bound nodes are inert here. The pin
+  draws in `buildDimensions` like an outlet pin but with a cyan (conduit) label; node dims are AR-only
+  authoring aids and never appear in sheet/DXF output (the sheet/DXF constraint loops skip any endpoint
+  with no drawable `.rect`). The conduit network is shown for picking (hovered/selected junctions
+  enlarge). Readout: `PICK NODE`, then `<->  ?`.
 - **MARKER · WIRE** (`id: marker_wire`) — define **wires routed over the conduit network**. A wire is
-  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` in the per-floor `wires` array; its physical path is
-  **DERIVED** as the shortest route through the conduits (Dijkstra, threading the ordered `via` nodes),
-  never stored — an unroutable wire simply draws nothing. Trigger two device markers to define one
-  (`project.addWire`, auto shortest route drawn at once); the created wire becomes selected. While a
+  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` in the **whole-house** `project.wires` array; its
+  physical path is **DERIVED** as the shortest route through the conduits (Dijkstra, threading the
+  ordered `via` nodes), never stored — an unroutable wire simply draws nothing. Trigger two device
+  markers to define one (`project.addWire`, which resolves markers house-wide, auto shortest route drawn
+  at once); the created wire becomes selected. **Cross-floor wires:** an adjacent-floor device (dimmed
+  in `adjacentGroup`) can be either endpoint, so a wire may span storeys over a riser. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
   override); grip **pops the last via** (`popWireVia`), or with no vias left **deletes the wire**
   (`removeWire`). Trigger an existing wire to re-select it; trigger empty space to deselect. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
-  `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green). A
+  `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green, riser
+  violet), showing the legs touching the active floor. A
   live amber preview threads the pending pair (first endpoint → hovered marker/tip). Readout:
   `PICK START`, `PICK END`, then `VIA · <n>`. The wall/ceiling/floor surface of each segment is
   **inferred** from geometry (`segmentSurface`), never stored. This REPLACES the removed

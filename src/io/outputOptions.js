@@ -3,11 +3,15 @@
 // live in localStorage and old project saves remain unchanged.
 
 export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'coohom', 'json'];
-export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'furniture', 'area'];
+export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'area'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,
   markerDims: true,
   markerIcons: true,
+  // The conduit network + routed wires (both riser glyphs included). Default OFF: they
+  // are authoring scaffold that clutters a contractor sheet. Markers and switch→light
+  // control links are unaffected. Gated under markerIcons (routes need endpoint glyphs).
+  wiring: false,
   furniture: false,
   area: true,
 });
@@ -22,6 +26,7 @@ export function resolveOutputLayers(options = {}) {
     planDims: bool(source.planDims, OUTPUT_LAYER_DEFAULTS.planDims),
     markerDims: bool(source.markerDims, OUTPUT_LAYER_DEFAULTS.markerDims),
     markerIcons: bool(source.markerIcons, OUTPUT_LAYER_DEFAULTS.markerIcons),
+    wiring: bool(source.wiring, OUTPUT_LAYER_DEFAULTS.wiring),
     furniture: bool(source.furniture, OUTPUT_LAYER_DEFAULTS.furniture),
     area: bool(source.area, OUTPUT_LAYER_DEFAULTS.area),
   };

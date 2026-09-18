@@ -7,7 +7,7 @@
 //   screen = CSS pixels on the canvas, +y DOWN (canvas convention)
 
 import { Rectangle } from '../core/model.js';
-import { makeDistance, EDGE_AXIS, isMarkerConstraint } from '../core/constraints.js';
+import { makeDistance, EDGE_AXIS, isMarkerConstraint, isNodeConstraint } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld, setDimLabelCoord } from '../core/dimline.js';
 import { fmt, unitLabel, unitInfo } from '../core/units.js';
 import { zoneKind, zoneColorCss, zoneColorRgb } from '../core/zoneColors.js';
@@ -593,7 +593,7 @@ export class Sketch2D {
 
     for (const c of constraints) {
       if (c.type !== 'distance') continue;
-      if (isMarkerConstraint(c)) continue; // marker pins are AR-only; the 2D editor doesn't draw them
+      if (isMarkerConstraint(c) || isNodeConstraint(c)) continue; // marker/node pins are AR-only; the 2D editor doesn't draw them
       const la = this._edgeLineWorld(c.a);
       const lb = this._edgeLineWorld(c.b);
       if (!la || !lb) continue;

@@ -1,0 +1,8 @@
+name = "ikea-rotera-proxy"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# No KV/D1/secrets needed — this is a stateless passthrough with edge caching.
+# After `wrangler deploy` the Worker is reachable at:
+#   https://ikea-rotera-proxy.<your-subdomain>.workers.dev
+# Put that URL in the app's VITE_IKEA_PROXY (see .env.example at the repo root).

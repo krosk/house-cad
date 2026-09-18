@@ -25,7 +25,7 @@ npm run preview  # serve the production build
 
 ## Core architecture
 
-The whole app is a one-way pipeline driven by a change bus. `Project` (in `src/core/model.js`) holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks` (switch→light control links), the `conduitNodes`/`conduitSegments`/`wires` electrical network (wires route over conduits; path derived in `src/core/conduit.js`, never stored), and `height`, and exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
+The whole app is a one-way pipeline driven by a change bus. Each `Floor` holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks` (switch→light control links), `furniture`, and `height`. `Project` (in `src/core/model.js`) additionally owns the **whole-house** `conduitNodes`/`conduitSegments`/`wires` electrical network: a conduit node stores position **relative to its floor** (`{x,y,z,floorId}`, or `{markerId}` bound to a live device), so a segment joining nodes on two storeys is a **riser** through the slab and a wire may connect device markers on different floors. All network positions resolve in absolute world Z (`floor.elevation + z`) at derivation time (`src/core/conduit.js`), never stored — so a floor-height edit re-stacks elevations and every higher node's world height follows. A **bare junction can be dimensioned to a wall** (a `{node}` constraint endpoint, resolved one-way in `solveConduitNodes` like a marker pin), so it tracks that wall on every edit; marker-bound nodes follow their device and are never pinned. `Project` exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
 
 ```
 rectangles (add/subtract, ordered)
@@ -58,7 +58,7 @@ before the solver runs once, preserving all relative dimensions and marker pins.
 
 ### Persistence
 
-`src/io/serialize.js` serializes the parametric definition (rectangles + constraints + markers + electrical links + conduit nodes/segments + wires + height) to JSON; the footprint/mesh is always recomputed, never stored. Missing `electricalLinks` default to `[]`, so older saves remain compatible. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`), and paste replaces the selected floor's authored plan with collision-free rectangle/constraint/marker/link ids plus remapped references. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
+`src/io/serialize.js` serializes the parametric definition to JSON (**`FILE_VERSION = 3`**): each floor carries rectangles + constraints + markers + electrical links + furniture + height, and the **whole-house** conduit nodes/segments + wires live at the top level. The footprint/mesh is always recomputed, never stored. Back-compat: v1/v2 files stored the conduit network per-floor — on load, when the top-level arrays are absent, each floor's conduit/wires are gathered up and every node stamped with that floor's id (lossless, since each old network was single-floor). Missing `electricalLinks` default to `[]`. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`) and carries only the **intra-floor** conduit/wire subset; paste replaces the selected floor's authored plan with collision-free ids plus remapped references, re-stamping bare junctions to the destination floor. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
 
 ### Plan sheets (printing / SVG export)
 
@@ -72,7 +72,12 @@ marker pins, and electrical routes without relying on color. AR interaction over
 and rounds the ratio denominator upward (`1:56.7` → `1:57`). It shares scale, orientation, origin, and
 generation time across Print, SVG, and AR previews so pages can be superposed. Sheets include the
 footprint, structural and marker-pin dimensions, dotted electrical routes, fixture stacks, semantic
-door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. FURNITURE defaults to
+door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. The whole-house conduit
+network + wires are an **opt-in layer** (the `wiring` output filter in `outputOptions.js`, default
+**off** — it's authoring scaffold that clutters a contractor sheet); when on, they are filtered per
+floor (`segmentsForFloor`): intra-floor runs draw in plan and a slab-piercing run collapses to a
+**riser glyph** (a ring + UP/DN tag, keyed in the legend) shown on both floors it connects. Markers
+and per-floor switch→light control links are unaffected by the `wiring` filter. FURNITURE defaults to
 hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
 remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
 still do. Vertical marker stacks require strictly identical plan `x` and `y`; horizontal fixtures
@@ -116,10 +121,15 @@ importers such as Coohom. It is model-space CAD, not a paper sheet: one meter be
 units and `$INSUNITS=4` declares millimeters. Separate layers retain `FOOTPRINT`, enabled semantic
 zone kinds, enabled structural and marker-pin dimensions/markers, room areas, true 3D
 `ELECTRICAL_ROUTE` switch legs, the `CONDUIT` network, per-surface routed wires
-(`ELECTRICAL_ROUTE_WALL`/`_CEILING`/`_FLOOR`), and `ORIGIN`.
+(`ELECTRICAL_ROUTE_WALL`/`_CEILING`/`_FLOOR`), and `ORIGIN`. The `CONDUIT` network + routed wires
+obey the same opt-in `wiring` filter as the sheets (default off; markers + control links unaffected);
+when on, they are filtered to the active floor (via `segmentsForFloor`) and drawn at storey-local Z,
+and a run that pierces the floor's slab becomes a **riser glyph** (`CONDUIT_RISER` /
+`ELECTRICAL_ROUTE_RISER`) on both floors it connects.
 The toolbar Print menu's **Download DXF (this floor)** mirrors the active-floor SVG action. In AR,
 **PROJECT · EXPORT** always targets the active LEVEL floor. Right thumbstick up/down switches SVG/DXF;
-a ray-picked panel toggles plan dims, marker dims, marker icons, furniture, and room area, plus a
+a ray-picked panel toggles plan dims, marker dims, marker icons, conduit/wire (opt-in, default off),
+furniture, and room area, plus a
 `COMPARE` row that cycles the change-map baseline (none → each saved slot) — flick the thumbstick while
 pointing at that row, or tap it — while a separate EXPORT button downloads. The layer profile persists
 locally (`house-cad:output:v1`), outside project saves; the baseline selection is session-only. The

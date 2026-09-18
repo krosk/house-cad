@@ -33,17 +33,42 @@ export function electricalRoutePoints(floor, link) {
   ];
 }
 
-// Classify one route segment by the surface a contractor would have run it on.
-// Inferred purely from geometry: a roughly level run near the ceiling plane is in
-// the ceiling, one near the floor is in the floor slab, and anything with vertical
-// extent (a drop/rise) or a level run at mid-height is chased inside a wall.
-export function segmentSurface(a, b, height) {
-  const CEILING_H = Number(height) || 0;
-  const LEVEL_TOL = 0.1;   // |dz| below this reads as a level run
-  const PLANE_TOL = 0.25;  // proximity to the ceiling/floor plane
-  const level = Math.abs((a.z || 0) - (b.z || 0)) < LEVEL_TOL;
-  const avgZ = ((a.z || 0) + (b.z || 0)) / 2;
-  if (level && CEILING_H > 0 && avgZ >= CEILING_H - PLANE_TOL) return 'ceiling';
-  if (level && avgZ <= PLANE_TOL) return 'floor';
+const LEVEL_TOL = 0.1;   // |dz| below this reads as a level run
+const PLANE_TOL = 0.25;  // proximity to a storey's ceiling/floor plane
+
+// Storey bands in ABSOLUTE world Z, one per floor, sorted bottom→top. Used to classify
+// whole-house conduit runs: a run whose two ends fall in different storeys is a riser.
+export function storeyBands(project) {
+  return (project?.floors || [])
+    .map((f) => ({ lo: f.elevation || 0, hi: (f.elevation || 0) + (Number(f.height) || 0) }))
+    .sort((a, b) => a.lo - b.lo);
+}
+
+// Which storey band a world-Z falls in (index into a sorted band list). Points on a
+// shared slab match the lower storey; points beyond the stack clamp to an end.
+function bandIndex(z, bands) {
+  for (let i = 0; i < bands.length; i++) {
+    if (z >= bands[i].lo - PLANE_TOL && z <= bands[i].hi + PLANE_TOL) return i;
+  }
+  return z < (bands[0]?.lo ?? 0) ? 0 : bands.length - 1;
+}
+
+// Classify one route segment by the surface a contractor would run it on, in absolute
+// world Z against the storey `bands` (from storeyBands). A run with vertical extent
+// whose ends sit in different storeys is a 'riser' (pierces a slab); otherwise a level
+// run near a storey's ceiling/floor plane is 'ceiling'/'floor', and anything else is a
+// wall chase. `bands` may be omitted for a single implicit storey [0, height]-less use.
+export function segmentSurface(a, b, bands = []) {
+  const az = a.z || 0, bz = b.z || 0;
+  const level = Math.abs(az - bz) < LEVEL_TOL;
+  if (bands.length) {
+    if (!level && bandIndex(az, bands) !== bandIndex(bz, bands)) return 'riser';
+    const avgZ = (az + bz) / 2;
+    const band = bands.find((bd) => avgZ >= bd.lo - PLANE_TOL && avgZ <= bd.hi + PLANE_TOL) || bands[bandIndex(avgZ, bands)];
+    if (band) {
+      if (level && avgZ >= band.hi - PLANE_TOL) return 'ceiling';
+      if (level && avgZ <= band.lo + PLANE_TOL) return 'floor';
+    }
+  }
   return 'wall';
 }

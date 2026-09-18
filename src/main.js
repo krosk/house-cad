@@ -88,9 +88,9 @@ const EDGE_SHORT = { left: 'L', right: 'R', top: 'T', bottom: 'B' };
 const cxCount = document.getElementById('cx-count');
 
 function renderConstraints() {
-  // Marker pins (a/b endpoint is a marker, not a rect edge) are AR-only annotations;
-  // they don't belong in the 2D dimension list.
-  const cs = project.constraints.filter((c) => !(c.a.marker || c.b.marker));
+  // Marker pins and conduit-node pins (a/b endpoint is a marker/node, not a rect edge)
+  // are AR-only annotations; they don't belong in the 2D dimension list.
+  const cs = project.constraints.filter((c) => !(c.a.marker || c.b.marker || c.a.node || c.b.node));
   cxCount.textContent = cs.length ? String(cs.length) : '';
 
   // Remove rows for deleted constraints.
@@ -312,7 +312,7 @@ try {
 } catch { /* an in-memory copy still works */ }
 
 document.getElementById('fc-copy').addEventListener('click', () => {
-  desktopFloorClipboard = createFloorClipboard(project.activeFloor);
+  desktopFloorClipboard = createFloorClipboard(project, project.activeFloor);
   try {
     localStorage.setItem(FLOOR_CLIPBOARD_KEY, JSON.stringify(desktopFloorClipboard));
   } catch { /* the current-page clipboard still works */ }
@@ -494,6 +494,7 @@ function sheetDownloadName(floor, extension, now = new Date()) {
 }
 
 const localizedSheetOptions = () => ({
+  project, // whole-house conduit network + wires (they span floors); sheets filter per floor
   floorLabel: localizedFloorName,
   generatedLabel: t('sheet.generated'),
   buildLabel: t('sheet.build'),
@@ -616,7 +617,7 @@ function printSheets(svgs) {
         } else if (b.dataset.print === 'dxf') {
           const f = project.activeFloor;
           const name = sheetDownloadName(f, 'dxf');
-          download(name, floorToDxf(f), 'application/dxf');
+          download(name, floorToDxf(project, f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — millimeters, 1:1 CAD scale.`);
         } else if (b.dataset.print === 'coohom') {
           const f = project.activeFloor;

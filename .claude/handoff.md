@@ -1,5 +1,9 @@
 # House CAD — session handoff
 
+> **Active sub-effort (2026-09-17): furniture-in-AR.** If that's the task, read
+> `docs/furniture-handoff.md` first — it has the live state (M1–M3, all uncommitted). This file
+> remains the broader Phase-5 AR resume doc.
+
 **Read this first.** This is the "how do I resume" doc — live state only. Stable detail lives in:
 - `docs/ar-survey.md` — how the AR survey tool (`src/ui/mr.js`) is built: modes, inputs,
   dimensioning, multi-floor/LEVEL, HUD, perf, durable traps, artifacts. **Kept current — trust it

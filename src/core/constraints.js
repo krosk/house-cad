@@ -140,6 +140,48 @@ export function makeMarkerOriginDistance(marker, axis) {
   };
 }
 
+// ---- conduit-node pins (bare junctions dimensioned to a wall) ----
+// A node endpoint is { node: <conduitNodeId> } (no edge). A node distance pins a
+// bare conduit junction's X or Y to a rect edge (or the origin) — same signed shape
+// as a marker pin, so the numpad/flip logic transfers. Resolved ONE-WAY in
+// solveConduitNodes (the node follows; it never moves the wall), excluded from the
+// rectangle solve(). Marker-bound nodes are never pinned (they follow their device).
+
+export function isNodeConstraint(c) {
+  return !!(c.a?.node || c.b?.node);
+}
+
+/** Pin a node's X or Y to a rect edge. value = node coord − edge coord (0 = on the wall). */
+export function makeNodeDistance(node, refRect, refEdge) {
+  const axis = EDGE_AXIS[refEdge];
+  return {
+    id: nextConstraintId(),
+    type: 'distance',
+    axis,
+    a: { rect: refRect.id, edge: refEdge }, // anchor (the real wall edge)
+    b: { node: node.id },                   // dependent (follows)
+    value: node[axis] - edgeCoord(refRect, refEdge),
+    offset: null,
+    labelT: 0.5,
+    conflict: false,
+  };
+}
+
+/** Pin a node's X or Y to the plan origin (coordinate 0 on that axis). */
+export function makeNodeOriginDistance(node, axis) {
+  return {
+    id: nextConstraintId(),
+    type: 'distance',
+    axis,
+    a: { rect: ORIGIN_ID, edge: axis }, // origin line, fixed at 0
+    b: { node: node.id },
+    value: node[axis],
+    offset: null,
+    labelT: 0.5,
+    conflict: false,
+  };
+}
+
 // ---- dense linear solver (Gaussian elimination, partial pivoting) ----
 // Solves M x = rhs for small symmetric positive-definite M.
 function solveLinear(M, rhs) {
@@ -225,7 +267,9 @@ export function solve(floor) {
     // Anchor boost: the first edge (a) of each distance dimension holds. Marker
     // pins are excluded — they reference a marker endpoint that is not a rect
     // variable, are resolved one-way in solveMarkers, and must never tug a wall.
-    const axisConstraints = constraints.filter((c) => c.axis === axis && !isMarkerConstraint(c));
+    const axisConstraints = constraints.filter(
+      (c) => c.axis === axis && !isMarkerConstraint(c) && !isNodeConstraint(c),
+    );
     for (const c of axisConstraints) {
       const ia = index.get(`${c.a.rect}:${c.a.edge}`);
       if (ia != null && vars[ia].weight === W_STAY) vars[ia].weight = W_ANCHOR;
@@ -322,4 +366,44 @@ export function solveMarkers(floor) {
   }
 
   for (const m of markers) m._full = m._locked.x && m._locked.y;
+}
+
+/**
+ * Resolve whole-house conduit-node pins, ONE-WAY, after every floor's solve()/
+ * solveMarkers() has settled. A node distance constraint lives in the constraints
+ * of the node's OWN floor and pins the bare junction's X or Y to a (now-resolved)
+ * rect edge or the plan origin ON THAT FLOOR; the node follows, the wall never
+ * moves. Marker-bound nodes are skipped (they follow their device marker). Tags
+ * each pinned node `_locked = {x,y}` and `_full` (both pinned → glyph reads placed);
+ * z is never touched — it is inherent, edited on the CONDUIT·EDIT height pad.
+ */
+export function solveConduitNodes(project) {
+  const nodes = project.conduitNodes || [];
+  if (!nodes.length) return;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  for (const n of nodes) n._locked = { x: false, y: false };
+
+  for (const floor of project.floors) {
+    const rectById = new Map(floor.rectangles.map((r) => [r.id, r]));
+    for (const c of floor.constraints) {
+      if (!isNodeConstraint(c)) continue;
+      c.conflict = false; // one-way pins are always satisfiable
+      const nodeIsB = !!c.b.node;
+      const nodeEnd = nodeIsB ? c.b : c.a;
+      const refEnd = nodeIsB ? c.a : c.b;
+      const n = byId.get(nodeEnd.node);
+      if (!n || n.markerId) continue; // dangling, or marker-bound (follows its device)
+      let refCoord;
+      if (refEnd.rect === ORIGIN_ID) refCoord = 0;
+      else {
+        const rr = rectById.get(refEnd.rect);
+        if (!rr) continue; // dangling ref (rect deleted) — leave the node free
+        refCoord = edgeCoord(rr, refEnd.edge);
+      }
+      n[c.axis] = nodeIsB ? refCoord + c.value : refCoord - c.value;
+      n._locked[c.axis] = true;
+    }
+  }
+
+  for (const n of nodes) n._full = n._locked.x && n._locked.y;
 }

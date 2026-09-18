@@ -13,9 +13,11 @@
 
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { Rectangle } from '../core/model.js';
 import { connectedRoomComponent } from '../core/geometry2d.js';
-import { makeDistance, makeOriginDistance, makeMarkerDistance, isMarkerConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
+import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
@@ -435,6 +437,7 @@ export function setupMR(view, project, getFootprint) {
     function redraw(floor, changeMap = null) {
       const oldWidth = canvas.width, oldHeight = canvas.height;
       const sheetOpts = sharedScaleSheetOptions(project.floors, {
+        project, // whole-house conduit/wires span floors; sheets filter per floor
         page: 'a4',
         targetPx: 2048,
         layers: getOutputSettings(),
@@ -571,10 +574,10 @@ export function setupMR(view, project, getFootprint) {
   // preview/export targets the active LEVEL floor. Thumbstick-y switches format;
   // trigger toggles a row or presses the explicit EXPORT button.
   function makeExportMenu() {
-    // Taller than the original 640 so the format + new "Compare" (change-map
-    // baseline) rows, the five layer toggles, and the download button all fit
-    // without the button clipping off the bottom. The plane keeps the canvas aspect.
-    const W = 512, H = 768;
+    // Tall enough that the format + "Compare" (change-map baseline) rows, the six layer
+    // toggles, and the download button all fit without the button clipping off the
+    // bottom. The plane keeps the canvas aspect.
+    const W = 512, H = 836;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -588,10 +591,10 @@ export function setupMR(view, project, getFootprint) {
     group.add(mesh);
     group.visible = false;
 
-    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'furniture', 'area'];
+    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'area'];
     const BASELINE_Y = 186, BASELINE_H = 58;   // change-map "Compare" row
-    const TOGGLE_Y = 268, ROW_H = 68;          // 5 layer toggles → 268..608
-    const BUTTON_Y = 632, BUTTON_H = 112;      // download button → 632..744 (fits H=768)
+    const TOGGLE_Y = 268, ROW_H = 68;          // 6 layer toggles → 268..676
+    const BUTTON_Y = 700, BUTTON_H = 112;      // download button → 700..812 (fits H=836)
     function actionAt(u, v) {
       const cy = (1 - v) * H;
       if (cy >= BASELINE_Y && cy < BASELINE_Y + BASELINE_H) return 'baseline';
@@ -948,6 +951,18 @@ export function setupMR(view, project, getFootprint) {
   const routedWireGroup = new THREE.Group();
   routedWireGroup.visible = false;
   planGroup.add(routedWireGroup);
+  // Cross-floor authoring targets: the floor directly above/below, dimmed at its true
+  // height, so a CONDUIT pen can close a riser onto its nodes/devices and a WIRE can span
+  // storeys. Shown only in CONDUIT/WIRE modes; rebuilt on demand, not by clearPlanGeometry.
+  const adjacentGroup = new THREE.Group();
+  adjacentGroup.visible = false;
+  planGroup.add(adjacentGroup);
+  // Furniture GLBs (real-scale product models, e.g. IKEA "rotera" models) live in
+  // their own group under planGroup so they ride the plan's yaw + per-floor elevation
+  // for free — a parallel lane like markers, never touching the boolean/extrude/solver
+  // pipeline. Async-loaded and skipped by clearPlanGeometry (see buildFurniture).
+  const furnitureGroup = new THREE.Group();
+  planGroup.add(furnitureGroup);
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1117,9 +1132,11 @@ export function setupMR(view, project, getFootprint) {
     // highlight that constraint's edges and selecting it loads the constraint to edit.
     const endpointToRef = (ep) => ep.marker
       ? { kind: 'marker', markerId: ep.marker }
-      : ep.rect === ORIGIN_ID
-        ? { kind: 'origin' }
-        : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+      : ep.node
+        ? { kind: 'node', nodeId: ep.node }
+        : ep.rect === ORIGIN_ID
+          ? { kind: 'origin' }
+          : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
     const pushDim = (sprite, c) => {
       sprite.userData.cId = c.id;
       sprite.userData.refA = endpointToRef(c.a);
@@ -1171,6 +1188,37 @@ export function setupMR(view, project, getFootprint) {
           segs.push({ ax: marker.x - tick, ay: marker.y, bx: xLine + tick, by: marker.y, conflict, marker: true });
           const ly = dimLabelCoord(c, le.coord, marker.y);
           pushLeader(le.coord, marker.y, ly, xLine, 'y', { conflict, marker: true });
+          pushDim(makeDimLabel(text, color, xLine, ly), c);
+        }
+        continue;
+      }
+      if (isNodeConstraint(c)) {
+        // Conduit-node pin: draw from its wall edge to the bare junction's plan point,
+        // like an outlet pin. Cyan label marks it as conduit (vs the amber outlet pin).
+        const nodeEnd = c.a.node ? c.a : c.b;
+        const edgeEnd = c.a.node ? c.b : c.a;
+        const node = project.conduitNodes.find((n) => n.id === nodeEnd.node);
+        const le = edgeLine(edgeEnd, floor.rectangles);
+        if (!node || node.markerId || !le) continue; // marker-bound nodes aren't pinned
+        const conflict = !!c.conflict;
+        const text = `${fmt(Math.abs(c.value))} ${unitLabel()}`;
+        const color = conflict ? '#ff5c5c' : '#22d3ee';
+        const tick = 0.045;
+        if (c.axis === 'x') {
+          const yLine = c.offset != null ? c.offset : node.y;
+          segs.push({ ax: le.coord, ay: yLine, bx: node.x, by: yLine, conflict, marker: true });
+          segs.push({ ax: le.coord, ay: node.y - tick, bx: le.coord, by: yLine + tick, conflict, marker: true });
+          segs.push({ ax: node.x, ay: node.y - tick, bx: node.x, by: yLine + tick, conflict, marker: true });
+          const lx = dimLabelCoord(c, le.coord, node.x);
+          pushLeader(le.coord, node.x, lx, yLine, 'x', { conflict, marker: true });
+          pushDim(makeDimLabel(text, color, lx, yLine), c);
+        } else {
+          const xLine = c.offset != null ? c.offset : node.x;
+          segs.push({ ax: xLine, ay: le.coord, bx: xLine, by: node.y, conflict, marker: true });
+          segs.push({ ax: node.x - tick, ay: le.coord, bx: xLine + tick, by: le.coord, conflict, marker: true });
+          segs.push({ ax: node.x - tick, ay: node.y, bx: xLine + tick, by: node.y, conflict, marker: true });
+          const ly = dimLabelCoord(c, le.coord, node.y);
+          pushLeader(le.coord, node.y, ly, xLine, 'y', { conflict, marker: true });
           pushDim(makeDimLabel(text, color, xLine, ly), c);
         }
         continue;
@@ -1330,7 +1378,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup) continue; // rebuilt separately below
+      if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup || child === furnitureGroup) continue; // rebuilt separately below
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -1754,7 +1802,7 @@ export function setupMR(view, project, getFootprint) {
 
   // Per-surface colors for conduits + routed wires (inferred, not stored): a run
   // inside the ceiling reads cyan, inside a wall amber, inside the floor slab green.
-  const WIRE_SURFACE_COLOR = { ceiling: 0x38bdf8, wall: 0xf59e0b, floor: 0x34d399 };
+  const WIRE_SURFACE_COLOR = { ceiling: 0x38bdf8, wall: 0xf59e0b, floor: 0x34d399, riser: 0xa78bfa };
 
   // Build one dashed line from a list of model points {x,y,z} → world.
   function makeRouteLine(points, color) {
@@ -1808,24 +1856,35 @@ export function setupMR(view, project, getFootprint) {
   const WAYPOINT_GRAB_M = 0.14; // m; tip within this of a node handle → direct 3D carry, else remote
 
   // ---- Conduit network rendering + picking ---------------------------------
+  // The conduit network + wires are WHOLE-HOUSE and resolve in ABSOLUTE world Z, but
+  // conduitGroup/routedWireGroup ride planGroup (already lifted by activeElevation), so
+  // strip the active-floor lift off each z to place geometry correctly; a riser's far
+  // end then sits at ±storey height above/below the active overlay.
+  const planLocalZ = (p) => ({ x: p.x, y: p.y, z: (p.z || 0) - activeElevation() });
+  // A segment/wire-leg belongs to the active-floor view if either end is on it.
+  const touchesActiveFloor = (s) => s.aFloorId === project.activeFloorId || s.bFloorId === project.activeFloorId;
+
   const conduitNodeGeom = new THREE.SphereGeometry(0.022, 12, 12);
-  // Draw every conduit segment (dashed, colored by inferred surface) and a small
-  // sphere per node (marker-bound nodes dimmer than free junctions). Rebuilt on
-  // any topology change; node spheres carry userData for picking/handles.
-  function buildConduits(floor = project.activeFloor) {
+  // Draw every conduit segment touching the active floor (dashed, colored by inferred
+  // surface; risers reuse the wall color) and a small sphere per active-floor node
+  // (marker-bound nodes dimmer than free junctions). Rebuilt on any topology change;
+  // node spheres carry userData for picking/handles.
+  function buildConduits() {
     for (const child of [...conduitGroup.children]) {
       conduitGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
     }
     conduitPreviewLine = null; // recreated on demand in the render branch
-    for (const seg of conduitNetworkSegments(floor)) {
+    for (const seg of conduitNetworkSegments(project)) {
+      if (!touchesActiveFloor(seg)) continue;
       const baseColor = WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b;
-      const line = makeRouteLine([seg.a, seg.b], baseColor);
+      const line = makeRouteLine([planLocalZ(seg.a), planLocalZ(seg.b)], baseColor);
       line.userData.conduitSegmentId = seg.id;
       line.userData.baseColor = baseColor; // restored when un-hovered (CONDUIT EDIT recolors the hover target)
       conduitGroup.add(line);
     }
-    for (const node of floor.conduitNodes || []) {
-      const p = conduitNodePos(floor, node);
+    for (const node of project.conduitNodes || []) {
+      if (project.conduitNodeFloorId(node) !== project.activeFloorId) continue; // this floor's junctions
+      const p = planLocalZ(conduitNodePos(project, node));
       const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
         color: node.markerId ? 0x94a3b8 : 0xffffff,
         depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
@@ -1837,23 +1896,24 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // Nearest conduit node under the reticle, by floor projection.
+  // Nearest conduit node ON THE ACTIVE FLOOR under the reticle, by plan projection.
   function conduitNodeAtFloorPoint(px, py) {
     let best = null, bestD = RETICLE_OUTER;
     for (const node of project.conduitNodes) {
-      const p = conduitNodePos(project.activeFloor, node);
+      if (project.conduitNodeFloorId(node) !== project.activeFloorId) continue;
+      const p = conduitNodePos(project, node);
       const d = Math.hypot(px - p.x, py - p.y);
       if (d < bestD) { bestD = d; best = node; }
     }
     return best;
   }
 
-  // Nearest conduit SEGMENT under the reticle (id), ignoring collapsed vertical
+  // Nearest conduit SEGMENT touching the active floor (id), ignoring collapsed vertical
   // segments with no plan extent; used by CONDUIT EDIT to split a run.
   function conduitSegmentAtFloorPoint(px, py) {
     let best = null, bestD = WIRE_PICK_M;
-    for (const seg of conduitNetworkSegments(project.activeFloor)) {
-      if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue;
+    for (const seg of conduitNetworkSegments(project)) {
+      if (!touchesActiveFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
       const d = planPointToSegment(px, py, seg.a, seg.b);
       if (d < bestD) { bestD = d; best = seg.id; }
     }
@@ -1888,13 +1948,14 @@ export function setupMR(view, project, getFootprint) {
   // inferred wall/ceiling/floor surface. The route comes from src/core/conduit.js
   // (shortest path through the graph, threading the wire's `via` overrides), so it
   // is always live — no stored geometry. An unroutable wire simply draws nothing.
-  function buildRoutedWires(floor = project.activeFloor) {
+  function buildRoutedWires() {
     for (const child of [...routedWireGroup.children]) {
       routedWireGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
     }
-    for (const wire of floor.wires || []) {
-      for (const seg of wireRouteSegments(floor, wire)) {
-        const line = makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b);
+    for (const wire of project.wires || []) {
+      for (const seg of wireRouteSegments(project, wire)) {
+        if (!touchesActiveFloor(seg)) continue; // draw the legs on this floor (incl. riser crossings)
+        const line = makeRouteLine([planLocalZ(seg.a), planLocalZ(seg.b)], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b);
         line.userData.routedWireId = wire.id;
         line.userData.surface = seg.surface;
         routedWireGroup.add(line);
@@ -1903,17 +1964,90 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Nearest routed wire (id's object) whose plan projection passes within WIRE_PICK_M
-  // of the reticle; collapsed vertical segments have no plan extent and are skipped.
+  // of the reticle; collapsed vertical segments have no plan extent and are skipped, and
+  // only legs touching the active floor are considered.
   function routedWireAtFloorPoint(px, py) {
     let best = null, bestD = WIRE_PICK_M;
     for (const wire of project.wires) {
-      for (const seg of wireRouteSegments(project.activeFloor, wire)) {
-        if (seg.a.x === seg.b.x && seg.a.y === seg.b.y) continue;
+      for (const seg of wireRouteSegments(project, wire)) {
+        if (!touchesActiveFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
         const d = planPointToSegment(px, py, seg.a, seg.b);
         if (d < bestD) { bestD = d; best = wire; }
       }
     }
     return best;
+  }
+
+  // ---- Cross-floor authoring targets (risers + cross-floor wires) --------------
+  // The floors immediately above and below the active one (its stack neighbors).
+  function adjacentFloors() {
+    const i = project.floors.findIndex((f) => f.id === project.activeFloorId);
+    if (i < 0) return [];
+    const out = [];
+    if (i > 0) out.push(project.floors[i - 1]);
+    if (i < project.floors.length - 1) out.push(project.floors[i + 1]);
+    return out;
+  }
+
+  const adjacentTargetGeom = new THREE.SphereGeometry(0.026, 12, 12);
+  // Draw the adjacent floors' pickable targets, dimmed at their true relative height
+  // (planLocalZ): device markers in both CONDUIT and WIRE modes (a riser can terminate at
+  // a box; a wire spans storeys between two boxes), plus bare conduit junctions in CONDUIT
+  // mode. Each carries userData.adjacent = {kind, id, floorId} for the trigger handlers.
+  function buildAdjacentTargets(modeId) {
+    for (const child of [...adjacentGroup.children]) {
+      adjacentGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+    }
+    if (modeId !== 'marker_conduit' && modeId !== 'marker_wire') return;
+    const wantNodes = modeId === 'marker_conduit';
+    const addDot = (wp, adjacent, opacity) => {
+      const p = planLocalZ(wp);
+      const mesh = new THREE.Mesh(adjacentTargetGeom, new THREE.MeshBasicMaterial({
+        color: 0x64748b, depthTest: false, depthWrite: false, transparent: true, opacity,
+      }));
+      mesh.position.set(p.x, p.z, -p.y);
+      mesh.renderOrder = 15;
+      mesh.userData.adjacent = adjacent;
+      adjacentGroup.add(mesh);
+    };
+    for (const floor of adjacentFloors()) {
+      for (const m of floor.markers || []) {
+        addDot({ x: m.x, y: m.y, z: (floor.elevation || 0) + (m.z || 0) }, { kind: 'marker', id: m.id, floorId: floor.id }, 0.5);
+      }
+      if (wantNodes) {
+        for (const node of project.conduitNodes) {
+          if (node.markerId || project.conduitNodeFloorId(node) !== floor.id) continue;
+          addDot(conduitNodePos(project, node), { kind: 'node', id: node.id, floorId: floor.id }, 0.6);
+        }
+      }
+    }
+  }
+
+  // Nearest adjacent-floor target under the reticle (plan projection), or null.
+  function adjacentTargetAtFloorPoint(px, py) {
+    let best = null, bestD = RETICLE_OUTER;
+    for (const child of adjacentGroup.children) {
+      const a = child.userData.adjacent;
+      if (!a) continue;
+      let mx, my;
+      if (a.kind === 'marker') { const f = project.findMarker(a.id); if (!f) continue; mx = f.marker.x; my = f.marker.y; }
+      else { const n = project.conduitNodes.find((nn) => nn.id === a.id); if (!n) continue; const wp = conduitNodePos(project, n); mx = wp.x; my = wp.y; }
+      const d = Math.hypot(px - mx, py - my);
+      if (d < bestD) { bestD = d; best = a; }
+    }
+    return best;
+  }
+
+  // Recolor adjacent-floor target dots each frame: the hovered one reads yellow + enlarged
+  // (it will close a riser / cross-floor wire), the rest stay dim slate.
+  function highlightAdjacentTargets() {
+    for (const child of adjacentGroup.children) {
+      const a = child.userData.adjacent;
+      if (!a) continue;
+      const hot = hoverAdjacent && hoverAdjacent.kind === a.kind && hoverAdjacent.id === a.id;
+      child.material.color.setHex(hot ? 0xffe14d : 0x64748b);
+      child.scale.setScalar(hot ? 1.6 : 1);
+    }
   }
 
   // Read-only building overview: every independent plan stays aligned to the shared
@@ -1937,7 +2071,187 @@ export function setupMR(view, project, getFootprint) {
       if (withDims) buildDimensions(floor, elevation, false);
       if (withDims) addFloorMarkers(floor, elevation, false);
     }
+    // Whole-house conduit network + wires, drawn ONCE at absolute world Z (the stacked
+    // view is seated at the ground datum, so p.z maps straight to height). Risers read as
+    // vertical runs between storeys. Drawn into planGroup so clearPlanGeometry sweeps them.
+    for (const seg of conduitNetworkSegments(project)) {
+      planGroup.add(makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b));
+    }
+    for (const wire of project.wires || []) {
+      for (const seg of wireRouteSegments(project, wire)) {
+        planGroup.add(makeRouteLine([seg.a, seg.b], WIRE_SURFACE_COLOR[seg.surface] || 0xf59e0b));
+      }
+    }
     return planGroup.children.length > 0;
+  }
+
+  // ---- Furniture (real-scale GLB product models) — Milestone 1 spike -------------
+  // A DRACO-enabled glTF loader shared by all furniture. The decoder is vendored to
+  // public/draco/ (no CDN in the offline APK); BASE_URL resolves it under the Pages
+  // subpath and in dev alike. IKEA GLBs are Draco + WebP, authored in METERS at true
+  // scale with the floor at Y=0, so they drop straight into planGroup-local space.
+  //
+  // Models are NOT bundled: they load ON THE FLY from a CORS proxy (Cloudflare Worker
+  // in tools/ikea-proxy/) at `${VITE_IKEA_PROXY}/<article>`, because IKEA's host
+  // origin-allowlists direct browser fetches. See memory `ikea-3d-model-pipeline`.
+  const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
+  const furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
+  const furnitureSrc = new Map();     // article -> decoded source scene (cloned per instance)
+  const furniturePending = new Map(); // article -> in-flight Promise (dedupe concurrent loads)
+  let furnitureCatalog = {};          // article -> { name, sizeMm } (from public/furniture/index.json)
+  const IKEA_PROXY = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
+  const furnitureUrl = (article) => (IKEA_PROXY ? `${IKEA_PROXY}/${article}` : null);
+  const FURNITURE_CACHE = 'house-cad:furniture:v1'; // on-device GLB cache (offline reuse)
+  let furnitureBuildToken = 0; // bumped per buildFurniture so stale async adds are dropped
+
+  // Load the catalog (bundled, tiny) so box fallbacks + labels know real dimensions.
+  fetch(import.meta.env.BASE_URL + 'furniture/index.json')
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((c) => { furnitureCatalog = c || {}; if (!currentFurnitureArticle) currentFurnitureArticle = Object.keys(furnitureCatalog)[0] || null; })
+    .catch(() => { furnitureCatalog = {}; });
+
+  // A lit box at the model's real footprint, sitting on the floor (min.y = 0). Shown
+  // when no proxy is configured, a fetch fails, or the model isn't decoded yet — so the
+  // feature degrades gracefully and placement stays visible instead of vanishing.
+  function furnitureBox(article) {
+    const mm = furnitureCatalog[article]?.sizeMm || [600, 600, 600];
+    const [w, h, d] = mm.map((v) => v / 1000);
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d),
+      new THREE.MeshStandardMaterial({ color: 0x8a9aa5, transparent: true, opacity: 0.55 }),
+    );
+    mesh.position.y = h / 2; // BoxGeometry is centered; lift so its base is on the floor
+    mesh.userData.furniturePlaceholder = article;
+    return mesh;
+  }
+
+  // Fetch a GLB via the proxy, preferring the on-device Cache API so a model pulled once
+  // works offline (on-site, no wifi). Returns the decoded source scene, cached in-memory
+  // per article; concurrent requests for the same article share one promise.
+  async function loadFurnitureSource(article) {
+    if (furnitureSrc.has(article)) return furnitureSrc.get(article);
+    if (furniturePending.has(article)) return furniturePending.get(article);
+    const url = furnitureUrl(article);
+    if (!url) throw new Error('no VITE_IKEA_PROXY');
+    const p = (async () => {
+      let buf;
+      const cache = self.caches ? await caches.open(FURNITURE_CACHE) : null;
+      const hit = cache && await cache.match(url);
+      if (hit) { buf = await hit.arrayBuffer(); rlog('furniture cache hit', { article }); }
+      else {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`proxy ${res.status}`);
+        if (cache) await cache.put(url, res.clone());
+        buf = await res.arrayBuffer();
+        rlog('furniture fetched', { article, kb: Math.round(buf.byteLength / 1024) });
+      }
+      const scene = await new Promise((resolve, reject) =>
+        furnitureLoader.parse(buf, '', (gltf) => resolve(gltf.scene), reject));
+      furnitureSrc.set(article, scene);
+      return scene;
+    })();
+    furniturePending.set(article, p);
+    try { return await p; } finally { furniturePending.delete(article); }
+  }
+
+  // --- FURNISH authoring state (M3) ---------------------------------------------
+  let selectedFurnitureId = null;      // the placed item under edit (rotate/move/delete)
+  let hoverFurnitureId = null;         // item under the reticle this frame
+  let currentFurnitureArticle = null;  // the article the trigger drops; cycled by thumbstick-y
+  const FURN_ROT_STEP = 15;            // degrees per thumbstick tick when an item is selected
+  const furnitureArticleList = () => Object.keys(furnitureCatalog);
+  const furnitureLabel = (article) => furnitureCatalog[article]?.name || article;
+
+  // Give each instance its OWN materials (textures stay shared) so the hover/selected
+  // emissive highlight applies per item, not to every clone of the same article.
+  function instantiateFurniture(src) {
+    const inst = src.clone();
+    inst.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+    });
+    return inst;
+  }
+
+  // Rebuild furnitureGroup from the active floor's `furniture` array. Each item is placed
+  // at plan (x,y) -> local (x, 0, -y), rotationY degrees about vertical. Models load async;
+  // a build token guards against a floor switch landing an item from a stale rebuild.
+  function buildFurniture(floor = project.activeFloor) {
+    const token = ++furnitureBuildToken;
+    // Remove previous instances. Instance materials are cloned per item (see
+    // instantiateFurniture); dispose them so repeated rebuilds don't leak. Geometry +
+    // textures belong to the cached source and are left intact.
+    for (const child of [...furnitureGroup.children]) {
+      furnitureGroup.remove(child);
+      child.traverse?.((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
+    }
+    for (const item of floor.furniture || []) {
+      const place = (obj) => {
+        if (token !== furnitureBuildToken) return; // a newer rebuild superseded this one
+        obj.position.set(item.x, 0, -item.y);
+        obj.rotation.y = THREE.MathUtils.degToRad(item.rotationY || 0);
+        obj.userData.furnitureId = item.id;
+        furnitureGroup.add(obj);
+      };
+      loadFurnitureSource(item.article)
+        .then((src) => place(instantiateFurniture(src)))
+        .catch((err) => { place(furnitureBox(item.article)); rlog('furniture load → box', { article: item.article, err: String(err) }); });
+    }
+  }
+
+  // Nearest placed furniture item under the reticle (by plan distance), for hover/pick.
+  function furnitureAtFloorPoint(px, py) {
+    let best = null, bestD = RETICLE_OUTER;
+    for (const f of project.furniture) {
+      const d = Math.hypot(px - f.x, py - f.y);
+      if (d < bestD) { bestD = d; best = f; }
+    }
+    return best;
+  }
+
+  // Thumbstick-y in FURNISH: rotate the selected item in FURN_ROT_STEP steps, or (nothing
+  // selected) cycle the article the trigger will drop.
+  function cycleFurnish(dir = 1) {
+    if (selectedFurnitureId) {
+      const f = project.furniture.find((x) => x.id === selectedFurnitureId);
+      if (!f) return;
+      project.rotateFurniture(f.id, (((f.rotationY || 0) + dir * FURN_ROT_STEP) % 360 + 360) % 360);
+      buildFurniture();
+      rlog('furniture rotate', { id: f.id, deg: f.rotationY });
+      return;
+    }
+    const list = furnitureArticleList();
+    if (!list.length) return;
+    const i = Math.max(0, list.indexOf(currentFurnitureArticle));
+    currentFurnitureArticle = list[(i + (dir > 0 ? 1 : -1) + list.length) % list.length];
+    setModeInfo();
+    rlog('furniture article', { article: currentFurnitureArticle });
+  }
+
+  // Live furniture drag over the floor reticle (no ray-distance — furniture sits on the
+  // floor). moveFurniture with {emit:false}; release commits once via touch().
+  function applyFurnitureGripDrag(source) {
+    if (gripDrag?.kind !== 'furniture') return;
+    const hit = rayFloorHit(source);
+    if (!hit) return;
+    const { px, py } = worldToPlan(hit);
+    project.moveFurniture(gripDrag.furnitureId, { x: px, y: py }, { emit: false });
+    const clone = furnitureGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
+    if (clone) clone.position.set(px, 0, -py);
+  }
+
+  // Emissive highlight (per-instance materials): reset all, then hover=yellow, selected=amber.
+  function paintFurnitureHighlight() {
+    const tint = (id, hex) => {
+      if (!id) return;
+      const obj = furnitureGroup.children.find((c) => c.userData.furnitureId === id);
+      obj?.traverse((o) => { if (o.isMesh && o.material?.emissive) o.material.emissive.setHex(hex); });
+    };
+    for (const child of furnitureGroup.children) {
+      child.traverse?.((o) => { if (o.isMesh && o.material?.emissive) o.material.emissive.setHex(0x000000); });
+    }
+    tint(hoverFurnitureId, 0x4a4416);   // dim yellow
+    tint(selectedFurnitureId, 0x5a3d0a); // dim amber (wins if it coincides)
   }
 
   // All existing model-changing call sites rebuild through this dispatcher, so a
@@ -2006,6 +2320,9 @@ export function setupMR(view, project, getFootprint) {
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
   let hoverConduitNode = null;
+  // Cross-floor authoring: the adjacent-floor target under the reticle this frame, if any
+  // — {kind:'node'|'marker', id, floorId, x, y}. A CONDUIT/WIRE trigger connects to it.
+  let hoverAdjacent = null;
   let conduitPreviewLine = null; // live pen preview (pen node → tip), lives in conduitGroup
   // CONDUIT · EDIT: the selected node (moved/deleted) + per-frame hovered segment id.
   let selectedConduitNodeId = null;
@@ -2284,28 +2601,36 @@ export function setupMR(view, project, getFootprint) {
   // --- PLAN DIMS / OUTLET DIMS (S2 numpad) helpers ---
 
   const isXEdge = (e) => e === 'left' || e === 'right';
-  const isDimMode = (id) => id === 'plan_dims' || id === 'outlet_dims';
+  const isDimMode = (id) => id === 'plan_dims' || id === 'outlet_dims' || id === 'conduit_dims';
+  // A distance constraint's authoring domain, matched against the active DIMS mode.
+  const dimDomain = (c) => isMarkerConstraint(c) ? 'marker' : isNodeConstraint(c) ? 'node' : 'plan';
+  // The DIMS domain each mode owns (plan_dims → 'plan', outlet_dims → 'marker', conduit_dims → 'node').
+  const modeDomain = (id) => id === 'outlet_dims' ? 'marker' : id === 'conduit_dims' ? 'node' : 'plan';
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
 
-  // A reference is a rect EDGE, the plan ORIGIN axis, or a MARKER (pinned to a wall).
+  // A reference is a rect EDGE, the plan ORIGIN axis, a MARKER, or a conduit NODE
+  // (both markers and bare junctions pin one-way to a wall).
   const markerOf = (ref) => project.markers.find((m) => m.id === ref.markerId);
+  const nodeOf = (ref) => project.conduitNodes.find((n) => n.id === ref.nodeId);
   const refLabel = (ref) => (!ref ? '?'
     : ref.kind === 'origin' ? t('ref.origin')
     : ref.kind === 'marker' ? t(`marker.${markerOf(ref)?.type ?? 'outlet'}`)
+    : ref.kind === 'node' ? t('ref.node')
     : t(`edge.${ref.edge}`));
   const refsEqual = (a, b) =>
     !!a && !!b && a.kind === b.kind &&
     (a.kind === 'origin' ? true
       : a.kind === 'marker' ? a.markerId === b.markerId
+      : a.kind === 'node' ? a.nodeId === b.nodeId
       : (a.rectId === b.rectId && a.edge === b.edge));
 
   // Two refs can be dimensioned if they lie on the same coordinate axis (and are not
-  // the same target). An edge pairs with the origin on its own axis. A MARKER pin must
-  // pair with a rect EDGE (the edge supplies the axis) — marker+marker / marker+origin
+  // the same target). An edge pairs with the origin on its own axis. A MARKER or NODE
+  // pin must pair with a rect EDGE (the edge supplies the axis) — pin+pin / pin+origin
   // have no axis source and are disallowed.
   function refsCompatible(a, b) {
-    const am = a.kind === 'marker', bm = b.kind === 'marker';
-    if (am || bm) return (am && b.kind === 'edge') || (bm && a.kind === 'edge');
+    const ap = a.kind === 'marker' || a.kind === 'node', bp = b.kind === 'marker' || b.kind === 'node';
+    if (ap || bp) return (ap && b.kind === 'edge') || (bp && a.kind === 'edge');
     if (a.kind === 'origin' && b.kind === 'origin') return false;
     if (a.kind === 'edge' && b.kind === 'edge') {
       if (refsEqual(a, b)) return false;
@@ -2325,6 +2650,7 @@ export function setupMR(view, project, getFootprint) {
   const coordOnAxis = (ref, axis) =>
     ref.kind === 'origin' ? 0
       : ref.kind === 'marker' ? (markerOf(ref)?.[axis] ?? 0)
+      : ref.kind === 'node' ? (nodeOf(ref)?.[axis] ?? 0)
       : edgeCoord(rectOf(ref), ref.edge);
   // The distance a pair currently spans, in the display unit — used to prefill the
   // numpad with the value you're already at, so entering size edits from the real
@@ -2338,6 +2664,14 @@ export function setupMR(view, project, getFootprint) {
       const e = markerRef === a ? b : a; // the edge endpoint
       return project.constraints.find((k) =>
         (k.a.marker === markerRef.markerId || k.b.marker === markerRef.markerId) &&
+        ((k.a.rect === e.rectId && k.a.edge === e.edge) || (k.b.rect === e.rectId && k.b.edge === e.edge)),
+      ) || null;
+    }
+    const nodeRef = a.kind === 'node' ? a : (b.kind === 'node' ? b : null);
+    if (nodeRef) {
+      const e = nodeRef === a ? b : a; // the edge endpoint
+      return project.constraints.find((k) =>
+        (k.a.node === nodeRef.nodeId || k.b.node === nodeRef.nodeId) &&
         ((k.a.rect === e.rectId && k.a.edge === e.edge) || (k.b.rect === e.rectId && k.b.edge === e.edge)),
       ) || null;
     }
@@ -2370,6 +2704,20 @@ export function setupMR(view, project, getFootprint) {
       project.addConstraint(mc);
       return mc;
     }
+    const nodeRef = a.kind === 'node' ? a : (b.kind === 'node' ? b : null);
+    if (nodeRef) {
+      const e = nodeRef === a ? b : a; // the wall edge (anchor)
+      const n = nodeOf(nodeRef);
+      const axis = isXEdge(e.edge) ? 'x' : 'y';
+      // At most one pin per (node, axis): drop any existing same-axis node pin first so
+      // picking a different wall RE-ANCHORS cleanly instead of stacking pins.
+      for (const k of [...project.constraints]) {
+        if ((k.a.node === n.id || k.b.node === n.id) && k.axis === axis) project.removeConstraint(k.id);
+      }
+      const nc = makeNodeDistance(n, rectOf(e), e.edge);
+      project.addConstraint(nc);
+      return nc;
+    }
     const origin = a.kind === 'origin' ? a : (b.kind === 'origin' ? b : null);
     let c;
     if (origin) {
@@ -2394,7 +2742,10 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function dimTitle() {
-    if (!dimRefA) return t(modes[currentMode]?.id === 'outlet_dims' ? 'dim.pickOutlet' : 'dim.pickPlan');
+    if (!dimRefA) {
+      const id = modes[currentMode]?.id;
+      return t(id === 'outlet_dims' ? 'dim.pickOutlet' : id === 'conduit_dims' ? 'dim.pickNode' : 'dim.pickPlan');
+    }
     if (!dimRefB) return refLabel(dimRefA) + '  <->  ?';
     return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  ' + t('dim.edit') : '');
   }
@@ -2567,15 +2918,24 @@ export function setupMR(view, project, getFootprint) {
     if (!c) return;
     const toRef = (ep) => ep.marker
       ? { kind: 'marker', markerId: ep.marker }
-      : ep.rect === ORIGIN_ID
-        ? { kind: 'origin' }
-        : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
+      : ep.node
+        ? { kind: 'node', nodeId: ep.node }
+        : ep.rect === ORIGIN_ID
+          ? { kind: 'origin' }
+          : { kind: 'edge', rectId: ep.rect, edge: ep.edge };
     if (isMarkerConstraint(c)) {
       // Keep the outlet-first invariant even though the stored constraint anchors
       // its wall edge as endpoint a.
       const markerEnd = c.a.marker ? c.a : c.b;
       const edgeEnd = c.a.marker ? c.b : c.a;
       dimRefA = toRef(markerEnd);
+      dimRefB = toRef(edgeEnd);
+    } else if (isNodeConstraint(c)) {
+      // Node-first, mirroring the outlet invariant (the stored constraint anchors
+      // its wall edge as endpoint a).
+      const nodeEnd = c.a.node ? c.a : c.b;
+      const edgeEnd = c.a.node ? c.b : c.a;
+      dimRefA = toRef(nodeEnd);
       dimRefB = toRef(edgeEnd);
     } else {
       dimRefA = toRef(c.a);
@@ -2792,22 +3152,26 @@ export function setupMR(view, project, getFootprint) {
     if (!placed || !activeRect) return;
     const modeId = modes[currentMode].id;
     if (dimRefA && dimRefB) { if (hoverKey) pressKey(hoverKey); return; }
+    const domain = modeDomain(modeId);
     if (hoverDim) {
       const c = project.constraints.find((k) => k.id === hoverDim.userData.cId);
-      const matchesDomain = c && (modeId === 'outlet_dims') === isMarkerConstraint(c);
-      if (matchesDomain) { loadConstraint(c.id); return; }
+      if (c && dimDomain(c) === domain) { loadConstraint(c.id); return; }
     }
     if (!hoverRef) return;
     if (!dimRefA) {
-      if ((modeId === 'plan_dims' && hoverRef.kind === 'marker') ||
-          (modeId === 'outlet_dims' && hoverRef.kind !== 'marker')) return;
+      // First pick must be the domain's dependent target: plan = edge/origin,
+      // marker = an outlet, node = a bare conduit junction.
+      const pinKind = domain === 'marker' ? 'marker' : domain === 'node' ? 'node' : null;
+      if (pinKind ? hoverRef.kind !== pinKind : (hoverRef.kind === 'marker' || hoverRef.kind === 'node')) return;
       dimRefA = hoverRef;
       rlog('dim A', { domain: modeId, ref: refLabel(hoverRef) });
       redrawNumpad();
       return;
     }
-    if (modeId === 'plan_dims' && hoverRef.kind === 'marker') return;
-    if (modeId === 'outlet_dims' && (dimRefA.kind !== 'marker' || hoverRef.kind !== 'edge')) return;
+    // Second pick: plan pairs edge/origin; a marker/node pin must anchor to a wall edge.
+    if (domain === 'plan' && (hoverRef.kind === 'marker' || hoverRef.kind === 'node')) return;
+    if (domain === 'marker' && (dimRefA.kind !== 'marker' || hoverRef.kind !== 'edge')) return;
+    if (domain === 'node' && (dimRefA.kind !== 'node' || hoverRef.kind !== 'edge')) return;
     if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
     dimRefB = hoverRef;
     dimOffsetPt = hoverFloorPt; // where the tip stands as the pair completes -> new dim's default line
@@ -3091,10 +3455,11 @@ export function setupMR(view, project, getFootprint) {
       data = floorToCoohomDxf(f);
       mime = 'application/dxf';
     } else if (extension === 'dxf') {
-      data = floorToDxf(f, { layers: settings });
+      data = floorToDxf(project, f, { layers: settings });
       mime = 'application/dxf';
     } else {
       const sheetOpts = sharedScaleSheetOptions(project.floors, {
+        project, // whole-house conduit/wires span floors; sheets filter per floor
         page: 'a4',
         layers: settings,
         markerLabel: (ty) => t(`marker.${ty}`),
@@ -3159,7 +3524,7 @@ export function setupMR(view, project, getFootprint) {
   } catch { /* unavailable or invalid storage: keep an in-memory clipboard */ }
 
   function copyActiveFloor() {
-    floorClipboard = createFloorClipboard(project.activeFloor);
+    floorClipboard = createFloorClipboard(project, project.activeFloor);
     try { localStorage.setItem(FLOOR_CLIPBOARD_KEY, JSON.stringify(floorClipboard)); } catch { /* memory copy still works */ }
     projectFlash(`${t('floorCopy.copied')} ${project.activeFloor.name}`);
     rlog('floor copied', {
@@ -3523,12 +3888,12 @@ export function setupMR(view, project, getFootprint) {
   // The dim value panel the RETICLE is over: the nearest eligible sprite within the
   // reticle radius. `markerDomain` hard-filters overlapping labels so a label from
   // the other dimension domain cannot mask the intended target.
-  function dimLabelAtPoint(px, py, markerDomain = null) {
+  function dimLabelAtPoint(px, py, domain = null) {
     let best = null, bestD = RETICLE_OUTER;
     for (const s of dimSprites) {
-      if (markerDomain != null) {
+      if (domain != null) {
         const c = project.constraints.find((k) => k.id === s.userData.cId);
-        if (!c || isMarkerConstraint(c) !== markerDomain) continue;
+        if (!c || dimDomain(c) !== domain) continue;
       }
       const d = Math.hypot(px - s.position.x, py - (-s.position.z)); // local (x,0,-y) -> plan (x,y)
       if (d < bestD) { bestD = d; best = s; }
@@ -3927,10 +4292,16 @@ export function setupMR(view, project, getFootprint) {
       // the pen. See help.marker_conduit.
       onTouch: (pos) => {
         if (!placed) return;
-        // Prefer an existing conduit node, then a device marker, then empty space.
+        // Prefer an active-floor node, then an active-floor device, then an adjacent-floor
+        // target (→ a riser through the slab), then empty space on the active floor.
         let targetNodeId = hoverConduitNode?.id || null;
         if (!targetNodeId && hoverMarker) {
           targetNodeId = project.ensureConduitNodeAtMarker(hoverMarker.id).id;
+        }
+        if (!targetNodeId && hoverAdjacent) {
+          targetNodeId = hoverAdjacent.kind === 'node'
+            ? hoverAdjacent.id
+            : project.ensureConduitNodeAtMarker(hoverAdjacent.id).id;
         }
         if (!targetNodeId) {
           const { px, py } = worldToPlan(pos);
@@ -3940,8 +4311,8 @@ export function setupMR(view, project, getFootprint) {
         if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId);
         penNodeId = targetNodeId;
         project.touch(); // ensureConduitNodeAtMarker doesn't emit on its own
-        buildConduits(); buildPlan(); applyPlanMatrix();
-        rlog('conduit pen', { node: penNodeId });
+        buildConduits(); buildAdjacentTargets('marker_conduit'); buildPlan(); applyPlanMatrix();
+        rlog('conduit pen', { node: penNodeId, riser: !!hoverAdjacent });
       },
     },
     {
@@ -3975,6 +4346,10 @@ export function setupMR(view, project, getFootprint) {
       // existing wire can be re-selected by triggering it.
       onTouch: () => {
         if (!placed) return;
+        // A device endpoint may be on the active floor (hoverMarker) OR an adjacent floor
+        // (hoverAdjacent) — the latter makes the wire span storeys over a riser.
+        const endMarker = hoverMarker
+          || (hoverAdjacent?.kind === 'marker' ? project.findMarker(hoverAdjacent.id)?.marker : null);
         // A selected wire is in override mode: pick conduit nodes to thread it.
         if (selectedRoutedWire) {
           if (hoverConduitNode) {
@@ -3983,19 +4358,19 @@ export function setupMR(view, project, getFootprint) {
             rlog('wire via add', { wire: selectedRoutedWire.id, node: hoverConduitNode.id });
             return;
           }
-          if (hoverMarker) { selectedRoutedWire = null; wireFromMarker = hoverMarker; rlog('wire from', { id: hoverMarker.id }); return; }
+          if (endMarker) { selectedRoutedWire = null; wireFromMarker = endMarker; rlog('wire from', { id: endMarker.id }); return; }
           if (hoverRoutedWire && hoverRoutedWire.id !== selectedRoutedWire.id) { selectedRoutedWire = hoverRoutedWire; rlog('wire reselect', { id: hoverRoutedWire.id }); return; }
           selectedRoutedWire = null; rlog('wire deselect'); return;
         }
         // No pending pair: a marker starts a new wire; an existing wire selects for override.
         if (!wireFromMarker) {
-          if (hoverMarker) { wireFromMarker = hoverMarker; rlog('wire from', { id: hoverMarker.id }); return; }
+          if (endMarker) { wireFromMarker = endMarker; rlog('wire from', { id: endMarker.id }); return; }
           if (hoverRoutedWire) { selectedRoutedWire = hoverRoutedWire; rlog('wire select', { id: hoverRoutedWire.id }); return; }
           return;
         }
         // Second endpoint → create the wire (auto shortest route) and select it.
-        if (hoverMarker && hoverMarker.id !== wireFromMarker.id) {
-          const result = project.addWire(wireFromMarker.id, hoverMarker.id);
+        if (endMarker && endMarker.id !== wireFromMarker.id) {
+          const result = project.addWire(wireFromMarker.id, endMarker.id);
           if (result.ok) {
             selectedRoutedWire = result.wire;
             wireFromMarker = null;
@@ -4003,6 +4378,27 @@ export function setupMR(view, project, getFootprint) {
             rlog('wire create', { from: result.wire.fromMarkerId, to: result.wire.toMarkerId, id: result.wire.id });
           }
         }
+      },
+    },
+    {
+      id: 'furnish', color: 0xa78bfa, // place real furniture GLB models (loaded on the fly)
+      // Thumbstick-y cycles the article to drop (or rotates the selected item 15°/tick).
+      // Trigger an item to select it; trigger empty floor to drop the current article;
+      // grip-drag an item to move it; grip away from an item to delete the selection.
+      onTouch: (pos) => {
+        if (!placed) return;
+        if (hoverFurnitureId) { // select the aimed item (for rotate/move/delete)
+          selectedFurnitureId = hoverFurnitureId;
+          setModeInfo();
+          rlog('furniture select', { id: selectedFurnitureId });
+          return;
+        }
+        if (selectedFurnitureId) { selectedFurnitureId = null; setModeInfo(); return; } // first empty trigger deselects
+        if (!currentFurnitureArticle) { rlog('furniture drop skipped: empty catalog'); return; }
+        const { px, py } = worldToPlan(pos);
+        const item = project.addFurniture({ article: currentFurnitureArticle, x: px, y: py, rotationY: 0 });
+        buildFurniture();
+        rlog('furniture drop', { id: item.id, article: item.article, px: +px.toFixed(3), py: +py.toFixed(3) });
       },
     },
     {
@@ -4075,6 +4471,13 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onNumpadTouch,
     },
     {
+      id: 'conduit_dims', color: 0x22d3ee,
+      // Conduit-node constraint domain: select a bare junction, then a wall edge, so the
+      // junction is PINNED to that wall (one-way, like an outlet) and tracks it on every
+      // edit. Marker-bound nodes are inert here (they follow their device).
+      onTouch: onNumpadTouch,
+    },
+    {
       id: 'save', color: 0x51d88a, // label/help via i18n: mode.save / help.save
       // Aim the ray at a slot on the menu and trigger to write the whole project
       // there (overwrites a filled slot). Slots show their save time + rect count.
@@ -4133,13 +4536,15 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'level', 'recal', 'teleport',
     'drop', 'edge', 'plan_dims', 'edit',
-    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_edit', 'marker_wire',
+    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire',
+    'furnish',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
-    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_edit: 'marker', marker_wire: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', outlet_dims: 'marker',
+    furnish: 'furnish',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
   };
@@ -4200,6 +4605,7 @@ export function setupMR(view, project, getFootprint) {
     selectedRoutedWire = null; // ...and any routed-wire override selection
     penNodeId = null; // ...and lift the conduit pen
     selectedConduitNodeId = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
+    selectedFurnitureId = null; // ...and any FURNISH selection
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
@@ -4223,11 +4629,15 @@ export function setupMR(view, project, getFootprint) {
     else hideSheet();
     // CONDUIT authoring/editing and WIRE routing all need the network on screen;
     // WIRE additionally draws the routed wires it defines over that network.
-    const showConduits = m.id === 'marker_conduit' || m.id === 'conduit_edit' || m.id === 'marker_wire';
+    const showConduits = m.id === 'marker_conduit' || m.id === 'conduit_edit' || m.id === 'marker_wire' || m.id === 'conduit_dims';
     if (showConduits) buildConduits();
     conduitGroup.visible = showConduits;
     if (m.id === 'marker_wire') buildRoutedWires();
     routedWireGroup.visible = m.id === 'marker_wire';
+    // Cross-floor authoring targets: CONDUIT (risers) + WIRE (cross-floor wires) only.
+    hoverAdjacent = null;
+    buildAdjacentTargets(m.id);
+    adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire';
   }
 
   // In the read-only building overview, mode traversal jumps across both editing
@@ -4239,7 +4649,7 @@ export function setupMR(view, project, getFootprint) {
     const group = MODE_GROUP[id];
     // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
     // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
-    if (allFloorsView && (group === 'plan' || group === 'marker' || id === 'translate')) return false;
+    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'furnish' || id === 'translate')) return false;
     return true;
   };
   function stepMode(direction) {
@@ -4327,6 +4737,8 @@ export function setupMR(view, project, getFootprint) {
   function afterFloorChange() {
     refreshFloorEditState();
     buildPlan();
+    if (!allFloorsView) buildFurniture(); // per-floor furniture; hide in ALL FLOORS
+    else for (const child of [...furnitureGroup.children]) furnitureGroup.remove(child);
     applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
     sheetDirty = true;
     if (exportMenu.group.visible) redrawExportMenu();
@@ -4402,6 +4814,7 @@ export function setupMR(view, project, getFootprint) {
     ensureFloors(); // seed Basement + Upper around Ground on first AR entry
     allFloorsView = false; // every new session starts on the persisted active floor
     buildPlan();
+    buildFurniture();     // async — furniture appears in furnitureGroup once decoded
     scene.add(planGroup);
     planGroup.visible = false;
     placed = false;
@@ -4518,6 +4931,11 @@ export function setupMR(view, project, getFootprint) {
       gripDrag = { kind: 'marker', markerId: hoverMarker.id, distance };
       rlog('grip-drag marker', { id: hoverMarker.id });
     }
+    if (id === 'furnish' && hoverFurnitureId) {
+      gripDrag = { kind: 'furniture', furnitureId: hoverFurnitureId };
+      rlog('grip-drag furniture', { id: hoverFurnitureId });
+      return;
+    }
     if (id === 'conduit_edit' && hoverConduitNode && !hoverConduitNode.markerId) {
       const handle = conduitGroup.children.find((c) => c.userData.conduitNodeId === hoverConduitNode.id);
       if (!handle) return;
@@ -4545,6 +4963,7 @@ export function setupMR(view, project, getFootprint) {
       // A conduit-node drag rewrote the network geometry: rebuild it once and, for a
       // direct 3D carry (which also changed z), refresh the height pad.
       if (gripDrag.kind === 'conduitNode') { buildConduits(); if (numpad.group.visible) refreshNodePad(); }
+      if (gripDrag.kind === 'furniture') buildFurniture(); // reseat canonically after the live drag
     }
     gripDrag = null;
   }
@@ -4662,6 +5081,15 @@ export function setupMR(view, project, getFootprint) {
     }
     if (mode.id === 'marker' && selectedMarker) {
       deleteSelectedMarker();
+      return;
+    }
+    if (mode.id === 'furnish' && selectedFurnitureId) { // grip away from an item deletes the selection
+      const id = selectedFurnitureId;
+      project.removeFurniture(id);
+      selectedFurnitureId = null;
+      buildFurniture();
+      setModeInfo();
+      rlog('furniture delete', { id });
       return;
     }
     if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -4783,6 +5211,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'unit') cycleUnit(stickY < 0 ? -1 : 1); // up = previous in the list
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
+      else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'export') { // point at Compare → cycle the change-map baseline; else format
@@ -4870,9 +5299,14 @@ export function setupMR(view, project, getFootprint) {
     const exportStatus = modes[currentMode].id === 'export'
       ? `${t('export.format')} · ${getOutputSettings().format === 'coohom'
         ? 'COOHOM DXF' : getOutputSettings().format.toUpperCase()}` : null;
+    const furnishStatus = modes[currentMode].id === 'furnish'
+      ? (selectedFurnitureId ? t('furnish.selected')
+        : currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
+      : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || wireStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
+      : furnishStatus ? 0xa78bfa
       : wireStatus ? (modes[currentMode].id === 'marker_conduit' || modes[currentMode].id === 'conduit_edit' ? 0x22d3ee : 0xf59e0b)
       : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
@@ -5101,7 +5535,7 @@ export function setupMR(view, project, getFootprint) {
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
           // A value label takes priority before the first reference, but only when
           // its constraint belongs to the active dimension domain.
-          hoverDim = dimRefA ? null : dimLabelAtPoint(px, py, modeId === 'outlet_dims');
+          hoverDim = dimRefA ? null : dimLabelAtPoint(px, py, modeDomain(modeId));
           if (!hoverDim) {
             if (modeId === 'plan_dims') {
               // Pick the origin in PLAN space, not against the raw registered world
@@ -5110,13 +5544,29 @@ export function setupMR(view, project, getFootprint) {
               if (Math.hypot(px, py) < 0.12) hoverRef = { kind: 'origin' };
               else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
             } else if (!dimRefA) {
-              const floorMarker = markerAtFloorPoint(px, py);
-              if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
+              // First pick is the domain's dependent target: an outlet, or a bare junction.
+              if (modeId === 'conduit_dims') {
+                const n = conduitNodeAtFloorPoint(px, py);
+                if (n && !n.markerId) hoverRef = { kind: 'node', nodeId: n.id };
+              } else {
+                const floorMarker = markerAtFloorPoint(px, py);
+                if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
+              }
             } else {
               const e = edgeAtPoint(px, py);
               if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge };
             }
           }
+        }
+      }
+      // CONDUIT DIMS: enlarge the node(s) this pair references (self-resetting per frame,
+      // since this branch doesn't rebuild the conduit spheres).
+      if (modeId === 'conduit_dims') {
+        const litNodeIds = new Set([dimRefA, dimRefB ?? hoverRef]
+          .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
+        for (const child of conduitGroup.children) {
+          const id = child.userData.conduitNodeId;
+          if (id != null) child.scale.setScalar(litNodeIds.has(id) ? 1.5 : 1);
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
@@ -5226,9 +5676,10 @@ export function setupMR(view, project, getFootprint) {
       hoverKey = null;
       numpadCursor.visible = false;
       const source = editCtl;
-      if (wireFromMarker && !project.markers.includes(wireFromMarker)) wireFromMarker = null;
+      // wireFromMarker may live on an adjacent floor (cross-floor wire) → resolve house-wide.
+      if (wireFromMarker && !project.findMarker(wireFromMarker.id)) wireFromMarker = null;
       if (selectedRoutedWire && !project.wires.includes(selectedRoutedWire)) selectedRoutedWire = null;
-      hoverMarker = null; hoverConduitNode = null; hoverRoutedWire = null;
+      hoverMarker = null; hoverConduitNode = null; hoverRoutedWire = null; hoverAdjacent = null;
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
@@ -5239,11 +5690,15 @@ export function setupMR(view, project, getFootprint) {
           if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
         } else {
           hoverMarker = markerAtFloorPoint(px, py);
+          // An adjacent-floor device becomes the endpoint if nothing on this floor is under
+          // the reticle → the wire spans storeys.
+          if (!hoverMarker) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
         }
-        if (!hoverMarker && !hoverConduitNode) hoverRoutedWire = routedWireAtFloorPoint(px, py);
+        if (!hoverMarker && !hoverConduitNode && !hoverAdjacent) hoverRoutedWire = routedWireAtFloorPoint(px, py);
       } else {
         reticle.visible = false;
       }
+      highlightAdjacentTargets();
       // Show the conduit nodes as context; hovered via target yellow, existing vias
       // cyan, else dim (marker-bound) / white (free junction).
       for (const child of conduitGroup.children) {
@@ -5294,7 +5749,7 @@ export function setupMR(view, project, getFootprint) {
       numpadCursor.visible = false;
       const source = editCtl;
       if (penNodeId && !project.conduitNodes.some((n) => n.id === penNodeId)) penNodeId = null;
-      hoverConduitNode = null; hoverMarker = null;
+      hoverConduitNode = null; hoverMarker = null; hoverAdjacent = null;
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
@@ -5302,9 +5757,12 @@ export function setupMR(view, project, getFootprint) {
         const { px, py } = worldToPlan(hit);
         hoverConduitNode = conduitNodeAtFloorPoint(px, py);
         if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
+        // Fall back to an adjacent-floor node/device → the next pen segment is a riser.
+        if (!hoverConduitNode && !hoverMarker) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
       } else {
         reticle.visible = false;
       }
+      highlightAdjacentTargets();
       // Recolor node spheres: pen amber, hovered yellow, else by kind.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
@@ -5327,7 +5785,7 @@ export function setupMR(view, project, getFootprint) {
       const penNode = penNodeId && project.conduitNodes.find((n) => n.id === penNodeId);
       const tipW = tipPosition(source);
       if (penNode && tipW) {
-        const from = conduitNodePos(project.activeFloor, penNode);
+        const from = planLocalZ(conduitNodePos(project, penNode)); // world Z → active-plan-local
         const { px, py } = worldToPlan(tipW);
         const to = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
         conduitPreviewLine.visible = true;
@@ -5435,6 +5893,26 @@ export function setupMR(view, project, getFootprint) {
       outlineMarker(selectedMarker, 'floor', 0xfbbf24);
       outlineMarker(selectedMarker, 'wall', 0xfbbf24);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
+    } else if (modeId === 'furnish') {
+      // FURNISH: aim a floor reticle; the placed item under it is the hover target
+      // (select / grip-drag / grip-away delete). Empty-floor trigger drops the current
+      // article. A live grip drag is applied here so the model follows the reticle.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = editCtl;
+      if (gripDrag?.kind === 'furniture') applyFurnitureGripDrag(source);
+      hoverFurnitureId = null;
+      const hit = rayFloorHit(source);
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        hoverFurnitureId = furnitureAtFloorPoint(px, py)?.id || null;
+      } else {
+        reticle.visible = false;
+      }
+      if (selectedFurnitureId && !project.furniture.some((f) => f.id === selectedFurnitureId)) selectedFurnitureId = null;
+      paintFurnitureHighlight();
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim at a slot, or at the separate confirm/cancel buttons once
       // an occupied SAVE slot has armed the overwrite screen.

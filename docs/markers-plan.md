@@ -59,15 +59,30 @@ feature.**
     origin), so it lives in the same space as everything else and survives RECAL/anchor drift.
   - `z`: **height above the floor** (meters). This is the new third scalar. Enter it numerically
     (reuse the SIZE numpad) or capture it from the tip height at drop time.
-- **Electrical is two layers.** (1) **Control links** are per-floor `electricalLinks` (`kind:'control'`,
-  switch/light ids) that derive a switch→ceiling→light polyline from live marker positions
-  (`src/core/electrical.js`: `electricalRoutePoints`, `segmentSurface`). (2) The **conduit network** +
-  **wires** live in per-floor `conduitNodes` / `conduitSegments` / `wires`: a wire is
-  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` whose physical path is DERIVED as the shortest route
-  through the conduit graph (Dijkstra, threading the ordered `via` overrides), never stored. Graph +
-  routing live in `src/core/conduit.js`; each segment's wall/ceiling/floor surface is inferred via
-  `segmentSurface`. This REPLACED the old per-wire-waypoint `kind:'wire'` model (removed with its
-  `MARKER · WIRE`-trace + `WIRE EDIT` AR lane).
+- **Electrical is two layers.** (1) **Control links** are **per-floor** `electricalLinks`
+  (`kind:'control'`, switch/light ids) that derive a switch→ceiling→light polyline from live marker
+  positions (`src/core/electrical.js`: `electricalRoutePoints`, `segmentSurface`). A ground-switch →
+  upstairs-light case is authored as two lights + two links (so the light + its link print on both floor
+  sheets) — controls are intentionally NOT cross-floor. (2) The **conduit network** + **wires** are
+  **whole-house** — they live on `Project` (`conduitNodes` / `conduitSegments` / `wires`), not on a
+  `Floor`. A conduit node stores position RELATIVE to its floor (`{x,y,z,floorId}`, or `{markerId}`
+  bound to a device), and positions resolve in ABSOLUTE world Z (`floor.elevation + z`) at derivation
+  time. So a segment joining nodes on two storeys is a **riser** through the slab, and a wire
+  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` may connect device markers on different floors; its
+  path is DERIVED as the shortest route through the conduit graph (Dijkstra, threading the ordered `via`
+  overrides), never stored. Graph + routing live in `src/core/conduit.js`; each segment's
+  wall/ceiling/floor/**riser** surface is inferred via `segmentSurface` (a run whose ends sit in
+  different storeys is a riser). `segmentsForFloor` filters the whole-house network to one floor for
+  per-floor sheet/DXF output (intra-floor runs + riser glyphs). This REPLACED the old per-wire-waypoint
+  `kind:'wire'` model (removed with its `MARKER · WIRE`-trace + `WIRE EDIT` AR lane).
+- **Conduit bare junctions can be DIMENSIONED to a wall** (the `CONDUIT · DIMS` AR lane). A junction's
+  X and/or Y is pinned to a rect edge via a `{node}` constraint endpoint — the same signed, one-way
+  shape as a marker pin — stored in the node's own floor's `constraints` and resolved in
+  `solveConduitNodes` (in `_emit` and `solveSilently`, so the junction follows the wall on any edit,
+  including a live AR edge grip-drag). z stays the inherent scalar (CONDUIT · EDIT height pad); do NOT
+  fold it into the X/Y solver. Marker-bound nodes are never pinned (they follow their device). Every
+  constraint consumer (2D editor, desktop panel, sheet/DXF loops) skips `{node}` endpoints, exactly as
+  they skip marker pins.
 - `z` is an **independent scalar** — keep the constraint solver 2-axis. If constrained placement is
   ever wanted, add a trivial 1-D pin later; do NOT fold z into the X/Y solver.
 
@@ -114,7 +129,7 @@ feature.**
 ## The artifacts and what each is for
 | Path | Role for this effort |
 |---|---|
-| `src/core/model.js` | Per-floor `markers` + `electricalLinks`; facade and lifecycle cleanup. Do NOT route through footprint/extrude. |
+| `src/core/model.js` | Per-floor `markers` + `electricalLinks`; **whole-house** `conduitNodes`/`conduitSegments`/`wires` on `Project` (+ `findMarker`/`floorById`/`conduitNodeFloorId` lookups); facade and lifecycle cleanup. Do NOT route through footprint/extrude. |
 | `src/core/electrical.js` | Shared derived switch→ceiling→light route geometry. |
 | `src/ui/mr.js` | Capture/edit/link modes, glyph and dotted 3D route rendering. The whole AR surface. |
 | `src/core/i18n.js` | Add EN/FR/ZH for every new mode label + help + any marker-type name. |
