@@ -5333,7 +5333,8 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
-  const btn = { a: false, b: false, stick: false, stickY: false };
+  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false };
+  const PLAN_YAW_STEP = THREE.MathUtils.degToRad(20); // LEFT stick-x nudges plan yaw in 20° steps
   // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
   // (not a tap) so it can't collide with stick flicks or be hit by accident.
@@ -5440,6 +5441,20 @@ export function setupMR(view, project, getFootprint) {
       btn.stickY = true;
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;
+    }
+    // LEFT companion stick-x rotates the PLACED plan about its origin corner in
+    // 20° steps (one per flick), so you can align the virtual plan to the room
+    // without re-registering. planYaw is session anchoring (not model geometry),
+    // so this stays a view/companion action, never an editor edit.
+    const lgp = leftSource(frame)?.gamepad;
+    const lx = lgp?.axes[2] ?? 0;
+    if (placed && !btn.leftStick && Math.abs(lx) > 0.7) {
+      planYaw += (lx > 0 ? 1 : -1) * PLAN_YAW_STEP;
+      applyPlanMatrix();
+      rlog(`plan yaw ${THREE.MathUtils.radToDeg(planYaw).toFixed(0)}°`);
+      btn.leftStick = true;
+    } else if (Math.abs(lx) < 0.3) {
+      btn.leftStick = false;
     }
   }
 
