@@ -2810,7 +2810,9 @@ export function setupMR(view, project, getFootprint) {
   // edge<->edge dims store it relative to the outer edge (the auto-stack baseline),
   // matching buildDimensions. Shared by grip-drag and the default-on-create placement.
   function setDimOffset(c, px, py) {
-    if (isMarkerConstraint(c)) {
+    if (isMarkerConstraint(c) || isNodeConstraint(c)) {
+      // Pin dims (marker/node) store the absolute perpendicular coord, matching
+      // buildDimensions (yLine/xLine default to the pinned point's own coord).
       c.offset = c.axis === 'x' ? py : px;
       return;
     }
@@ -2830,6 +2832,7 @@ export function setupMR(view, project, getFootprint) {
   function setDimLabelPosition(c, px, py) {
     const endpointCoord = (ep) => {
       if (ep.marker) return project.markers.find((m) => m.id === ep.marker)?.[c.axis];
+      if (ep.node) return project.conduitNodes.find((n) => n.id === ep.node)?.[c.axis];
       if (ep.rect === ORIGIN_ID) return 0;
       const rect = project.rectangles.find((r) => r.id === ep.rect);
       return rect ? edgeCoord(rect, ep.edge) : null;
