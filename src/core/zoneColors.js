@@ -6,18 +6,39 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'window', 'stairs', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'halfwall', 'window', 'stairs', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
   wall:    0xff6b6b, // red
   insulation: 0xe879f9, // magenta
   door:    0x4ade80, // green
+  halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
   window:  0x22d3ee, // cyan
   stairs:  0xfbbf24, // yellow
   cabinet: 0xa78bfa, // purple
   furniture: 0xfb923c, // orange
 };
+
+// Vertical + opening semantics for the "aperture" kinds. Every aperture is one
+// opening band [sill, head] cut into the wall; the kinds differ only in which
+// band is solid: a door is open [0..head] (solid lintel above), a window is open
+// [sill..head] (solid below and above), a half wall is solid [0..sill] (open
+// above, so `head:null` = up to the ceiling — the inverse of a door). These are
+// stored for a future height-aware extrude; today only `hinge` reaches the plan
+// glyph. `hinge` is the sideways opening direction measured ALONG THE WALL'S OWN
+// AXIS — 'left' = the min-coordinate jamb, 'right' = the max-coordinate jamb,
+// 'both' = a double casement. Doors open left/right; windows left/right/both; a
+// half wall opens uniformly upward, so it has no side (`hinge:null`).
+export const APERTURE_DEFAULTS = {
+  door:     { sill: 0,   head: 2.1,  hinge: 'left' },
+  window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
+  halfwall: { sill: 1.1, head: null, hinge: null   },
+};
+
+export function isAperture(kind) {
+  return Object.prototype.hasOwnProperty.call(APERTURE_DEFAULTS, kind);
+}
 
 const FALLBACK = ZONE_COLORS.room;
 

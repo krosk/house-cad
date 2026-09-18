@@ -19,7 +19,8 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
-import { zoneKind } from '../core/zoneColors.js';
+import { zoneKind, APERTURE_DEFAULTS } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -104,7 +105,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -387,18 +388,28 @@ function drawFootprint(be, L, footprint) {
 // sit over the corresponding cutouts in the computed footprint so a door,
 // window, stair or cabinet no longer prints as an anonymous rectangular hole.
 // The same function draws the compact legend samples below.
-function drawZoneGlyph(be, x, y, w, h, kind) {
+function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false) {
   if (!(w > 0 && h > 0)) return;
   const x1 = x + w, y1 = y + h;
   const horizontal = w >= h;
   const line = (ax, ay, bx, by, width = 0.18) =>
     be.line(ax, ay, bx, by, { stroke: C_ZONE, width });
+  // Draw a shared box-space segment list at the glyph's page origin.
+  const segs = (list, width) => { for (const [ax, ay, bx, by] of list) line(x + ax, y + ay, x + bx, y + by, width); };
 
   be.rect(x, y, w, h, { fill: '#fff', stroke: C_ZONE, width: 0.25 });
 
   if (kind === 'door') {
-    // Door leaf: one unmistakable diagonal across the authored opening.
-    line(x, y1, x1, y, 0.28);
+    // Real architectural door: hinge-side leaf + swing arc (sampled — no arc primitive).
+    // In the compact legend, cap the arc reach to the sample height so it can't
+    // overflow into the row above.
+    segs(doorSwingSegments(w, h, hingeEnd, compact ? { reach: Math.min(w, h) } : undefined), 0.22);
+  } else if (kind === 'halfwall') {
+    // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
+    segs(halfWallHatchSegments(w, h), 0.13);
+  } else if (kind === 'window') {
+    // Glazing panes + a casement "V" pointing at the hinge (which side opens).
+    segs(windowCasementSegments(w, h, hingeEnd));
   } else if (kind === 'insulation') {
     // Repeating diagonal batts distinguish insulation from a plain wall cutout.
     const count = 6;
@@ -410,15 +421,6 @@ function drawZoneGlyph(be, x, y, w, h, kind) {
         const ya = y + h * i / count, yb = y + h * (i + 1) / count;
         line(i % 2 ? x : x1, ya, i % 2 ? x1 : x, yb, 0.13);
       }
-    }
-  } else if (kind === 'window') {
-    // Glazing: two parallel panes along the wall/opening's long axis.
-    if (horizontal) {
-      line(x, y + h * 0.35, x1, y + h * 0.35);
-      line(x, y + h * 0.65, x1, y + h * 0.65);
-    } else {
-      line(x + w * 0.35, y, x + w * 0.35, y1);
-      line(x + w * 0.65, y, x + w * 0.65, y1);
     }
   } else if (kind === 'stairs') {
     // Five tread divisions plus an arrow showing the run direction.
@@ -449,6 +451,20 @@ function drawZoneGlyph(be, x, y, w, h, kind) {
   }
 }
 
+// Resolve a rectangle's `hinge` (authored along the wall's own axis: 'left' =
+// min-coordinate jamb) to a box 'lo'/'hi'/'both' in PAGE space. The page Y is
+// flipped relative to plan, so a vertical opening's "left" jamb can land at the
+// larger page-Y end — compare mapped corners rather than assuming min = lo.
+function resolveHingeEnd(rect, sx0, sx1, sy0, sy1) {
+  const hinge = rect.hinge ?? APERTURE_DEFAULTS[zoneKind(rect)]?.hinge ?? 'left';
+  if (hinge === 'both') return 'both';
+  const horizontal = Math.abs(sx1 - sx0) >= Math.abs(sy1 - sy0);
+  const [lo, jamb] = horizontal
+    ? [Math.min(sx0, sx1), hinge === 'right' ? sx1 : sx0]
+    : [Math.min(sy0, sy1), hinge === 'right' ? sy1 : sy0];
+  return jamb === lo ? 'lo' : 'hi';
+}
+
 function drawZones(be, L, floor, layers) {
   for (const rect of floor.rectangles) {
     const kind = zoneKind(rect);
@@ -462,6 +478,7 @@ function drawZones(be, L, floor, layers) {
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
       kind,
+      resolveHingeEnd(rect, sx0, sx1, sy0, sy1),
     );
   }
 }
@@ -1313,7 +1330,7 @@ function drawStrip(be, L, floor, opts) {
     let x = page.w - MARGIN - row.width;
     const y = yBase + 4 + legendRow++ * 6;
     for (const entry of row.entries) {
-      drawZoneGlyph(be, x, y - 1.6, 6, 3.2, entry.t);
+      drawZoneGlyph(be, x, y - 1.6, 6, 3.2, entry.t, 'lo', true);
       be.text(entry.label, x + 7.4, y,
         { fill: '#000', size: 2.2, align: 'left', baseline: 'middle' });
       x += entry.width;

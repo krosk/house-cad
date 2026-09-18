@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
-import { ZONE_KINDS } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
 let _id = 0;
@@ -86,7 +86,7 @@ export function syncFloorIdCounter(ids) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId() }) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -97,6 +97,28 @@ export class Rectangle {
     const inferredKind = op === 'subtract' ? 'wall' : 'room';
     this.kind = ZONE_KINDS.includes(kind) ? kind : inferredKind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
+    // Aperture kinds (door/window/half wall) carry an opening band [sill, head]
+    // and a `hinge` side. Explicit values win (deserialize/clone); otherwise the
+    // per-kind default fills in. Non-aperture kinds carry none of these fields.
+    const d = APERTURE_DEFAULTS[this.kind];
+    if (d) {
+      this.sill  = sill  !== undefined ? sill  : d.sill;
+      this.head  = head  !== undefined ? head  : d.head;
+      this.hinge = hinge !== undefined ? hinge : d.hinge;
+    }
+  }
+
+  // Retype in place (used by the desktop panel + AR kind-cycle). Keeps `op` in
+  // sync and resets the aperture band/hinge to the new kind's defaults (there is
+  // no per-instance editor yet, so a retype adopts the target kind's presets);
+  // retyping to a non-aperture kind clears the aperture fields entirely.
+  setKind(kind) {
+    if (ZONE_KINDS.includes(kind)) this.kind = kind;
+    this.op = this.kind === 'room' ? 'add' : 'subtract';
+    const d = APERTURE_DEFAULTS[this.kind];
+    if (d) { this.sill = d.sill; this.head = d.head; this.hinge = d.hinge; }
+    else { delete this.sill; delete this.head; delete this.hinge; }
+    return this;
   }
 
   // Normalized bounds (handles rectangles drawn right-to-left / top-to-bottom).

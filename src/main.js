@@ -197,7 +197,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
@@ -216,8 +216,7 @@ pOp.addEventListener('click', () => {
   if (!selectedRect) return;
   const current = ZONE_KINDS.includes(selectedRect.kind)
     ? selectedRect.kind : (selectedRect.op === 'subtract' ? 'wall' : 'room');
-  selectedRect.kind = ZONE_KINDS[(ZONE_KINDS.indexOf(current) + 1) % ZONE_KINDS.length];
-  selectedRect.op = selectedRect.kind === 'room' ? 'add' : 'subtract';
+  selectedRect.setKind(ZONE_KINDS[(ZONE_KINDS.indexOf(current) + 1) % ZONE_KINDS.length]);
   project.touch();
 });
 pDel.addEventListener('click', () => sketch.deleteSelected());

@@ -7,7 +7,8 @@
 import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js';
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
-import { zoneKind } from '../core/zoneColors.js';
+import { zoneKind, APERTURE_DEFAULTS } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, hingeEndFromPlan } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -24,6 +25,7 @@ const LAYERS = [
   ['WALL', 1, 'CONTINUOUS'],
   ['INSULATION', 6, 'CONTINUOUS'],
   ['DOOR', 3, 'CONTINUOUS'],
+  ['HALFWALL', 8, 'CONTINUOUS'],
   ['WINDOW', 4, 'CONTINUOUS'],
   ['STAIRS', 2, 'CONTINUOUS'],
   ['CABINET', 6, 'CONTINUOUS'],
@@ -163,8 +165,16 @@ function writeZoneSymbol(w, rect, kind) {
   const b = rect.bounds;
   const width = b.x1 - b.x0, height = b.y1 - b.y0;
   const horizontal = width >= height;
+  // DXF model space runs the same way as plan (min = lo), so hinge maps directly.
+  const hingeEnd = hingeEndFromPlan(rect.hinge ?? APERTURE_DEFAULTS[kind]?.hinge);
+  const segs = (layer, list) => { for (const [ax, ay, bx, by] of list) w.line(layer, b.x0 + ax, b.y0 + ay, b.x0 + bx, b.y0 + by); };
   if (kind === 'door') {
-    w.line('DOOR', b.x0, b.y0, b.x1, b.y1);
+    segs('DOOR', doorSwingSegments(width, height, hingeEnd));
+  } else if (kind === 'halfwall') {
+    // Inverse of the door opening: uniform diagonal hatch reading as solid (low) wall.
+    segs('HALFWALL', halfWallHatchSegments(width, height));
+  } else if (kind === 'window') {
+    segs('WINDOW', windowCasementSegments(width, height, hingeEnd));
   } else if (kind === 'insulation') {
     const count = 6;
     for (let i = 0; i < count; i++) {
@@ -175,14 +185,6 @@ function writeZoneSymbol(w, rect, kind) {
         const ya = b.y0 + height * i / count, yb = b.y0 + height * (i + 1) / count;
         w.line('INSULATION', i % 2 ? b.x0 : b.x1, ya, i % 2 ? b.x1 : b.x0, yb);
       }
-    }
-  } else if (kind === 'window') {
-    if (horizontal) {
-      w.line('WINDOW', b.x0, b.y0 + height * 0.35, b.x1, b.y0 + height * 0.35);
-      w.line('WINDOW', b.x0, b.y0 + height * 0.65, b.x1, b.y0 + height * 0.65);
-    } else {
-      w.line('WINDOW', b.x0 + width * 0.35, b.y0, b.x0 + width * 0.35, b.y1);
-      w.line('WINDOW', b.x0 + width * 0.65, b.y0, b.x0 + width * 0.65, b.y1);
     }
   } else if (kind === 'stairs') {
     for (let i = 1; i < 6; i++) {

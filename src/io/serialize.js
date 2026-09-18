@@ -23,7 +23,14 @@ export const FLOOR_CLIPBOARD_KEY = 'house-cad:floor-clipboard:v1';
 export const FLOOR_CLIPBOARD_VERSION = 1;
 
 function serializeRect(r) {
-  return { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op, kind: r.kind };
+  const out = { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op, kind: r.kind };
+  // Aperture fields (opening band + hinge) only exist on door/window/half wall;
+  // omit them everywhere else so plain zones stay compact. Missing on load →
+  // the Rectangle constructor re-applies the per-kind default (back-compat).
+  if (r.sill !== undefined) out.sill = r.sill;
+  if (r.head !== undefined) out.head = r.head;
+  if (r.hinge !== undefined) out.hinge = r.hinge;
+  return out;
 }
 function serializeConstraint(c) {
   return {
@@ -150,7 +157,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
 
   const rectIds = new Map();
   const rectangles = (source.rectangles || []).map((r) => {
-    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind });
+    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge });
     rectIds.set(r.id, copy.id);
     return copy;
   });
@@ -338,7 +345,7 @@ export function deserializeInto(project, data) {
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
     rectangles: (f.rectangles || []).map(
-      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind }),
+      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge }),
     ),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({

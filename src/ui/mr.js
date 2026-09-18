@@ -34,7 +34,8 @@ import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex } from '../core/zoneColors.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, APERTURE_DEFAULTS } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, hingeEndFromPlan } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -1428,6 +1429,46 @@ export function setupMR(view, project, getFootprint) {
     }
   };
 
+  // Plan symbols for the aperture zones (door swing, window casement, half-wall
+  // hatch), drawn as thin floor strips so AR and the printed sheet stay legible
+  // side by side. Segments come from the SAME shared module the sheet/DXF use, so
+  // the three surfaces can't drift. Each glyph strip is a flat quad per segment
+  // with a proper perpendicular (the door arc segments aren't axis-aligned).
+  const APERTURE_GLYPH_HALF = 0.006; // 1.2 cm strip
+  const addApertureGlyphs = (floor, elevation) => {
+    const byKind = new Map();
+    for (const r of floor.rectangles) {
+      const k = zoneKind(r);
+      if (!isAperture(k)) continue;
+      (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
+    }
+    for (const [k, rects] of byKind) {
+      const arr = [];
+      for (const r of rects) {
+        const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+        const hingeEnd = hingeEndFromPlan(r.hinge ?? APERTURE_DEFAULTS[k]?.hinge);
+        const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd)
+          : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
+            : halfWallHatchSegments(bw, bh);
+        for (const [ax, ay, bx, by] of segs) {
+          // plan (x,y) -> planGroup (x,0,-y); thicken perpendicular to the segment.
+          const x0 = b.x0 + ax, y0 = b.y0 + ay, x1 = b.x0 + bx, y1 = b.y0 + by;
+          let dx = x1 - x0, dy = y1 - y0; const len = Math.hypot(dx, dy) || 1;
+          const px = (-dy / len) * APERTURE_GLYPH_HALF, py = (dx / len) * APERTURE_GLYPH_HALF;
+          const c = [[x0 - px, y0 - py], [x1 - px, y1 - py], [x1 + px, y1 + py], [x0 + px, y0 + py]];
+          const tri = (p) => arr.push(p[0], 0, -p[1]);
+          tri(c[0]); tri(c[1]); tri(c[2]); tri(c[0]); tri(c[2]); tri(c[3]);
+        }
+      }
+      if (!arr.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+      const mesh = new THREE.Mesh(geo, edgeMat(k, false));
+      mesh.position.y = elevation + 0.0035; // above the faint fill, below the 0.004 edge strips
+      planGroup.add(mesh);
+    }
+  };
+
   const addFloorStrips = (floor, elevation, active = null) => {
     const pushStrips = (rects, mat, y, wantEdge) => {
       const geo = rectStripGeo(rects, EDGE_HALF, wantEdge);
@@ -1461,6 +1502,7 @@ export function setupMR(view, project, getFootprint) {
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = room free space
     if (fillGeo) planGroup.add(new THREE.Mesh(fillGeo, fillMat));
     addZoneFills(floor, 0); // faint per-kind tint for the subtract zones on top
+    addApertureGlyphs(floor, 0); // door swing / window casement / half-wall hatch
     // Per-rectangle edge strips, colored per kind (see edgeMat / zoneColors.js).
     // Non-active zones sit lower; the active zone is a lightened tint and on top.
     addFloorStrips(floor, 0, activeRect);
@@ -2190,6 +2232,7 @@ export function setupMR(view, project, getFootprint) {
         planGroup.add(fill);
       }
       addZoneFills(floor, elevation); // faint per-kind tint for subtract zones
+      addApertureGlyphs(floor, elevation);
       addFloorStrips(floor, elevation);
       if (withDims) buildDimensions(floor, elevation, false);
       if (withDims) addFloorMarkers(floor, elevation, false);
@@ -4129,8 +4172,7 @@ export function setupMR(view, project, getFootprint) {
     if (!selectedRect) return;
     const current = zoneKindOf(selectedRect);
     const i = ZONE_KINDS.indexOf(current);
-    selectedRect.kind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
-    selectedRect.op = zoneOp(selectedRect.kind);
+    selectedRect.setKind(ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length]);
     project.touch();
     buildPlan();
     applyPlanMatrix();
