@@ -53,6 +53,10 @@ const STRINGS = {
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.save':     { en: 'SAVE',   fr: 'ENREG.',   zh: '保存' },
   'mode.load':     { en: 'LOAD',   fr: 'CHARGER',  zh: '加载' },
+  // Shown head-locked when the controllers are set down and the headset falls back
+  // to hand tracking (unsupported — the survey UI is controller-only).
+  'controllers.pickUp':   { en: 'Pick up your controllers', fr: 'Reprenez vos manettes', zh: '请拿起手柄' },
+  'controllers.handMode': { en: 'Hand tracking is not supported', fr: 'Le suivi des mains n’est pas pris en charge', zh: '不支持手部追踪' },
   'mode.export':   { en: 'EXPORT', fr: 'EXPORT',    zh: '导出' },
   'mode.copy_floor': { en: 'COPY FLOOR', fr: 'COPIER ÉTAGE', zh: '复制楼层' },
   'mode.paste_floor': { en: 'PASTE FLOOR', fr: 'COLLER ÉTAGE', zh: '粘贴楼层' },

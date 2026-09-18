@@ -746,6 +746,17 @@ export function setupMR(view, project, getFootprint) {
   }
   const lastTouch = new THREE.Vector3(NaN, NaN, NaN);
 
+  // Head-locked notice shown when NO physical controller drives the editor — i.e.
+  // the controllers were set down and the headset fell back to hand tracking. The
+  // survey UI is controller-only (isControllerSource gates every editing event),
+  // so instead of going silently blank we prompt the user to pick a controller
+  // back up. Positioned in front of the headset each frame it is visible.
+  const handPrompt = makeHelp();
+  handPrompt.sprite.renderOrder = HUD_ORDER;
+  handPrompt.sprite.scale.set(0.22, 0.11, 1); // shorter than a help box — two lines
+  handPrompt.sprite.visible = false;
+  scene.add(handPrompt.sprite);
+
   // Floor-target rings. The main one follows the RIGHT editor and recolors with its
   // current mode. The cyan one belongs permanently to the optional LEFT companion
   // and is always a teleport target.
@@ -5461,6 +5472,14 @@ export function setupMR(view, project, getFootprint) {
     currentFrame = frame;
     pollModeCycle(frame, time);
     const editCtl = editorSource(frame);
+    // No physical controller in the editor role → the headset is in hand tracking
+    // (controllers set down). Prompt to pick one up rather than going blank; the
+    // rest of the HUD (keyed on editCtl) stays hidden this frame.
+    if (!editCtl) {
+      handPrompt.setText(t('controllers.pickUp'), t('controllers.handMode'), 0xfbbf24);
+      placePanel(handPrompt.sprite, 1.0, 0.05);
+    }
+    handPrompt.sprite.visible = !editCtl;
     const companionCtl = leftSource(frame);
     const companionController = controllerForSource(companionCtl);
     // Fixed roles replace last-active hiding. RIGHT exposes the editor HUD; LEFT,
