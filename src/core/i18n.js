@@ -128,9 +128,9 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. Grip deletes; thumbstick up/down cycles the zone type.',
-    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. Poignée : supprime ; joystick haut/bas : type de zone.',
-    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。握把删除；摇杆上/下切换区域类型。',
+    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. B/Y deletes; thumbstick up/down cycles the zone type.',
+    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. B/Y : supprime ; joystick haut/bas : type de zone.',
+    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。B/Y 删除；摇杆上/下切换区域类型。',
   },
   'help.translate': {
     en: 'Relocate the active floor rigidly. Pick an X edge and a Y edge, entering each desired distance from origin. FLIP changes side; the complete floor moves only after both are set.',
@@ -138,9 +138,9 @@ const STRINGS = {
     zh: '整体平移当前楼层。选择一条 X 方向边和一条 Y 方向边，并分别输入其到原点的目标距离。“翻转”可改变所在侧；两项均设定后才移动整个楼层。',
   },
   'help.marker': {
-    en: 'Edit markers only. Trigger repeatedly to cycle markers stacked at one position. Thumbstick up/down picks or changes type. Trigger empty space to place; ENTER saves height. Grip-drag moves one, grip away deletes.',
-    fr: 'Modifiez seulement les marqueurs. Répétez la gâchette pour parcourir ceux empilés au même point. Joystick haut/bas : type. Gâchette dans le vide : poser ; VALIDER enregistre la hauteur. Poignée-glisser : déplacer ; poignée ailleurs : supprimer.',
-    zh: '仅编辑标记。在同一位置重复扣动扳机可循环选择堆叠标记。摇杆上/下选择或更改类型。对空处扣动扳机放置；按确定保存高度。按住握把拖动，移开后按握把删除。',
+    en: 'Edit markers only. Trigger repeatedly to cycle markers stacked at one position. Thumbstick up/down picks or changes type. Trigger empty space to place; ENTER saves height. Grip-drag moves one; B/Y deletes the selected one.',
+    fr: 'Modifiez seulement les marqueurs. Répétez la gâchette pour parcourir ceux empilés au même point. Joystick haut/bas : type. Gâchette dans le vide : poser ; VALIDER enregistre la hauteur. Poignée-glisser : déplacer ; B/Y : supprimer.',
+    zh: '仅编辑标记。在同一位置重复扣动扳机可循环选择堆叠标记。摇杆上/下选择或更改类型。对空处扣动扳机放置；按确定保存高度。按住握把拖动；B/Y 删除所选标记。',
   },
   'help.marker_link': {
     en: 'Link electrical controls. Trigger a switch, then trigger lights to add or remove their connection. Grip clears the selected switch. Routes rise to the ceiling automatically.',
@@ -148,9 +148,9 @@ const STRINGS = {
     zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
   },
   'help.marker_wire': {
-    en: 'Route a wire over the conduit network. Trigger two device markers to define it — its path is the automatic shortest route through the conduits, drawn at once. A dimmed device on the floor above/below can be an endpoint, so a wire can span storeys over a riser. Trigger the wire to select it, then trigger conduit nodes to force the route through them (a via override); grip pops the last override, or (with none) deletes the selected wire. The wall/ceiling/floor/riser of each segment is inferred.',
-    fr: 'Faites cheminer un câble dans le réseau de gaines. Gâchette sur deux marqueurs d’appareil pour le définir — son trajet est la route la plus courte à travers les gaines, tracée aussitôt. Un appareil estompé à l’étage au-dessus/en dessous peut servir d’extrémité : un câble peut donc franchir les niveaux par une colonne montante. Gâchette sur le câble pour le sélectionner, puis gâchette sur des nœuds de gaine pour l’y forcer (dérivation via) ; la poignée retire la dernière dérivation, ou (sans aucune) supprime le câble choisi. Le mur/plafond/sol/colonne de chaque segment est déduit.',
-    zh: '让线路沿管路网络走线。对两个设备标记扣动扳机即可定义——其路径为经管路的最短路线，立即绘出。上一层/下一层的暗显设备也可作为端点，因此线路可经竖向立管跨楼层。对线路扣动扳机选中它，再对管路节点扣动扳机可强制经由该节点（via 覆盖）；按握把撤销最后一个覆盖，或（在没有覆盖时）删除所选线路。每段所在的墙/天花板/地板/立管会自动推断。',
+    en: 'Route a wire over the conduit network. Trigger two device markers to define it — its path is the automatic shortest route through the conduits, drawn at once. A dimmed device on the floor above/below can be an endpoint, so a wire can span storeys over a riser. Trigger the wire to select it, then trigger conduit nodes to force the route through them (a via override); grip pops the last override, and B/Y deletes the selected wire. The wall/ceiling/floor/riser of each segment is inferred.',
+    fr: 'Faites cheminer un câble dans le réseau de gaines. Gâchette sur deux marqueurs d’appareil pour le définir — son trajet est la route la plus courte à travers les gaines, tracée aussitôt. Un appareil estompé à l’étage au-dessus/en dessous peut servir d’extrémité : un câble peut donc franchir les niveaux par une colonne montante. Gâchette sur le câble pour le sélectionner, puis gâchette sur des nœuds de gaine pour l’y forcer (dérivation via) ; la poignée retire la dernière dérivation, et B/Y supprime le câble choisi. Le mur/plafond/sol/colonne de chaque segment est déduit.',
+    zh: '让线路沿管路网络走线。对两个设备标记扣动扳机即可定义——其路径为经管路的最短路线，立即绘出。上一层/下一层的暗显设备也可作为端点，因此线路可经竖向立管跨楼层。对线路扣动扳机选中它，再对管路节点扣动扳机可强制经由该节点（via 覆盖）；按握把撤销最后一个覆盖，B/Y 删除所选线路。每段所在的墙/天花板/地板/立管会自动推断。',
   },
   'help.marker_conduit': {
     en: 'Build the whole-house conduit network. Trigger a device or an existing node to start the pen there, trigger empty space to drop a junction and run a conduit to it, or trigger another node to connect (branch/loop). Dimmed targets on the floor above/below are pickable — trigger one to run a riser through the slab. Grip lifts the pen; lift then start elsewhere to branch.',
@@ -158,19 +158,19 @@ const STRINGS = {
     zh: '构建整屋管路网络。对设备或已有节点扣动扳机以在此落笔，对空处扣动扳机放置接头并连一段管路，或对另一节点扣动扳机进行连接（分支/环路）。上一层/下一层的暗显目标可被选取——对其扣动扳机即可穿过楼板拉一条竖向立管。握把抬笔；抬笔后从另一节点重新开始即可分支。',
   },
   'help.conduit_dims': {
-    en: 'Dimension a conduit junction to a wall so it tracks that wall on every edit. Trigger a bare junction to pick it, then trigger a wall edge; the numpad sets the distance (B/Y flips the side). Pin X and Y separately for a full lock. Marker-bound nodes are inert here — they follow their device.',
-    fr: 'Cotez une jonction de gaine par rapport à un mur pour qu’elle le suive à chaque modification. Gâchette sur une jonction libre pour la choisir, puis gâchette sur un bord de mur ; le pavé numérique règle la distance (B/Y inverse le côté). Épinglez X et Y séparément pour un verrouillage complet. Les nœuds liés à un appareil sont inertes ici — ils suivent celui-ci.',
-    zh: '将管路接头相对某面墙标注尺寸，使其在每次编辑时都跟随该墙。对自由接头扣动扳机以选取，再对墙边扣动扳机；数字键盘设定距离（B/Y 翻转方向）。分别锁定 X 和 Y 以完全固定。绑定到设备的节点在此为惰性——它们跟随该设备。',
+    en: 'Dimension a conduit junction to a wall so it tracks that wall on every edit. Trigger a bare junction to pick it, then trigger a wall edge; the numpad sets the distance (A/X flips the side, B/Y removes the pin). Grip cycles vertically stacked junctions before picking. Pin X and Y separately for a full lock. Marker-bound nodes are inert here — they follow their device.',
+    fr: 'Cotez une jonction de gaine par rapport à un mur pour qu’elle le suive à chaque modification. Gâchette sur une jonction libre pour la choisir, puis gâchette sur un bord de mur ; le pavé numérique règle la distance (A/X inverse le côté, B/Y retire la cote). La saisie fait défiler les jonctions empilées verticalement avant le choix. Épinglez X et Y séparément pour un verrouillage complet. Les nœuds liés à un appareil sont inertes ici — ils suivent celui-ci.',
+    zh: '将管路接头相对某面墙标注尺寸，使其在每次编辑时都跟随该墙。对自由接头扣动扳机以选取，再对墙边扣动扳机；数字键盘设定距离（A/X 翻转方向，B/Y 删除该尺寸）。选取前，握把可在垂直堆叠的接头间循环。分别锁定 X 和 Y 以完全固定。绑定到设备的节点在此为惰性——它们跟随该设备。',
   },
   'help.conduit_edit': {
-    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height), or grip away to delete the selected node and its segments. Trigger a segment (highlights yellow) to split it with a new junction, or grip it to delete just that segment. Marker-bound nodes follow their device.',
-    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie), ou poignée à l’écart pour supprimer le nœud choisi et ses segments. Gâchette sur un segment (surligné en jaune) pour le scinder par une nouvelle jonction, ou poignée dessus pour supprimer ce seul segment. Les nœuds liés à un appareil suivent celui-ci.',
-    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度），或将握把移开以删除所选节点及其段。对某段（高亮为黄色）扣动扳机可用新接头将其分割，或按住握把仅删除该段。绑定到设备的节点跟随该设备。',
+    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height). B/Y deletes the selected node and its segments; hover a segment (highlights yellow) and press B/Y to delete just that segment, or trigger it to split it with a new junction. Marker-bound nodes follow their device.',
+    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie). B/Y supprime le nœud choisi et ses segments ; visez un segment (surligné en jaune) et appuyez sur B/Y pour ne supprimer que ce segment, ou gâchette pour le scinder par une nouvelle jonction. Les nœuds liés à un appareil suivent celui-ci.',
+    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度）。B/Y 删除所选节点及其段；瞄准某段（高亮为黄色）按 B/Y 可仅删除该段，或扣动扳机用新接头将其分割。绑定到设备的节点跟随该设备。',
   },
   'help.furnish': {
-    en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; grip away from an item to delete the selection. Models load on the fly.',
-    fr: 'Placez des modèles de meubles réels. Le joystick haut/bas fait défiler l’article à poser (ou fait pivoter l’élément sélectionné par pas de 15°). Gâchette sur le sol vide pour le poser ; gâchette sur un élément pour le sélectionner ; poignée-glisser pour le déplacer ; poignée à l’écart pour supprimer la sélection. Les modèles se chargent à la volée.',
-    zh: '放置真实家具模型。摇杆上/下切换要放置的商品（或以15°步进旋转所选项）。对空地扣扳机放置；对某项扣扳机以选中；按住握把拖动可移动；将握把移开以删除所选项。模型即时加载。',
+    en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; B/Y deletes the selection. Models load on the fly.',
+    fr: 'Placez des modèles de meubles réels. Le joystick haut/bas fait défiler l’article à poser (ou fait pivoter l’élément sélectionné par pas de 15°). Gâchette sur le sol vide pour le poser ; gâchette sur un élément pour le sélectionner ; poignée-glisser pour le déplacer ; B/Y supprime la sélection. Les modèles se chargent à la volée.',
+    zh: '放置真实家具模型。摇杆上/下切换要放置的商品（或以15°步进旋转所选项）。对空地扣扳机放置；对某项扣扳机以选中；按住握把拖动可移动；B/Y 删除所选项。模型即时加载。',
   },
   'furnish.pick':     { en: 'Place / select', fr: 'Placer / sélectionner', zh: '放置 / 选择' },
   'furnish.selected': { en: 'Rotate · move · delete', fr: 'Pivoter · déplacer · supprimer', zh: '旋转 · 移动 · 删除' },
@@ -186,9 +186,9 @@ const STRINGS = {
     zh: '仅编辑平面尺寸。选择两条兼容的边，或一条边与原点，再输入距离。标记图标在此模式下无效。',
   },
   'help.outlet_dims': {
-    en: 'Marker dimensions only. Pick a marker floor icon first, then a plan edge and type the distance (0 = on wall). The wall marker highlights too.',
-    fr: 'Cotes des marqueurs uniquement. Choisissez d’abord l’icône au sol, puis un bord du plan et tapez la distance (0 = au mur). Le marqueur mural est aussi surligné.',
-    zh: '仅编辑标记尺寸。先选择标记地面图标，再选择平面边并输入距离（0 = 贴墙）。对应的墙上标记也会高亮。',
+    en: 'Marker dimensions only. Pick a marker floor icon first, then a plan edge and type the distance (0 = on wall). Grip cycles vertically stacked markers before picking. The wall marker highlights too.',
+    fr: 'Cotes des marqueurs uniquement. Choisissez d’abord l’icône au sol, puis un bord du plan et tapez la distance (0 = au mur). La saisie fait défiler les marqueurs empilés verticalement avant le choix. Le marqueur mural est aussi surligné.',
+    zh: '仅编辑标记尺寸。先选择标记地面图标，再选择平面边并输入距离（0 = 贴墙）。选取前，握把可在垂直堆叠的标记间循环。对应的墙上标记也会高亮。',
   },
   'help.save': {
     en: 'Aim at a slot and trigger to save. For an occupied slot, select the separate CONFIRM OVERWRITE button.',
@@ -334,7 +334,7 @@ const STRINGS = {
   'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },
   'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
   'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
-  'conduit.editSeg':  { en: 'SEGMENT — SPLIT / GRIP DEL', fr: 'SEGMENT — DIVISER / SAISIR SUPPR', zh: '管段 — 分割 / 握把删除' },
+  'conduit.editSeg':  { en: 'SEGMENT — TRIGGER SPLIT / B DEL', fr: 'SEGMENT — GÂCHETTE DIVISER / B SUPPR', zh: '管段 — 扳机分割 / B 删除' },
 };
 
 let current = 'en';

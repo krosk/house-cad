@@ -1992,6 +1992,45 @@ export function setupMR(view, project, getFootprint) {
     return stack[idx < 0 ? 0 : (idx + 1) % stack.length];
   }
 
+  // Ordered vertical stack (high→low z) of DIMS-eligible first-ref targets sharing the
+  // floor point under the reticle: bare conduit junctions in CONDUIT DIMS, markers in
+  // MARKER DIMS. Returns [{kind,id}] (empty for PLAN DIMS or an empty point). Used so
+  // grip can cycle which stacked member the pending dimension will reference.
+  function dimStackAt(px, py) {
+    if (px == null) return [];
+    if (modes[currentMode].id === 'conduit_dims') {
+      const anchor = conduitNodeAtFloorPoint(px, py);
+      if (!anchor || anchor.markerId) return [];
+      const p0 = conduitNodePos(project, anchor);
+      return project.conduitNodes
+        .filter((n) => !n.markerId && project.conduitNodeFloorId(n) === project.activeFloorId)
+        .map((n) => ({ n, p: conduitNodePos(project, n) }))
+        .filter(({ p }) => p.x === p0.x && p.y === p0.y)
+        .sort((a, b) => (b.p.z || 0) - (a.p.z || 0))
+        .map(({ n }) => ({ kind: 'node', id: n.id }));
+    }
+    if (modes[currentMode].id === 'outlet_dims') {
+      const anchor = markerAtFloorPoint(px, py);
+      if (!anchor) return [];
+      return project.markers
+        .filter((m) => m.x === anchor.x && m.y === anchor.y)
+        .sort((a, b) => (b.z || 0) - (a.z || 0))
+        .map((m) => ({ kind: 'marker', id: m.id }));
+    }
+    return [];
+  }
+
+  // Grip in the DIMS first-ref phase: advance dimStackPick to the next member of the
+  // vertical stack under the reticle, so a stacked node/marker can be singled out.
+  function cycleDimStackPick() {
+    const stack = hoverFloorPt ? dimStackAt(hoverFloorPt.px, hoverFloorPt.py) : [];
+    if (stack.length < 2) return false;
+    const idx = stack.findIndex((s) => s.id === dimStackPick);
+    dimStackPick = stack[idx < 0 ? 0 : (idx + 1) % stack.length].id;
+    rlog('dim stack cycle', { id: dimStackPick });
+    return true;
+  }
+
   // Nearest conduit SEGMENT touching the active floor (id), ignoring collapsed vertical
   // segments with no plan extent; used by CONDUIT EDIT to split a run.
   function conduitSegmentAtFloorPoint(px, py) {
@@ -2427,6 +2466,7 @@ export function setupMR(view, project, getFootprint) {
   let dimRefB = null;       // second-picked reference
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
   let hoverFloorPt = null;  // {px,py} reticle floor point this frame during DIMS ref-pick
+  let dimStackPick = null;  // in DIMS first-ref phase, the chosen member id of a vertical stack (grip cycles it)
   let dimOffsetPt = null;   // {px,py} captured when a pair completes -> new dim's default line placement
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
   let gripDrag = null;      // active grip-drag: dim (DIMS), edge (EDGE), or marker (OUTLET)
@@ -2816,6 +2856,7 @@ export function setupMR(view, project, getFootprint) {
 
   function resetDim() {
     dimRefA = dimRefB = null;
+    dimStackPick = null;
     editingId = null;
     dimOffsetPt = null;
     dimBuffer = '';
@@ -2889,6 +2930,24 @@ export function setupMR(view, project, getFootprint) {
     if (wasNode) buildConduits(); // refresh the freed junction's node sphere / highlight state
     applyPlanMatrix();
     redrawNumpad();
+  }
+
+  // B/Y delete in a DIMS mode (where "the selected item" is a dimension constraint): a
+  // completed pair removes its constraint (deleteDim); otherwise a hovered existing dim
+  // label is removed directly. No-op when nothing is targeted. Returns true if it removed.
+  function deleteDimContext() {
+    if (dimRefA && dimRefB) { deleteDim(); return true; }
+    if (hoverDim) {
+      const c = project.constraints.find((k) => k.id === hoverDim.userData.cId);
+      if (c) {
+        const wasNode = isNodeConstraint(c);
+        project.removeConstraint(c.id);
+        rlog('dim delete (hover)', { id: c.id });
+        resetDim(); buildPlan(); if (wasNode) buildConduits(); applyPlanMatrix(); redrawNumpad();
+        return true;
+      }
+    }
+    return false;
   }
 
   // Live update for an active grip-drag, from the reticle's floor point (px,py):
@@ -5068,14 +5127,71 @@ export function setupMR(view, project, getFootprint) {
     gripDrag = null;
   }
 
-  // Grip button: context-sensitive deletion belongs to the active editing domain;
-  // other modes only cancel an in-progress gesture (or do nothing).
-  //  - PLAN: delete the selected zone.
-  //  - MARKER EDIT: delete the selected marker (an aimed grip starts a drag instead).
+  // B/Y delete: remove the mode's selected/hovered item (see pollModeCycle). Deletion
+  // was moved off grip so grip means only grab-drag / cancel. Returns true if it removed
+  // something.
+  //  - PLAN EDIT: the selected zone.  - MARKER EDIT: the selected marker.
+  //  - FURNISH: the selected furniture.  - CONDUIT EDIT: the hovered segment (keeps its
+  //    nodes) else the selected node + its segments.  - WIRE: the selected wire.
+  function deleteInMode() {
+    const mode = modes[currentMode];
+    if (mode.id === 'edit') {
+      if (!selectedRect) return false;
+      const id = selectedRect.id;
+      project.removeRectangle(id);
+      const si = surveyed.indexOf(id);
+      if (si >= 0) surveyed.splice(si, 1);
+      if (activeRect && activeRect.id === id) activeRect = project.rectangles[project.rectangles.length - 1] || null;
+      selectedRect = null;
+      updateRoomAreaHud();
+      buildPlan(); applyPlanMatrix();
+      rlog('edit delete', { id });
+      return true;
+    }
+    if (mode.id === 'marker' && selectedMarker) { deleteSelectedMarker(); return true; }
+    if (mode.id === 'furnish' && selectedFurnitureId) {
+      const id = selectedFurnitureId;
+      project.removeFurniture(id);
+      selectedFurnitureId = null;
+      buildFurniture();
+      setModeInfo();
+      rlog('furniture delete', { id });
+      return true;
+    }
+    if (mode.id === 'conduit_edit') {
+      if (hoverConduitSegmentId) { // one leg of a branch, leaving its end nodes
+        rlog('conduit segment delete', { id: hoverConduitSegmentId });
+        project.removeConduitSegment(hoverConduitSegmentId);
+        buildConduits();
+        return true;
+      }
+      if (selectedConduitNodeId) {
+        rlog('conduit node delete', { id: selectedConduitNodeId });
+        project.removeConduitNode(selectedConduitNodeId);
+        selectConduitNode(null);
+        buildConduits();
+        return true;
+      }
+      return false;
+    }
+    if (mode.id === 'marker_wire' && selectedRoutedWire) {
+      rlog('wire delete', { id: selectedRoutedWire.id });
+      project.removeWire(selectedRoutedWire.id);
+      selectedRoutedWire = null;
+      buildRoutedWires();
+      return true;
+    }
+    return false;
+  }
+
+  // Grip button: NON-destructive only — grab-drag a target (armed in onSqueezeStart), or
+  // cancel/undo/back-out an in-progress gesture. Deletion lives on B/Y (deleteInMode).
   //  - MARKER LINK: clear the selected source switch without deleting links.
-  //  - PLAN DIMS / OUTLET DIMS: cancel the last dimension pick, step by step.
+  //  - MARKER CONDUIT: lift the pen (stop the run).
+  //  - MARKER WIRE: pop the last via override (B/Y deletes the wire).
+  //  - PLAN/MARKER/CONDUIT DIMS: undo the last dim pick, step by step; else cycle a stack.
   //  - EDGE: cancel a pending locked edge.
-  //  - REGISTER / RECAL mid-gesture: back out the pending point/direction.
+  //  - TRANSLATE / REGISTER / RECAL mid-gesture: back out the pending point/direction.
   function onReset(event) {
     if (!isControllerSource(event?.data)) return;
     if (event?.data?.handedness === 'left') return;
@@ -5098,6 +5214,9 @@ export function setupMR(view, project, getFootprint) {
     if (isDimMode(mode.id)) { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; dimBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
       if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
+      // Nothing picked yet: grip cycles a vertical stack under the reticle so a stacked
+      // node/marker can be singled out before its first-ref pick.
+      if (cycleDimStackPick()) return;
       return;
     }
     if (mode.id === 'translate') {
@@ -5113,83 +5232,25 @@ export function setupMR(view, project, getFootprint) {
       if (translateTargets.x) { translateTargets.x = null; rlog('translate X cancelled'); return; }
       return;
     }
-    if (mode.id === 'edit') { // PLAN domain: grip deletes only a selected zone
-      if (!selectedRect) return;
-      const id = selectedRect.id;
-      project.removeRectangle(id);
-      const si = surveyed.indexOf(id);
-      if (si >= 0) surveyed.splice(si, 1);
-      if (activeRect && activeRect.id === id) {
-        activeRect = project.rectangles[project.rectangles.length - 1] || null;
-      }
-      selectedRect = null;
-      updateRoomAreaHud();
-      buildPlan();
-      applyPlanMatrix();
-      rlog('edit delete', { id });
-      return;
-    }
     if (mode.id === 'marker_link') {
       if (selectedLinkSwitch) rlog('link switch cleared', { id: selectedLinkSwitch.id });
       selectedLinkSwitch = null;
       return;
     }
     if (mode.id === 'marker_conduit') {
-      // Grip lifts the pen (stops the current run) without deleting geometry;
-      // node/segment deletion belongs to CONDUIT EDIT.
+      // Grip lifts the pen (stops the current run) without deleting geometry.
       if (penNodeId) { rlog('conduit pen lift', { node: penNodeId }); penNodeId = null; }
       return;
     }
-    if (mode.id === 'conduit_edit') {
-      // Grip on a hovered segment deletes that ONE segment (leaves its end nodes) — the
-      // way to drop one leg of a branch without nuking the whole node. Takes precedence
-      // over the node delete below so aiming at a segment is unambiguous.
-      if (hoverConduitSegmentId) {
-        rlog('conduit segment delete', { id: hoverConduitSegmentId });
-        project.removeConduitSegment(hoverConduitSegmentId);
-        buildConduits();
-        return;
-      }
-      // Grip away from a node deletes the selected node + its segments. (A grip ON a
-      // node became a drag and never reaches here.)
-      if (selectedConduitNodeId) {
-        rlog('conduit node delete', { id: selectedConduitNodeId });
-        project.removeConduitNode(selectedConduitNodeId);
-        selectConduitNode(null);
-        buildConduits();
-      }
-      return;
-    }
     if (mode.id === 'marker_wire') {
-      // Grip: on a selected wire, undo its last via override; with no overrides left,
-      // delete the wire (MARKER-domain delete). Otherwise clear a pending start marker.
-      if (selectedRoutedWire) {
-        if ((selectedRoutedWire.via || []).length) {
-          project.popWireVia(selectedRoutedWire.id);
-          buildRoutedWires();
-          rlog('wire via pop', { id: selectedRoutedWire.id });
-        } else {
-          rlog('wire delete', { id: selectedRoutedWire.id });
-          project.removeWire(selectedRoutedWire.id);
-          selectedRoutedWire = null;
-          buildRoutedWires();
-        }
+      // Grip pops the last via override (non-destructive undo); B/Y deletes the wire.
+      if (selectedRoutedWire && (selectedRoutedWire.via || []).length) {
+        project.popWireVia(selectedRoutedWire.id);
+        buildRoutedWires();
+        rlog('wire via pop', { id: selectedRoutedWire.id });
         return;
       }
       if (wireFromMarker) { rlog('wire from cleared', { id: wireFromMarker.id }); wireFromMarker = null; }
-      return;
-    }
-    if (mode.id === 'marker' && selectedMarker) {
-      deleteSelectedMarker();
-      return;
-    }
-    if (mode.id === 'furnish' && selectedFurnitureId) { // grip away from an item deletes the selection
-      const id = selectedFurnitureId;
-      project.removeFurniture(id);
-      selectedFurnitureId = null;
-      buildFurniture();
-      setModeInfo();
-      rlog('furniture delete', { id });
       return;
     }
     if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -5219,7 +5280,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
-  const btn = { next: false, prev: false, stick: false, stickY: false };
+  const btn = { a: false, b: false, stick: false, stickY: false };
   // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
   // (not a tap) so it can't collide with stick flicks or be hit by accident.
@@ -5255,15 +5316,16 @@ export function setupMR(view, project, getFootprint) {
 
   function pollModeCycle(frame, time) {
     // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
-    // buttons[4]=A/X (prev mode), buttons[5]=B/Y (DIMS/TRANSLATE flip; does NOT cycle modes),
-    // axes[2]=thumbstick x (cycle mode), axes[3]=thumbstick y (cycle the current
+    // buttons[4]=A/X (flip: DIMS completed pair / TRANSLATE pending coord; else inert),
+    // buttons[5]=B/Y (delete the selected/hovered item; never cycles modes),
+    // axes[2]=thumbstick x (cycle mode, both ways), axes[3]=thumbstick y (cycle the current
     // thing: LEVEL floor / UNIT display unit / LANG language / MARKER type / EDIT zone type).
     // Only the fixed RIGHT editor role is read; LEFT never changes modes.
-    let next = false, prev = false, stickX = 0, stickY = 0, stickDown = false;
+    let aBtn = false, bBtn = false, stickX = 0, stickY = 0, stickDown = false;
     const gp = editorSource(frame)?.gamepad;
     if (gp) {
-      next = !!gp.buttons[5]?.pressed;     // upper face button -> next
-      prev = !!gp.buttons[4]?.pressed;     // lower face button -> previous
+      aBtn = !!gp.buttons[4]?.pressed;      // A/X (lower face) -> flip (DIMS / TRANSLATE)
+      bBtn = !!gp.buttons[5]?.pressed;      // B/Y (upper face) -> delete
       stickDown = !!gp.buttons[3]?.pressed; // thumbstick click (hold to exit)
       stickX = gp.axes[2] ?? 0;
       stickY = gp.axes[3] ?? 0;
@@ -5281,17 +5343,21 @@ export function setupMR(view, project, getFootprint) {
       exitHoldStart = 0;
       exitProgress = 0;
     }
-    // Upper face button (B/Y) does NOT cycle modes — mode nav is thumbstick-x (both ways)
-    // and A/X (prev). In DIMS, B/Y flips a completed dimension; in TRANSLATE it
-    // flips the pending coordinate across the origin. Contextual "cycle the current
-    // thing" actions live on thumbstick-y.
-    if (next && !btn.next) {
+    // Neither face button cycles modes — mode nav is thumbstick-x (both ways). A/X = FLIP:
+    // a completed DIMS dimension, or the pending TRANSLATE coordinate across the origin
+    // (inert otherwise). B/Y = DELETE the mode's selected/hovered item where applicable
+    // (grip no longer deletes; TRANSLATE has nothing to delete). Contextual "cycle the
+    // current thing" lives on thumbstick-y.
+    if (aBtn && !btn.a) {
       if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
       else if (modes[currentMode].id === 'translate' && translateEdge) pressTranslateKey('swap');
     }
-    if (prev && !btn.prev) stepMode(-1);
-    btn.next = next;
-    btn.prev = prev;
+    if (bBtn && !btn.b) {
+      if (isDimMode(modes[currentMode].id)) deleteDimContext();
+      else deleteInMode();
+    }
+    btn.a = aBtn;
+    btn.b = bBtn;
     // Thumbstick flick, dead-zoned, one step per flick. The dominant axis wins so
     // a diagonal doesn't cycle a mode AND change floor at once.
     if (!btn.stick && Math.abs(stickX) > 0.7 && Math.abs(stickX) >= Math.abs(stickY)) {
@@ -5646,12 +5712,16 @@ export function setupMR(view, project, getFootprint) {
               else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
             } else if (!dimRefA) {
               // First pick is the domain's dependent target: an outlet, or a bare junction.
-              if (modeId === 'conduit_dims') {
-                const n = conduitNodeAtFloorPoint(px, py);
-                if (n && !n.markerId) hoverRef = { kind: 'node', nodeId: n.id };
-              } else {
-                const floorMarker = markerAtFloorPoint(px, py);
-                if (floorMarker) hoverRef = { kind: 'marker', markerId: floorMarker.id };
+              // Honor grip-cycled stack selection: default to the top of the vertical
+              // stack under the reticle, but if grip picked a lower member, target that.
+              // Reset the pick once the reticle moves off that stack.
+              const stack = dimStackAt(px, py);
+              if (dimStackPick && !stack.some((s) => s.id === dimStackPick)) dimStackPick = null;
+              const picked = stack.find((s) => s.id === dimStackPick) || stack[0];
+              if (picked) {
+                hoverRef = modeId === 'conduit_dims'
+                  ? { kind: 'node', nodeId: picked.id }
+                  : { kind: 'marker', markerId: picked.id };
               }
             } else {
               const e = edgeAtPoint(px, py);

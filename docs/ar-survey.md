@@ -20,7 +20,7 @@ PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LO
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
-navigation remains one fast linear cycle across the rows above (A/B or thumbstick-x); group
+navigation remains one fast linear cycle across the rows above (thumbstick-x, both ways); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
 `edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_conduit`, `conduit_dims`, `conduit_edit`, `marker_wire`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
@@ -54,7 +54,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
-  through overlapping zones), grip deletes it, and thumbstick up/down cycles
+  through overlapping zones), B/Y deletes it, and thumbstick up/down cycles
   room→wall→insulation→door→window→stairs→cabinet→furniture. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
   readout continuously shows `TYPE · <kind>` and is the only label that changes while cycling.
@@ -91,7 +91,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   hovered marker opens its height pad; ENTER commits the height, closes the pad, and clears the
   selection. **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D, but a
   **pinned axis stays locked** (`marker._locked` from its X/Y pins), so a fully-pinned marker becomes
-  a pure vertical (z) slider; **grip aimed at empty space deletes the selected marker**. Every marker
+  a pure vertical (z) slider; **B/Y deletes the selected marker**. Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Aim at a switch's
@@ -128,14 +128,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   distance from the tip to the node sphere (`WAYPOINT_GRAB_M`): **direct** (in reach) carries it 1:1
   in full 3D; **remote** (far) has the floor reticle drive X/Y while z is held and typed on the pad.
   Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
-  immovable** (they follow their device) and have no pad — selecting one just arms it. **Grip away
-  from a node deletes the selected node + its segments** (`onReset` → `removeConduitNode`; `via`
-  references to it are dropped). Readout: `PICK NODE`, then `EDIT NODE`.
+  immovable** (they follow their device) and have no pad — selecting one just arms it. **B/Y deletes
+  the selected node + its segments, or the hovered segment alone** (`deleteInMode` → `removeConduitNode`
+  / `removeConduitSegment`; `via` references are dropped). Readout: `PICK NODE`, then `EDIT NODE`.
 - **CONDUIT · DIMS** (`id: conduit_dims`) — dimension a **bare junction to a wall** so it tracks that
   wall on every edit. It shares the DIMS numpad machinery with PLAN/OUTLET DIMS via a third
   ref kind, `node` (see the `modeDomain`/`dimDomain` helpers): first trigger a bare junction
   (`conduitNodeAtFloorPoint`, marker-bound nodes excluded), then a wall edge; the numpad sets the
-  distance (B/Y flips the pair). Commit builds a `{node}` distance constraint (`makeNodeDistance`) in
+  distance (A/X flips the pair; B/Y removes the pin). Commit builds a `{node}` distance constraint (`makeNodeDistance`) in
   the node's own floor, resolved ONE-WAY in `solveConduitNodes` (the junction follows, the wall never
   moves) — exactly the marker-pin model. At most one pin per (node, axis); re-picking a wall re-anchors.
   Pin X and Y separately for a full lock (`node._full`). Marker-bound nodes are inert here. The pin
@@ -151,8 +151,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   at once); the created wire becomes selected. **Cross-floor wires:** an adjacent-floor device (dimmed
   in `adjacentGroup`) can be either endpoint, so a wire may span storeys over a riser. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
-  override); grip **pops the last via** (`popWireVia`), or with no vias left **deletes the wire**
-  (`removeWire`). Trigger an existing wire to re-select it; trigger empty space to deselect. The
+  override); grip **pops the last via** (`popWireVia`), and **B/Y deletes the wire** (`removeWire`).
+  Trigger an existing wire to re-select it; trigger empty space to deselect. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green, riser
   violet), showing the legs touching the active floor. A
@@ -254,14 +254,16 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
   markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
-- RIGHT **grip** = context action. Deletes only within an editing domain (PLAN = selected zone;
-  MARKER = selected marker); elsewhere it performs a non-destructive cancel/undo (either DIMS = undo a
-  dim pick; EDGE = cancel a locked edge; REGISTER/RECAL = back out a point; SAVE/LOAD/LEVEL =
-  nothing). UNLESS the
+- RIGHT **grip** = **non-destructive** context action only (deletion moved to B/Y — see below). It
+  cancels/undoes an in-progress gesture (either DIMS = undo a dim pick, or, before the first pick,
+  cycle a vertical node/marker stack under the reticle; EDGE = cancel a locked edge; TRANSLATE/
+  REGISTER/RECAL = back out a point; MARKER LINK = clear the source switch; MARKER CONDUIT = lift the
+  pen; MARKER WIRE = pop the last via override; SAVE/LOAD/LEVEL = nothing). UNLESS the
   reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = place the line
   perpendicularly and slide the value box along it; EDGE
   over an edge = move it; MARKER with the floor reticle over a marker's floor icon = grab it and move
-  in 3D at its initial pointer depth).
+  in 3D at its initial pointer depth; CONDUIT EDIT over a bare node = move it; FURNISH over an item =
+  move it).
   Marker drag **locks any pinned axis** (`marker._locked`, from its X/Y pins) so a measured position
   isn't dragged off — a fully-pinned marker moves in z only; free axes + z follow. Its
   per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
@@ -276,10 +278,14 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
   **thumbstick-hold (~1.2 s)** =
   exit AR.
-- RIGHT **A/X** = prev mode. **B/Y does NOT cycle modes** — mode nav is thumbstick-x (both ways) + A/X
-  (prev). B/Y flips the dimension side in either DIMS mode with a completed pair
-  (`flipConstraintSide`, NOT `swapConstraint`), or the pending coordinate side in TRANSLATE; it is
-  otherwise inert. All contextual cycling lives on thumbstick-y (above).
+- **Neither face button cycles modes** (mode nav is thumbstick-x, both ways; prev-mode on A/X was
+  removed as an asymmetric one-off). **A/X = FLIP**: in either DIMS mode with a completed pair it flips
+  the dimension side (`flipConstraintSide`, NOT `swapConstraint`); in TRANSLATE it flips the pending
+  coordinate side; inert otherwise. **B/Y = DELETE** the mode's selected/hovered item where applicable:
+  in DIMS it removes the dimension constraint (`deleteDimContext` — a completed pair, else a hovered
+  existing dim label); elsewhere `deleteInMode` (PLAN EDIT zone, MARKER, FURNISH item, CONDUIT EDIT
+  hovered segment else selected node + its segments, WIRE selected wire). TRANSLATE has nothing to
+  delete, so B/Y is inert there. All contextual cycling lives on thumbstick-y (above).
 - Both tracked controllers remain visible. The RIGHT HUD and LEFT sheet/teleport target are displayed
   by role; when LEFT is absent, its sheet and reticle are absent and RIGHT continues alone.
 
