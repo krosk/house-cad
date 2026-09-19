@@ -428,8 +428,13 @@ function download(filename, data, mime = 'application/json') {
 }
 
 document.getElementById('save').addEventListener('click', () => {
-  download('house.json', JSON.stringify(serializeProject(project), null, 2));
-  sketch.onStatus?.('Saved house.json');
+  const rev = project.bumpRevision(); // deliberate save → advance the revision
+  const data = JSON.stringify(serializeProject(project), null, 2);
+  // Mirror to autosave right away so the new revision survives a reload without an
+  // intervening edit (autosave only re-runs on project changes, which a save is not).
+  try { localStorage.setItem(LS_KEY, data); } catch { /* storage unavailable — ignore */ }
+  download('house.json', data);
+  sketch.onStatus?.(`Saved house.json (rev ${rev})`);
 });
 
 const fileInput = document.getElementById('file-input');
@@ -502,7 +507,8 @@ function sheetDownloadName(floor, extension, now = new Date()) {
   const pad = (n, width = 2) => String(n).padStart(width, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
     + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`;
-  return `plan-${safeName(floor.name)}-${stamp}.${extension}`;
+  const rev = project.revision > 0 ? `-r${project.revision}` : ''; // omit for a never-saved project
+  return `plan-${safeName(floor.name)}${rev}-${stamp}.${extension}`;
 }
 
 // Sheet text follows an explicitly chosen language (the Print menu's "Language"
@@ -516,6 +522,8 @@ const localizedSheetOptions = (lang = getLang()) => ({
   markerLegendNote: (ty) => (ty === 'outlet_aircon' ? t('marker.dedicatedCircuit', lang) : ''),
   zoneLabel: (kind) => t(`mode.${kind}`, lang),
   revLabels: revLabels(lang),
+  revision: project.revision, // saved-revision number, stamped on the sheet strip
+  revisionLabel: t('sheet.revision', lang),
 });
 
 function printSheets(svgs) {

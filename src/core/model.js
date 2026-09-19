@@ -211,7 +211,19 @@ export class Project {
     this.conduitNodes = [];
     this.conduitSegments = [];
     this.wires = [];
+    // Saved-revision counter: advanced by every explicit SAVE (desktop house.json,
+    // AR slot) — NOT by autosave — so it tracks deliberate saves. Persisted with the
+    // project and stamped on export filenames and printed sheets. 0 = never saved.
+    this.revision = 0;
     this._listeners = new Set();
+  }
+
+  // Advance the saved-revision counter and return the new value. Call from every
+  // explicit save path (never from autosave). Pure state change — no _emit, since
+  // the number surfaces only on export outputs, which are recomputed on demand.
+  bumpRevision() {
+    this.revision = (this.revision || 0) + 1;
+    return this.revision;
   }
 
   // --- floor access -------------------------------------------------------

@@ -93,6 +93,7 @@ export function serializeProject(project) {
   return {
     app: 'house-cad',
     version: FILE_VERSION,
+    revision: project.revision || 0, // saved-revision counter (advanced by explicit saves)
     activeFloorId: project.activeFloorId,
     groundFloorId: project.groundFloorId,
     floors: project.floors.map(serializeFloor),
@@ -367,6 +368,7 @@ export function deserializeInto(project, data) {
   }));
 
   project.floors = floors;
+  project.revision = Number.isFinite(data.revision) ? data.revision : 0; // 0 for pre-revision files
   project.groundFloorId = floors.some((f) => f.id === data.groundFloorId)
     ? data.groundFloorId : floors[0].id;
   project.activeFloorId = floors.some((f) => f.id === data.activeFloorId)

@@ -1278,9 +1278,13 @@ function drawStrip(be, L, floor, opts) {
   const yBase = page.h - MARGIN - STRIP;
   const rowY = yBase + STRIP - 5; // title/scale row below the wrapped legends
 
-  // Floor name (left) — a single label, not a full title block.
+  // Floor name (left) — a single label, not a full title block. The saved-revision
+  // number (when the project has been saved at least once) rides alongside it as the
+  // sheet's document identity.
   const floorName = opts.floorLabel?.(floor.name) || floor.name || 'Floor';
-  be.text(floorName, MARGIN, yBase + 20, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
+  const revision = Number(opts.revision) || 0;
+  const revChip = revision > 0 ? `  ·  ${opts.revisionLabel || 'Rev'} ${revision}` : '';
+  be.text(`${floorName}${revChip}`, MARGIN, yBase + 20, { fill: '#000', size: 4, weight: 'bold', baseline: 'top' });
   const generatedLabel = opts.generatedLabel || 'Generated';
   const buildLabel = opts.buildLabel || 'Build';
   const buildId = opts.buildId || BUILD_ID;
@@ -1422,7 +1426,7 @@ const CLOUD_MERGE_GAP = 2 * CLOUD_OUTSET + CLOUD_R;
 // as opts.revLabels (see revLabels() in i18n.js); planSheet interpolates the
 // {kind}/{name}/{from}/{to}/{value}/{unit} placeholders since it owns unit display.
 const REV_TEXT_EN = {
-  title: 'REV — CHANGES',
+  title: 'CHANGES',
   zoneAdded: 'Zone added ({kind})', zoneRemoved: 'Zone removed ({kind})', zoneRetyped: 'Zone {from}→{to}',
   zoneResized: 'Zone resized', zoneMoved: 'Zone moved', zoneChanged: 'Zone changed',
   markerAdded: '{name} added', markerRemoved: '{name} removed', markerMoved: '{name} moved', markerRetyped: '{from}→{to}',
@@ -1517,7 +1521,7 @@ function dimAnchor(floor, c) {
 // the plan. Each row is one location: its △N is printed once, then every change at
 // that location is listed under it (so a co-located stack reads as one grouped block
 // instead of repeated numbers). White-filled so it sits cleanly over any geometry.
-function drawRevLegend(be, rows, pageW, title = 'REV — CHANGES') {
+function drawRevLegend(be, rows, pageW, title = 'CHANGES') {
   const size = 2.4, lh = 4.2, pad = 2.4;
   const labels = rows.flatMap((r) => r.labels);
   const w = Math.max(be.measure(title, 2.6), ...labels.map((label) => 7 + be.measure(label, size))) + pad * 2;

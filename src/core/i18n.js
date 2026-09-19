@@ -70,10 +70,11 @@ const STRINGS = {
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
   'sheet.build': { en: 'Build', fr: 'Version', zh: '构建版本' },
+  'sheet.revision': { en: 'Rev', fr: 'Rév', zh: '版本' },
 
-  // --- change map (revision clouds) — templates; {kind}/{name}/{from}/{to}/{value}/{unit}
+  // --- change map (change clouds) — templates; {kind}/{name}/{from}/{to}/{value}/{unit}
   //     are interpolated by planSheet.js (which owns unit display).
-  'rev.title':        { en: 'REV — CHANGES', fr: 'RÉV — CHANGEMENTS', zh: '修订 — 变更' },
+  'rev.title':        { en: 'CHANGES', fr: 'CHANGEMENTS', zh: '变更' },
   'rev.zoneAdded':    { en: 'Zone added ({kind})',   fr: 'Zone ajoutée ({kind})',   zh: '新增区域（{kind}）' },
   'rev.zoneRemoved':  { en: 'Zone removed ({kind})', fr: 'Zone supprimée ({kind})', zh: '删除区域（{kind}）' },
   'rev.zoneRetyped':  { en: 'Zone {from}→{to}',      fr: 'Zone {from}→{to}',        zh: '区域 {from}→{to}' },

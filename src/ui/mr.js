@@ -3608,9 +3608,10 @@ export function setupMR(view, project, getFootprint) {
     const pad = (n, width = 2) => String(n).padStart(width, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
       + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`;
+    const rev = project.revision > 0 ? `-r${project.revision}` : ''; // omit for a never-saved project
     return extension === 'json'
       ? `house-debug-${stamp}.json`
-      : `plan-${floor}-${stamp}.${extension}`;
+      : `plan-${floor}${rev}-${stamp}.${extension}`;
   };
 
   // Briefly show a message on the mode label, then restore the breadcrumb.
@@ -3667,6 +3668,8 @@ export function setupMR(view, project, getFootprint) {
       floorLabel: (name) => localizedFloorName(name, lang),
       generatedLabel: t('sheet.generated', lang),
       buildLabel: t('sheet.build', lang),
+      revision: project.revision, // saved-revision number, stamped on the sheet strip
+      revisionLabel: t('sheet.revision', lang),
     };
   }
   // The active baseline's per-floor diff Map<floorId, diff>, or null (no comparison /
@@ -3921,11 +3924,12 @@ export function setupMR(view, project, getFootprint) {
         return;
       }
       try {
+        project.bumpRevision(); // deliberate save → advance the revision
         localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
         overwriteSlot = null;
         hoverSlotAction = prevHoverSlotAction = null;
         slotFlash = `${t('slot.saved')} ${i + 1}`;
-        rlog('slot save', { slot: i });
+        rlog('slot save', { slot: i, revision: project.revision });
       } catch (e) {
         overwriteSlot = null;
         hoverSlotAction = prevHoverSlotAction = null;
