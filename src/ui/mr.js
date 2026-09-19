@@ -35,7 +35,7 @@ import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -442,13 +442,7 @@ export function setupMR(view, project, getFootprint) {
         page: 'a4',
         targetPx: 2048,
         layers: getOutputSettings(),
-        markerLabel: (ty) => t(`marker.${ty}`),
-        markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
-        zoneLabel: (kind) => t(`mode.${kind}`),
-        revLabels: revLabels(),
-        floorLabel: localizedFloorName,
-        generatedLabel: t('sheet.generated'),
-        buildLabel: t('sheet.build'),
+        ...sheetLabelOpts(), // sheet text in the chosen export language
         changeMap, // revision clouds vs the EXPORT baseline slot (null = none)
       });
       floorToCanvas(floor, canvas, sheetOpts);
@@ -575,10 +569,10 @@ export function setupMR(view, project, getFootprint) {
   // preview/export targets the active LEVEL floor. Thumbstick-y switches format;
   // trigger toggles a row or presses the explicit EXPORT button.
   function makeExportMenu() {
-    // Tall enough that the format + "Compare" (change-map baseline) rows, the six layer
-    // toggles, and the download button all fit without the button clipping off the
-    // bottom. The plane keeps the canvas aspect.
-    const W = 512, H = 896;
+    // Tall enough that the format + "Compare" (change-map baseline) + "Language" rows,
+    // the seven layer toggles, and the download button all fit without the button
+    // clipping off the bottom. The plane keeps the canvas aspect.
+    const W = 512, H = 948;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -593,19 +587,21 @@ export function setupMR(view, project, getFootprint) {
     group.visible = false;
 
     const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
-    const BASELINE_Y = 186, BASELINE_H = 58;   // change-map "Compare" row
-    const TOGGLE_Y = 268, ROW_H = 68;          // 7 layer toggles → 268..744
-    const BUTTON_Y = 760, BUTTON_H = 112;      // download button → 760..872 (fits H=896)
+    const BASELINE_Y = 186, BASELINE_H = 58;   // change-map "Compare" row → 186..244
+    const LANG_Y = 250, LANG_H = 58;           // sheet-language row → 250..308
+    const TOGGLE_Y = 322, ROW_H = 68;          // 7 layer toggles → 322..798
+    const BUTTON_Y = 812, BUTTON_H = 112;      // download button → 812..924 (fits H=948)
     function actionAt(u, v) {
       const cy = (1 - v) * H;
       if (cy >= BASELINE_Y && cy < BASELINE_Y + BASELINE_H) return 'baseline';
+      if (cy >= LANG_Y && cy < LANG_Y + LANG_H) return 'lang';
       if (cy >= TOGGLE_Y && cy < TOGGLE_Y + TOGGLES.length * ROW_H) {
         return TOGGLES[Math.floor((cy - TOGGLE_Y) / ROW_H)] || null;
       }
       if (cy >= BUTTON_Y && cy <= BUTTON_Y + BUTTON_H) return 'export';
       return null;
     }
-    function draw(accent, hoverAction, settings, floorName, baselineLabel) {
+    function draw(accent, hoverAction, settings, floorName, baselineLabel, langLabel) {
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.96)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 24); ctx.fill();
@@ -637,6 +633,20 @@ export function setupMR(view, project, getFootprint) {
         ctx.fillText(t('export.compare'), 40, y + h / 2 + 1);
         ctx.fillStyle = accent; ctx.font = 'bold 27px sans-serif'; ctx.textAlign = 'right';
         ctx.fillText(baselineLabel, W - 44, y + h / 2 + 1);
+      }
+
+      // Language row: point at it and flick the thumbstick (or tap) to cycle the
+      // language of the exported/printed sheet text — independent of the app UI
+      // language, so a sheet can be handed off in a language you don't run the app in.
+      {
+        const y = LANG_Y, h = LANG_H, hot = hoverAction === 'lang';
+        ctx.fillStyle = hot ? 'rgba(72,79,88,0.98)' : 'rgba(38,44,52,0.96)';
+        ctx.beginPath(); ctx.roundRect(18, y, W - 36, h, 14); ctx.fill();
+        ctx.fillStyle = '#e6edf3'; ctx.font = 'bold 27px sans-serif';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(t('export.language'), 40, y + h / 2 + 1);
+        ctx.fillStyle = accent; ctx.font = 'bold 27px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(langLabel, W - 44, y + h / 2 + 1);
       }
 
       TOGGLES.forEach((key, i) => {
@@ -1461,7 +1471,8 @@ export function setupMR(view, project, getFootprint) {
         const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
           : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
             : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
-              : halfWallHatchSegments(bw, bh);
+              : k === 'heater' ? heaterFinSegments(bw, bh)
+                : halfWallHatchSegments(bw, bh);
         for (const [ax, ay, bx, by] of segs) {
           // plan (x,y) -> planGroup (x,0,-y); thicken perpendicular to the segment.
           const x0 = b.x0 + ax, y0 = b.y0 + ay, x1 = b.x0 + bx, y1 = b.y0 + by;
@@ -3631,6 +3642,33 @@ export function setupMR(view, project, getFootprint) {
   }
   const baselineLabel = () => (exportBaselineSlot == null
     ? t('export.baselineNone') : `${t('export.slot')} ${exportBaselineSlot + 1}`);
+
+  // ---- EXPORT sheet language -----------------------------------------------
+  // The language of the exported/printed SHEET text (labels, legends, floor names),
+  // chosen independently of the app UI language — so a plan can be handed off in a
+  // language you don't run the tool in. Session state; defaults to the current UI
+  // language and does not follow later UI-language switches (that's the point).
+  let exportSheetLang = getLang();
+  function cycleExportLang(dir = 1) {
+    const at = Math.max(0, LANG_ORDER.indexOf(exportSheetLang));
+    exportSheetLang = LANG_ORDER[(at + (dir < 0 ? -1 : 1) + LANG_ORDER.length) % LANG_ORDER.length];
+    rlog('export sheet lang', { lang: exportSheetLang });
+    sheetDirty = true; // the LEFT preview must re-render in the new language
+    if (exportMenu.group.visible) redrawExportMenu();
+  }
+  // Shared per-language label options for the preview AND the download, so the two
+  // can never drift. Resolves every sheet string in the chosen export language.
+  function sheetLabelOpts(lang = exportSheetLang) {
+    return {
+      markerLabel: (ty) => t(`marker.${ty}`, lang),
+      markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit', lang) : '',
+      zoneLabel: (kind) => t(`mode.${kind}`, lang),
+      revLabels: revLabels(lang),
+      floorLabel: (name) => localizedFloorName(name, lang),
+      generatedLabel: t('sheet.generated', lang),
+      buildLabel: t('sheet.build', lang),
+    };
+  }
   // The active baseline's per-floor diff Map<floorId, diff>, or null (no comparison /
   // slot vanished / invalid snapshot). Sheet outputs (preview/SVG/PNG) consume it;
   // DXF/Coohom/JSON never do. Recomputed on demand — the diff deserializes + solves
@@ -3669,13 +3707,7 @@ export function setupMR(view, project, getFootprint) {
         project, // whole-house conduit/wires span floors; sheets filter per floor
         page: 'a4',
         layers: settings,
-        markerLabel: (ty) => t(`marker.${ty}`),
-        markerLegendNote: (ty) => ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : '',
-        zoneLabel: (kind) => t(`mode.${kind}`),
-        revLabels: revLabels(),
-        floorLabel: localizedFloorName,
-        generatedLabel: t('sheet.generated'),
-        buildLabel: t('sheet.build'),
+        ...sheetLabelOpts(), // sheet text in the chosen export language
         changeMap: exportChangeMap(), // revision clouds when a baseline slot is chosen
       });
       if (extension === 'png') {
@@ -3706,6 +3738,7 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (hoverExportAction === 'baseline') { cycleExportBaseline(1); return; } // tap advances the baseline
+    if (hoverExportAction === 'lang') { cycleExportLang(1); return; } // tap advances the sheet language
     toggleOutputLayer(hoverExportAction);
   }
 
@@ -3840,6 +3873,7 @@ export function setupMR(view, project, getFootprint) {
     getOutputSettings(),
     project.activeFloor.name,
     baselineLabel(),
+    langLabel(exportSheetLang),
   );
 
   function showExportMenu() {
@@ -5439,8 +5473,9 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
-      else if (modeId === 'export') { // point at Compare → cycle the change-map baseline; else format
+      else if (modeId === 'export') { // point at Compare/Language → cycle that; else format
         if (hoverExportAction === 'baseline') cycleExportBaseline(stickY < 0 ? -1 : 1);
+        else if (hoverExportAction === 'lang') cycleExportLang(stickY < 0 ? -1 : 1);
         else cycleOutputFormat(stickY < 0 ? -1 : 1);
       }
       btn.stickY = true;

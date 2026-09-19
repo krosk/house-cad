@@ -38,6 +38,12 @@ export function computeFootprint(rectangles) {
   let result = []; // empty MultiPolygon
 
   for (const rect of rectangles) {
+    // Furniture is a movable object sitting IN the room, not part of the building
+    // massing: it must never carve the footprint (nor, via extrude, the 3D shell).
+    // Its plan symbol is drawn separately; here it is simply ignored, so the room
+    // outline (and its bold extremity line) encloses the furniture rather than
+    // notching around it.
+    if (zoneKind(rect) === 'furniture') continue;
     const b = rect.bounds;
     if (b.x1 - b.x0 <= 0 || b.y1 - b.y0 <= 0) continue; // skip degenerate
 

@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'halfwall', 'sliding', 'window', 'stairs', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'halfwall', 'heater', 'sliding', 'window', 'stairs', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -14,6 +14,7 @@ export const ZONE_COLORS = {
   insulation: 0xe879f9, // magenta
   door:    0x4ade80, // green
   halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
+  heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
   window:  0x22d3ee, // cyan
   stairs:  0xfbbf24, // yellow
@@ -38,6 +39,10 @@ export const APERTURE_DEFAULTS = {
   door:     { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
   window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
   halfwall: { sill: 1.1, head: null, hinge: null   },
+  // Wall-mounted heater (radiator): behaves like a half wall — a solid low band
+  // [0..sill], open above (head:null), no hinge. Its own kind so it reads as a
+  // heater on plans and can be counted separately. sill = a typical radiator height.
+  heater:   { sill: 0.6, head: null, hinge: null   },
   // Sliding (surface-mounted / barn-door): rail on one wall face; the panel is
   // INFERRED as the opening + a fixed 10 cm overhang (not authored). Rotates through
   // 4 states like a door — `hinge` = slide direction (left/right), `swing` = which

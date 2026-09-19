@@ -18,7 +18,7 @@ import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS, isAperture } from './core/zoneColors.js';
-import { t, localizedFloorName, revLabels } from './core/i18n.js';
+import { t, localizedFloorName, revLabels, getLang, LANGS, LANG_ORDER } from './core/i18n.js';
 
 const project = new Project();
 
@@ -199,7 +199,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', sliding: '↔ Sliding door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
@@ -505,15 +505,17 @@ function sheetDownloadName(floor, extension, now = new Date()) {
   return `plan-${safeName(floor.name)}-${stamp}.${extension}`;
 }
 
-const localizedSheetOptions = () => ({
+// Sheet text follows an explicitly chosen language (the Print menu's "Language"
+// picker), independent of the app UI language. Defaults to the current UI language.
+const localizedSheetOptions = (lang = getLang()) => ({
   project, // whole-house conduit network + wires (they span floors); sheets filter per floor
-  floorLabel: localizedFloorName,
-  generatedLabel: t('sheet.generated'),
-  buildLabel: t('sheet.build'),
-  markerLabel: (ty) => t(`marker.${ty}`),
-  markerLegendNote: (ty) => (ty === 'outlet_aircon' ? t('marker.dedicatedCircuit') : ''),
-  zoneLabel: (kind) => t(`mode.${kind}`),
-  revLabels: revLabels(),
+  floorLabel: (name) => localizedFloorName(name, lang),
+  generatedLabel: t('sheet.generated', lang),
+  buildLabel: t('sheet.build', lang),
+  markerLabel: (ty) => t(`marker.${ty}`, lang),
+  markerLegendNote: (ty) => (ty === 'outlet_aircon' ? t('marker.dedicatedCircuit', lang) : ''),
+  zoneLabel: (kind) => t(`mode.${kind}`, lang),
+  revLabels: revLabels(lang),
 });
 
 function printSheets(svgs) {
@@ -548,7 +550,20 @@ function printSheets(svgs) {
   const btn = document.getElementById('print-btn');
   const pop = document.getElementById('print-pop');
   const baselineSel = document.getElementById('print-baseline');
+  const langSel = document.getElementById('print-lang');
   const close = () => { pop.hidden = true; };
+
+  // Export-sheet language picker: one option per supported language, defaulting to
+  // the current UI language. The choice is read per export (sheetLang), so it never
+  // changes the app UI language — only the text baked into the printed/exported sheet.
+  for (const l of LANG_ORDER) {
+    const opt = document.createElement('option');
+    opt.value = l;
+    opt.textContent = LANGS[l]?.label ?? l;
+    langSel.appendChild(opt);
+  }
+  langSel.value = getLang();
+  const sheetLang = () => langSel.value || getLang();
 
   // The 6 AR save slots (house-cad:slot:0..5) double as change-map baselines. Read
   // one as {savedAt, data} | null (bad/absent/foreign JSON -> null).
@@ -615,13 +630,13 @@ function printSheets(svgs) {
           const f = project.activeFloor;
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
-          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions()), changeMap };
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap };
           const name = sheetDownloadName(f, 'svg');
           download(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded ${name}${changeMap ? ' — with change map' : ''}`);
         } else if (b.dataset.print === 'png') {
           const f = project.activeFloor;
-          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions()), changeMap };
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap };
           const blob = await floorToPngBlob(f, sheetOpts);
           const name = sheetDownloadName(f, 'png');
           download(name, blob, 'image/png');
@@ -637,7 +652,7 @@ function printSheets(svgs) {
           download(name, floorToCoohomDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — simplified Coohom recognition geometry.`);
         } else {
-          printSheets(floorsToSharedScaleSvgs(project.floors, { ...localizedSheetOptions(), changeMap }));
+          printSheets(floorsToSharedScaleSvgs(project.floors, { ...localizedSheetOptions(sheetLang()), changeMap }));
           sketch.onStatus?.(`Opening print dialog — choose Save as PDF, print at 100%.${changeMap ? ' Change map included.' : ''}`);
         }
       } catch (err) {

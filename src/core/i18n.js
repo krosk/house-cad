@@ -34,6 +34,7 @@ const STRINGS = {
   'mode.insulation': { en: 'INSULATION', fr: 'ISOLATION', zh: '保温层' },
   'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
   'mode.halfwall': { en: 'HALF WALL', fr: 'DEMI-MUR', zh: '矮墙' },
+  'mode.heater': { en: 'HEATER', fr: 'RADIATEUR', zh: '暖气' },
   'mode.sliding':  { en: 'SLIDING', fr: 'COULISSANT', zh: '推拉门' },
   'mode.window':   { en: 'WINDOW', fr: 'FENÊTRE',  zh: '窗' },
   'mode.stairs':   { en: 'STAIRS', fr: 'ESCALIER', zh: '楼梯' },
@@ -100,6 +101,7 @@ const STRINGS = {
   'export.area': { en: 'AREA', fr: 'SURFACE', zh: '面积' },
   'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
   'export.compare': { en: 'COMPARE', fr: 'COMPARER', zh: '对比' },
+  'export.language': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },
   'export.baselineNone': { en: 'none', fr: 'aucun', zh: '无' },
   'export.slot': { en: 'Slot', fr: 'Empl.', zh: '槽位' },
 
@@ -375,28 +377,30 @@ export function onLangChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
-// Translate a key to the current language (en fallback, then the raw key).
-export function t(key) {
+// Translate a key. Defaults to the current UI language; pass an explicit `lang`
+// (e.g. for an export sheet whose language is chosen independently of the UI).
+// Falls back to en, then the raw key.
+export function t(key, lang = current) {
   const e = STRINGS[key];
-  return (e && (e[current] ?? e.en)) ?? key;
+  return (e && (e[lang] ?? e.en)) ?? key;
 }
 
 // The change-map legend/label templates for the current language, as a plain object
 // the (i18n-agnostic) plan sheet interpolates. Pass as opts.revLabels so the diff
 // text follows the UI language in Print/SVG/PNG and the AR preview alike.
-export function revLabels() {
+export function revLabels(lang = current) {
   const keys = ['title', 'zoneAdded', 'zoneRemoved', 'zoneRetyped', 'zoneResized', 'zoneMoved',
     'zoneChanged', 'markerAdded', 'markerRemoved', 'markerMoved', 'markerRetyped',
     'dimChanged', 'dimAdded', 'dimRemoved'];
-  return Object.fromEntries(keys.map((k) => [k, t(`rev.${k}`)]));
+  return Object.fromEntries(keys.map((k) => [k, t(`rev.${k}`, lang)]));
 }
 
 // Built-in floor names remain stable model data for save compatibility. Translate
 // only their presentation; a user-renamed floor passes through verbatim.
-export function localizedFloorName(name) {
+export function localizedFloorName(name, lang = current) {
   const normalized = String(name || '').trim().toLowerCase();
-  if (normalized === 'ground' || normalized === 'ground floor') return t('floor.ground');
-  if (normalized === 'upper' || normalized === 'upper floor') return t('floor.upper');
-  if (normalized === 'basement') return t('floor.basement');
+  if (normalized === 'ground' || normalized === 'ground floor') return t('floor.ground', lang);
+  if (normalized === 'upper' || normalized === 'upper floor') return t('floor.upper', lang);
+  if (normalized === 'basement') return t('floor.basement', lang);
   return name;
 }

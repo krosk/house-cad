@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -105,7 +105,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -131,6 +131,16 @@ export function constraintInvolvesFurniture(constraint, rectangles) {
 function skipFurnitureConstraint(constraint, rectangles, layers) {
   if (layers.furniture && layers.furnitureDims) return false;
   return constraintInvolvesFurniture(constraint, rectangles);
+}
+
+// A structural dimension endpoint's drawable line. Like edgeLineWorld(), but the
+// shared ORIGIN datum resolves to the axis line at coord 0 (it is a corner point,
+// not an edge). Without this, any dimension measured FROM the origin corner — a
+// natural datum for placing half walls and other zones — was dropped from the sheet
+// even though DXF draws it. Marker endpoints still return null (drawn elsewhere).
+function structuralDimLine(ep, rectangles) {
+  if (ep?.rect === ORIGIN_ID) return { coord: 0, p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } };
+  return edgeLineWorld(ep, rectangles);
 }
 
 function localGenerationTime(value = new Date()) {
@@ -284,7 +294,7 @@ function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
       else { add(line, a); add(line, b); add(line, label); }
       continue;
     }
-    const la = edgeLineWorld(c.a, floor.rectangles), lb = edgeLineWorld(c.b, floor.rectangles);
+    const la = structuralDimLine(c.a, floor.rectangles), lb = structuralDimLine(c.b, floor.rectangles);
     if (!la || !lb) continue;
     if (c.axis === 'x') {
       if (c.offset == null) { add(label, la.p0.y); continue; } // only parallel overflow affects model bbox
@@ -415,6 +425,9 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
   } else if (kind === 'halfwall') {
     // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
     segs(halfWallHatchSegments(w, h), 0.13);
+  } else if (kind === 'heater') {
+    // Wall-mounted radiator: outline + fins (the conventional heater symbol).
+    segs(heaterFinSegments(w, h), 0.13);
   } else if (kind === 'sliding') {
     // Surface slider: panel (opening + 10 cm) at rest + open, rail, slide arrow.
     segs(slidingDoorSegments(w, h, hingeEnd, { over, perp }), 0.16);
@@ -530,9 +543,9 @@ function drawDimensions(be, L, floor, layers) {
     if (c.type !== 'distance' || isMarkerConstraint(c)) continue;
     if (skipFurnitureConstraint(c, rects, layers)) continue;
     if (displaysZero(c.value)) continue; // a 0.00 dimension is clutter
-    const la = edgeLineWorld(c.a, rects);
-    const lb = edgeLineWorld(c.b, rects);
-    if (!la || !lb) continue; // origin/marker refs have no drawable edge (matches the 2D editor)
+    const la = structuralDimLine(c.a, rects);
+    const lb = structuralDimLine(c.b, rects);
+    if (!la || !lb) continue; // marker refs have no drawable edge; origin resolves to coord 0
     const color = c.conflict ? C_DIM_BAD : C_DIM;
     const label = fmtSheetDim(c.value);
 

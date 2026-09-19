@@ -137,6 +137,20 @@ export function halfWallHatchSegments(w, h, count = 5) {
   return out;
 }
 
+// Heater (wall-mounted radiator): the box outline plus evenly spaced fins across
+// the long axis — the conventional radiator symbol. Distinct from the half-wall's
+// diagonal poché and insulation's zigzag, so a heater reads as its own thing even
+// though it behaves like a half wall. No hinge (it faces uniformly into the room).
+export function heaterFinSegments(w, h, count = 6) {
+  const out = [[0, 0, w, 0], [w, 0, w, h], [w, h, 0, h], [0, h, 0, 0]]; // outline
+  const horizontal = w >= h;
+  for (let i = 1; i < count; i++) {
+    if (horizontal) { const x = (w * i) / count; out.push([x, 0, x, h]); }
+    else { const y = (h * i) / count; out.push([0, y, w, y]); }
+  }
+  return out;
+}
+
 // Resolve an aperture's authored `hinge` (along the wall's own axis: 'left' =
 // min-coord jamb) and `swing` ('in'/'out') into the box-space `hingeEnd`
 // ('lo'/'hi'/'both') and `perp` (+1/-1) the glyph functions consume — given the
