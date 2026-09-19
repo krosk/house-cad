@@ -34,7 +34,7 @@ import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, apertureBounds } from '../core/zoneColors.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
@@ -2350,6 +2350,8 @@ export function setupMR(view, project, getFootprint) {
   // --- FURNISH authoring state (M3) ---------------------------------------------
   let selectedFurnitureId = null;      // the placed item under edit (rotate/move/delete)
   let hoverFurnitureId = null;         // item under the reticle this frame
+  let furnitureBuffer = '';            // FURNISH foot-elevation pad: typed digits (prefilled with z)
+  let furniturePristine = false;       // buffer holds a prefilled value; first key replaces it
   let currentFurnitureArticle = null;  // the article the trigger drops; cycled by thumbstick-y
   const FURN_ROT_STEP = 15;            // degrees per thumbstick tick when an item is selected
   const furnitureArticleList = () => Object.keys(furnitureCatalog);
@@ -2381,7 +2383,7 @@ export function setupMR(view, project, getFootprint) {
     for (const item of floor.furniture || []) {
       const place = (obj) => {
         if (token !== furnitureBuildToken) return; // a newer rebuild superseded this one
-        obj.position.set(item.x, 0, -item.y);
+        obj.position.set(item.x, item.z || 0, -item.y); // z = foot elevation off the floor
         obj.rotation.y = THREE.MathUtils.degToRad(item.rotationY || 0);
         obj.userData.furnitureId = item.id;
         furnitureGroup.add(obj);
@@ -2421,6 +2423,53 @@ export function setupMR(view, project, getFootprint) {
     rlog('furniture article', { article: currentFurnitureArticle });
   }
 
+  // ---- FURNISH foot elevation: a selected GLB item's z (how high its base sits off
+  // the floor) is typed on the reused numpad — a single value, like MARKER height. The
+  // GLB's own mesh supplies the height; z only lifts it (wall-hung units, shelves).
+  const selectedFurnitureObj = () =>
+    selectedFurnitureId ? project.furniture.find((f) => f.id === selectedFurnitureId) : null;
+  const furnitureTitle = () => {
+    const f = selectedFurnitureObj();
+    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')}`;
+  };
+  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey);
+
+  function refreshFurniturePad() {
+    const f = selectedFurnitureObj();
+    furnitureBuffer = f ? fmt(f.z || 0) : '';
+    furniturePristine = true;
+    redrawFurniturePad();
+  }
+
+  function activateFurniturePad() {
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    refreshFurniturePad();
+  }
+
+  function commitFurnitureFoot() {
+    const f = selectedFurnitureObj();
+    if (!f) return;
+    const val = parseFloat(furnitureBuffer);
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
+    project.setFurnitureElevation(f.id, toMeters(val));
+    rlog('furniture foot', { id: f.id, m: +toMeters(val).toFixed(3) });
+    buildFurniture(); // z changed → the model re-seats at the new elevation
+    refreshFurniturePad(); // keep it selected so it can be raised again
+  }
+
+  function pressFurnitureKey(k) {
+    if (k === 'enter') { commitFurnitureFoot(); return; }
+    if (k === 'swap') return; // no role when entering a single value
+    if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the item
+    if (furniturePristine && k !== 'back') furnitureBuffer = '';
+    furniturePristine = false;
+    if (k === 'back') furnitureBuffer = furnitureBuffer.slice(0, -1);
+    else if (k === '.') { if (!furnitureBuffer.includes('.')) furnitureBuffer += '.'; }
+    else if (furnitureBuffer.replace('.', '').length < 6) furnitureBuffer += k;
+    redrawFurniturePad();
+  }
+
   // Live furniture drag over the floor reticle (no ray-distance — furniture sits on the
   // floor). moveFurniture with {emit:false}; release commits once via touch().
   function applyFurnitureGripDrag(source) {
@@ -2430,7 +2479,7 @@ export function setupMR(view, project, getFootprint) {
     const { px, py } = worldToPlan(hit);
     project.moveFurniture(gripDrag.furnitureId, { x: px, y: py }, { emit: false });
     const clone = furnitureGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
-    if (clone) clone.position.set(px, 0, -py);
+    if (clone) clone.position.set(px, clone.position.y, -py); // preserve foot elevation (y)
   }
 
   // Emissive highlight (per-instance materials): reset all, then hover=yellow, selected=amber.
@@ -2528,11 +2577,12 @@ export function setupMR(view, project, getFootprint) {
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
-  // PLAN EDIT aperture pad: type a selected aperture's opening-band bounds. One field
-  // at a time; the SWAP cell cycles which (SILL↔HEAD). Buffer prefilled from the rect.
-  let apertureBuffer = '';
-  let aperturePristine = false;
-  let apertureField = 'sill'; // 'sill' | 'head' — which band bound the pad currently edits
+  // PLAN EDIT band pad: type a selected rect's vertical-band bounds (aperture sill/head
+  // or furniture foot/top). One field at a time; the SWAP cell cycles which. Buffer
+  // prefilled from the rect.
+  let bandBuffer = '';
+  let bandPristine = false;
+  let bandField = 'sill'; // which band bound the pad currently edits (sill/head/foot/top)
 
   // Shared state for the two hard-separated dimension domains. PLAN DIMS accepts
   // edge<->edge and edge<->origin pairs. OUTLET DIMS requires an outlet floor icon
@@ -4241,91 +4291,93 @@ export function setupMR(view, project, getFootprint) {
     rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
     // Retyping can flip a room into an aperture (or back): keep the sill/head pad in
     // sync so it opens on the new opening band and closes for non-apertures.
-    syncAperturePad();
+    syncBandPad();
   }
 
-  // ---- PLAN EDIT aperture band editor (sill/head) --------------------------------
-  // A selected aperture opens the reused DIMS numpad to type its opening band. hinge/
-  // swing stay on A/X rotate; only the numeric bounds live here. Which bounds are
-  // editable is per-kind (apertureBounds): window/heater = SILL+HEAD; door/sliding =
-  // HEAD only (they reach the floor, sill fixed at 0); half wall = SILL only.
-  const apertureFields = (rect) => apertureBounds(rect);
-  const fieldLabel = (f) => t(`aperture.${f}`);
-  const apertureKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
-  const apertureTitle = () => `${apertureKindLabel()}  ·  ${fieldLabel(apertureField)}`;
-  // The SWAP cell becomes the field toggle; its caption names the field it switches TO
-  // (null when the kind has a single editable bound, so the key stays inert).
-  const apertureSwapLabel = () => {
-    const fs = apertureFields(selectedRect);
+  // ---- PLAN EDIT vertical-band editor (aperture sill/head + furniture foot/top) ----
+  // Selecting a rect that carries a vertical band opens the reused DIMS numpad to type
+  // its bounds; the SWAP cell becomes a field toggle. Two kinds of band share this pad:
+  //   • apertures — opening band [sill, head] (which bounds are editable is per-kind:
+  //     window/heater = SILL+HEAD, door/sliding = HEAD only, half wall = SILL only);
+  //   • furniture placeholders — solid body band [foot, top] (both bounds).
+  // Bounds are always [lower, upper] in field order; the commit keeps them ordered.
+  // Aperture hinge/swing stay on A/X rotate; B/Y deletes the whole zone.
+  const bandFields = (rect) => verticalBandFields(rect);
+  const rectHasBand = (rect) => bandFields(rect).length > 0;
+  // Field labels are namespaced by which band the field belongs to.
+  const bandFieldLabel = (f) =>
+    (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
+  const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
+  const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
+  // SWAP names the field it switches TO (null when a single bound is editable → inert).
+  const bandSwapLabel = () => {
+    const fs = bandFields(selectedRect);
     if (fs.length < 2) return null;
-    const other = fs[(fs.indexOf(apertureField) + 1) % fs.length];
-    return `⇄ ${fieldLabel(other).toUpperCase()}`;
+    const other = fs[(fs.indexOf(bandField) + 1) % fs.length];
+    return `⇄ ${bandFieldLabel(other).toUpperCase()}`;
   };
-  const redrawAperturePad = () =>
-    numpad.draw(apertureTitle(), apertureBuffer, hoverKey, apertureSwapLabel());
+  const redrawBandPad = () =>
+    numpad.draw(bandTitle(), bandBuffer, hoverKey, bandSwapLabel());
 
-  function refreshAperturePad() {
-    const fs = apertureFields(selectedRect);
-    if (!fs.includes(apertureField)) apertureField = fs[0]; // clamp after a retype
-    apertureBuffer = selectedRect ? fmt(selectedRect[apertureField] ?? 0) : '';
-    aperturePristine = true;
-    redrawAperturePad();
+  function refreshBandPad() {
+    const fs = bandFields(selectedRect);
+    if (!fs.includes(bandField)) bandField = fs[0]; // clamp after a retype
+    bandBuffer = selectedRect ? fmt(selectedRect[bandField] ?? 0) : '';
+    bandPristine = true;
+    redrawBandPad();
   }
 
-  function activateAperturePad() {
-    apertureField = apertureFields(selectedRect)[0] || 'sill'; // door/sliding open on HEAD
+  function activateBandPad() {
+    bandField = bandFields(selectedRect)[0] || 'sill'; // door/sliding open on HEAD
     placePanel(numpad.group);
     numpad.group.visible = true;
-    refreshAperturePad();
+    refreshBandPad();
   }
 
-  // Open/refresh/close the pad to match the current selection — an aperture shows it,
-  // anything else (or no selection) tears it down.
-  function syncAperturePad() {
-    if (selectedRect && isAperture(zoneKindOf(selectedRect))) {
-      if (numpad.group.visible) refreshAperturePad(); else activateAperturePad();
+  // Open/refresh/close the pad to match the current selection — a band-carrying rect
+  // shows it, anything else (or no selection) tears it down.
+  function syncBandPad() {
+    if (rectHasBand(selectedRect)) {
+      if (numpad.group.visible) refreshBandPad(); else activateBandPad();
     } else if (numpad.group.visible) {
       deactivateNumpad();
     }
   }
 
-  function cycleApertureField() {
-    const fs = apertureFields(selectedRect);
+  function cycleBandField() {
+    const fs = bandFields(selectedRect);
     if (fs.length < 2) return; // nothing to toggle
-    apertureField = fs[(fs.indexOf(apertureField) + 1) % fs.length];
-    refreshAperturePad();
+    bandField = fs[(fs.indexOf(bandField) + 1) % fs.length];
+    refreshBandPad();
   }
 
-  function commitApertureField() {
-    if (!selectedRect || !isAperture(zoneKindOf(selectedRect))) return;
-    const val = parseFloat(apertureBuffer);
+  function commitBandField() {
+    if (!rectHasBand(selectedRect)) return;
+    const val = parseFloat(bandBuffer);
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
     const m = toMeters(val);
-    // Keep the band ordered (sill below head) so the opening never inverts.
-    if (apertureField === 'sill' && selectedRect.head != null && m >= selectedRect.head) {
-      rlog('aperture sill rejected (>= head)', { id: selectedRect.id, m });
-      return;
-    }
-    if (apertureField === 'head' && m <= (selectedRect.sill ?? 0)) {
-      rlog('aperture head rejected (<= sill)', { id: selectedRect.id, m });
-      return;
-    }
-    selectedRect[apertureField] = m;
+    // Keep the band ordered: field[0] is the lower bound, field[1] the upper.
+    const fs = bandFields(selectedRect), i = fs.indexOf(bandField);
+    const upper = i === 0 && fs.length > 1 ? selectedRect[fs[1]] : null;
+    const lower = i === 1 ? selectedRect[fs[0]] : null;
+    if (upper != null && m >= upper) { rlog('band lower rejected (>= upper)', { id: selectedRect.id, m }); return; }
+    if (lower != null && m <= lower) { rlog('band upper rejected (<= lower)', { id: selectedRect.id, m }); return; }
+    selectedRect[bandField] = m;
     project.touch(); // band bounds aren't solver inputs, but mark dirty → autosave + listeners
-    rlog('aperture band', { id: selectedRect.id, field: apertureField, m: +m.toFixed(3) });
-    refreshAperturePad(); // stay open so the other bound can be typed next
+    rlog('band edit', { id: selectedRect.id, field: bandField, m: +m.toFixed(3) });
+    refreshBandPad(); // stay open so the other bound can be typed next
   }
 
-  function pressApertureKey(k) {
-    if (k === 'enter') { commitApertureField(); return; }
-    if (k === 'swap') { cycleApertureField(); return; }
+  function pressBandKey(k) {
+    if (k === 'enter') { commitBandField(); return; }
+    if (k === 'swap') { cycleBandField(); return; }
     if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the whole zone
-    if (aperturePristine && k !== 'back') apertureBuffer = '';
-    aperturePristine = false;
-    if (k === 'back') apertureBuffer = apertureBuffer.slice(0, -1);
-    else if (k === '.') { if (!apertureBuffer.includes('.')) apertureBuffer += '.'; }
-    else if (apertureBuffer.replace('.', '').length < 6) apertureBuffer += k;
-    redrawAperturePad();
+    if (bandPristine && k !== 'back') bandBuffer = '';
+    bandPristine = false;
+    if (k === 'back') bandBuffer = bandBuffer.slice(0, -1);
+    else if (k === '.') { if (!bandBuffer.includes('.')) bandBuffer += '.'; }
+    else if (bandBuffer.replace('.', '').length < 6) bandBuffer += k;
+    redrawBandPad();
   }
 
   // DIMS mode: flip which SIDE ref B sits on relative to ref A — negates the signed
@@ -4557,14 +4609,14 @@ export function setupMR(view, project, getFootprint) {
       // is zebra-highlighted. GRIP deletes it; thumbstick-y cycles its zone kind.
       onTouch: () => {
         if (!placed) return;
-        // While an aperture's sill/head pad is open and the ray is on a key, the
-        // trigger drives the pad (mirrors MARKER). Aiming at the floor (hoverKey null)
-        // falls through to zone stack-cycling below.
-        if (selectedRect && numpad.group.visible && hoverKey) { pressApertureKey(hoverKey); return; }
+        // While a band pad is open and the ray is on a key, the trigger drives the pad
+        // (mirrors MARKER). Aiming at the floor (hoverKey null) falls through to zone
+        // stack-cycling below.
+        if (selectedRect && numpad.group.visible && hoverKey) { pressBandKey(hoverKey); return; }
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
-        syncAperturePad(); // an aperture opens its band pad; a room tears it down
+        syncBandPad(); // a band-carrying rect opens its pad; a plain room tears it down
         updateRoomAreaHud();
         setModeInfo();
         rlog('edit select', {
@@ -4738,13 +4790,17 @@ export function setupMR(view, project, getFootprint) {
       // grip-drag an item to move it; grip away from an item to delete the selection.
       onTouch: (pos) => {
         if (!placed) return;
-        if (hoverFurnitureId) { // select the aimed item (for rotate/move/delete)
+        // With the foot-elevation pad open and the ray on a key, the trigger drives the
+        // pad (mirrors MARKER); aiming at the floor falls through to select/drop.
+        if (selectedFurnitureId && numpad.group.visible && hoverKey) { pressFurnitureKey(hoverKey); return; }
+        if (hoverFurnitureId) { // select the aimed item (opens the foot pad; also rotate/move/delete)
           selectedFurnitureId = hoverFurnitureId;
+          activateFurniturePad();
           setModeInfo();
           rlog('furniture select', { id: selectedFurnitureId });
           return;
         }
-        if (selectedFurnitureId) { selectedFurnitureId = null; setModeInfo(); return; } // first empty trigger deselects
+        if (selectedFurnitureId) { selectedFurnitureId = null; deactivateNumpad(); setModeInfo(); return; } // first empty trigger deselects
         if (!currentFurnitureArticle) { rlog('furniture drop skipped: empty catalog'); return; }
         const { px, py } = worldToPlan(pos);
         const item = project.addFurniture({ article: currentFurnitureArticle, x: px, y: py, rotationY: 0 });
@@ -4946,7 +5002,7 @@ export function setupMR(view, project, getFootprint) {
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
     selectedRect = null; // clear the EDIT selection when changing modes
-    apertureBuffer = ''; apertureField = 'sill'; // ...and any aperture band being typed (pad torn down below)
+    bandBuffer = ''; bandField = 'sill'; // ...and any vertical band being typed (pad torn down below)
     roomComponentCacheKey = '';
     roomComponentCache = null;
     roomAreaHud = null;
@@ -4957,7 +5013,7 @@ export function setupMR(view, project, getFootprint) {
     selectedRoutedWire = null; // ...and any routed-wire override selection
     penNodeId = null; // ...and lift the conduit pen
     selectedConduitNodeId = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
-    selectedFurnitureId = null; // ...and any FURNISH selection
+    selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
@@ -6033,10 +6089,10 @@ export function setupMR(view, project, getFootprint) {
         }
       }
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
-      // No live aperture selection ⇒ the band pad has no subject: tear it down (covers
+      // No band-carrying selection ⇒ the band pad has no subject: tear it down (covers
       // B/Y delete, which clears selectedRect but can't reach the pad itself).
-      if (numpad.group.visible && !(selectedRect && isAperture(zoneKindOf(selectedRect)))) deactivateNumpad();
-      if (padOpen && hoverKey !== prevHoverKey) { redrawAperturePad(); prevHoverKey = hoverKey; }
+      if (numpad.group.visible && !rectHasBand(selectedRect)) deactivateNumpad();
+      if (padOpen && hoverKey !== prevHoverKey) { redrawBandPad(); prevHoverKey = hoverKey; }
       updateRoomAreaHud();
       if (selectedRect) {
         showRectOutline(selectedRect, lightenHex(zoneColorHex(zoneKind(selectedRect))));
@@ -6316,17 +6372,35 @@ export function setupMR(view, project, getFootprint) {
       numpadCursor.visible = false;
       const source = editCtl;
       if (gripDrag?.kind === 'furniture') applyFurnitureGripDrag(source);
+      // With the foot pad open, the ray drives the numpad (like MARKER); otherwise it
+      // rays the floor to hover/select/drop.
+      const padOpen = selectedFurnitureId && numpad.group.visible;
+      if (padOpen) {
+        const panelHit = rayPanelHit(source);
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
       hoverFurnitureId = null;
-      const hit = rayFloorHit(source);
-      if (hit) {
-        reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
-        const { px, py } = worldToPlan(hit);
-        hoverFurnitureId = furnitureAtFloorPoint(px, py)?.id || null;
+      if (hoverKey) {
+        reticle.visible = false; // the pad owns the ray this frame
       } else {
-        reticle.visible = false;
+        const hit = rayFloorHit(source);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          hoverFurnitureId = furnitureAtFloorPoint(px, py)?.id || null;
+        } else {
+          reticle.visible = false;
+        }
       }
       if (selectedFurnitureId && !project.furniture.some((f) => f.id === selectedFurnitureId)) selectedFurnitureId = null;
+      // No live selection ⇒ the foot pad has no subject: tear it down (covers B/Y delete).
+      if (numpad.group.visible && !selectedFurnitureId) deactivateNumpad();
+      if (padOpen && hoverKey !== prevHoverKey) { redrawFurniturePad(); prevHoverKey = hoverKey; }
       paintFurnitureHighlight();
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim at a slot, or at the separate confirm/cancel buttons once

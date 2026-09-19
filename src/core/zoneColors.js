@@ -68,6 +68,19 @@ export function apertureBounds(rect) {
   return fields;
 }
 
+// A furniture placeholder is the DUAL of an aperture: a solid body occupying the
+// vertical band [foot, top] (open above and below), where the real GLB carries no
+// mesh — so both bounds are authored. Default: a floor-standing ~0.9 m box.
+export const FURNITURE_BAND = { foot: 0, top: 0.9 };
+
+// The editable vertical bounds of any rect that carries a band, in pad order, as
+// property names on the rect: apertures → [sill?, head?]; a furniture placeholder →
+// [foot, top]; everything else → []. This is what the AR band pad iterates over.
+export function verticalBandFields(rect) {
+  if (rect?.kind === 'furniture') return ['foot', 'top'];
+  return apertureBounds(rect);
+}
+
 const FALLBACK = ZONE_COLORS.room;
 
 // Resolve a rectangle to its zone kind. Mirrors the model's rule so rectangles

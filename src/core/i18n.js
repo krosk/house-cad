@@ -261,6 +261,9 @@ const STRINGS = {
   // --- aperture sill/head editor (PLAN EDIT) ----------------------------------
   'aperture.sill': { en: 'sill', fr: 'seuil',   zh: '下沿' },
   'aperture.head': { en: 'head', fr: 'linteau', zh: '上沿' },
+  // --- furniture band (PLAN EDIT placeholder) + foot elevation (FURNISH) -------
+  'furniture.foot': { en: 'foot', fr: 'pied',    zh: '底' },
+  'furniture.top':  { en: 'top',  fr: 'sommet',  zh: '顶' },
 
   // --- DIMS dimension title ---------------------------------------------------
   'dim.pickPlan':   { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },

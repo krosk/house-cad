@@ -31,6 +31,9 @@ function serializeRect(r) {
   if (r.head !== undefined) out.head = r.head;
   if (r.hinge !== undefined) out.hinge = r.hinge;
   if (r.swing !== undefined) out.swing = r.swing;
+  // Furniture placeholders carry a solid body band [foot, top]; omit elsewhere.
+  if (r.foot !== undefined) out.foot = r.foot;
+  if (r.top !== undefined) out.top = r.top;
   return out;
 }
 function serializeConstraint(c) {
@@ -71,7 +74,7 @@ function serializeWire(w) {
   return { id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])] };
 }
 function serializeFurniture(f) {
-  return { id: f.id, article: f.article, x: f.x, y: f.y, rotationY: f.rotationY || 0, name: f.name || null };
+  return { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, rotationY: f.rotationY || 0, name: f.name || null };
 }
 
 export function serializeFloor(f) {
@@ -159,7 +162,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
 
   const rectIds = new Map();
   const rectangles = (source.rectangles || []).map((r) => {
-    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing });
+    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top });
     rectIds.set(r.id, copy.id);
     return copy;
   });
@@ -242,7 +245,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   });
   // Furniture has no cross-references — just mint fresh ids.
   const furniture = (source.furniture || []).map((x) => ({
-    id: nextFurnitureId(), article: String(x.article), x: x.x, y: x.y,
+    id: nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
     rotationY: x.rotationY || 0, name: x.name || null,
   }));
 
@@ -347,7 +350,7 @@ export function deserializeInto(project, data) {
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
     rectangles: (f.rectangles || []).map(
-      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing }),
+      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top }),
     ),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({
@@ -362,7 +365,7 @@ export function deserializeInto(project, data) {
       route: serializeRoute(link.route),
     })),
     furniture: (f.furniture || []).map((x) => ({
-      id: x.id || nextFurnitureId(), article: String(x.article), x: x.x, y: x.y,
+      id: x.id || nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
       rotationY: x.rotationY || 0, name: x.name || null,
     })),
   }));

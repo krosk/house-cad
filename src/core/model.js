@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
-import { ZONE_KINDS, APERTURE_DEFAULTS } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
 let _id = 0;
@@ -86,7 +86,7 @@ export function syncFloorIdCounter(ids) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -106,6 +106,11 @@ export class Rectangle {
       this.head  = head  !== undefined ? head  : d.head;
       this.hinge = hinge !== undefined ? hinge : d.hinge;
       if (d.swing !== undefined) this.swing = swing !== undefined ? swing : d.swing;
+    } else if (this.kind === 'furniture') {
+      // A furniture placeholder carries a solid [foot, top] body band (the dual of
+      // an aperture opening). Explicit values win on deserialize/clone.
+      this.foot = foot !== undefined ? foot : FURNITURE_BAND.foot;
+      this.top  = top  !== undefined ? top  : FURNITURE_BAND.top;
     }
   }
 
@@ -120,7 +125,12 @@ export class Rectangle {
     if (d) {
       this.sill = d.sill; this.head = d.head; this.hinge = d.hinge;
       if (d.swing !== undefined) this.swing = d.swing; else delete this.swing;
-    } else { delete this.sill; delete this.head; delete this.hinge; delete this.swing; }
+      delete this.foot; delete this.top;
+    } else {
+      delete this.sill; delete this.head; delete this.hinge; delete this.swing;
+      if (this.kind === 'furniture') { this.foot = FURNITURE_BAND.foot; this.top = FURNITURE_BAND.top; }
+      else { delete this.foot; delete this.top; }
+    }
     return this;
   }
 
@@ -655,11 +665,22 @@ export class Project {
   // --- furniture (real-scale product-model placements) --------------------
   // Add a furniture instance to the active floor. `article` keys the GLB (fetched on
   // the fly via the proxy); x,y are plan meters, rotationY degrees about vertical.
-  addFurniture({ article, x = 0, y = 0, rotationY = 0, name = null } = {}) {
-    const item = { id: nextFurnitureId(), article: String(article), x, y, rotationY, name };
+  addFurniture({ article, x = 0, y = 0, z = 0, rotationY = 0, name = null } = {}) {
+    // z = foot elevation: how high the model's base sits off the floor (0 = on the
+    // floor; raise it for a wall-hung unit). The GLB's own mesh supplies the height.
+    const item = { id: nextFurnitureId(), article: String(article), x, y, z, rotationY, name };
     this.furniture.push(item);
     this._emit();
     return item;
+  }
+
+  // Set a furniture item's foot elevation (meters off the floor). Discrete edit, so
+  // it emits by default; kept separate from moveFurniture (which owns plan x/y).
+  setFurnitureElevation(id, z, { emit = true } = {}) {
+    const f = this.furniture.find((f) => f.id === id);
+    if (!f) return;
+    f.z = z;
+    if (emit) this._emit();
   }
 
   // Move a furniture item in plan. Continuous XR drags pass { emit:false } and commit
