@@ -258,6 +258,10 @@ const STRINGS = {
   'key.del':   { en: '🗑 DEL',  fr: '🗑 SUPPR',  zh: '🗑 删除' },
   'key.flip':  { en: '⇄ FLIP',  fr: '⇄ INVERSER', zh: '⇄ 翻转' },
 
+  // --- aperture sill/head editor (PLAN EDIT) ----------------------------------
+  'aperture.sill': { en: 'sill', fr: 'seuil',   zh: '下沿' },
+  'aperture.head': { en: 'head', fr: 'linteau', zh: '上沿' },
+
   // --- DIMS dimension title ---------------------------------------------------
   'dim.pickPlan':   { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },
   'dim.pickOutlet': { en: 'pick marker floor icon', fr: 'icône de marqueur au sol', zh: '选择标记地面图标' },

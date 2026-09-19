@@ -34,7 +34,7 @@ import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture } from '../core/zoneColors.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, apertureBounds } from '../core/zoneColors.js';
 import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
@@ -248,7 +248,11 @@ export function setupMR(view, project, getFootprint) {
       return grid[row]?.[col] ?? null;
     }
 
-    function draw(title, buffer, hoverKey) {
+    // swapLabel (optional) overrides the bottom-left SWAP cell's caption — used by
+    // the aperture pad, which repurposes that (otherwise inert) key as a SILL/HEAD
+    // field cycler. Null keeps the default FLIP label.
+    function draw(title, buffer, hoverKey, swapLabel = null) {
+      const lbl = (kid) => (kid === 'swap' && swapLabel) ? swapLabel : keyLabel(kid);
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.94)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
@@ -272,7 +276,7 @@ export function setupMR(view, project, getFootprint) {
         else ctx.fillStyle = hot ? 'rgba(96,165,250,0.9)' : 'rgba(48,54,61,0.92)';
         ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
         ctx.fillStyle = '#e6edf3';
-        ctx.fillText(keyLabel(kid), x + w / 2, y + h / 2 + 2);
+        ctx.fillText(lbl(kid), x + w / 2, y + h / 2 + 2);
       };
       for (let r = 0; r < 4; r++) { // digit rows
         for (let c = 0; c < COLS; c++) {
@@ -2524,6 +2528,11 @@ export function setupMR(view, project, getFootprint) {
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
+  // PLAN EDIT aperture pad: type a selected aperture's opening-band bounds. One field
+  // at a time; the SWAP cell cycles which (SILL↔HEAD). Buffer prefilled from the rect.
+  let apertureBuffer = '';
+  let aperturePristine = false;
+  let apertureField = 'sill'; // 'sill' | 'head' — which band bound the pad currently edits
 
   // Shared state for the two hard-separated dimension domains. PLAN DIMS accepts
   // edge<->edge and edge<->origin pairs. OUTLET DIMS requires an outlet floor icon
@@ -4230,6 +4239,93 @@ export function setupMR(view, project, getFootprint) {
     // The mode breadcrumb deliberately stays PLAN · EDIT. The dedicated TYPE
     // readout is the sole UI element whose label/color changes with the zone kind.
     rlog('edit kind', { id: selectedRect.id, kind: selectedRect.kind, op: selectedRect.op });
+    // Retyping can flip a room into an aperture (or back): keep the sill/head pad in
+    // sync so it opens on the new opening band and closes for non-apertures.
+    syncAperturePad();
+  }
+
+  // ---- PLAN EDIT aperture band editor (sill/head) --------------------------------
+  // A selected aperture opens the reused DIMS numpad to type its opening band. hinge/
+  // swing stay on A/X rotate; only the numeric bounds live here. Which bounds are
+  // editable is per-kind (apertureBounds): window/heater = SILL+HEAD; door/sliding =
+  // HEAD only (they reach the floor, sill fixed at 0); half wall = SILL only.
+  const apertureFields = (rect) => apertureBounds(rect);
+  const fieldLabel = (f) => t(`aperture.${f}`);
+  const apertureKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
+  const apertureTitle = () => `${apertureKindLabel()}  ·  ${fieldLabel(apertureField)}`;
+  // The SWAP cell becomes the field toggle; its caption names the field it switches TO
+  // (null when the kind has a single editable bound, so the key stays inert).
+  const apertureSwapLabel = () => {
+    const fs = apertureFields(selectedRect);
+    if (fs.length < 2) return null;
+    const other = fs[(fs.indexOf(apertureField) + 1) % fs.length];
+    return `⇄ ${fieldLabel(other).toUpperCase()}`;
+  };
+  const redrawAperturePad = () =>
+    numpad.draw(apertureTitle(), apertureBuffer, hoverKey, apertureSwapLabel());
+
+  function refreshAperturePad() {
+    const fs = apertureFields(selectedRect);
+    if (!fs.includes(apertureField)) apertureField = fs[0]; // clamp after a retype
+    apertureBuffer = selectedRect ? fmt(selectedRect[apertureField] ?? 0) : '';
+    aperturePristine = true;
+    redrawAperturePad();
+  }
+
+  function activateAperturePad() {
+    apertureField = apertureFields(selectedRect)[0] || 'sill'; // door/sliding open on HEAD
+    placePanel(numpad.group);
+    numpad.group.visible = true;
+    refreshAperturePad();
+  }
+
+  // Open/refresh/close the pad to match the current selection — an aperture shows it,
+  // anything else (or no selection) tears it down.
+  function syncAperturePad() {
+    if (selectedRect && isAperture(zoneKindOf(selectedRect))) {
+      if (numpad.group.visible) refreshAperturePad(); else activateAperturePad();
+    } else if (numpad.group.visible) {
+      deactivateNumpad();
+    }
+  }
+
+  function cycleApertureField() {
+    const fs = apertureFields(selectedRect);
+    if (fs.length < 2) return; // nothing to toggle
+    apertureField = fs[(fs.indexOf(apertureField) + 1) % fs.length];
+    refreshAperturePad();
+  }
+
+  function commitApertureField() {
+    if (!selectedRect || !isAperture(zoneKindOf(selectedRect))) return;
+    const val = parseFloat(apertureBuffer);
+    if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
+    const m = toMeters(val);
+    // Keep the band ordered (sill below head) so the opening never inverts.
+    if (apertureField === 'sill' && selectedRect.head != null && m >= selectedRect.head) {
+      rlog('aperture sill rejected (>= head)', { id: selectedRect.id, m });
+      return;
+    }
+    if (apertureField === 'head' && m <= (selectedRect.sill ?? 0)) {
+      rlog('aperture head rejected (<= sill)', { id: selectedRect.id, m });
+      return;
+    }
+    selectedRect[apertureField] = m;
+    project.touch(); // band bounds aren't solver inputs, but mark dirty → autosave + listeners
+    rlog('aperture band', { id: selectedRect.id, field: apertureField, m: +m.toFixed(3) });
+    refreshAperturePad(); // stay open so the other bound can be typed next
+  }
+
+  function pressApertureKey(k) {
+    if (k === 'enter') { commitApertureField(); return; }
+    if (k === 'swap') { cycleApertureField(); return; }
+    if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the whole zone
+    if (aperturePristine && k !== 'back') apertureBuffer = '';
+    aperturePristine = false;
+    if (k === 'back') apertureBuffer = apertureBuffer.slice(0, -1);
+    else if (k === '.') { if (!apertureBuffer.includes('.')) apertureBuffer += '.'; }
+    else if (apertureBuffer.replace('.', '').length < 6) apertureBuffer += k;
+    redrawAperturePad();
   }
 
   // DIMS mode: flip which SIDE ref B sits on relative to ref A — negates the signed
@@ -4461,9 +4557,14 @@ export function setupMR(view, project, getFootprint) {
       // is zebra-highlighted. GRIP deletes it; thumbstick-y cycles its zone kind.
       onTouch: () => {
         if (!placed) return;
+        // While an aperture's sill/head pad is open and the ray is on a key, the
+        // trigger drives the pad (mirrors MARKER). Aiming at the floor (hoverKey null)
+        // falls through to zone stack-cycling below.
+        if (selectedRect && numpad.group.visible && hoverKey) { pressApertureKey(hoverKey); return; }
         if (!hoverStack.length) return;
         const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
         selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
+        syncAperturePad(); // an aperture opens its band pad; a room tears it down
         updateRoomAreaHud();
         setModeInfo();
         rlog('edit select', {
@@ -4845,6 +4946,7 @@ export function setupMR(view, project, getFootprint) {
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
     selectedRect = null; // clear the EDIT selection when changing modes
+    apertureBuffer = ''; apertureField = 'sill'; // ...and any aperture band being typed (pad torn down below)
     roomComponentCacheKey = '';
     roomComponentCache = null;
     roomAreaHud = null;
@@ -5905,17 +6007,36 @@ export function setupMR(view, project, getFootprint) {
       hoverKey = null;
       numpadCursor.visible = false;
       const source = editCtl;
-      const hit = rayFloorHit(source);
-      if (hit) {
-        const { px, py } = worldToPlan(hit);
-        hoverStack = rectsAtPoint(px, py);
-        reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+      // With an aperture's band pad open, the ray drives the numpad (like MARKER);
+      // otherwise it rays the floor to hover/cycle the zone stack.
+      const padOpen = selectedRect && numpad.group.visible;
+      if (padOpen) {
+        const panelHit = rayPanelHit(source);
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
+      if (hoverKey) {
+        reticle.visible = false; // the pad owns the ray this frame
       } else {
-        reticle.visible = false;
-        hoverStack = [];
+        const hit = rayFloorHit(source);
+        if (hit) {
+          const { px, py } = worldToPlan(hit);
+          hoverStack = rectsAtPoint(px, py);
+          reticle.visible = true;
+          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        } else {
+          reticle.visible = false;
+          hoverStack = [];
+        }
       }
       if (selectedRect && !project.rectangles.includes(selectedRect)) selectedRect = null;
+      // No live aperture selection ⇒ the band pad has no subject: tear it down (covers
+      // B/Y delete, which clears selectedRect but can't reach the pad itself).
+      if (numpad.group.visible && !(selectedRect && isAperture(zoneKindOf(selectedRect)))) deactivateNumpad();
+      if (padOpen && hoverKey !== prevHoverKey) { redrawAperturePad(); prevHoverKey = hoverKey; }
       updateRoomAreaHud();
       if (selectedRect) {
         showRectOutline(selectedRect, lightenHex(zoneColorHex(zoneKind(selectedRect))));

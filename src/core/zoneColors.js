@@ -39,10 +39,12 @@ export const APERTURE_DEFAULTS = {
   door:     { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
   window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
   halfwall: { sill: 1.1, head: null, hinge: null   },
-  // Wall-mounted heater (radiator): behaves like a half wall — a solid low band
-  // [0..sill], open above (head:null), no hinge. Its own kind so it reads as a
-  // heater on plans and can be counted separately. sill = a typical radiator height.
-  heater:   { sill: 0.6, head: null, hinge: null   },
+  // Wall-mounted heater (radiator): a BOUNDED solid object, NOT open to the ceiling
+  // — solid band [sill..head], open above the head (and below the sill if raised off
+  // the floor), no hinge. Its own kind so it reads as a heater on plans and can be
+  // counted separately. Default: on the floor (sill 0) up to a typical radiator top
+  // (head 0.6); a wall-hung radiator raises the sill. Both bounds are editable.
+  heater:   { sill: 0,   head: 0.6,  hinge: null   },
   // Sliding (surface-mounted / barn-door): rail on one wall face; the panel is
   // INFERRED as the opening + a fixed 10 cm overhang (not authored). Rotates through
   // 4 states like a door — `hinge` = slide direction (left/right), `swing` = which
@@ -52,6 +54,18 @@ export const APERTURE_DEFAULTS = {
 
 export function isAperture(kind) {
   return Object.prototype.hasOwnProperty.call(APERTURE_DEFAULTS, kind);
+}
+
+// Which opening-band bounds a user can actually edit for a given aperture, in pad
+// order. A door / sliding door reaches the floor, so its sill is structurally 0
+// (not editable) and only the head is meaningful. A half wall is open to the
+// ceiling (head === null), so only the sill. A window / heater exposes both.
+export function apertureBounds(rect) {
+  if (!rect || !isAperture(rect.kind)) return [];
+  const fields = [];
+  if (rect.kind !== 'door' && rect.kind !== 'sliding') fields.push('sill');
+  if (rect.head !== null && rect.head !== undefined) fields.push('head');
+  return fields;
 }
 
 const FALLBACK = ZONE_COLORS.room;
