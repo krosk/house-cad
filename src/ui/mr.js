@@ -249,10 +249,13 @@ export function setupMR(view, project, getFootprint) {
     }
 
     // swapLabel (optional) overrides the bottom-left SWAP cell's caption — used by
-    // the aperture pad, which repurposes that (otherwise inert) key as a SILL/HEAD
-    // field cycler. Null keeps the default FLIP label.
-    function draw(title, buffer, hoverKey, swapLabel = null) {
-      const lbl = (kid) => (kid === 'swap' && swapLabel) ? swapLabel : keyLabel(kid);
+    // the aperture pad (SILL/HEAD field cycler) and the height pads (FLOOR/CEILING
+    // datum toggle). delLabel (optional) overrides the DEL cell — the height pads use
+    // it for "free Z" (DEL clears the vertical dim, not the object). Null keeps the
+    // default FLIP / DEL labels.
+    function draw(title, buffer, hoverKey, swapLabel = null, delLabel = null) {
+      const lbl = (kid) => (kid === 'swap' && swapLabel) ? swapLabel
+        : (kid === 'del' && delLabel) ? delLabel : keyLabel(kid);
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.94)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
@@ -3301,8 +3304,13 @@ export function setupMR(view, project, getFootprint) {
   // plain 0.1). datumWord labels the current datum + direction; datumSwapLabel names the
   // datum SWAP switches to; convertDatumValue re-expresses the offset against the other
   // datum while keeping the physical height constant.
-  const datumWord = (d) => d === 'ceiling' ? `↓ ${t('z.ceiling')}` : `↑ ${t('z.floor')}`;
-  const datumSwapLabel = (d) => `⇄ ${(d === 'ceiling' ? t('z.floor') : t('z.ceiling')).toUpperCase()}`;
+  // Datum can be 'free' (undefined — grab moves Z), 'floor' (absolute above the floor),
+  // or 'ceiling' (below the ceiling). SWAP cycles free→floor→ceiling→floor (free is only
+  // re-entered via DEL). convertDatumValue keeps the physical height across a floor↔ceiling
+  // toggle (a free→floor toggle needs none — the free display already shows the floor value).
+  const nextDatum = (d) => d === 'floor' ? 'ceiling' : 'floor';
+  const datumWord = (d) => d === 'ceiling' ? `↓ ${t('z.ceiling')}` : d === 'free' ? `⊘ ${t('z.free')}` : `↑ ${t('z.floor')}`;
+  const datumSwapLabel = (d) => `⇄ ${t(`z.${nextDatum(d)}`).toUpperCase()}`;
   const convertDatumValue = (value, fromD, toD, height) => {
     const abs = fromD === 'ceiling' ? height - value : value; // absolute z above the floor
     return Math.max(0, toD === 'ceiling' ? height - abs : abs);
@@ -3312,10 +3320,12 @@ export function setupMR(view, project, getFootprint) {
   // (reused, like LEVEL). SWAP toggles the FLOOR/CEILING datum; DEL deletes the marker.
   // X/Y are pinned separately in DIMS — height is never a constraint axis.
   const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${datumWord(markerDatum)}`;
-  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey, datumSwapLabel(markerDatum));
+  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey, datumSwapLabel(markerDatum), t('z.freeKey'));
 
   function refreshMarkerPad() {
-    markerDatum = selectedMarker?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
+    // No datum = height never defined = FREE (grab moves Z). The buffer shows the current
+    // floor-relative z (informational when free / editable when floor).
+    markerDatum = selectedMarker?.zDatum ?? 'free';
     markerBuffer = selectedMarker ? fmt(markerDatum === 'ceiling' ? (selectedMarker.zOff || 0) : selectedMarker.z) : '';
     markerPristine = true;
     redrawMarkerPad();
@@ -3332,8 +3342,9 @@ export function setupMR(view, project, getFootprint) {
     const val = parseFloat(markerBuffer);
     if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
     const id = selectedMarker.id;
-    project.setMarkerVertical(id, markerDatum, toMeters(val));
-    rlog('marker height', { id, datum: markerDatum, m: +toMeters(val).toFixed(3) });
+    const datum = markerDatum === 'free' ? 'floor' : markerDatum; // entering a value DEFINES it (default floor)
+    project.setMarkerVertical(id, datum, toMeters(val));
+    rlog('marker height', { id, datum, m: +toMeters(val).toFixed(3) });
     selectedMarker = null; // ENTER completes the edit instead of leaving the pad active
     deactivateNumpad();
     buildPlan(); applyPlanMatrix(); // z changed -> the glyph re-seats at the new height
@@ -3351,12 +3362,21 @@ export function setupMR(view, project, getFootprint) {
 
   function pressMarkerKey(k) {
     if (k === 'enter') { commitMarkerHeight(); return; }
-    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
-      const next = markerDatum === 'ceiling' ? 'floor' : 'ceiling';
-      markerBuffer = fmt(convertDatumValue(parseFloat(markerBuffer) || 0, markerDatum, next, project.height));
+    if (k === 'swap') { // cycle the datum (free→floor→ceiling→floor), keeping the height
+      const next = nextDatum(markerDatum);
+      if (markerDatum !== 'free') markerBuffer = fmt(convertDatumValue(parseFloat(markerBuffer) || 0, markerDatum, next, project.height));
       markerDatum = next; markerPristine = false; redrawMarkerPad(); return;
     }
-    if (k === 'del') { deleteSelectedMarker(); return; }
+    if (k === 'del') { // DEL clears the Z DIM (frees Z for the grab); B/Y deletes the marker
+      if (selectedMarker) {
+        project.setMarkerVertical(selectedMarker.id, 'free');
+        rlog('marker z freed', { id: selectedMarker.id });
+        buildPlan(); applyPlanMatrix();
+        refreshMarkerPad(); // now reads ⊘ free
+      }
+      return;
+    }
+    if (markerDatum === 'free') markerDatum = 'floor'; // typing a height defines it (from the floor)
     if (markerPristine && k !== 'back') markerBuffer = '';
     markerPristine = false;
     if (k === 'back') markerBuffer = markerBuffer.slice(0, -1);
@@ -3390,7 +3410,7 @@ export function setupMR(view, project, getFootprint) {
   const selectedConduitNodeObj = () =>
     (selectedConduitNodeId ? project.conduitNodes.find((n) => n.id === selectedConduitNodeId) : null) || null;
   const nodePadTitle = () => `${t('conduit.node')}  ·  ${datumWord(nodeDatum)}`;
-  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum));
+  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum), t('z.freeKey'));
   // A node's ceiling is its OWN floor's height (nodes are whole-house, not always active).
   const nodeCeiling = () => {
     const n = selectedConduitNodeObj();
@@ -3400,7 +3420,7 @@ export function setupMR(view, project, getFootprint) {
 
   function refreshNodePad() {
     const n = selectedConduitNodeObj();
-    nodeDatum = n?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
+    nodeDatum = n?.zDatum ?? 'free'; // no datum = free in the 3D carry
     nodeBuffer = n ? fmt(nodeDatum === 'ceiling' ? (n.zOff || 0) : (n.z || 0)) : '';
     nodePristine = true;
     redrawNodePad();
@@ -3426,28 +3446,31 @@ export function setupMR(view, project, getFootprint) {
     if (!n || n.markerId) return;
     const val = parseFloat(nodeBuffer);
     if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
-    project.setConduitNodeVertical(n.id, nodeDatum, toMeters(val));
-    rlog('conduit node height', { id: n.id, datum: nodeDatum, m: +toMeters(val).toFixed(3) });
+    const datum = nodeDatum === 'free' ? 'floor' : nodeDatum; // entering a value DEFINES it (default floor)
+    project.setConduitNodeVertical(n.id, datum, toMeters(val));
+    rlog('conduit node height', { id: n.id, datum, m: +toMeters(val).toFixed(3) });
     buildConduits();
     refreshNodePad(); // keep it selected so it can be repositioned again
   }
 
   function pressNodeKey(k) {
     if (k === 'enter') { commitNodeHeight(); return; }
-    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
-      const next = nodeDatum === 'ceiling' ? 'floor' : 'ceiling';
-      nodeBuffer = fmt(convertDatumValue(parseFloat(nodeBuffer) || 0, nodeDatum, next, nodeCeiling()));
+    if (k === 'swap') { // cycle the datum (free→floor→ceiling→floor), keeping the height
+      const next = nextDatum(nodeDatum);
+      if (nodeDatum !== 'free') nodeBuffer = fmt(convertDatumValue(parseFloat(nodeBuffer) || 0, nodeDatum, next, nodeCeiling()));
       nodeDatum = next; nodePristine = false; redrawNodePad(); return;
     }
-    if (k === 'del') { // DEL removes the node + its segments, mirroring the marker pad
-      if (selectedConduitNodeId) {
-        project.removeConduitNode(selectedConduitNodeId);
-        rlog('conduit node delete (pad)', { id: selectedConduitNodeId });
-        selectConduitNode(null);
+    if (k === 'del') { // DEL clears the Z DIM (frees Z for the 3D carry); B/Y deletes the node
+      const n = selectedConduitNodeObj();
+      if (n && !n.markerId) {
+        project.setConduitNodeVertical(n.id, 'free');
+        rlog('conduit node z freed', { id: n.id });
         buildConduits();
+        refreshNodePad(); // now reads ⊘ free
       }
       return;
     }
+    if (nodeDatum === 'free') nodeDatum = 'floor'; // typing a height defines it (from the floor)
     if (nodePristine && k !== 'back') nodeBuffer = '';
     nodePristine = false;
     if (k === 'back') nodeBuffer = nodeBuffer.slice(0, -1);

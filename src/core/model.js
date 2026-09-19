@@ -25,6 +25,7 @@ const nextId = () => `r${++_id}`;
 // is free in Z and follows the grab.
 function setVertical(obj, datum, value) {
   if (!obj) return;
+  if (datum === 'free') { delete obj.zDatum; delete obj.zOff; return; } // un-define → free in grab; keep the current z
   if (datum === 'ceiling') { obj.zDatum = 'ceiling'; obj.zOff = value; }
   else { obj.zDatum = 'floor'; delete obj.zOff; obj.z = value; }
 }
