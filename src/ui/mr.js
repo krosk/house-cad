@@ -5711,16 +5711,28 @@ export function setupMR(view, project, getFootprint) {
     } else if (Math.abs(stickY) < 0.3) {
       btn.stickY = false;
     }
-    // LEFT companion stick-x rotates the PLACED plan about its origin corner in
-    // 20° steps (one per flick), so you can align the virtual plan to the room
-    // without re-registering. planYaw is session anchoring (not model geometry),
-    // so this stays a view/companion action, never an editor edit.
+    // LEFT companion stick-x rotates the PLACED plan about the HEADSET position in
+    // 20° steps (one per flick), so the point under you stays put and the room swings
+    // around you — you can align the virtual plan to the room without re-registering.
+    // planYaw is session anchoring (not model geometry), so this stays a view/companion
+    // action, never an editor edit. Pivoting off-origin also translates planPos so the
+    // headset's world XZ is invariant: newPos = P + R_y(d)·(oldPos − P).
     const lgp = leftSource(frame)?.gamepad;
     const lx = lgp?.axes[2] ?? 0;
     if (placed && !btn.leftStick && Math.abs(lx) > 0.7) {
-      planYaw += (lx > 0 ? 1 : -1) * PLAN_YAW_STEP;
+      const d = (lx > 0 ? 1 : -1) * PLAN_YAW_STEP;
+      const cam = renderer.xr.getCamera().matrixWorld.elements; // world XZ of the headset
+      const px = cam[12], pz = cam[14];
+      // Rotate the plan group's current world XZ about the headset pivot by d
+      // (R_y: x' = x·cos + z·sin, z' = −x·sin + z·cos), then back out planPos
+      // (planGroup.position = planPos + navOffset in XZ; navOffset stays fixed).
+      const vx = (planPos.x + navOffset.x) - px, vz = (planPos.z + navOffset.z) - pz;
+      const c = Math.cos(d), s = Math.sin(d);
+      planPos.x = px + (vx * c + vz * s) - navOffset.x;
+      planPos.z = pz + (-vx * s + vz * c) - navOffset.z;
+      planYaw += d;
       applyPlanMatrix();
-      rlog(`plan yaw ${THREE.MathUtils.radToDeg(planYaw).toFixed(0)}°`);
+      rlog(`plan yaw ${THREE.MathUtils.radToDeg(planYaw).toFixed(0)}° about headset`);
       btn.leftStick = true;
     } else if (Math.abs(lx) < 0.3) {
       btn.leftStick = false;

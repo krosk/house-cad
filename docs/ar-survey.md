@@ -13,18 +13,25 @@ editor (`ar-2d-parity` memory).
 ## Mode hierarchy (tools with stable `id`s)
 
 ```text
-SETUP    · ORIGIN → FLOOR → RECAL → TELEPORT → LEVEL
-PLAN     · ADD → EDGE → EDIT → TRANSLATE → DIMS
-MARKER   · EDIT → LINK → CONDUIT → CONDUIT EDIT → WIRE → DIMS
-PROJECT  · COPY FLOOR → PASTE FLOOR → MOVE UP → MOVE DOWN → SAVE → LOAD → EXPORT → UNIT → LANG
+SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
+PLAN     · ADD → EDGE → DIMS → EDIT
+MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE
+FURNISH  · FURNISH
+PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
 navigation remains one fast linear cycle across the rows above (thumbstick-x, both ways); group
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
-Internal IDs in traversal order are `register`, `floor`, `recal`, `teleport`, `level`, `drop`, `edge`,
-`edit`, `translate`, `plan_dims`, `marker`, `marker_link`, `marker_conduit`, `conduit_dims`, `conduit_edit`, `marker_wire`, `outlet_dims`, `copy_floor`, `paste_floor`, `move_up`,
-`move_down`, `save`, `load`, `export`, `unit`, `lang`.
+The single source of truth for order is `MODE_ORDER` (which sorts the `modes` array) and `MODE_GROUP`;
+IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport`, `drop`, `edge`,
+`plan_dims`, `edit`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
+`conduit_edit`, `marker_wire`, `furnish`, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
+`translate`, `save`, `load`, `export`, `unit`, `lang`. **`MODE_HIDDEN`** = `{copy_floor, paste_floor,
+move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
+are removed from the thumbstick-x cycle to keep the list short, so they do **not** appear in the
+diagram above. Un-hide by deleting an id from that set. **TRANSLATE now lives in the PROJECT group**
+(not PLAN), and **FURNISH is its own group** (real GLB furniture placement).
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -45,24 +52,33 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
 - **ADD** (`id: drop`) — one action: add a starter rectangle at the standing position.
-  **Thumbstick up/down picks the kind** (`cycleZoneKind`): ROOM = add; WALL, DOOR, WINDOW,
-  STAIRS, CABINET, and FURNITURE = subtract for now. The rectangle persists `kind` independently from its boolean `op`,
-  preserving semantic identity for later type-specific behavior. The breadcrumb remains
-  `PLAN · ADD`; the separate `TYPE · <kind>` readout is the only label that changes with
-  thumbstick up/down. ROOM is green and subtract types use their type color. Edges get pushed to real walls in EDGE.
+  **Thumbstick up/down picks the kind** (`cycleZoneKind`, wraps over `ZONE_KINDS`): ROOM = add;
+  everything else = subtract — WALL, INSULATION, DOOR, HALFWALL, HEATER, SLIDING, WINDOW, STAIRS,
+  CABINET, FURNITURE. DOOR/WINDOW/HALFWALL/HEATER/SLIDING are the **aperture family** (one shared
+  `[sill,head]` band + glyph model — see "Apertures & vertical bands" below). The rectangle persists
+  `kind` independently from its boolean `op`, preserving semantic identity for later type-specific
+  behavior. The breadcrumb remains `PLAN · ADD`; the separate `TYPE · <kind>` readout is the only
+  label that changes with thumbstick up/down. ROOM is blue (the only "add" color) and subtract types
+  use their type color. Edges get pushed to real walls in EDGE.
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
-  through overlapping zones), B/Y deletes it, and thumbstick up/down cycles
-  room→wall→insulation→door→window→stairs→cabinet→furniture. Marker
+  through overlapping zones), B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
+  through `ZONE_KINDS` (room→wall→insulation→door→halfwall→heater→sliding→window→stairs→cabinet→
+  furniture). **When the selection is an aperture** (door/window/halfwall/heater/sliding), **A/X
+  rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge; halfwall/heater
+  return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
+  bounds — see "Apertures & vertical bands". Selecting a **furniture** placeholder zone opens the same
+  band pad for its `[foot,top]`. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
   readout continuously shows `TYPE · <kind>` and is the only label that changes while cycling.
   All subtract kinds deliberately share their current geometry/color. Selecting a ROOM adds its connected component's
   `room: <area> m²` to the info panel, independent of reticle position. Positive-length shared edges and
   overlaps connect rectangles; corner-only contact does not, and overlapping area is counted once. The
   plan sheet prints the same union area once inside every distinct ROOM component.
-- **PLAN · TRANSLATE** (`id: translate`) — rigidly relocate the complete active floor relative to
+- **PROJECT · TRANSLATE** (`id: translate`; grouped under PROJECT, though it acts on the active plan)
+  — rigidly relocate the complete active floor relative to
   the unchanged plan origin. Pick one vertical edge and enter its desired signed X distance, then
   pick one horizontal edge and enter its desired signed Y distance (either axis may be first).
   FLIP changes the pending coordinate to the other side of origin. Only after both entries does one
@@ -88,10 +104,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   current selection stays amber while the next candidate previews yellow. Both the selected floor
   icon and wall glyph are outlined, and the height pad refreshes for each cycled marker.
   Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
-  hovered marker opens its height pad; ENTER commits the height, closes the pad, and clears the
-  selection. **Grip-drag grabs the HOVERED marker** (no prior select) and moves it in 3D, but a
-  **pinned axis stays locked** (`marker._locked` from its X/Y pins), so a fully-pinned marker becomes
-  a pure vertical (z) slider; **B/Y deletes the selected marker**. Every marker
+  hovered marker opens its **height pad** (a single-value datum pad — see "Vertical authoring"): the
+  typed value is an offset, **SWAP toggles the FLOOR/CEILING datum** (`↑ floor` / `↓ ceiling`), and
+  **DEL frees Z** (`⊘ FREE Z`) — clearing the height dim so the grab moves Z again. ENTER commits the
+  height, closes the pad, and clears the selection. **Grip-drag grabs the HOVERED marker** (no prior
+  select) and moves it in 3D, but **every axis carrying a defined dim stays locked**: X/Y from
+  `marker._locked` (its distance pins) and **Z whenever a `zDatum` is set** (`nz = marker.zDatum ?
+  marker.z : tipZ`). So a fully-pinned marker with a defined height doesn't move at all under grab; a
+  free (never-height-set) marker grabs in full 3D; a ceiling-pinned marker's z follows a LEVEL height
+  change. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Aim at a switch's
@@ -121,12 +142,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   then `RUN CONDUIT`.
 - **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are
   always drawn, so no wire-select step). Trigger a node to **select** it; a free (bare) junction opens
-  a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad — DEL removes
-  the node + its segments, ENTER commits z and keeps it selected). Trigger a **segment** between nodes
+  a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad: single-value
+  datum pad, **SWAP toggles FLOOR/CEILING**, **DEL frees Z** (`⊘ FREE Z`, clears the height dim — it
+  no longer deletes the node), ENTER commits z and keeps it selected). Trigger a **segment** between nodes
   to **split** it with a new junction at the reticle (`splitConduitSegment`). Trigger empty space to
   deselect. **Grip-drag a node moves it**, direct vs remote chosen at grip-press by the real 3D
   distance from the tip to the node sphere (`WAYPOINT_GRAB_M`): **direct** (in reach) carries it 1:1
   in full 3D; **remote** (far) has the floor reticle drive X/Y while z is held and typed on the pad.
+  **A node with a defined `zDatum` holds its Z even in the direct carry** (`nz = n.zDatum ? n.z :
+  tipZ`, matching the marker grab), so a height-defined junction slides only in X/Y.
   Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
   immovable** (they follow their device) and have no pad — selecting one just arms it. **B/Y deletes
   the selected node + its segments, or the hovered segment alone** (`deleteInMode` → `removeConduitNode`
@@ -163,6 +187,19 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
+- **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,
+  IKEA models loaded on the fly through the Cloudflare Worker proxy; memory `ikea-3d-model-pipeline`),
+  drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`. These are **NOT massing** — they never
+  enter the footprint/boolean/extrude pipeline (distinct from the `furniture` *zone* kind, a
+  `[foot,top]` placeholder rect authored in PLAN). Trigger empty space to **drop** the current article
+  at the tip; trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a
+  single value = how high the model's base sits off the floor (for wall-hung units/shelves). That pad
+  is a **two-state datum pad** (SWAP toggles FLOOR/CEILING only; there is **no** free-Z and **DEL
+  deletes the item**, because furniture grip-drag is floor-planar so the foot is pad-only). **Thumbstick
+  up/down** (`cycleFurnish`) rotates the selected item, or cycles the drop article when none selected.
+  **Grip-drag** moves the hovered item over the floor reticle (`applyFurnitureGripDrag`, x/y only,
+  `emit:false`, committed once via `touch()`; the foot elevation `y` is preserved). **B/Y deletes** the
+  selected item. Detail: `docs/furniture-handoff.md`.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
@@ -194,12 +231,20 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   8 fps during continuous dimension/edge drags. The preview/export floor is always the active
   real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
   `SVG` / `PNG` / `DXF` / `COOHOM DXF` / `JSON`. PNG is a 4096-pixel-long-edge raster of the same complete paper sheet
-  as SVG. A ray-picked panel toggles PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA;
-  a separate **EXPORT** button downloads the selected format to the headset. These choices persist
-  locally under `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
-  The panel also has a **COMPARE** row: the **change-map baseline**, cycling `none` → each saved slot
-  (`house-cad:slot:i`). Cycle it by flicking the RIGHT **thumbstick** while pointing the ray at that
-  row (so it does not clash with format cycling), or by tapping the row. When a slot is chosen, the
+  as SVG. A ray-picked panel has **7 output-layer toggles** (`TOGGLES` = `planDims`, `markerDims`,
+  `markerIcons`, `wiring`, `furniture`, `furnitureDims`, `area`): `wiring` (default **off**) surfaces
+  the whole-house conduit/wire layer, and `furnitureDims` (default off) surfaces dimensions anchored to
+  a furniture edge — each gated under its parent (`wiring` under `markerIcons`, `furnitureDims` under
+  `furniture`) so a dim/route to an undrawn element can't dangle. A separate **EXPORT** button
+  downloads the selected format to the headset. These choices persist locally under
+  `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
+  The panel also has two cycling rows, each cycled by flicking the RIGHT **thumbstick** while pointing
+  the ray at that row (so neither clashes with format cycling), or by tapping the row:
+  a **LANGUAGE** row picks the **sheet** language independently of the app UI language (session-only
+  `exportSheetLang`, fed to preview + download via `sheetLabelOpts`; DXF layer names stay English), and
+  a **COMPARE** row picks the **change-map baseline**, cycling `none` → each saved slot
+  (`house-cad:slot:i`). The taller 7-toggle + COMPARE + LANGUAGE + button panel is **unwalked** — fit/
+  readability unverified in headset. When a slot is chosen, the
   sheet — LEFT preview and the SVG/PNG export — is drawn with revision clouds + numbered delta tags +
   a `REV — CHANGES` legend for everything that changed since that snapshot (see `planDiff.js` /
   `drawChangeMap`). Change maps are sheet-only: DXF/Coohom/JSON ignore the baseline. The selection is
@@ -228,7 +273,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 
 All user-facing AR text is localized (EN default, FR, ZH) — mode labels, per-mode help boxes,
 transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS titles + edge/origin ref
-names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines stay English (diagnostic).
+names, band-pad field labels (`aperture.sill`/`head`, `furniture.foot`/`top`), datum words
+(`z.floor`/`ceiling`/`free`/`freeKey`), the pick-up-controllers prompt (`controllers.*`), SAVE/LOAD
+slot menu, LEVEL pad title, and UNIT/LANG menus. The EXPORT sheet language is chosen separately from
+the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic).
 
 - `i18n.js` mirrors `units.js`: a `current` language + an `onLangChange` bus, plus `t(key)`,
   `setLang`/`cycleLang`, and `getLang`/`langLabel`. The choice **persists** to localStorage
@@ -254,6 +302,17 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
   markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
+  **LEFT thumbstick-x** rotates the placed plan **about the headset position** in **±20° steps**
+  (`PLAN_YAW_STEP`, one per flick) so the point under you stays put and the room swings around you —
+  aligning the virtual plan to the real room without re-registering. Pivoting off-origin also
+  translates `planPos` so the headset's world XZ is invariant (`newPos = P + R_y(d)·(oldPos − P)`,
+  `navOffset` held fixed). `planYaw`/`planPos` here are session anchoring (a view/companion transform,
+  applied via `applyPlanMatrix`), **not** model geometry — never an editor edit. LEFT grip/other
+  controls never invoke editor actions.
+- **No physical controller in the editor (RIGHT) role** → the headset is in hand tracking (controllers
+  set down). Rather than going blank, a **"Pick up your controllers"** prompt (`handPrompt`,
+  `controllers.pickUp` / `controllers.handMode`) shows and the rest of the HUD stays hidden that frame;
+  hand-tracked select/pinch is never a role source.
 - RIGHT **grip** = **non-destructive** context action only (deletion moved to B/Y — see below). It
   cancels/undoes an in-progress gesture (either DIMS = undo a dim pick, or, before the first pick,
   cycle a vertical node/marker stack under the reticle; EDGE = cancel a locked edge; TRANSLATE/
@@ -264,24 +323,31 @@ names, SAVE/LOAD slot menu, LEVEL pad title, UNIT/LANG menus. HUD debug lines st
   over an edge = move it; MARKER with the floor reticle over a marker's floor icon = grab it and move
   in 3D at its initial pointer depth; CONDUIT EDIT over a bare node = move it; FURNISH over an item =
   move it).
-  Marker drag **locks any pinned axis** (`marker._locked`, from its X/Y pins) so a measured position
-  isn't dragged off — a fully-pinned marker moves in z only; free axes + z follow. Its
-  per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip release calls
-  `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
+  Marker drag **locks any axis with a defined dim** — X/Y from `marker._locked` (its pins) AND **Z when
+  a `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`) — so a measured position/height isn't dragged
+  off; only free axes follow (a fully-pinned, height-defined marker doesn't move). See "Vertical
+  authoring". Its per-frame `moveMarker(..., {emit:false})` updates are visual/model-local; grip
+  release calls `project.touch()` once, avoiding a full solve/listener/autosave cascade every XR frame.
   `onReset` early-returns while `gripDrag` is set (`squeeze` fires before `squeezeend`).
 - RIGHT **thumbstick-x** = cycle mode; **thumbstick-y** = the universal "cycle the current thing" control,
   no-op where nothing applies: **LEVEL** = floor / ALL FLOORS (`switchFloor`, no wrap); **UNIT** =
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
-  **PLAN · ADD** = the room/wall/insulation/door/window/stairs/cabinet/furniture kind to add
-  (`cycleZoneKind`); **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`).
+  **FURNISH** = rotate the selected GLB item, or cycle the drop article if none selected
+  (`cycleFurnish`); **PLAN · ADD** = the kind to add over `ZONE_KINDS`
+  (room/wall/insulation/door/halfwall/heater/sliding/window/stairs/cabinet/furniture, `cycleZoneKind`);
+  **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
+  Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
+  baseline) or LANGUAGE row (→ cycles the sheet language), which take precedence.
   **thumbstick-hold (~1.2 s)** =
   exit AR.
 - **Neither face button cycles modes** (mode nav is thumbstick-x, both ways; prev-mode on A/X was
-  removed as an asymmetric one-off). **A/X = FLIP**: in either DIMS mode with a completed pair it flips
-  the dimension side (`flipConstraintSide`, NOT `swapConstraint`); in TRANSLATE it flips the pending
-  coordinate side; inert otherwise. **B/Y = DELETE** the mode's selected/hovered item where applicable:
+  removed as an asymmetric one-off). **A/X = FLIP or ROTATE**: in either DIMS mode with a completed
+  pair it flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`); in TRANSLATE it flips
+  the pending coordinate side; **in PLAN · EDIT with a selected aperture it rotates that aperture**
+  (`rotateAperture`, gated on `edit` mode so it does not collide with the DIMS/TRANSLATE flip); inert
+  otherwise. **B/Y = DELETE** the mode's selected/hovered item where applicable:
   in DIMS it removes the dimension constraint (`deleteDimContext` — a completed pair, else a hovered
   existing dim label); elsewhere `deleteInMode` (PLAN EDIT zone, MARKER, FURNISH item, CONDUIT EDIT
   hovered segment else selected node + its segments, WIRE selected wire). TRANSLATE has nothing to
@@ -324,6 +390,75 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
   default-on-create). A new dim's line defaults to the tip position when the pair completes.
 - AR renders edge↔origin dimensions (the DESKTOP draws none for origin refs — that parity note
   is AR-only).
+
+## Apertures & vertical bands (PLAN EDIT band pad)
+
+**Apertures** (`door`/`window`/`halfwall`/`heater`/`sliding`) are subtract zone kinds sharing **one
+vertical model** and **one glyph source**. Each carries a `[sill, head]` opening band plus, on
+door/sliding, `hinge` (opening side along the wall axis) × `swing` (which wall face the leaf sweeps).
+Kinds differ only in which part is solid: a door is open `[0..head]` (solid lintel), a window open
+`[sill..head]`, a **half wall** solid `[0..sill]` with `head:null` = open to the ceiling, a **heater**
+a **bounded solid `[sill,head]` band** (default `0`/`0.6`, amber, radiator-fin glyph, `HEATER` DXF
+layer — s26 fix: NOT a `head:null` half-wall clone; a heater has a top and doesn't reach the ceiling),
+a **sliding** door a rail whose panel is inferred as the opening + a fixed 10 cm overhang. Defaults
+live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
+
+- **All plan symbols come from `src/core/apertureGlyph.js`** (`doorSwingSegments`,
+  `windowCasementSegments`, `halfWallHatchSegments`, `heaterFinSegments`, `slidingDoorSegments` +
+  `resolveApertureOrient`), consumed by `planSheet.js`, `dxf.js`, AND `mr.js` (`addApertureGlyphs`, in
+  `planGroup`) so print / DXF / AR **cannot diverge**. Arcs are sampled as line segments (no backend
+  arc primitive); hinge/swing resolve from each caller's own mapped corners so the Y-flipped print
+  page keeps left/right and in/out correct — never bake orientation into the glyph functions.
+- **A/X rotates the selected aperture** in PLAN EDIT (`rotateAperture`): door/sliding cycle 4 states
+  `[left,in]→[right,in]→[right,out]→[left,out]`, window cycles 3 hinge states `left→right→both`.
+  Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
+  not collide with A/X = FLIP in DIMS/TRANSLATE.
+- **Band pad** — selecting a band-carrying rect in PLAN EDIT opens the reused DIMS numpad as a band
+  editor (`activateBandPad`/`syncBandPad`/`commitBandField`). `verticalBandFields(rect)` is the
+  authoritative per-kind field list: apertures → `apertureBounds` (door/sliding = HEAD only since sill
+  is structurally 0; halfwall = SILL only since head is null; window/heater = both); furniture zone →
+  `[foot,top]`; else `[]`. The **SWAP cell cycles the field** (only when ≥2 fields; label names the
+  field it switches to, namespaced `aperture.*` vs `furniture.*`); ENTER writes `rect[field]` with a
+  band-ordering guard (lower < upper); **DEL deletes the whole zone** (unlike the height pads' DEL).
+  The pad stays open after a commit so the other bound can be typed next.
+- **Sill/head/foot/top reach NO output yet** — `extrude.js` is deliberately not aperture-aware, and
+  the glyph/sheet/DXF ignore the band bounds; only `serialize.js` (v3, additive) persists them. So
+  **band edits are geometrically invisible** — verify a change by re-selecting (the pad prefills the
+  stored value). Height-aware extrude that carves `[sill,head]` is owner-deferred; do not build it
+  unprompted.
+
+## Vertical authoring (heights & datums)
+
+Marker z, bare conduit-node z, and GLB foot elevation are all authored as a **single-value height on a
+datum pad** (`nextDatum`/`datumWord`/`datumSwapLabel`/`convertDatumValue`, shared by all three).
+
+- **INVARIANT: stored `z` is always the height above the (active) floor.** A datum is **input-only**:
+  ceiling-relative entry resolves to a floor-referenced z and is never stored ceiling-relative.
+- A z may carry a **`zDatum`**: `'floor'` (absolute above the floor), `'ceiling'` (below the ceiling,
+  stored as `zOff` and resolved by `solveVerticalDatums` in `constraints.js` — run in `_emit` after
+  the marker/node pins — as `z = max(0, floorHeight − zOff)`, so it **tracks LEVEL height edits
+  one-way**), or **no `zDatum` = FREE** (height never defined; the 3D grab moves Z). A node's ceiling
+  is its **own** floor's height (nodes are whole-house).
+- **Marker + conduit-node pads are tri-state**: **SWAP** cycles `free → floor → ceiling → floor`
+  (`free` is only re-entered via DEL), keeping the physical height across a floor↔ceiling toggle
+  (`convertDatumValue`); typing any digit while free defines it as `floor`. **DEL frees Z** (`⊘ FREE
+  Z`, `t('z.freeKey')`) — clears the height dim, it does NOT delete the object (object-delete is B/Y).
+  Setters: `setMarkerVertical` / `setConduitNodeVertical(id, datum, value)` via shared `setVertical`
+  (datum `'free'` drops the dim). A z-datum edit that moves geometry needs a hand `buildPlan()` /
+  `buildConduits()` (`mr.js` doesn't subscribe to `onChange`).
+- **GLB foot pad is two-state** (SWAP toggles floor/ceiling only; no free; DEL deletes the item) — see
+  FURNISH. `setFurnitureVertical(id, datum, value)`.
+- **The 3D grip-drag holds any axis with a defined dim.** X/Y come from `marker._locked` (distance
+  pins); **Z is held whenever `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`, in
+  `applyMarkerGripDrag` / `applyConduitNodeGripDrag`). A ceiling-pinned object also follows a LEVEL
+  height change. Applies to markers, bare nodes, and (in reach) direct-carried conduit nodes; the GLB
+  foot and the furniture-zone `[foot,top]` are pad-only (no Z-grab). Z is **not** in the solver (that
+  stays 2× 1-D X/Y); the blocker to full Z-dimensioning is display (no section view yet).
+- **The pads reuse the DIMS numpad's SWAP/DEL cells via overrides.** `numpad.draw(...)` takes optional
+  `swapLabel` and `delLabel`. So **SWAP now has three context meanings** — FLIP (DIMS), field-cycle
+  (band pad), datum-toggle (height pads) — and **DEL means "delete the DIM you're editing"** on the
+  height pads (Z-dim) and in DIMS (constraint), but **"delete the whole zone/item"** on the band pad
+  and GLB foot pad. Don't assume SWAP == FLIP or DEL == delete-object.
 
 ## Multi-floor (LEVEL)
 
@@ -373,8 +508,9 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   therefore has identical scale, orientation, and origin for physical superposition. Content =
   footprint bbox ∪ rect bounds ∪ markers; a fixed margin reserves room for dims/legend/scale bar.
 - Draws: the **computed footprint** (`computeFootprint`, holes cut by nonzero winding); distinct
-  black-and-white **door, window, stairs, and cabinet symbols** over their authored cutouts, with
-  a separate per-floor zone legend row; the
+  black-and-white **semantic zone symbols** over their authored cutouts — door/window/**half-wall**/
+  **heater** (radiator-fin)/**sliding** all from the shared `apertureGlyph.js` module, plus stairs and
+  cabinet — with a separate per-floor zone legend row; the
   **edge↔edge structural dimensions** (via the shared `edgeLineWorld`, `src/core/dimline.js` —
   edge↔origin refs have no drawable edge and are skipped, matching the 2D editor); the
   **marker floor-pin dimensions** (`drawMarkerPins`, black dashed linework) — the surveyed
@@ -410,13 +546,16 @@ arrows) are fixed PAPER sizes and stay legible at any scale, while geometry obey
   fractional part is omitted (`3.00` → `3`, `300.0` → `300`), while non-integers retain the
   configured display precision. For example, centimeter heights `107.0` and `24.0` print as
   `107` and `24`.
-- **Output layers are configurable in AR**: PLAN DIMS, MARKER DIMS, MARKER ICONS, FURNITURE, and AREA
-  default to on/on/on/off/on. The first three independently control drawing, legend, and scale-fitting
-  participation; FURNITURE controls its footprint/symbol/legend in SVG, PNG, and DXF. Furniture
-  constraints remain authoring-only and are excluded from those formats even when furniture is shown.
-  AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF. Electrical switch-light
-  routes are tied to MARKER ICONS: hiding endpoint glyphs also hides their otherwise contextless links
-  and removes those links from sheet scale-fitting and DXF output.
+- **Output layers are configurable in AR** (7 toggles): PLAN DIMS, MARKER DIMS, MARKER ICONS, WIRING,
+  FURNITURE, FURNITURE DIMS, AREA — default on/on/on/**off**/off/off/on. PLAN/MARKER DIMS + MARKER
+  ICONS independently control drawing, legend, and scale-fitting participation; FURNITURE controls its
+  footprint/symbol/legend in SVG, PNG, and DXF, and FURNITURE DIMS (only when FURNITURE is on) adds
+  dimensions anchored to a furniture edge. WIRING (only when MARKER ICONS is on) is the opt-in
+  whole-house conduit/wire layer — authoring scaffold, off by default so a contractor sheet isn't
+  cluttered. Furniture constraints remain authoring-only and are excluded from all formats even when
+  furniture is shown. AREA controls room-area chips in sheets and `ROOM_INFO` entities in DXF.
+  Electrical switch-light control routes are tied to MARKER ICONS (not WIRING): hiding endpoint glyphs
+  also hides their otherwise contextless links and removes them from sheet scale-fitting and DXF output.
   The model geometry and constraints remain stored and solved.
 - **Dimension placement is AR-authoritative**: grip-dragging a value box stores both the line's
   perpendicular `offset` and the box's affine position along the measured span (`labelT`; 0/1 are
@@ -494,6 +633,20 @@ teleport reticle; no last-active routing remains.
 - **The solver can produce negative w/h** unless normalized. `edgeCoord` reads raw x/w while
   every picker/highlight reads normalized min/max; the solver write-back normalizes
   (`src/core/constraints.js`). Don't reintroduce a raw negative-size path.
+- **The numpad's SWAP/DEL cells are context-overloaded** (via optional `swapLabel`/`delLabel` args to
+  `numpad.draw`). **SWAP** = FLIP (DIMS), field-cycle (band pad), or datum-toggle (marker/node/GLB
+  height pads). **DEL** = "delete the DIM you're editing" (constraint in DIMS; free-Z in the marker/
+  node height pads) OR "delete the whole zone/item" (band pad, GLB foot pad). It is **never** the
+  object-delete for a marker/node — that's B/Y. Don't assume SWAP == FLIP or DEL == delete-object.
+- **`zDatum: 'ceiling'` is INPUT-ONLY.** Stored `z` is always height above the active floor; the
+  ceiling datum stores `zOff` and `solveVerticalDatums` (`constraints.js`, run in `_emit` after the
+  pins) resolves it to a floor-referenced z each solve. Never store anything ceiling-referenced in `z`.
+- **Aperture band bounds (`sill`/`head`/`foot`/`top`) reach NO output** — `extrude.js`, the glyphs,
+  the sheet, and DXF all ignore them; only `serialize.js` persists them. So a band-pad edit is
+  **geometrically invisible** — verify by re-selecting (the pad prefills). Aperture glyphs live in
+  `planGroup` (`addApertureGlyphs`), so a door/window/heater/sliding change needs a hand `buildPlan()`
+  (mr.js doesn't subscribe to `onChange`); edit glyph shapes ONLY in `apertureGlyph.js` (the print
+  page's Y is flipped, so orientation resolves from mapped corners — never baked into the glyph fns).
 - **XR reference-space**: in `sessionstart` request `local-floor` AND
   `renderer.xr.setReferenceSpace(localSpace)` (the type setter alone did NOT take through
   ARButton). Read world cam pos from `matrixWorld.elements` ([12],[13],[14]);
@@ -506,16 +659,18 @@ teleport reticle; no last-active routing remains.
 
 | Path | Role |
 |---|---|
-| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad, slot menu, grip-drag, multi-floor/LEVEL, RECAL, `?ar=1` auto-AR, thumbstick-hold exit |
+| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad (DIMS + band pad + tri-state datum height pads + 2-state GLB foot pad), slot menu, grip-drag (X/Y/Z dim-lock), multi-floor/LEVEL, RECAL, FURNISH, conduit ribbons/nodes, `planYaw`, `?ar=1` auto-AR, thumbstick-hold exit |
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
-| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict` |
+| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict`; `solveMarkers`/`solveConduitNodes` (one-way pins) + **`solveVerticalDatums`** (ceiling-pin resolve) |
+| `src/core/apertureGlyph.js` | **Sole** source of door/window/half-wall/heater/sliding plan glyphs (`doorSwingSegments` etc.) + `resolveApertureOrient`; consumed by planSheet, dxf, AND mr (`addApertureGlyphs`) so they can't diverge |
+| `src/core/zoneColors.js` | `ZONE_KINDS`, per-kind colors, `APERTURE_DEFAULTS`, `FURNITURE_BAND`, `isAperture`, `apertureBounds`, `verticalBandFields` (the authoritative band-pad field list) |
 | `src/core/translate.js` | atomic rigid floor translation; preserves relative constraints and moves origin locks + authored dimension-label placements coherently |
-| `src/io/serialize.js` | `serializeProject`/`deserializeInto` (rectangles + constraints + markers + electrical links + height, multi-floor) — desktop JSON, localStorage autosave, AND the AR slots |
+| `src/io/serialize.js` | `serializeProject`/`deserializeInto` v3 (rectangles [+ `sill`/`head`/`hinge`/`swing`/`foot`/`top`] + constraints + markers [+ `z`/`zDatum`/`zOff`] + electrical links + furniture + height per floor; whole-house conduit/wires + `revision` at top level) — desktop JSON, localStorage autosave, AND the AR slots |
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light control-route points + `segmentSurface` classifier, consumed by AR, sheets, DXF, and conduit routing |
 | `src/core/conduit.js` | Conduit-network graph + Dijkstra `shortestConduitPath` (threads `via`); `wireRouteSegments`/`wireRoutePoints`/`conduitNetworkSegments` — wires route over conduits, path derived not stored |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
 | `src/core/planDiff.js` | Change-map diff: id-matched, solved-geometry diff of zones/markers/dimensions between a saved-slot baseline and the live project (`diffAgainstSnapshot`); rendered as revision clouds by `planSheet.js`, sheet-only |
-| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format and plan-dims/marker-dims/marker-icons/furniture/area output profile |
+| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format + 7-toggle output profile (`planDims`/`markerDims`/`markerIcons`/`wiring`/`furniture`/`furnitureDims`/`area`) |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

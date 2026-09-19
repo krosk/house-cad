@@ -3,9 +3,12 @@
 **Read this first.** This is the "how do I resume" doc — live state only. Stable detail lives in:
 - `docs/ar-survey.md` — how the AR survey tool (`src/ui/mr.js`) is built: modes, inputs,
   dimensioning, multi-floor/LEVEL, HUD, perf, durable traps. **Trust it over this file for structural
-  detail, BUT it is NOT updated for s24 (aperture AR bits, A/X-rotate, LEFT-stick plan rotate, hand-
-  mode prompt), s25 (EXPORT-panel LANGUAGE row, heater glyph), OR s26 (aperture sill/head band pad,
-  furniture foot/z + band pads, the datum toggle + free-Z DEL in the height pads)** — see Next step A.
+  detail. NOW UPDATED through s26** (session 27): the mode-hierarchy diagram was corrected to the
+  actual `MODE_ORDER`/`MODE_GROUP` (FURNISH is its own group; TRANSLATE moved to PROJECT; 4 hidden
+  modes), plus new sections "Apertures & vertical bands" and "Vertical authoring (heights & datums)",
+  the FURNISH mode, the datum-relative height pads, A/X aperture-rotate, LEFT-stick plan-yaw, the
+  pick-up-controllers prompt, the 7-toggle EXPORT panel + LANGUAGE row, and matching traps. The
+  remaining s24–s26 gap is **on-device walking**, not documentation — see Next step A.
 - `docs/ar-qa-checklist.md` — the on-device QA record (what's been walked on the Quest vs not).
 - `CLAUDE.md` — core (desktop) architecture, build/verify, git workflow, deployment.
 - `packaging/quest-apk.md` — Quest APK runbook (read before any packaging work).
@@ -287,15 +290,15 @@ Browser** for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), asset
 | `src/io/serialize.js` | v3 JSON; rect `sill/head/hinge/swing/foot/top`; marker/node/furniture `z`+`zDatum`/`zOff` (additive) |
 | `src/io/outputOptions.js` | 7 output-layer toggles (incl. `furnitureDims`) + format; persisted in `localStorage` |
 | `src/io/planSheet.js` / `src/io/dxf.js` | Print sheet / DXF; `drawZoneGlyph`/`writeZoneSymbol` call the aperture module; sheet strip stamps `Rev N`; `structuralDimLine` handles the origin datum |
-| `docs/ar-survey.md` | Kept-current AR structural reference (modes/inputs/dimensioning/traps) — **NOT updated for s24–s26** |
+| `docs/ar-survey.md` | Kept-current AR structural reference (modes/inputs/dimensioning/traps) — **updated through s26 (session 27)** |
 | `docs/ar-qa-checklist.md` | On-device QA record (walked vs not) |
 
 ## Next step
 
 - **A — s26 VERTICAL-AUTHORING + s24/s25 AR BITS: WALK ON DEVICE + DOC IT (newest, all
-  build+headless-verified, NONE walked).** Do NOT rebuild — this is AR walking + updating
-  `docs/ar-survey.md` (which covers none of s24/s25/s26). Design: memories `aperture-zones` +
-  `vertical-datum` + `ikea-3d-model-pipeline`. Walk, per feature:
+  build+headless-verified, NONE walked).** Do NOT rebuild — this is AR walking. **`docs/ar-survey.md`
+  is now updated through s26 (session 27)**, so the remaining task here is the on-device walk only.
+  Design: memories `aperture-zones` + `vertical-datum` + `ikea-3d-model-pipeline`. Walk, per feature:
   - **(s26 band pad)** PLAN EDIT → select an aperture → the numpad opens as a band editor; SWAP
     cycles SILL/HEAD (door/sliding = HEAD only, half-wall = SILL only, window/heater = both); ENTER
     writes; confirm a **heater** shows both SILL+HEAD (it's a bounded band now). NOTE band edits are
