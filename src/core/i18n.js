@@ -96,6 +96,7 @@ const STRINGS = {
   'export.markerIcons': { en: 'MARKER ICONS', fr: 'ICÔNES MARQUEURS', zh: '标记图标' },
   'export.wiring': { en: 'CONDUIT / WIRE', fr: 'GAINE / CÂBLE', zh: '管路/布线' },
   'export.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
+  'export.furnitureDims': { en: 'FURNITURE DIMS', fr: 'COTES MOBILIER', zh: '家具尺寸' },
   'export.area': { en: 'AREA', fr: 'SURFACE', zh: '面积' },
   'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
   'export.compare': { en: 'COMPARE', fr: 'COMPARER', zh: '对比' },

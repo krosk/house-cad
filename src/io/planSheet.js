@@ -125,6 +125,14 @@ export function constraintInvolvesFurniture(constraint, rectangles) {
   });
 }
 
+// True when this constraint must be dropped from output: it touches a furniture edge
+// and the opt-in furnitureDims layer is off. furnitureDims only takes effect when the
+// furniture itself is drawn — a dimension to an undrawn furniture edge would dangle.
+function skipFurnitureConstraint(constraint, rectangles, layers) {
+  if (layers.furniture && layers.furnitureDims) return false;
+  return constraintInvolvesFurniture(constraint, rectangles);
+}
+
 function localGenerationTime(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   const valid = Number.isFinite(date.getTime()) ? date : new Date();
@@ -262,7 +270,7 @@ function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
   };
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance') continue;
-    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
+    if (skipFurnitureConstraint(c, floor.rectangles, layers)) continue;
     if (isMarkerConstraint(c) ? !layers.markerDims : !layers.planDims) continue;
     const a = endpointCoord(c.a, c.axis), b = endpointCoord(c.b, c.axis);
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
@@ -515,12 +523,12 @@ function drawTextChip(be, text, cx, cy, size = 1.9, color = C_MARK) {
   be.text(text, cx, cy + size * 0.05, { fill: color, size, align: 'center', baseline: 'middle' });
 }
 
-function drawDimensions(be, L, floor) {
+function drawDimensions(be, L, floor, layers) {
   const rects = floor.rectangles;
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || isMarkerConstraint(c)) continue;
-    if (constraintInvolvesFurniture(c, rects)) continue;
+    if (skipFurnitureConstraint(c, rects, layers)) continue;
     if (displaysZero(c.value)) continue; // a 0.00 dimension is clutter
     const la = edgeLineWorld(c.a, rects);
     const lb = edgeLineWorld(c.b, rects);
@@ -573,12 +581,12 @@ function drawDimensions(be, L, floor) {
 // Marker floor pins: the surveyed distance from a wall (or the origin) to a marker's
 // plan coordinate — i.e. WHERE to place the fixture. One-way pins (isMarkerConstraint),
 // drawn in a distinct color, terminating at the marker so the glyph reads as the target.
-function drawMarkerPins(be, L, floor) {
+function drawMarkerPins(be, L, floor, layers) {
   const rects = floor.rectangles;
   const markers = floor.markers || [];
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || !isMarkerConstraint(c)) continue;
-    if (constraintInvolvesFurniture(c, rects)) continue;
+    if (skipFurnitureConstraint(c, rects, layers)) continue;
     if (displaysZero(c.value)) continue; // marker sits on the wall — nothing to place-measure
     const markerEnd = c.b?.marker ? c.b : c.a;
     const refEnd = c.b?.marker ? c.a : c.b;
@@ -1565,8 +1573,10 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers(), opts 
 
   if (layers.planDims) { // structural dimensions aren't drawn → don't flag their deltas
     const u = unitLabel();
-    for (const { cur, from, to } of diff.dims.changed) pushDim(dimAnchor(floor, cur), fill(R.dimChanged, { from: fmtSheetDim(from), to: fmtSheetDim(to), unit: u }));
-    for (const { cur } of diff.dims.added) pushDim(dimAnchor(floor, cur), fill(R.dimAdded, { value: fmtSheetDim(cur.value), unit: u }));
+    // A furniture-anchored dimension the sheet suppresses must not have its delta flagged.
+    const dimShown = (c) => !skipFurnitureConstraint(c, floor.rectangles, layers);
+    for (const { cur, from, to } of diff.dims.changed) if (dimShown(cur)) pushDim(dimAnchor(floor, cur), fill(R.dimChanged, { from: fmtSheetDim(from), to: fmtSheetDim(to), unit: u }));
+    for (const { cur } of diff.dims.added) if (dimShown(cur)) pushDim(dimAnchor(floor, cur), fill(R.dimAdded, { value: fmtSheetDim(cur.value), unit: u }));
     for (const _ of diff.dims.removed) pushDim(null, R.dimRemoved);
   }
 
@@ -1631,8 +1641,8 @@ function renderFloor(be, floor, opts = {}) {
     }
     drawElectricalLinks(be, L, floor); // logical switch→light control legs (per-floor, always with icons)
   }
-  if (layers.planDims) drawDimensions(be, L, floor);
-  if (layers.markerDims) drawMarkerPins(be, L, floor); // fixture-placement dimensions, under the glyphs
+  if (layers.planDims) drawDimensions(be, L, floor, layers);
+  if (layers.markerDims) drawMarkerPins(be, L, floor, layers); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);
   if (layers.markerIcons) drawMarkers(be, L, floor, footprint); // contextual room-side callouts stay foremost
   // Revision clouds sit above the drawing but below the strip. opts.changeMap is a

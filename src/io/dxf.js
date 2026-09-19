@@ -244,6 +244,13 @@ function constraintInvolvesFurniture(constraint, rectangles) {
   });
 }
 
+// Drop a furniture-anchored dimension unless the opt-in furnitureDims layer is on and
+// furniture itself is drawn (mirrors the plan-sheet rule so exports stay consistent).
+function skipFurnitureConstraint(constraint, rectangles, layers) {
+  if (layers.furniture && layers.furnitureDims) return false;
+  return constraintInvolvesFurniture(constraint, rectangles);
+}
+
 function writeTick(w, layer, x, y) {
   const d = 0.055;
   w.line(layer, x - d, y - d, x + d, y + d);
@@ -257,11 +264,11 @@ function writeLeader(w, layer, a, b, label, fixed, axis) {
   else w.line(layer, fixed, from, fixed, label, 'DOTTED');
 }
 
-function writeDimensions(w, floor) {
+function writeDimensions(w, floor, layers) {
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || isMarkerConstraint(c) || Math.abs(c.value) < 5e-7) continue;
-    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
+    if (skipFurnitureConstraint(c, floor.rectangles, layers)) continue;
     const la = edgeLineWorld(c.a, floor.rectangles), lb = edgeLineWorld(c.b, floor.rectangles);
     const aOrigin = c.a?.rect === ORIGIN_ID, bOrigin = c.b?.rect === ORIGIN_ID;
     if ((!la && !aOrigin) || (!lb && !bOrigin)) continue;
@@ -297,10 +304,10 @@ function writeDimensions(w, floor) {
   }
 }
 
-function writeMarkerDimensions(w, floor) {
+function writeMarkerDimensions(w, floor, layers) {
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || !isMarkerConstraint(c) || Math.abs(c.value) < 5e-7) continue;
-    if (constraintInvolvesFurniture(c, floor.rectangles)) continue;
+    if (skipFurnitureConstraint(c, floor.rectangles, layers)) continue;
     const markerEnd = c.a?.marker ? c.a : c.b;
     const refEnd = c.a?.marker ? c.b : c.a;
     const marker = (floor.markers || []).find((m) => m.id === markerEnd?.marker);
@@ -504,8 +511,8 @@ export function floorToDxf(project, floor, opts = {}) {
     writeZoneSymbol(w, rect, kind);
   }
 
-  if (layers.planDims) writeDimensions(w, floor);
-  if (layers.markerDims) writeMarkerDimensions(w, floor);
+  if (layers.planDims) writeDimensions(w, floor, layers);
+  if (layers.markerDims) writeMarkerDimensions(w, floor, layers);
   if (layers.markerIcons) {
     for (const marker of floor.markers || []) writeMarker(w, marker);
     if (layers.wiring) { // conduit network + routed wires are an opt-in layer (default off)

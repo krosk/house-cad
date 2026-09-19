@@ -3,7 +3,7 @@
 // live in localStorage and old project saves remain unchanged.
 
 export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'coohom', 'json'];
-export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'area'];
+export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,
   markerDims: true,
@@ -13,6 +13,10 @@ export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   // control links are unaffected. Gated under markerIcons (routes need endpoint glyphs).
   wiring: false,
   furniture: false,
+  // Structural + marker-pin dimensions anchored to a furniture edge. Default OFF: these
+  // are working dimensions, not construction dimensions. Gated under `furniture` (a dim
+  // to an undrawn furniture edge would dangle), like wiring is gated under markerIcons.
+  furnitureDims: false,
   area: true,
 });
 
@@ -28,6 +32,7 @@ export function resolveOutputLayers(options = {}) {
     markerIcons: bool(source.markerIcons, OUTPUT_LAYER_DEFAULTS.markerIcons),
     wiring: bool(source.wiring, OUTPUT_LAYER_DEFAULTS.wiring),
     furniture: bool(source.furniture, OUTPUT_LAYER_DEFAULTS.furniture),
+    furnitureDims: bool(source.furnitureDims, OUTPUT_LAYER_DEFAULTS.furnitureDims),
     area: bool(source.area, OUTPUT_LAYER_DEFAULTS.area),
   };
 }

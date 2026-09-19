@@ -578,7 +578,7 @@ export function setupMR(view, project, getFootprint) {
     // Tall enough that the format + "Compare" (change-map baseline) rows, the six layer
     // toggles, and the download button all fit without the button clipping off the
     // bottom. The plane keeps the canvas aspect.
-    const W = 512, H = 836;
+    const W = 512, H = 896;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -592,10 +592,10 @@ export function setupMR(view, project, getFootprint) {
     group.add(mesh);
     group.visible = false;
 
-    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'area'];
+    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
     const BASELINE_Y = 186, BASELINE_H = 58;   // change-map "Compare" row
-    const TOGGLE_Y = 268, ROW_H = 68;          // 6 layer toggles → 268..676
-    const BUTTON_Y = 700, BUTTON_H = 112;      // download button → 700..812 (fits H=836)
+    const TOGGLE_Y = 268, ROW_H = 68;          // 7 layer toggles → 268..744
+    const BUTTON_Y = 760, BUTTON_H = 112;      // download button → 760..872 (fits H=896)
     function actionAt(u, v) {
       const cy = (1 - v) * H;
       if (cy >= BASELINE_Y && cy < BASELINE_Y + BASELINE_H) return 'baseline';
