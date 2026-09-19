@@ -82,6 +82,43 @@ export function windowCasementSegments(w, h, hingeEnd = 'lo') {
   return out;
 }
 
+// Sliding (surface-mounted / barn-door): the authored box is the OPENING; the
+// panel is inferred as opening + `over` (a fixed 10 cm total overhang, passed in
+// the caller's units). Rail sits on ONE wall face (`perp`). We draw the panel at
+// REST (centred, covering the opening symmetrically) AND at OPEN (parked to the
+// slide side, leading edge aligned with the opening jamb) plus a rail line across
+// the whole travel, so the plan shows the panel's full movement range, with an
+// arrow for slide direction. `hingeEnd` = slide direction ('lo' = toward the
+// min-coord jamb, 'hi' = toward the max).
+export function slidingDoorSegments(w, h, hingeEnd = 'lo', { over = 0, perp = 1 } = {}) {
+  const out = [];
+  const rect = (x0, y0, x1, y1) => out.push([x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]);
+  const horizontal = w >= h;
+  const sd = hingeEnd === 'hi' ? 1 : -1; // slide direction along the long axis
+  if (horizontal) {
+    const W = w, Lp = W + over;
+    const gap = 0.28 * h, pt = 0.5 * h;
+    const [yb0, yb1] = perp >= 0 ? [h + gap, h + gap + pt] : [-gap - pt, -gap];
+    const yr = perp >= 0 ? h + gap * 0.45 : -gap * 0.45; // travel arrow in the gap
+    rect(-over / 2, yb0, W + over / 2, yb1);        // panel at rest (covers opening)
+    const openEdge = sd < 0 ? -Lp : W + Lp;         // panel's far edge when fully open
+    const ah = 0.45 * h;                            // arrow: opening centre → open extent
+    out.push([W / 2, yr, openEdge, yr],
+      [openEdge, yr, openEdge - sd * ah, yr - ah], [openEdge, yr, openEdge - sd * ah, yr + ah]);
+  } else {
+    const H = h, Lp = H + over;
+    const gap = 0.28 * w, pt = 0.5 * w;
+    const [xb0, xb1] = perp >= 0 ? [w + gap, w + gap + pt] : [-gap - pt, -gap];
+    const xr = perp >= 0 ? w + gap * 0.45 : -gap * 0.45;
+    rect(xb0, -over / 2, xb1, H + over / 2);
+    const openEdge = sd < 0 ? -Lp : H + Lp;
+    const ah = 0.45 * w;
+    out.push([xr, H / 2, xr, openEdge],
+      [xr, openEdge, xr - ah, openEdge - sd * ah], [xr, openEdge, xr + ah, openEdge - sd * ah]);
+  }
+  return out;
+}
+
 // Half wall: uniform same-direction diagonal hatch (a poché of solid material) —
 // the inverse of the door's empty swing. Same-direction strokes distinguish it
 // from insulation's alternating zigzag. No hinge (opens upward everywhere).

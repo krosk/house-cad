@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -26,6 +26,7 @@ const LAYERS = [
   ['INSULATION', 6, 'CONTINUOUS'],
   ['DOOR', 3, 'CONTINUOUS'],
   ['HALFWALL', 8, 'CONTINUOUS'],
+  ['SLIDING', 130, 'CONTINUOUS'],
   ['WINDOW', 4, 'CONTINUOUS'],
   ['STAIRS', 2, 'CONTINUOUS'],
   ['CABINET', 6, 'CONTINUOUS'],
@@ -173,6 +174,9 @@ function writeZoneSymbol(w, rect, kind) {
   } else if (kind === 'halfwall') {
     // Inverse of the door opening: uniform diagonal hatch reading as solid (low) wall.
     segs('HALFWALL', halfWallHatchSegments(width, height));
+  } else if (kind === 'sliding') {
+    // Surface slider; panel is opening + 10 cm (native meters in model space).
+    segs('SLIDING', slidingDoorSegments(width, height, hingeEnd, { over: 0.10, perp }));
   } else if (kind === 'window') {
     segs('WINDOW', windowCasementSegments(width, height, hingeEnd));
   } else if (kind === 'insulation') {

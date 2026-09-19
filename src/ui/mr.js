@@ -35,7 +35,7 @@ import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -1459,8 +1459,9 @@ export function setupMR(view, project, getFootprint) {
         const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
         const { hingeEnd, perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
         const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
-          : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
-            : halfWallHatchSegments(bw, bh);
+          : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
+            : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
+              : halfWallHatchSegments(bw, bh);
         for (const [ax, ay, bx, by] of segs) {
           // plan (x,y) -> planGroup (x,0,-y); thicken perpendicular to the segment.
           const x0 = b.x0 + ax, y0 = b.y0 + ay, x1 = b.x0 + bx, y1 = b.y0 + by;

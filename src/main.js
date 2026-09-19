@@ -199,7 +199,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', sliding: '↔ Sliding door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
@@ -208,7 +208,7 @@ function updateProps() {
   const aperture = isAperture(r.kind) && r.hinge != null;
   pApertureRow.hidden = !aperture;
   if (aperture) {
-    const state = r.kind === 'door' ? `${r.hinge} · ${r.swing}` : r.hinge;
+    const state = (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;
   }
 }

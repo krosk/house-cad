@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -105,7 +105,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -388,7 +388,7 @@ function drawFootprint(be, L, footprint) {
 // sit over the corresponding cutouts in the computed footprint so a door,
 // window, stair or cabinet no longer prints as an anonymous rectangular hole.
 // The same function draws the compact legend samples below.
-function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1) {
+function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1, over = 0) {
   if (!(w > 0 && h > 0)) return;
   const x1 = x + w, y1 = y + h;
   const horizontal = w >= h;
@@ -407,6 +407,9 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
   } else if (kind === 'halfwall') {
     // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
     segs(halfWallHatchSegments(w, h), 0.13);
+  } else if (kind === 'sliding') {
+    // Surface slider: panel (opening + 10 cm) at rest + open, rail, slide arrow.
+    segs(slidingDoorSegments(w, h, hingeEnd, { over, perp }), 0.16);
   } else if (kind === 'window') {
     // Glazing panes + a casement "V" pointing at the hinge (which side opens).
     segs(windowCasementSegments(w, h, hingeEnd));
@@ -460,11 +463,13 @@ function drawZones(be, L, floor, layers) {
     const sx0 = L.X(b.x0), sx1 = L.X(b.x1);
     const sy0 = L.Y(b.y0), sy1 = L.Y(b.y1);
     const { hingeEnd, perp } = resolveApertureOrient(rect, sx0, sx1, sy0, sy1);
+    // Sliding panel overhangs the opening by a fixed 10 cm; convert to page units.
+    const over = kind === 'sliding' ? 0.10 * Math.abs(L.X(1) - L.X(0)) : 0;
     drawZoneGlyph(
       be,
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
-      kind, hingeEnd, false, perp,
+      kind, hingeEnd, false, perp, over,
     );
   }
 }

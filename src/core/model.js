@@ -128,7 +128,9 @@ export class Rectangle {
   // desktop panel). A door has 4: hinge left/right × swing in/out. A window has 3:
   // hinge left → right → both. Half walls / non-apertures have nothing to rotate.
   rotateAperture(dir = 1) {
-    if (this.kind === 'door') {
+    // Doors and sliding doors share the 4-state hinge×swing cycle (for a slider,
+    // hinge = slide direction and swing = which wall face the rail sits on).
+    if (this.kind === 'door' || this.kind === 'sliding') {
       const states = [['left', 'in'], ['right', 'in'], ['right', 'out'], ['left', 'out']];
       const i = states.findIndex(([h, s]) => h === this.hinge && s === this.swing);
       const [h, s] = states[(((i < 0 ? 0 : i) + dir) % 4 + 4) % 4];
