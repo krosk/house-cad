@@ -34,8 +34,8 @@ import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, APERTURE_DEFAULTS } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, hingeEndFromPlan } from '../core/apertureGlyph.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -1457,8 +1457,8 @@ export function setupMR(view, project, getFootprint) {
       const arr = [];
       for (const r of rects) {
         const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
-        const hingeEnd = hingeEndFromPlan(r.hinge ?? APERTURE_DEFAULTS[k]?.hinge);
-        const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd)
+        const { hingeEnd, perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
+        const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
           : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
             : halfWallHatchSegments(bw, bh);
         for (const [ax, ay, bx, by] of segs) {
@@ -5405,6 +5405,10 @@ export function setupMR(view, project, getFootprint) {
     if (aBtn && !btn.a) {
       if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
       else if (modes[currentMode].id === 'translate' && translateEdge) pressTranslateKey('swap');
+      // PLAN EDIT: A/X rotates the selected aperture (door: hinge×swing, window: hinge).
+      else if (modes[currentMode].id === 'edit' && selectedRect?.rotateAperture(1)) {
+        project.touch(); buildPlan(); applyPlanMatrix();
+      }
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();

@@ -29,9 +29,12 @@ export const ZONE_COLORS = {
 // glyph. `hinge` is the sideways opening direction measured ALONG THE WALL'S OWN
 // AXIS — 'left' = the min-coordinate jamb, 'right' = the max-coordinate jamb,
 // 'both' = a double casement. Doors open left/right; windows left/right/both; a
-// half wall opens uniformly upward, so it has no side (`hinge:null`).
+// half wall opens uniformly upward, so it has no side (`hinge:null`). A door also
+// carries `swing` ('in'/'out') = which face of the wall the leaf sweeps; hinge ×
+// swing gives the four door orientations you rotate through. Windows/half walls
+// have no swing.
 export const APERTURE_DEFAULTS = {
-  door:     { sill: 0,   head: 2.1,  hinge: 'left' },
+  door:     { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
   window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
   halfwall: { sill: 1.1, head: null, hinge: null   },
 };

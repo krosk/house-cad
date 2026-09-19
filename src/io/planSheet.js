@@ -19,8 +19,8 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
-import { zoneKind, APERTURE_DEFAULTS } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments } from '../core/apertureGlyph.js';
+import { zoneKind } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -388,7 +388,7 @@ function drawFootprint(be, L, footprint) {
 // sit over the corresponding cutouts in the computed footprint so a door,
 // window, stair or cabinet no longer prints as an anonymous rectangular hole.
 // The same function draws the compact legend samples below.
-function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false) {
+function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1) {
   if (!(w > 0 && h > 0)) return;
   const x1 = x + w, y1 = y + h;
   const horizontal = w >= h;
@@ -403,7 +403,7 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false) {
     // Real architectural door: hinge-side leaf + swing arc (sampled — no arc primitive).
     // In the compact legend, cap the arc reach to the sample height so it can't
     // overflow into the row above.
-    segs(doorSwingSegments(w, h, hingeEnd, compact ? { reach: Math.min(w, h) } : undefined), 0.22);
+    segs(doorSwingSegments(w, h, hingeEnd, { perp, reach: compact ? Math.min(w, h) : undefined }), 0.22);
   } else if (kind === 'halfwall') {
     // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
     segs(halfWallHatchSegments(w, h), 0.13);
@@ -451,20 +451,6 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false) {
   }
 }
 
-// Resolve a rectangle's `hinge` (authored along the wall's own axis: 'left' =
-// min-coordinate jamb) to a box 'lo'/'hi'/'both' in PAGE space. The page Y is
-// flipped relative to plan, so a vertical opening's "left" jamb can land at the
-// larger page-Y end — compare mapped corners rather than assuming min = lo.
-function resolveHingeEnd(rect, sx0, sx1, sy0, sy1) {
-  const hinge = rect.hinge ?? APERTURE_DEFAULTS[zoneKind(rect)]?.hinge ?? 'left';
-  if (hinge === 'both') return 'both';
-  const horizontal = Math.abs(sx1 - sx0) >= Math.abs(sy1 - sy0);
-  const [lo, jamb] = horizontal
-    ? [Math.min(sx0, sx1), hinge === 'right' ? sx1 : sx0]
-    : [Math.min(sy0, sy1), hinge === 'right' ? sy1 : sy0];
-  return jamb === lo ? 'lo' : 'hi';
-}
-
 function drawZones(be, L, floor, layers) {
   for (const rect of floor.rectangles) {
     const kind = zoneKind(rect);
@@ -473,12 +459,12 @@ function drawZones(be, L, floor, layers) {
     const b = rect.bounds;
     const sx0 = L.X(b.x0), sx1 = L.X(b.x1);
     const sy0 = L.Y(b.y0), sy1 = L.Y(b.y1);
+    const { hingeEnd, perp } = resolveApertureOrient(rect, sx0, sx1, sy0, sy1);
     drawZoneGlyph(
       be,
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
-      kind,
-      resolveHingeEnd(rect, sx0, sx1, sy0, sy1),
+      kind, hingeEnd, false, perp,
     );
   }
 }

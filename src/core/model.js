@@ -86,7 +86,7 @@ export function syncFloorIdCounter(ids) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -105,6 +105,7 @@ export class Rectangle {
       this.sill  = sill  !== undefined ? sill  : d.sill;
       this.head  = head  !== undefined ? head  : d.head;
       this.hinge = hinge !== undefined ? hinge : d.hinge;
+      if (d.swing !== undefined) this.swing = swing !== undefined ? swing : d.swing;
     }
   }
 
@@ -116,9 +117,31 @@ export class Rectangle {
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
-    if (d) { this.sill = d.sill; this.head = d.head; this.hinge = d.hinge; }
-    else { delete this.sill; delete this.head; delete this.hinge; }
+    if (d) {
+      this.sill = d.sill; this.head = d.head; this.hinge = d.hinge;
+      if (d.swing !== undefined) this.swing = d.swing; else delete this.swing;
+    } else { delete this.sill; delete this.head; delete this.hinge; delete this.swing; }
     return this;
+  }
+
+  // Cycle an aperture through its orientations (used by the AR A/X flip and the
+  // desktop panel). A door has 4: hinge left/right × swing in/out. A window has 3:
+  // hinge left → right → both. Half walls / non-apertures have nothing to rotate.
+  rotateAperture(dir = 1) {
+    if (this.kind === 'door') {
+      const states = [['left', 'in'], ['right', 'in'], ['right', 'out'], ['left', 'out']];
+      const i = states.findIndex(([h, s]) => h === this.hinge && s === this.swing);
+      const [h, s] = states[(((i < 0 ? 0 : i) + dir) % 4 + 4) % 4];
+      this.hinge = h; this.swing = s;
+      return true;
+    }
+    if (this.kind === 'window') {
+      const states = ['left', 'right', 'both'];
+      const i = states.indexOf(this.hinge);
+      this.hinge = states[(((i < 0 ? 0 : i) + dir) % 3 + 3) % 3];
+      return true;
+    }
+    return false;
   }
 
   // Normalized bounds (handles rectangles drawn right-to-left / top-to-bottom).

@@ -17,7 +17,7 @@ import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOp
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
-import { ZONE_KINDS } from './core/zoneColors.js';
+import { ZONE_KINDS, isAperture } from './core/zoneColors.js';
 import { t, localizedFloorName, revLabels } from './core/i18n.js';
 
 const project = new Project();
@@ -178,6 +178,8 @@ const pX = document.getElementById('p-x');
 const pY = document.getElementById('p-y');
 const pOp = document.getElementById('p-op');
 const pDel = document.getElementById('p-del');
+const pRot = document.getElementById('p-rot');
+const pApertureRow = document.getElementById('p-aperture-row');
 let selectedRect = null;
 
 function updateProps() {
@@ -201,6 +203,14 @@ function updateProps() {
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
+  // Rotate control: only apertures have an orientation. Show the current state so
+  // it's clear what each click changes (door: hinge·swing, window: hinge side).
+  const aperture = isAperture(r.kind) && r.hinge != null;
+  pApertureRow.hidden = !aperture;
+  if (aperture) {
+    const state = r.kind === 'door' ? `${r.hinge} · ${r.swing}` : r.hinge;
+    pRot.textContent = `↻ Rotate (${state})`;
+  }
 }
 
 sketch.onSelect = (rect) => {
@@ -218,6 +228,9 @@ pOp.addEventListener('click', () => {
     ? selectedRect.kind : (selectedRect.op === 'subtract' ? 'wall' : 'room');
   selectedRect.setKind(ZONE_KINDS[(ZONE_KINDS.indexOf(current) + 1) % ZONE_KINDS.length]);
   project.touch();
+});
+pRot.addEventListener('click', () => {
+  if (selectedRect?.rotateAperture(1)) project.touch();
 });
 pDel.addEventListener('click', () => sketch.deleteSelected());
 

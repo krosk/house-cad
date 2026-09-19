@@ -30,25 +30,31 @@ function arcSegments(cx, cy, r, a0, a1, steps, out) {
 export function doorSwingSegments(w, h, hingeEnd = 'lo', { perp = 1, steps = 8, reach } = {}) {
   const out = [];
   const horizontal = w >= h;
+  const dir = perp >= 0 ? 1 : -1; // leaf swings toward +axis (dir>0) or −axis
+  // Pivot P (hinge on the wall line), leaf tip T (perpendicular), far jamb F
+  // (along the wall). The wall line sits on the box edge the leaf swings FROM, so
+  // the quarter-arc always sweeps to the swing side.
+  let Px, Py, Tx, Ty, Fx, Fy, r;
   if (horizontal) {
-    const r = reach ?? w, sy = perp >= 0 ? 0 : h, dir = perp >= 0 ? 1 : -1;
-    if (hingeEnd === 'hi') {
-      out.push([w, sy, w, sy + dir * r]);
-      arcSegments(w, sy, r, dir * Math.PI / 2, Math.PI, steps, out);
-    } else {
-      out.push([0, sy, 0, sy + dir * r]);
-      arcSegments(0, sy, r, dir * Math.PI / 2, 0, steps, out);
-    }
+    r = reach ?? w;
+    const sy = perp >= 0 ? 0 : h;
+    Px = hingeEnd === 'hi' ? w : 0; Py = sy;
+    Tx = Px; Ty = sy + dir * r;
+    Fx = Px + (hingeEnd === 'hi' ? -r : r); Fy = sy;
   } else {
-    const r = reach ?? h, sx = perp >= 0 ? 0 : w, dir = perp >= 0 ? 1 : -1;
-    if (hingeEnd === 'hi') {
-      out.push([sx, h, sx + dir * r, h]);
-      arcSegments(sx, h, r, dir >= 0 ? 0 : Math.PI, -Math.PI / 2, steps, out);
-    } else {
-      out.push([sx, 0, sx + dir * r, 0]);
-      arcSegments(sx, 0, r, dir >= 0 ? 0 : Math.PI, Math.PI / 2, steps, out);
-    }
+    r = reach ?? h;
+    const sx = perp >= 0 ? 0 : w;
+    Px = sx; Py = hingeEnd === 'hi' ? h : 0;
+    Tx = sx + dir * r; Ty = Py;
+    Fx = sx; Fy = Py + (hingeEnd === 'hi' ? -r : r);
   }
+  out.push([Px, Py, Tx, Ty]); // leaf
+  // Sweep from the leaf tip to the far jamb the SHORT way (they're 90° apart).
+  const a0 = Math.atan2(Ty - Py, Tx - Px);
+  let d = Math.atan2(Fy - Py, Fx - Px) - a0;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  arcSegments(Px, Py, r, a0, a0 + d, steps, out);
   return out;
 }
 
@@ -94,10 +100,30 @@ export function halfWallHatchSegments(w, h, count = 5) {
   return out;
 }
 
-// Resolve a rectangle's `hinge` ('left'|'right'|'both') to a box 'lo'/'hi'/'both'
-// for a caller whose box coordinates run the SAME way as plan (min = lo): DXF and
-// the AR floor overlay. The print page (flipped Y) resolves lo/hi itself.
-export function hingeEndFromPlan(hinge) {
-  if (hinge === 'both') return 'both';
-  return hinge === 'right' ? 'hi' : 'lo';
+// Resolve an aperture's authored `hinge` (along the wall's own axis: 'left' =
+// min-coord jamb) and `swing` ('in'/'out') into the box-space `hingeEnd`
+// ('lo'/'hi'/'both') and `perp` (+1/-1) the glyph functions consume — given the
+// rectangle's four corners AS MAPPED INTO THE CALLER'S SPACE. Pass plan corners
+// (b.x0,b.x1,b.y0,b.y1) for DXF and the AR overlay (min = lo, no flip); pass the
+// page-mapped corners for the print sheet (flipped Y) so left/right and in/out
+// both stay put across the flip and the three surfaces remain superposable.
+// `swing:'in'` is defined as the +plan-normal side (toward +y for a horizontal
+// opening, +x for a vertical one); the caller's axis orientation is inferred from
+// its own corners, so no surface has to special-case the flip.
+export function resolveApertureOrient(rect, sx0, sx1, sy0, sy1) {
+  const hinge = rect?.hinge ?? 'left';
+  const horizontal = Math.abs(sx1 - sx0) >= Math.abs(sy1 - sy0);
+  let hingeEnd;
+  if (hinge === 'both') hingeEnd = 'both';
+  else {
+    const [lo, jamb] = horizontal
+      ? [Math.min(sx0, sx1), hinge === 'right' ? sx1 : sx0]
+      : [Math.min(sy0, sy1), hinge === 'right' ? sy1 : sy0];
+    hingeEnd = jamb === lo ? 'lo' : 'hi';
+  }
+  const swingIn = (rect?.swing ?? 'in') === 'in';
+  // Which caller-space direction is box '+' (toward the larger mapped coord on the
+  // perpendicular axis)? +plan-normal maps there only when that axis isn't flipped.
+  const flip = horizontal ? (sy1 >= sy0 ? 1 : -1) : (sx1 >= sx0 ? 1 : -1);
+  return { hingeEnd, perp: (swingIn ? 1 : -1) * flip };
 }

@@ -30,6 +30,7 @@ function serializeRect(r) {
   if (r.sill !== undefined) out.sill = r.sill;
   if (r.head !== undefined) out.head = r.head;
   if (r.hinge !== undefined) out.hinge = r.hinge;
+  if (r.swing !== undefined) out.swing = r.swing;
   return out;
 }
 function serializeConstraint(c) {
@@ -157,7 +158,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
 
   const rectIds = new Map();
   const rectangles = (source.rectangles || []).map((r) => {
-    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge });
+    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing });
     rectIds.set(r.id, copy.id);
     return copy;
   });
@@ -345,7 +346,7 @@ export function deserializeInto(project, data) {
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
     rectangles: (f.rectangles || []).map(
-      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge }),
+      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing }),
     ),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({

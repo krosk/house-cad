@@ -7,8 +7,8 @@
 import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js';
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
-import { zoneKind, APERTURE_DEFAULTS } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, hingeEndFromPlan } from '../core/apertureGlyph.js';
+import { zoneKind } from '../core/zoneColors.js';
+import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -165,11 +165,11 @@ function writeZoneSymbol(w, rect, kind) {
   const b = rect.bounds;
   const width = b.x1 - b.x0, height = b.y1 - b.y0;
   const horizontal = width >= height;
-  // DXF model space runs the same way as plan (min = lo), so hinge maps directly.
-  const hingeEnd = hingeEndFromPlan(rect.hinge ?? APERTURE_DEFAULTS[kind]?.hinge);
+  // DXF model space runs the same way as plan (min = lo), so pass plan corners.
+  const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
   const segs = (layer, list) => { for (const [ax, ay, bx, by] of list) w.line(layer, b.x0 + ax, b.y0 + ay, b.x0 + bx, b.y0 + by); };
   if (kind === 'door') {
-    segs('DOOR', doorSwingSegments(width, height, hingeEnd));
+    segs('DOOR', doorSwingSegments(width, height, hingeEnd, { perp }));
   } else if (kind === 'halfwall') {
     // Inverse of the door opening: uniform diagonal hatch reading as solid (low) wall.
     segs('HALFWALL', halfWallHatchSegments(width, height));
