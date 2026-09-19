@@ -2124,7 +2124,8 @@ export function setupMR(view, project, getFootprint) {
       const tip = tipPosition(inputSource);
       if (!tip) return;
       const plan = worldToPlan(tip);
-      nx = plan.px; ny = plan.py; nz = Math.max(0, tip.y - overlayY());
+      // A datum-pinned node holds its height even in the 3D carry (defined dim wins).
+      nx = plan.px; ny = plan.py; nz = n.zDatum ? (n.z || 0) : Math.max(0, tip.y - overlayY());
     } else {
       const hit = rayFloorHit(inputSource);
       if (!hit) return;
@@ -2430,13 +2431,14 @@ export function setupMR(view, project, getFootprint) {
     selectedFurnitureId ? project.furniture.find((f) => f.id === selectedFurnitureId) : null;
   const furnitureTitle = () => {
     const f = selectedFurnitureObj();
-    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')}`;
+    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')} ${datumWord(furnitureDatum)}`;
   };
-  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey);
+  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey, datumSwapLabel(furnitureDatum));
 
   function refreshFurniturePad() {
     const f = selectedFurnitureObj();
-    furnitureBuffer = f ? fmt(f.z || 0) : '';
+    furnitureDatum = f?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
+    furnitureBuffer = f ? fmt(furnitureDatum === 'ceiling' ? (f.zOff || 0) : (f.z || 0)) : '';
     furniturePristine = true;
     redrawFurniturePad();
   }
@@ -2451,16 +2453,20 @@ export function setupMR(view, project, getFootprint) {
     const f = selectedFurnitureObj();
     if (!f) return;
     const val = parseFloat(furnitureBuffer);
-    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
-    project.setFurnitureElevation(f.id, toMeters(val));
-    rlog('furniture foot', { id: f.id, m: +toMeters(val).toFixed(3) });
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
+    project.setFurnitureVertical(f.id, furnitureDatum, toMeters(val));
+    rlog('furniture foot', { id: f.id, datum: furnitureDatum, m: +toMeters(val).toFixed(3) });
     buildFurniture(); // z changed → the model re-seats at the new elevation
     refreshFurniturePad(); // keep it selected so it can be raised again
   }
 
   function pressFurnitureKey(k) {
     if (k === 'enter') { commitFurnitureFoot(); return; }
-    if (k === 'swap') return; // no role when entering a single value
+    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
+      const next = furnitureDatum === 'ceiling' ? 'floor' : 'ceiling';
+      furnitureBuffer = fmt(convertDatumValue(parseFloat(furnitureBuffer) || 0, furnitureDatum, next, project.height));
+      furnitureDatum = next; furniturePristine = false; redrawFurniturePad(); return;
+    }
     if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the item
     if (furniturePristine && k !== 'back') furnitureBuffer = '';
     furniturePristine = false;
@@ -2577,6 +2583,12 @@ export function setupMR(view, project, getFootprint) {
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
+  // Datum for each single-value height pad ('floor' = absolute above the floor; 'ceiling'
+  // = distance below the ceiling, tracked one-way as storey height changes). The SWAP
+  // cell toggles it; the typed value is the offset from the current datum.
+  let markerDatum = 'floor';
+  let nodeDatum = 'floor';
+  let furnitureDatum = 'floor';
   // PLAN EDIT band pad: type a selected rect's vertical-band bounds (aperture sill/head
   // or furniture foot/top). One field at a time; the SWAP cell cycles which. Buffer
   // prefilled from the rect.
@@ -3154,16 +3166,19 @@ export function setupMR(view, project, getFootprint) {
     if (!marker) return;
     _dragPoint.copy(_ro).addScaledVector(_rd, gripDrag.distance);
     const { px, py } = worldToPlan(_dragPoint);
-    // Respect pins ("if its constraints allow"): a locked axis (solveMarkers sets
-    // marker._locked from the X/Y pins) does NOT move — only free axes + z follow the
-    // grab. A fully-pinned marker therefore becomes a pure vertical (z) slider.
+    // Respect the defined dims on EACH axis: a locked axis does NOT follow the grab, so
+    // only the free axes move. X/Y lock from their distance pins (solveMarkers sets
+    // marker._locked); Z locks when it carries a datum pin (a defined vertical dim). A
+    // fully-dimensioned marker holds still; a wall-pinned marker at a fixed height won't
+    // drift up/down as you slide it — the grab is 3D but constrained by whatever is set.
     const nx = marker._locked?.x ? marker.x : px;
     const ny = marker._locked?.y ? marker.y : py;
+    const nz = marker.zDatum ? marker.z : Math.max(0, _dragPoint.y - overlayY());
     // Update marker coordinates + pin offsets without emitting the project's full
     // solve/listener cascade every XR frame. Release commits once via project.touch().
     project.moveMarker(
       marker.id,
-      { x: nx, y: ny, z: Math.max(0, _dragPoint.y - overlayY()) },
+      { x: nx, y: ny, z: nz },
       { emit: false },
     );
     // Move the existing visuals directly during the drag; on release, buildPlan
@@ -3280,14 +3295,28 @@ export function setupMR(view, project, getFootprint) {
     if (hoverKey) pressLevelKey(hoverKey);
   }
 
-  // ---- EDIT marker height: a marker's inherent height above the floor, typed by hand
-  // on the DIMS numpad (reused, like LEVEL). SWAP is inert; DEL deletes the marker. X/Y
-  // are pinned separately in DIMS — height is never a constraint axis.
-  const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${t('marker.height')}`;
-  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey);
+  // ---- Vertical-datum helpers, shared by the single-value height pads (marker / node /
+  // furniture foot). The SWAP cell toggles the datum; the typed value is the OFFSET from
+  // it — up from the floor, or DOWN from the ceiling (so a "0.1 below ceiling" reads as a
+  // plain 0.1). datumWord labels the current datum + direction; datumSwapLabel names the
+  // datum SWAP switches to; convertDatumValue re-expresses the offset against the other
+  // datum while keeping the physical height constant.
+  const datumWord = (d) => d === 'ceiling' ? `↓ ${t('z.ceiling')}` : `↑ ${t('z.floor')}`;
+  const datumSwapLabel = (d) => `⇄ ${(d === 'ceiling' ? t('z.floor') : t('z.ceiling')).toUpperCase()}`;
+  const convertDatumValue = (value, fromD, toD, height) => {
+    const abs = fromD === 'ceiling' ? height - value : value; // absolute z above the floor
+    return Math.max(0, toD === 'ceiling' ? height - abs : abs);
+  };
+
+  // ---- EDIT marker height: a marker's inherent height, typed by hand on the DIMS numpad
+  // (reused, like LEVEL). SWAP toggles the FLOOR/CEILING datum; DEL deletes the marker.
+  // X/Y are pinned separately in DIMS — height is never a constraint axis.
+  const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${datumWord(markerDatum)}`;
+  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey, datumSwapLabel(markerDatum));
 
   function refreshMarkerPad() {
-    markerBuffer = selectedMarker ? fmt(selectedMarker.z) : '';
+    markerDatum = selectedMarker?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
+    markerBuffer = selectedMarker ? fmt(markerDatum === 'ceiling' ? (selectedMarker.zOff || 0) : selectedMarker.z) : '';
     markerPristine = true;
     redrawMarkerPad();
   }
@@ -3301,10 +3330,10 @@ export function setupMR(view, project, getFootprint) {
   function commitMarkerHeight() {
     if (!selectedMarker) return;
     const val = parseFloat(markerBuffer);
-    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
     const id = selectedMarker.id;
-    project.setMarkerHeight(id, toMeters(val));
-    rlog('marker height', { id, m: +toMeters(val).toFixed(3) });
+    project.setMarkerVertical(id, markerDatum, toMeters(val));
+    rlog('marker height', { id, datum: markerDatum, m: +toMeters(val).toFixed(3) });
     selectedMarker = null; // ENTER completes the edit instead of leaving the pad active
     deactivateNumpad();
     buildPlan(); applyPlanMatrix(); // z changed -> the glyph re-seats at the new height
@@ -3322,7 +3351,11 @@ export function setupMR(view, project, getFootprint) {
 
   function pressMarkerKey(k) {
     if (k === 'enter') { commitMarkerHeight(); return; }
-    if (k === 'swap') return; // no role when entering a height
+    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
+      const next = markerDatum === 'ceiling' ? 'floor' : 'ceiling';
+      markerBuffer = fmt(convertDatumValue(parseFloat(markerBuffer) || 0, markerDatum, next, project.height));
+      markerDatum = next; markerPristine = false; redrawMarkerPad(); return;
+    }
     if (k === 'del') { deleteSelectedMarker(); return; }
     if (markerPristine && k !== 'back') markerBuffer = '';
     markerPristine = false;
@@ -3356,12 +3389,19 @@ export function setupMR(view, project, getFootprint) {
   // follows the device), so selecting one just arms it for deletion.
   const selectedConduitNodeObj = () =>
     (selectedConduitNodeId ? project.conduitNodes.find((n) => n.id === selectedConduitNodeId) : null) || null;
-  const nodePadTitle = () => `${t('conduit.node')}  ·  ${t('marker.height')}`;
-  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey);
+  const nodePadTitle = () => `${t('conduit.node')}  ·  ${datumWord(nodeDatum)}`;
+  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum));
+  // A node's ceiling is its OWN floor's height (nodes are whole-house, not always active).
+  const nodeCeiling = () => {
+    const n = selectedConduitNodeObj();
+    const f = n ? project.floors.find((fl) => fl.id === n.floorId) : null;
+    return f ? f.height : project.height;
+  };
 
   function refreshNodePad() {
     const n = selectedConduitNodeObj();
-    nodeBuffer = n ? fmt(n.z || 0) : '';
+    nodeDatum = n?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
+    nodeBuffer = n ? fmt(nodeDatum === 'ceiling' ? (n.zOff || 0) : (n.z || 0)) : '';
     nodePristine = true;
     redrawNodePad();
   }
@@ -3385,16 +3425,20 @@ export function setupMR(view, project, getFootprint) {
     const n = selectedConduitNodeObj();
     if (!n || n.markerId) return;
     const val = parseFloat(nodeBuffer);
-    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor; negatives rejected
-    project.moveConduitNode(n.id, { x: n.x, y: n.y, z: toMeters(val) });
-    rlog('conduit node height', { id: n.id, m: +toMeters(val).toFixed(3) });
+    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
+    project.setConduitNodeVertical(n.id, nodeDatum, toMeters(val));
+    rlog('conduit node height', { id: n.id, datum: nodeDatum, m: +toMeters(val).toFixed(3) });
     buildConduits();
     refreshNodePad(); // keep it selected so it can be repositioned again
   }
 
   function pressNodeKey(k) {
     if (k === 'enter') { commitNodeHeight(); return; }
-    if (k === 'swap') return; // no role when entering a height
+    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
+      const next = nodeDatum === 'ceiling' ? 'floor' : 'ceiling';
+      nodeBuffer = fmt(convertDatumValue(parseFloat(nodeBuffer) || 0, nodeDatum, next, nodeCeiling()));
+      nodeDatum = next; nodePristine = false; redrawNodePad(); return;
+    }
     if (k === 'del') { // DEL removes the node + its segments, mirroring the marker pad
       if (selectedConduitNodeId) {
         project.removeConduitNode(selectedConduitNodeId);

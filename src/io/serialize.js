@@ -44,8 +44,12 @@ function serializeConstraint(c) {
     labelT: Number.isFinite(c.labelT) ? c.labelT : 0.5,
   };
 }
+// zDatum/zOff (ceiling-relative height) are omitted when absent → the marker reads as
+// a plain absolute z (floor datum), the back-compat default.
 function serializeMarker(m) {
-  return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
+  const out = { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
+  if (m.zDatum) { out.zDatum = m.zDatum; out.zOff = m.zOff || 0; }
+  return out;
 }
 function serializeRoute(route) {
   const mode = route?.mode || 'ceiling';
@@ -65,7 +69,9 @@ function serializeElectricalLink(link) {
   };
 }
 function serializeConduitNode(n) {
-  return { id: n.id, x: n.x, y: n.y, z: n.z || 0, floorId: n.floorId || null, markerId: n.markerId || null };
+  const out = { id: n.id, x: n.x, y: n.y, z: n.z || 0, floorId: n.floorId || null, markerId: n.markerId || null };
+  if (n.zDatum) { out.zDatum = n.zDatum; out.zOff = n.zOff || 0; }
+  return out;
 }
 function serializeConduitSegment(s) {
   return { id: s.id, a: s.a, b: s.b };
@@ -74,7 +80,9 @@ function serializeWire(w) {
   return { id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])] };
 }
 function serializeFurniture(f) {
-  return { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, rotationY: f.rotationY || 0, name: f.name || null };
+  const out = { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, rotationY: f.rotationY || 0, name: f.name || null };
+  if (f.zDatum) { out.zDatum = f.zDatum; out.zOff = f.zOff || 0; }
+  return out;
 }
 
 export function serializeFloor(f) {
@@ -170,6 +178,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   const markers = (source.markers || []).map((m) => {
     const copy = {
       id: nextMarkerId(), type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
+      ...(m.zDatum ? { zDatum: m.zDatum, zOff: m.zOff || 0 } : {}),
       _locked: { x: false, y: false },
     };
     markerIds.set(m.id, copy.id);
@@ -188,7 +197,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   const conduitNodes = srcNodes.flatMap((n) => {
     const markerId = n.markerId ? markerIds.get(n.markerId) : null;
     if (n.markerId && !markerId) return []; // its device didn't come across
-    const copy = { id: nextConduitNodeId(), x: n.x, y: n.y, z: n.z || 0, floorId: target.id, markerId: markerId || null };
+    const copy = { id: nextConduitNodeId(), x: n.x, y: n.y, z: n.z || 0, ...(n.zDatum ? { zDatum: n.zDatum, zOff: n.zOff || 0 } : {}), floorId: target.id, markerId: markerId || null };
     nodeIds.set(n.id, copy.id);
     return [copy];
   });
@@ -246,6 +255,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   // Furniture has no cross-references — just mint fresh ids.
   const furniture = (source.furniture || []).map((x) => ({
     id: nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
+    ...(x.zDatum ? { zDatum: x.zDatum, zOff: x.zOff || 0 } : {}),
     rotationY: x.rotationY || 0, name: x.name || null,
   }));
 
@@ -355,6 +365,7 @@ export function deserializeInto(project, data) {
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({
       id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
+      ...(m.zDatum ? { zDatum: m.zDatum, zOff: m.zOff || 0 } : {}),
       _locked: { x: false, y: false },
     })),
     electricalLinks: (f.electricalLinks || []).map((link) => ({
@@ -366,6 +377,7 @@ export function deserializeInto(project, data) {
     })),
     furniture: (f.furniture || []).map((x) => ({
       id: x.id || nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
+      ...(x.zDatum ? { zDatum: x.zDatum, zOff: x.zOff || 0 } : {}),
       rotationY: x.rotationY || 0, name: x.name || null,
     })),
   }));
@@ -383,6 +395,7 @@ export function deserializeInto(project, data) {
   const fallbackFloorId = project.groundFloorId;
   const makeNode = (n, floorId) => ({
     id: n.id || nextConduitNodeId(), x: n.x, y: n.y, z: n.z || 0,
+    ...(n.zDatum ? { zDatum: n.zDatum, zOff: n.zOff || 0 } : {}),
     floorId: n.floorId || floorId || fallbackFloorId, markerId: n.markerId || null,
   });
   const makeSeg = (s) => ({ id: s.id || nextConduitSegmentId(), a: s.a, b: s.b });

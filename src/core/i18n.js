@@ -264,6 +264,9 @@ const STRINGS = {
   // --- furniture band (PLAN EDIT placeholder) + foot elevation (FURNISH) -------
   'furniture.foot': { en: 'foot', fr: 'pied',    zh: '底' },
   'furniture.top':  { en: 'top',  fr: 'sommet',  zh: '顶' },
+  // --- vertical datum for height pads (floor / ceiling relative) ---------------
+  'z.floor':   { en: 'floor',   fr: 'sol',     zh: '地面' },
+  'z.ceiling': { en: 'ceiling', fr: 'plafond', zh: '天花' },
 
   // --- DIMS dimension title ---------------------------------------------------
   'dim.pickPlan':   { en: 'pick edge / origin', fr: 'bord / origine', zh: '选择 边/原点' },

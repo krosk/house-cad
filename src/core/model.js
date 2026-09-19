@@ -9,12 +9,25 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, solveVerticalDatums } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
+
+// Write a vertical placement onto any z-bearing object (marker / furniture item /
+// conduit node). Setting a height DEFINES a vertical dim, so `zDatum` is stamped in
+// BOTH cases — that is what makes the value hold during a 3D grab (like an X/Y pin).
+// 'ceiling' stores the offset (distance below the ceiling), leaving the absolute z to
+// be resolved in _emit (solveVerticalDatums); 'floor' stores the absolute z directly.
+// An object with NO zDatum (e.g. a freshly dropped marker whose height was never set)
+// is free in Z and follows the grab.
+function setVertical(obj, datum, value) {
+  if (!obj) return;
+  if (datum === 'ceiling') { obj.zDatum = 'ceiling'; obj.zOff = value; }
+  else { obj.zDatum = 'floor'; delete obj.zOff; obj.z = value; }
+}
 
 // After loading a project, advance the counter past any loaded ids so newly
 // created rectangles never reuse an existing id.
@@ -297,6 +310,7 @@ export class Project {
     this._recomputeElevations();
     for (const f of this.floors) { solve(f); solveMarkers(f); }
     solveConduitNodes(this); // whole-house node pins follow the walls, one-way
+    solveVerticalDatums(this); // ceiling-pinned heights track storey height, one-way
     for (const fn of this._listeners) fn(this);
   }
 
@@ -480,6 +494,16 @@ export class Project {
     this._emit();
   }
 
+  // Set a marker's vertical placement against a datum. datum 'floor' → value is the
+  // absolute height above the floor; 'ceiling' → value is the distance BELOW the
+  // ceiling (resolved in _emit, so it tracks storey-height edits).
+  setMarkerVertical(id, datum, value) {
+    const m = this.markers.find((m) => m.id === id);
+    if (!m) return;
+    setVertical(m, datum, value);
+    this._emit();
+  }
+
   // Change a marker's kind in place (outlet/switch/…). It does not touch geometry
   // or pins, but any now-incompatible electrical control links are removed.
   setMarkerType(id, type) {
@@ -581,8 +605,16 @@ export class Project {
   moveConduitNode(id, { x, y, z }, { emit = true } = {}) {
     const n = this.conduitNodes.find((n) => n.id === id);
     if (!n || n.markerId) return;
-    n.x = x; n.y = y; n.z = z || 0;
+    n.x = x; n.y = y; n.z = z || 0; // a pinned z is held by the drag caller, so the datum survives
     if (emit) this._emit();
+  }
+
+  // Set a bare junction's vertical placement against a datum (see setMarkerVertical).
+  setConduitNodeVertical(id, datum, value) {
+    const n = this.conduitNodes.find((n) => n.id === id);
+    if (!n || n.markerId) return;
+    setVertical(n, datum, value);
+    this._emit();
   }
 
   // Remove a conduit segment. Wires derive their path live, so nothing else needs
@@ -683,6 +715,15 @@ export class Project {
     if (emit) this._emit();
   }
 
+  // Set a furniture item's foot elevation against a datum (see setMarkerVertical):
+  // 'floor' → absolute foot height; 'ceiling' → distance below the ceiling.
+  setFurnitureVertical(id, datum, value) {
+    const f = this.furniture.find((f) => f.id === id);
+    if (!f) return;
+    setVertical(f, datum, value);
+    this._emit();
+  }
+
   // Move a furniture item in plan. Continuous XR drags pass { emit:false } and commit
   // once via touch() on release (mirrors moveMarker) to avoid a per-frame solve cascade.
   moveFurniture(id, { x, y }, { emit = true } = {}) {
@@ -725,7 +766,7 @@ export class Project {
     }
     m.x = x;
     m.y = y;
-    m.z = z;
+    m.z = z; // a pinned z is held by the drag caller (passes the resolved z), so the datum survives
     if (emit) this._emit();
   }
 
