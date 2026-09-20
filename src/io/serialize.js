@@ -11,7 +11,7 @@
 // deserializeInto.
 
 import {
-  Floor, Rectangle, nextMarkerId, nextElectricalLinkId,
+  Floor, Rectangle, WIRE_TYPES, nextMarkerId, nextElectricalLinkId,
   nextConduitNodeId, nextConduitSegmentId, nextWireId, nextFurnitureId,
   syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter, syncElectricalLinkIdCounter,
   syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter, syncFurnitureIdCounter,
@@ -90,7 +90,10 @@ function serializeConduitSegment(s) {
   return { id: s.id, a: s.a, b: s.b };
 }
 function serializeWire(w) {
-  return { id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])] };
+  return {
+    id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId,
+    type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via: [...(w.via || [])],
+  };
 }
 function serializeFurniture(f) {
   return { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, ...verticalFields(f), rotationY: f.rotationY || 0, name: f.name || null };
@@ -262,7 +265,10 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
     const toMarkerId = markerIds.get(w.toMarkerId);
     if (!fromMarkerId || !toMarkerId) return [];
     const via = (w.via || []).map((v) => nodeIds.get(v)).filter(Boolean);
-    return [{ id: nextWireId(), fromMarkerId, toMarkerId, via }];
+    return [{
+      id: nextWireId(), fromMarkerId, toMarkerId,
+      type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via,
+    }];
   });
   // Furniture has no cross-references — just mint fresh ids.
   const furniture = (source.furniture || []).map((x) => ({
@@ -413,7 +419,8 @@ export function deserializeInto(project, data) {
   });
   const makeSeg = (s) => ({ id: s.id || nextConduitSegmentId(), a: s.a, b: s.b });
   const makeWire = (w) => ({
-    id: w.id || nextWireId(), fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId, via: [...(w.via || [])],
+    id: w.id || nextWireId(), fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId,
+    type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via: [...(w.via || [])],
   });
   const topLevelNetwork = Array.isArray(data.conduitNodes) || Array.isArray(data.conduitSegments) || Array.isArray(data.wires);
   if (topLevelNetwork) {

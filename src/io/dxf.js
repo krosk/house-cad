@@ -448,13 +448,6 @@ function writeMarker(w, marker) {
   }
 }
 
-const WIRE_SURFACE_LAYER = {
-  wall: 'ELECTRICAL_ROUTE_WALL',
-  ceiling: 'ELECTRICAL_ROUTE_CEILING',
-  floor: 'ELECTRICAL_ROUTE_FLOOR',
-  riser: 'ELECTRICAL_ROUTE_RISER',
-};
-
 // A riser glyph on a floor's plan: a small circle at the slab-penetration point plus a
 // UP/DN tag toward the connected storey. Drawn in plan (2D), like all sheet symbols.
 function writeRiserGlyph(w, layer, r) {
@@ -490,13 +483,16 @@ function writeConduits(w, project, floor) {
 // legs are true-3D at local Z; slab crossings become riser glyphs.
 function writeRoutedWires(w, project, floor) {
   const dz = floor.elevation || 0;
-  const worldSegs = (project.wires || []).flatMap((wire) => wireRouteSegments(project, wire));
-  const { runs, risers } = segmentsForFloor(floor, worldSegs);
-  for (const s of runs) {
-    const layer = WIRE_SURFACE_LAYER[s.surface] || 'ELECTRICAL_ROUTE_WALL';
-    w.line3d(layer, s.a.x, s.a.y, s.a.z - dz, s.b.x, s.b.y, s.b.z - dz, 'DOTTED');
+  for (const wire of project.wires || []) {
+    const prefix = wire.type === 'ethernet' ? 'ETHERNET_ROUTE' : 'ELECTRICAL_ROUTE';
+    const { runs, risers } = segmentsForFloor(floor, wireRouteSegments(project, wire));
+    for (const s of runs) {
+      const surface = s.surface === 'ceiling' ? 'CEILING' : s.surface === 'floor' ? 'FLOOR'
+        : s.surface === 'riser' ? 'RISER' : 'WALL';
+      w.line3d(`${prefix}_${surface}`, s.a.x, s.a.y, s.a.z - dz, s.b.x, s.b.y, s.b.z - dz, 'DOTTED');
+    }
+    for (const r of risers) writeRiserGlyph(w, `${prefix}_RISER`, r);
   }
-  for (const r of risers) writeRiserGlyph(w, 'ELECTRICAL_ROUTE_RISER', r);
 }
 
 /**

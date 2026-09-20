@@ -158,9 +158,9 @@ const STRINGS = {
     zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
   },
   'help.marker_wire': {
-    en: 'Route a wire over the conduit network. Trigger two device markers to define it — its path is the automatic shortest route through the conduits, drawn at once. A dimmed device on the floor above/below can be an endpoint, so a wire can span storeys over a riser. Trigger the wire to select it, then trigger conduit nodes to force the route through them (a via override); grip pops the last override, and B/Y deletes the selected wire. The wall/ceiling/floor/riser of each segment is inferred.',
-    fr: 'Faites cheminer un câble dans le réseau de gaines. Gâchette sur deux marqueurs d’appareil pour le définir — son trajet est la route la plus courte à travers les gaines, tracée aussitôt. Un appareil estompé à l’étage au-dessus/en dessous peut servir d’extrémité : un câble peut donc franchir les niveaux par une colonne montante. Gâchette sur le câble pour le sélectionner, puis gâchette sur des nœuds de gaine pour l’y forcer (dérivation via) ; la poignée retire la dernière dérivation, et B/Y supprime le câble choisi. Le mur/plafond/sol/colonne de chaque segment est déduit.',
-    zh: '让线路沿管路网络走线。对两个设备标记扣动扳机即可定义——其路径为经管路的最短路线，立即绘出。上一层/下一层的暗显设备也可作为端点，因此线路可经竖向立管跨楼层。对线路扣动扳机选中它，再对管路节点扣动扳机可强制经由该节点（via 覆盖）；按握把撤销最后一个覆盖，B/Y 删除所选线路。每段所在的墙/天花板/地板/立管会自动推断。',
+    en: 'Route a wire over the conduit network. Thumbstick up/down chooses electrical or Ethernet (and changes a selected wire). Trigger two device markers to define it; the shortest conduit route is drawn at once. Repeated triggers cycle wires sharing a conduit. Trigger conduit nodes for optional via overrides; grip removes the last via, and B/Y deletes the selected wire.',
+    fr: 'Faites cheminer un câble dans le réseau de gaines. Joystick haut/bas choisit électrique ou Ethernet (et modifie le câble sélectionné). Gâchette sur deux appareils pour le définir ; le trajet de gaine le plus court est tracé. Des pressions répétées parcourent les câbles partageant une gaine. Les nœuds ajoutent des passages VIA facultatifs ; la poignée retire le dernier, B/Y supprime le câble.',
+    zh: '让线路沿管路网络走线。摇杆上/下选择电力或以太网（也可更改选中的线路）。对两个设备标记扣动扳机即可按最短管路布线。重复扣动可循环选择共享管路的线路。选择管路节点可添加可选经由点；握把移除最后一个，B/Y 删除线路。',
   },
   'help.marker_conduit': {
     en: 'Build the whole-house conduit network. Trigger a device or an existing node to start the pen there, trigger empty space to drop a junction and run a conduit to it, or trigger another node to connect (branch/loop). Dimmed targets on the floor above/below are pickable — trigger one to run a riser through the slab. Grip lifts the pen; lift then start elsewhere to branch.',
@@ -351,6 +351,8 @@ const STRINGS = {
   'wire.pickStart':  { en: 'PICK START',  fr: 'CHOISIR DÉBUT',        zh: '选择起点' },
   'wire.pickEnd':    { en: 'PICK END',    fr: 'CHOISIR FIN',          zh: '选择终点' },
   'wire.override':   { en: 'VIA',         fr: 'VIA',                  zh: '经由' },
+  'wire.type.electrical': { en: 'ELECTRICAL', fr: 'ÉLECTRIQUE', zh: '电力' },
+  'wire.type.ethernet': { en: 'ETHERNET', fr: 'ETHERNET', zh: '以太网' },
   'conduit.pickStart': { en: 'START PEN', fr: 'DÉBUT TRACÉ',        zh: '落笔' },
   'conduit.run':     { en: 'RUN CONDUIT', fr: 'TIRER GAINE',        zh: '布管' },
   'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },

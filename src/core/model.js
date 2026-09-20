@@ -74,6 +74,7 @@ export function syncConduitSegmentIdCounter(ids) {
   for (const id of ids) { const m = /^cs(\d+)$/.exec(id); if (m) _csid = Math.max(_csid, Number(m[1])); }
 }
 let _wid = 0;
+export const WIRE_TYPES = ['electrical', 'ethernet'];
 export const nextWireId = () => `w${++_wid}`;
 export function syncWireIdCounter(ids) {
   for (const id of ids) { const m = /^w(\d+)$/.exec(id); if (m) _wid = Math.max(_wid, Number(m[1])); }
@@ -666,13 +667,16 @@ export class Project {
   // ---- Wires (routed over the conduit network) -----------------------------
   // A wire connects two device markers; its path is DERIVED as the shortest route
   // through the conduits (via src/core/conduit.js), so it needs no stored geometry.
-  addWire(fromMarkerId, toMarkerId) {
+  addWire(fromMarkerId, toMarkerId, type = 'electrical') {
     // Wires are whole-house: resolve endpoints across every floor, not just the active
     // one, so a wire may run up a riser between markers on different storeys.
     const from = this.findMarker(fromMarkerId)?.marker;
     const to = this.findMarker(toMarkerId)?.marker;
     if (!from || !to || fromMarkerId === toMarkerId) return { ok: false, reason: 'incompatible' };
-    const wire = { id: nextWireId(), fromMarkerId, toMarkerId, via: [] };
+    const wire = {
+      id: nextWireId(), fromMarkerId, toMarkerId,
+      type: WIRE_TYPES.includes(type) ? type : 'electrical', via: [],
+    };
     this.wires.push(wire);
     this._emit();
     return { ok: true, wire };
@@ -684,6 +688,14 @@ export class Project {
     const [wire] = this.wires.splice(i, 1);
     this._emit();
     return { ok: true, wire };
+  }
+
+  setWireType(id, type) {
+    const wire = this.wires.find((w) => w.id === id);
+    if (!wire || !WIRE_TYPES.includes(type)) return false;
+    wire.type = type;
+    this._emit();
+    return true;
   }
 
   // Force a wire's route through an extra conduit node (manual override). Appends

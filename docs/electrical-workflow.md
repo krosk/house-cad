@@ -43,7 +43,7 @@ through it. So the model keeps them separate:
 2. Run the conduit network     MARKER · CONDUIT  pen device → junction → device; cross-slab = riser
    (refine)                    CONDUIT · EDIT    move / split / delete nodes & segments, set node height
    (survey to walls)           CONDUIT · DIMS    pin a bare junction to a wall so it tracks edits
-3. Declare wires               MARKER · WIRE     pick two devices; the route auto-derives over conduit
+3. Declare wires               MARKER · WIRE     choose electrical/Ethernet, then pick two devices
 4. Circuits fall out           (derived)         deriveCircuits(): components of the wire graph + breakers
 ```
 
@@ -67,6 +67,10 @@ sit on two storeys is a **riser** through the slab.
 - **`via` = bare junctions only, in order.** It's an override to force a wire down a
   specific run when you don't want the automatic shortest path. Never devices — a device
   is only ever a wire **endpoint** (`fromMarkerId` / `toMarkerId`), never a mid-path stop.
+- **Wire nature is authored, not inferred.** `type` is `electrical` or `ethernet`
+  (legacy saves default to electrical). In AR, thumbstick up/down picks the next wire's
+  type or retypes the selected wire. Purple is reserved for conduit; electrical wires
+  draw amber and Ethernet wires cyan.
 - **Wires never create or move conduit; conduit carries no circuit identity.** Clean
   separation both directions.
 

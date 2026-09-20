@@ -169,7 +169,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   with no drawable `.rect`). The conduit network is shown for picking (hovered/selected junctions
   enlarge). Readout: `PICK NODE`, then `<->  ?`.
 - **MARKER · WIRE** (`id: marker_wire`) — define **wires routed over the conduit network**. A wire is
-  `{id, fromMarkerId, toMarkerId, via:[nodeId]}` in the **whole-house** `project.wires` array; its
+  `{id, fromMarkerId, toMarkerId, type, via:[nodeId]}` in the **whole-house** `project.wires` array;
+  `type` is `electrical` or `ethernet` (legacy/missing defaults electrical), and thumbstick up/down
+  chooses the new-wire type or retypes the selected wire. Its
   physical path is **DERIVED** as the shortest route through the conduits (Dijkstra, threading the
   ordered `via` nodes), never stored — an unroutable wire simply draws nothing. Trigger two device
   markers to define one (`project.addWire`, which resolves markers house-wide, auto shortest route drawn
@@ -177,7 +179,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   in `adjacentGroup`) can be either endpoint, so a wire may span storeys over a riser. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
   override); grip **pops the last via** (`popWireVia`), and **B/Y deletes the wire** (`removeWire`).
-  Trigger an existing wire to re-select it; trigger empty space to deselect. The
+  Trigger an existing wire to re-select it; repeated triggers cycle every wire whose route overlaps
+  under the reticle (the selected ribbon is yellow and rendered foremost); trigger empty space to deselect. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green, riser
   violet), showing the legs touching the active floor. A
