@@ -21,6 +21,7 @@ import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
 import { ZONE_KINDS, isAperture } from './core/zoneColors.js';
 import { t, localizedFloorName, revLabels, getLang, LANGS, LANG_ORDER } from './core/i18n.js';
+import { checkForUpdate, onVersionStatus, startVersionChecks } from './core/versionCheck.js';
 
 const project = new Project();
 
@@ -30,6 +31,27 @@ let viewMode = false;
 
 const sketch = new Sketch2D(document.getElementById('sketch'), project);
 const view = new View3D(document.getElementById('view3d'));
+
+const versionStatus = document.getElementById('version-status');
+const VERSION_LABEL = {
+  checking: 'VERSION · CHECKING', current: 'VERSION · CURRENT',
+  available: 'UPDATE AVAILABLE', offline: 'VERSION · OFFLINE',
+  unavailable: 'VERSION · UNKNOWN',
+};
+onVersionStatus((status) => {
+  versionStatus.dataset.state = status.state;
+  versionStatus.textContent = VERSION_LABEL[status.state] || VERSION_LABEL.unavailable;
+  versionStatus.title = status.state === 'available'
+    ? `Installed ${status.current}; published ${status.latest?.build}. Click to reload.`
+    : `Installed ${status.current}. Click to check again.`;
+});
+versionStatus.addEventListener('click', async () => {
+  const result = await checkForUpdate();
+  if (result.state !== 'available') return;
+  try { await navigator.serviceWorker?.getRegistration()?.then((registration) => registration?.update()); } catch { /* reload still rechecks */ }
+  location.reload();
+});
+startVersionChecks();
 
 // Desktop presentation: switch the main surface between the plan editor and the
 // existing interactive Three.js renderer. Shared #view= links open in 3D by

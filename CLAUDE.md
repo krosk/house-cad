@@ -57,6 +57,10 @@ authority; the fixture/light are presentation-only. At most two visible lights c
 shadows to contain mobile rendering cost. Shadow allocation is contextual: overhead uses none, and
 POV assigns shadows to the two light sources nearest the camera.
 
+Production builds emit an un-precached `version.json` beside `index.html`; `src/core/versionCheck.js`
+fetches it with `cache: no-store` plus a timestamp query and compares its complete build id with the
+compiled `__BUILD_ID__`. Desktop shows the state in the toolbar and the AR debug HUD includes it.
+
 Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
 They refresh only Sketch2D and the dimension panel: never feed them to `solve()`, rebuild 3D/export
 geometry, or persist them as model-driving constraints.

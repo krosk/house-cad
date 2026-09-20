@@ -378,6 +378,19 @@ body {
   color: var(--accent, #4ea1ff) !important;
   cursor: pointer;
 }
+#version-status {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+#version-status[data-state="available"] {
+  color: #0b1220;
+  background: #f8d76a;
+  border-color: #f8d76a;
+  font-weight: 700;
+}
+#version-status[data-state="offline"],
+#version-status[data-state="unavailable"] { color: #ffb86b; }
 
 /* ---- constraints panel ---- */
 #constraints {

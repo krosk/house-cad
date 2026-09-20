@@ -7,13 +7,28 @@ import { execSync } from 'node:child_process';
 // A build stamp shown on the in-headset HUD: git short-hash + UTC build time.
 // It lets you confirm on-device that a fresh deploy actually loaded (vs. a stale
 // service-worker cache) — the stamp changes only when the site is rebuilt.
-function buildId() {
+function buildMeta() {
   let hash = 'nogit';
   try { hash = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* not a git checkout */ }
   const t = new Date();
   const p = (n) => String(n).padStart(2, '0');
   const stamp = `${p(t.getUTCMonth() + 1)}${p(t.getUTCDate())}-${p(t.getUTCHours())}${p(t.getUTCMinutes())}`;
-  return `${hash} ${stamp}Z`;
+  const builtAt = t.toISOString();
+  return { commit: hash, builtAt, key: `${hash}:${builtAt}`, build: `${hash} ${stamp}Z` };
+}
+
+function versionManifest(meta) {
+  return {
+    name: 'version-manifest',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: `${JSON.stringify(meta, null, 2)}\n`,
+      });
+    },
+  };
 }
 
 // Dev-only: a POST /__log endpoint so the app running in the Quest browser can
@@ -40,7 +55,9 @@ function questLogger() {
   };
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command }) => {
+  const meta = buildMeta();
+  return ({
   // Relative base for production so the build works under GitHub Pages'
   // project-site subpath (https://<user>.github.io/<repo>/) without hard-coding
   // the repo name. Dev server stays at '/'.
@@ -48,7 +65,10 @@ export default defineConfig(({ command }) => ({
 
   // Inject the build stamp as a compile-time constant (see mr.js HUD).
   define: {
-    __BUILD_ID__: JSON.stringify(buildId()),
+    __BUILD_ID__: JSON.stringify(meta.build),
+    __BUILD_KEY__: JSON.stringify(meta.key),
+    __BUILD_COMMIT__: JSON.stringify(meta.commit),
+    __BUILD_TIME__: JSON.stringify(meta.builtAt),
   },
 
   // DEV (serve): basic-ssl serves https with a self-signed cert. WebXR
@@ -64,7 +84,7 @@ export default defineConfig(({ command }) => ({
   // (a service worker would fight HMR and the self-signed-cert flow).
   plugins: command === 'serve'
     ? [basicSsl(), questLogger()]
-    : [VitePWA({
+    : [versionManifest(meta), VitePWA({
         registerType: 'autoUpdate',
         // Relative paths so it stays portable under the GitHub Pages subpath
         // (same reason base is './'). start_url/scope resolve to the app root.
@@ -98,4 +118,5 @@ export default defineConfig(({ command }) => ({
     host: true,
     port: 5173,
   },
-}));
+  });
+});

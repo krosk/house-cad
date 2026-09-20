@@ -21,6 +21,7 @@ import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance,
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
+import { getVersionStatus } from '../core/versionCheck.js';
 import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
@@ -5981,6 +5982,9 @@ export function setupMR(view, project, getFootprint) {
       const edgeM = edgeLen(edgeRef);
       const lines = [
         `build:  ${BUILD_ID}`,
+        `update: ${getVersionStatus().state === 'available' ? `NEW ${getVersionStatus().latest?.build || ''}`
+          : getVersionStatus().state === 'current' ? 'current'
+          : getVersionStatus().state}`,
         ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
