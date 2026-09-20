@@ -43,6 +43,11 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
 
+Desktop/mobile View 3D also has a view-only WALK mode: click/tap an architectural floor to
+teleport to 1.65 m eye height, drag to look, and move with WASD/arrows or the touch D-pad. Camera
+state is session-only and must not mutate project or shared-view data. The viewer initially isolates
+the project's active floor; WALK reveals that floor's ceiling, which stays hidden in orbit overview.
+
 ### The constraint solver (`src/core/constraints.js`) — the heart of the app
 
 The key insight: because every rectangle edge is axis-aligned, each edge is a single scalar (a left/right edge is an X-coord, a bottom/top edge is a Y-coord), so **the constraint problem decouples into two independent 1-D systems** (all x's, all y's). Each axis is solved as a small **weighted least-squares** problem via normal equations + Gaussian elimination — no general geometric/iterative solver.

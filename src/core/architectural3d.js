@@ -145,6 +145,11 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const slabThickness = opts.slabThickness ?? ARCH_SLAB_THICKNESS;
   const floorGeometry = extrudeFootprint(roomFootprint, slabThickness);
   if (floorGeometry) floorGeometry.translate(0, -slabThickness, 0); // finished floor remains at local Y=0
+  // Reuse the exact room footprint for an overhead slab. Its underside is at
+  // the authored storey height; View3D only reveals it in first-person mode so
+  // the exterior orbit remains an unobstructed architectural overview.
+  const ceilingGeometry = floorGeometry?.clone() || null;
+  if (ceilingGeometry) ceilingGeometry.translate(0, (floor?.height || 0) + slabThickness, 0);
   const wallGeometry = boxesGeometry(architecturalWallBoxes(floor, opts));
-  return { floorGeometry, wallGeometry };
+  return { floorGeometry, wallGeometry, ceilingGeometry };
 }
