@@ -5829,8 +5829,13 @@ export function setupMR(view, project, getFootprint) {
     const lx = lgp?.axes[2] ?? 0;
     if (placed && !btn.leftStick && Math.abs(lx) > 0.7) {
       const d = (lx > 0 ? 1 : -1) * PLAN_YAW_STEP;
-      const cam = renderer.xr.getCamera().matrixWorld.elements; // world XZ of the headset
-      const px = cam[12], pz = cam[14];
+      // XRFrame's viewer pose is authoritative here. The renderer's ArrayCamera
+      // matrix can describe the fixed reference-space origin on Quest, which made
+      // this apparently pivot around registration (especially after TELEPORT).
+      const viewer = localSpace ? frame.getViewerPose(localSpace) : null;
+      const fallback = renderer.xr.getCamera().matrixWorld.elements;
+      const px = viewer?.transform.position.x ?? fallback[12];
+      const pz = viewer?.transform.position.z ?? fallback[14];
       // Rotate the plan group's current world XZ about the headset pivot by d
       // (R_y: x' = x·cos + z·sin, z' = −x·sin + z·cos), then back out planPos
       // (planGroup.position = planPos + navOffset in XZ; navOffset stays fixed).
@@ -5840,7 +5845,10 @@ export function setupMR(view, project, getFootprint) {
       planPos.z = pz + (-vx * s + vz * c) - navOffset.z;
       planYaw += d;
       applyPlanMatrix();
-      rlog(`plan yaw ${THREE.MathUtils.radToDeg(planYaw).toFixed(0)}° about headset`);
+      rlog('plan yaw about viewer', {
+        deg: +THREE.MathUtils.radToDeg(planYaw).toFixed(0),
+        px: +px.toFixed(3), pz: +pz.toFixed(3),
+      });
       btn.leftStick = true;
     } else if (Math.abs(lx) < 0.3) {
       btn.leftStick = false;
