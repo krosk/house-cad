@@ -297,9 +297,9 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   The optional **LEFT** is an independent companion: its trigger always teleports to its dedicated
   cyan floor reticle, and its other controls never invoke the active editing mode. Roles require a
   physical controller input source (`gamepad` present, `hand` absent): tracked-hand select/pinch
-  events are ignored. The sheet is offset along the left controller's outside (-X) so it does not
-  cover that controller's pointing ray or teleport reticle, then yawed 45° inward toward the
-  headset and pitched 45° upward toward the user for comfortable reading with a leftward head turn.
+  events are ignored. The sheet is **hold-to-view on LEFT grip**: hidden at rest and visible only
+  while the grip remains pressed. It sits directly above the controller in a neutral upright pose;
+  when the controller has no rotation, the sheet is a vertical plane facing back toward the user.
   Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
   markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.

@@ -3726,14 +3726,12 @@ export function setupMR(view, project, getFootprint) {
   let sheetDirty = true;
   let lastSheetRedrawAt = -Infinity;
   const SHEET_REFRESH_MS = 125; // at most 8 fps while a dim/edge is being dragged
-  // Keep the large sheet on the OUTSIDE of the left controller. In controller-local
-  // coordinates -X is left/outward, leaving a clear corridor around the -Z aim ray
-  // and its cyan floor reticle. Yaw its front normal inward (+X/+Z) so the sheet
-  // faces the headset and reads naturally with a simple look to the left; pitch
-  // it upward toward the user's head like a clipboard held below eye level.
-  const LEFT_SHEET_POS = new THREE.Vector3(-0.42, 0.22, -0.32);
-  const LEFT_SHEET_YAW = Math.PI / 4;
-  const LEFT_SHEET_PITCH = -Math.PI / 4;
+  // Neutral companion-sheet pose in target-ray/controller-local coordinates.
+  // With an unrotated controller, -Z points away from the user and the plane's +Z
+  // front faces back toward them: upright, vertical, and directly above the hand.
+  // The sheet is grip-gated, so it may occupy this readable central position without
+  // permanently obstructing the left teleport ray.
+  const LEFT_SHEET_POS = new THREE.Vector3(0, 0.46, 0);
 
   const currentSheetFloor = () => project.activeFloor;
   const redrawSheet = () => {
@@ -3747,15 +3745,15 @@ export function setupMR(view, project, getFootprint) {
   // Reparenting to the detected left controller makes the sheet follow its tracked
   // pose exactly like the controller HUD. The panel + dedicated teleport reticle are
   // both absent when LEFT is not connected.
-  function updateLeftSheet(time, leftController) {
-    if (!leftController) {
+  function updateLeftSheet(time, leftController, gripPressed) {
+    if (!leftController || !gripPressed) {
       sheetPanel.group.visible = false;
       return;
     }
     if (sheetPanel.group.parent !== leftController) {
       leftController.add(sheetPanel.group);
       sheetPanel.group.position.copy(LEFT_SHEET_POS);
-      sheetPanel.group.rotation.set(LEFT_SHEET_PITCH, LEFT_SHEET_YAW, 0);
+      sheetPanel.group.rotation.set(0, 0, 0);
     }
     if (sheetFloorId !== project.activeFloorId) sheetDirty = true;
     if (sheetDirty && time - lastSheetRedrawAt >= SHEET_REFRESH_MS) redrawSheet();
@@ -5915,7 +5913,10 @@ export function setupMR(view, project, getFootprint) {
       helps[i].sprite.visible = editor;
       debugs[i].sprite.visible = editor;
     });
-    updateLeftSheet(time, companionController);
+    // xr-standard button 1 is squeeze/grip. The sheet is a hold-to-view companion:
+    // hidden at rest, visible only for as long as the LEFT grip remains pressed.
+    const companionGripPressed = !!companionCtl?.gamepad?.buttons[1]?.pressed;
+    updateLeftSheet(time, companionController, companionGripPressed);
     const companionHit = placed && companionCtl ? rayFloorHit(companionCtl) : null;
     if (companionHit) {
       leftTeleportReticle.position.set(companionHit.x, overlayY() + 0.003, companionHit.z);
