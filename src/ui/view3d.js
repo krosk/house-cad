@@ -64,6 +64,18 @@ export class View3D {
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
+    this.floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8995a3,
+      roughness: 0.95,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    this.wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd7dee7,
+      roughness: 0.82,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
     // The house is a stack of one mesh per floor, each offset in Y by its
     // elevation. Kept in a group so multi-floor models frame/hide as a unit.
     this.house = new THREE.Group();
@@ -95,16 +107,23 @@ export class View3D {
       ? floors
       : (floors ? [{ geometry: floors, elevation: 0 }] : []);
 
-    for (const { geometry, elevation, floorId, name } of list) {
-      if (!geometry) continue;
-      const mesh = new THREE.Mesh(geometry, this.material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.position.y = elevation || 0;
-      mesh.userData.floorId = floorId || null;
-      mesh.userData.floorName = name || '';
-      mesh.visible = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
-      this.house.add(mesh);
+    for (const entry of list) {
+      const { geometry, floorGeometry, wallGeometry, elevation, floorId, name } = entry;
+      const parts = geometry
+        ? [[geometry, this.material, 'massing']]
+        : [[floorGeometry, this.floorMaterial, 'floor'], [wallGeometry, this.wallMaterial, 'walls']];
+      for (const [partGeometry, material, role] of parts) {
+        if (!partGeometry) continue;
+        const mesh = new THREE.Mesh(partGeometry, material);
+        mesh.castShadow = role !== 'floor';
+        mesh.receiveShadow = true;
+        mesh.position.y = elevation || 0;
+        mesh.userData.floorId = floorId || null;
+        mesh.userData.floorName = name || '';
+        mesh.userData.architecturalRole = role;
+        mesh.visible = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
+        this.house.add(mesh);
+      }
     }
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
   }

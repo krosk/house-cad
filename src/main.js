@@ -2,6 +2,7 @@ import './style.css';
 import { Project, Rectangle } from './core/model.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
+import { buildArchitecturalFloor } from './core/architectural3d.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { setupMR } from './ui/mr.js';
@@ -99,7 +100,7 @@ let firstBuild = true;
 let currentGeometry = null; // merged mesh of all floors, kept for export
 function rebuild() {
   const floorGeos = project.floors.map((f) => ({
-    geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
+    ...buildArchitecturalFloor(f),
     elevation: f.elevation,
     floorId: f.id,
     name: f.name,
@@ -107,8 +108,16 @@ function rebuild() {
   view.setGeometry(floorGeos);
   view.setFloorFilter(selected3DFloorId);
   render3DFloorList();
-  currentGeometry = mergeFloorGeometries(floorGeos);
-  if (firstBuild && floorGeos.some((g) => g.geometry)) {
+  // Mesh export deliberately remains on the legacy massing pipeline for now;
+  // architectural viewing is presentation-only until its interpretation has
+  // been walked and accepted.
+  const exportGeos = project.floors.map((f) => ({
+    geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
+    elevation: f.elevation,
+  }));
+  currentGeometry = mergeFloorGeometries(exportGeos);
+  exportGeos.forEach(({ geometry }) => geometry?.dispose());
+  if (firstBuild && floorGeos.some((g) => g.floorGeometry || g.wallGeometry)) {
     view.frameModel();
     firstBuild = false;
   }

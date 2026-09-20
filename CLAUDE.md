@@ -35,6 +35,14 @@ rectangles (add/subtract, ordered)
   → View3D.setGeometry()
 ```
 
+The desktop **View 3D** presentation no longer uses that legacy massing mesh directly. Its shared
+`src/core/architectural3d.js` interpretation treats ROOM unions as thin floor slabs, derives an
+exterior wall shell from exposed room boundaries, renders explicit WALL zones as interior solids,
+and cuts DOOR/WINDOW/SLIDING/HALFWALL vertical bands into overlapping wall segments. This module is
+deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains on the legacy
+`computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
+accepted; do not silently change exports when editing the viewer.
+
 ### The constraint solver (`src/core/constraints.js`) — the heart of the app
 
 The key insight: because every rectangle edge is axis-aligned, each edge is a single scalar (a left/right edge is an X-coord, a bottom/top edge is a Y-coord), so **the constraint problem decouples into two independent 1-D systems** (all x's, all y's). Each axis is solved as a small **weighted least-squares** problem via normal equations + Gaussian elimination — no general geometric/iterative solver.
