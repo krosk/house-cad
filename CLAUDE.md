@@ -53,8 +53,9 @@ white procedural plaster. These CanvasTextures are generated locally (no network
 UV space, and use restrained bump/roughness so they remain mobile-friendly.
 Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
 puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
-authority; the fixture/light are presentation-only. At most two lights per floor cast low-resolution
-shadows to contain mobile rendering cost.
+authority; the fixture/light are presentation-only. At most two visible lights cast low-resolution
+shadows to contain mobile rendering cost. Shadow allocation is contextual: overhead uses none, and
+POV assigns shadows to the two light sources nearest the camera.
 
 Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
 They refresh only Sketch2D and the dimension panel: never feed them to `solve()`, rebuild 3D/export

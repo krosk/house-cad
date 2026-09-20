@@ -255,7 +255,6 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
-      let shadowCount = 0;
       for (const marker of entry.markers || []) {
         if (marker.type !== 'light') continue;
         const fixture = new THREE.Group();
@@ -276,14 +275,11 @@ export class View3D {
 
         const source = new THREE.PointLight(0xffc58f, 70, 8, 2);
         source.position.y = -0.08;
-        if (shadowCount < 2) {
-          source.castShadow = true;
-          source.shadow.mapSize.set(256, 256);
-          source.shadow.camera.near = 0.08;
-          source.shadow.camera.far = 8;
-          source.shadow.bias = -0.001;
-          shadowCount++;
-        }
+        source.castShadow = false;
+        source.shadow.mapSize.set(256, 256);
+        source.shadow.camera.near = 0.08;
+        source.shadow.camera.far = 8;
+        source.shadow.bias = -0.001;
         fixture.add(source);
         fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
         this.markerLights.add(fixture);
@@ -291,6 +287,7 @@ export class View3D {
     }
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
     this.markerLights.visible = !this.hideMesh;
+    this._updateLightShadows();
   }
 
   setFloorFilter(floorId = null) {
@@ -301,6 +298,7 @@ export class View3D {
     for (const fixture of this.markerLights.children) {
       fixture.visible = floorId == null || fixture.userData.floorId === floorId;
     }
+    this._updateLightShadows();
     this.frameModel();
   }
 
@@ -392,6 +390,22 @@ export class View3D {
       this.viewPitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
     }
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+    this._updateLightShadows();
+  }
+
+  _updateLightShadows() {
+    const candidates = [];
+    for (const fixture of this.markerLights.children) {
+      const source = fixture.children.find((child) => child.isPointLight);
+      if (!source) continue;
+      source.castShadow = false;
+      if (this.navigationMode === 'pov' && fixture.visible && this.markerLights.visible) {
+        const position = source.getWorldPosition(new THREE.Vector3());
+        candidates.push({ source, distance: position.distanceToSquared(this.camera.position) });
+      }
+    }
+    candidates.sort((a, b) => a.distance - b.distance);
+    for (const { source } of candidates.slice(0, 2)) source.castShadow = true;
   }
 
   _applyPovLook() {
@@ -430,6 +444,7 @@ export class View3D {
     this.camera.lookAt(center.x, center.y, center.z);
     this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+    this._updateLightShadows();
   }
 
   _resize() {
