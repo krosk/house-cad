@@ -5825,8 +5825,11 @@ export function setupMR(view, project, getFootprint) {
     // 20° steps (one per flick), so the point under you stays put and the room swings
     // around you — you can align the virtual plan to the room without re-registering.
     // planYaw is session anchoring (not model geometry), so this stays a view/companion
-    // action, never an editor edit. Pivoting off-origin also translates planPos so the
-    // headset's world XZ is invariant: newPos = P + R_y(d)·(oldPos − P).
+    // action, never an editor edit. Pivoting off-origin translates navOffset so the
+    // headset's world XZ is invariant: newPos = P + R_y(d)·(oldPos − P). Do NOT
+    // put this translation in planPos: the spatial-anchor pass restores planPos to
+    // the registered origin later in every frame and would discard it, leaving only
+    // the yaw and making the plan visibly rotate about that origin.
     const lgp = leftSource(frame)?.gamepad;
     const lx = lgp?.axes[2] ?? 0;
     if (placed && !btn.leftStick && Math.abs(lx) > 0.7) {
@@ -5839,17 +5842,21 @@ export function setupMR(view, project, getFootprint) {
       const px = viewer?.transform.position.x ?? fallback[12];
       const pz = viewer?.transform.position.z ?? fallback[14];
       // Rotate the plan group's current world XZ about the headset pivot by d
-      // (R_y: x' = x·cos + z·sin, z' = −x·sin + z·cos), then back out planPos
-      // (planGroup.position = planPos + navOffset in XZ; navOffset stays fixed).
-      const vx = (planPos.x + navOffset.x) - px, vz = (planPos.z + navOffset.z) - pz;
+      // (R_y: x' = x·cos + z·sin, z' = −x·sin + z·cos), then store the resulting
+      // group translation in navOffset (planGroup.position = planPos + navOffset).
+      const gx = planPos.x + navOffset.x, gz = planPos.z + navOffset.z;
+      const vx = gx - px, vz = gz - pz;
       const c = Math.cos(d), s = Math.sin(d);
-      planPos.x = px + (vx * c + vz * s) - navOffset.x;
-      planPos.z = pz + (-vx * s + vz * c) - navOffset.z;
+      const nextX = px + (vx * c + vz * s);
+      const nextZ = pz + (-vx * s + vz * c);
+      navOffset.x = nextX - planPos.x;
+      navOffset.z = nextZ - planPos.z;
       planYaw += d;
       applyPlanMatrix();
       rlog('plan yaw about viewer', {
         deg: +THREE.MathUtils.radToDeg(planYaw).toFixed(0),
         px: +px.toFixed(3), pz: +pz.toFixed(3),
+        navX: +navOffset.x.toFixed(3), navZ: +navOffset.z.toFixed(3),
       });
       btn.leftStick = true;
     } else if (Math.abs(lx) < 0.3) {

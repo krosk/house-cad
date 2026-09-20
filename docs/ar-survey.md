@@ -304,10 +304,12 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
   **LEFT thumbstick-x** rotates the placed plan **about the headset position** in **±20° steps**
-  (`PLAN_YAW_STEP`, one per flick) so the point under you stays put and the room swings around you —
+  by updating `planYaw` plus `navOffset` (never `planPos`, which the spatial anchor restores each frame),
+  one per flick (`PLAN_YAW_STEP`), so the point under you stays put and the room swings around you —
   aligning the virtual plan to the real room without re-registering. Pivoting off-origin also
-  translates `planPos` so the headset's world XZ is invariant (`newPos = P + R_y(d)·(oldPos − P)`,
-  `navOffset` held fixed). `planYaw`/`planPos` here are session anchoring (a view/companion transform,
+  translates `navOffset` so the headset's world XZ is invariant
+  (`newPos = P + R_y(d)·(oldPos − P)`). `planYaw`/`navOffset` here are session navigation
+  (a view/companion transform,
   applied via `applyPlanMatrix`), **not** model geometry — never an editor edit. LEFT grip/other
   controls never invoke editor actions.
 - **No physical controller in the editor (RIGHT) role** → the headset is in hand tracking (controllers
