@@ -23,17 +23,19 @@
   sill/head editor; `vertical-datum` — floor/ceiling-relative heights + the grab-lock rule.
   Don't duplicate them here.
 
-**Date:** 2026-09-19 (session 26)
-**Status:** Quest APK path WORKING. Session 26 shipped **4 commits, all pushed** (HEAD `e1a5548` =
-`origin/main`, clean tree except pre-existing/untracked noise — see Commits). It was an **AR
-vertical-authoring** session, all on `src/ui/mr.js` + core/io: an **AR aperture sill/head editor**,
-**furniture vertical extent** (GLB foot elevation + placeholder `[foot,top]` band), **datum-relative
-heights** (floor/ceiling, tracked one-way), the **3D grab now holds every defined-dim axis incl. Z**,
-and **DEL frees Z** in the height pads. Also a model fix: **heater is now a bounded `[sill,head]`
-band**, not a ceiling-open half-wall clone. All **build- + headless-verified** (round-trips, resolve);
-every one of these is **AR-UNWALKED**. The prior unwalked lanes still await a Quest too: **(1)** the
-s24 aperture AR interactions + s25 export/heater bits, **(2)** the whole conduit lane + s23 input
-rework — now **(3)** all of s26's vertical-authoring AR surface. No AR walking happened this session.
+**Date:** 2026-09-20 (session 27)
+**Status:** Quest APK path WORKING. Session 27 shipped **2 commits, all pushed** (HEAD `273e5fc` =
+`origin/main`, clean tree except pre-existing/untracked noise — see Commits). Two independent bits,
+both **desktop-side, build-verified, AR-UNWALKED**: (1) **LEFT-stick plan rotate now pivots about the
+headset** (not the origin corner) so the room swings around the user; (2) a first cut of **derived
+electrical circuits** — a new `breaker` marker type as each circuit's terminal + `src/core/circuits.js`
+(`deriveCircuits`, connected-component derivation over the device↔wire graph). **Circuits are derived,
+never stored, and NOT wired into any output yet** (print sheet unchanged) — this increment was for the
+owner's understanding + future output work. Also this session (no code): **`docs/ar-survey.md` was
+brought current for s24–s26** (it had been stale) and **`docs/electrical-workflow.md` was added**.
+The still-unwalked AR lanes are unchanged: **(1)** s24 aperture interactions + s25 export/heater bits,
+**(2)** the whole conduit/wire lane + s23 input rework, **(3)** all of s26's vertical-authoring surface,
+now **(4)** the s27 headset-pivot rotate. No AR walking happened this session.
 
 ## Where things stand in one paragraph
 
@@ -45,6 +47,10 @@ in AR. Electrical is a **whole-house two-layer model** (`src/core/conduit.js`): 
 (nodes + segments, surface inferred per segment; a node's z is floor-relative so a cross-storey
 segment is a **riser**) with **wires routed over it** (path derived by shortest route, never stored).
 A bare junction can be **dimensioned to a wall** (a `{node}` constraint, one-way in `solveConduitNodes`).
+**Circuits** (s27) are a **derived projection of the wire lane** (`src/core/circuits.js`): a `breaker`
+marker is each circuit's terminal, and a circuit is the connected component of the device↔wire graph
+containing it — derived, never stored; NOT yet in any output. The three electrical lanes (conduit /
+wire+circuit / control-link) + the intended authoring order are in `docs/electrical-workflow.md`.
 Markers are a **parallel annotation lane** (never touch the footprint/boolean/extrude pipeline).
 **Apertures** (door/window/half-wall/**heater**/sliding) are subtract zone kinds sharing one model
 (`[sill,head]` band + `hinge`/`swing`) and one glyph module (`src/core/apertureGlyph.js`) feeding
@@ -60,32 +66,30 @@ cross-floor conduit/risers, furniture M3, and all of s23's conduit polish + inpu
 of the MARKER lane, LEVEL, deeper change-map. Before planning marker/dimension/electrical/input work,
 read `docs/ar-survey.md`.
 
-## What changed in session 26 (4 commits, all pushed)
+## What changed in session 27 (2 commits, all pushed)
 > Next agent: as you add your own section, fold live constraints into "Standing decisions" /
 > "Findings" and delete this narrative.
 
-**AR vertical-authoring** session. Touched `src/core/{zoneColors,model,constraints,i18n}.js`,
-`src/io/serialize.js`, `src/ui/mr.js`. All **build- + headless-verified** (round-trips + resolve);
-every AR-facing bit is **AR-unwalked**. All design is in memories `aperture-zones` + `vertical-datum`
-+ `ikea-3d-model-pipeline` — read those before touching this; below is just the map:
+Two independent, desktop-side, **build-verified, AR-unwalked** bits, plus doc work:
 
-1. **AR aperture sill/head editor** (`356366a`). Selecting an aperture in PLAN EDIT opens the reused
-   DIMS numpad as a band editor; the (previously inert) **SWAP cell** became a field cycler. Editable
-   bounds are per-kind (`apertureBounds` in zoneColors): window/heater = SILL+HEAD, door/sliding =
-   HEAD only, half-wall = SILL only. **Heater fixed** to a bounded `[sill,head]` band (default
-   `0`/`0.6`), not a `head:null` half-wall clone.
-2. **Furniture vertical extent** (`f943e45`). GLB item gained a `z` **foot elevation** (FURNISH: a new
-   single-value foot pad; `buildFurniture` places at `(x,z,-y)`); the placeholder **furniture ZONE**
-   gained a solid `[foot,top]` band, edited through the same PLAN EDIT pad — so that pad was
-   **generalized aperture→band** (`bandFields`/`verticalBandFields`, `band*` fns).
-3. **Datum-relative heights + grab-lock** (`bc7ec14`). Marker z / bare-node z / GLB foot can be FLOOR
-   (absolute) or CEILING (below-ceiling, resolved one-way in `solveVerticalDatums` so it tracks height
-   edits). Setting a height stamps a `zDatum` — that **defines a vertical dim**. The **3D grip-drag now
-   holds every axis with a defined dim, Z included** (`nz = obj.zDatum ? obj.z : tipZ`), matching the
-   existing X/Y `_locked` behaviour. SWAP toggles FLOOR/CEILING in the single-value pads.
-4. **DEL frees Z** (`e1a5548`). In the marker/node height pads DEL now **clears the Z dim** (frees Z
-   for the grab) instead of deleting the object — object-delete stays on B/Y. Pad datum is tri-state
-   `⊘ free → ↑ floor → ↓ ceiling`; numpad `draw` gained a `delLabel` override.
+1. **LEFT-stick plan rotate pivots about the headset** (`f4362c5`, `src/ui/mr.js`). Was: yaw about the
+   plan origin corner. Now: each ±20° flick keeps the world point under the headset fixed and swings
+   the room around the user (`newPos = P + R_y(d)·(oldPos − P)`, P = headset world XZ from
+   `renderer.xr.getCamera().matrixWorld`, `navOffset` held; then back out `planPos`). Still pure
+   session anchoring (`planYaw`/`planPos`), not model geometry.
+2. **Derived electrical circuits + `breaker` marker** (`273e5fc`). New `src/core/circuits.js`
+   `deriveCircuits(project)`: union-find over the device↔wire graph → each connected component
+   containing exactly one breaker is a **circuit**, ≥2 breakers a **conflict** (illegal cross-tie), 0 a
+   **unassigned** group. Returns circuits + conflicts + unassigned + `deviceCircuit`/`wireCircuit`/
+   `circuitColor` maps. **Pure, derived, never stored; NOT wired into `_emit` or any output.** Added
+   `breaker` to `MARKER_TYPES` (renders via the default marker glyph for now), `marker.breaker` i18n,
+   and breaker `number`/`rating`/`poles` persistence in `serialize.js` (additive; save/load + floor
+   copy/paste). Verified by a scratchpad node script exercising all four outcomes incl. cross-floor.
+3. **Docs (no code):** `docs/ar-survey.md` brought current for s24–s26 (mode-hierarchy diagram fixed to
+   real `MODE_ORDER`/`MODE_GROUP`; new "Apertures & vertical bands" + "Vertical authoring" sections;
+   FURNISH mode; datum pads; 7-toggle EXPORT + LANGUAGE row; new traps). Added
+   `docs/electrical-workflow.md` (three lanes + conduit→wire→circuit workflow), cross-linked from the
+   handoff doc list and the ar-survey `MARKER · CONDUIT` entry.
 
 ## Standing decisions (live constraints; stable architecture is in the docs above)
 
@@ -183,6 +187,16 @@ every AR-facing bit is **AR-unwalked**. All design is in memories `aperture-zone
   boolean — keep it 3-way. Every constraint consumer (2D editor, panel, serialize, sheet/DXF) must
   skip `{node}` (no `.rect`, no `.marker`); node dims never reach sheet/DXF output. Marker-bound nodes
   are never pinned. Design: memory `cross-floor-conduit`.
+- **Circuits are DERIVED from the wire lane, never stored (s27).** A `breaker` marker is each circuit's
+  terminal; a circuit is the connected component of the {device markers, `project.wires` edges} graph
+  containing it (`src/core/circuits.js` `deriveCircuits`, union-find). Identity/metadata
+  (`number`/`rating`/`poles`) live ON the breaker marker (persisted, additive); membership is derived.
+  Because grouping is on the wire layer, wires from different circuits SHARE conduit with no ambiguity —
+  never put a circuit id on conduit. **Control links are NOT circuit edges** (they're the control lane).
+  It is a pure model helper: NOT called in `_emit`, NOT in output. Rationale + workflow:
+  `docs/electrical-workflow.md`. The three electrical lanes are conduit / wire (+circuit) / control-link.
+- **LEFT-stick plan rotate pivots about the HEADSET, not the origin (s27).** Keeps the world point under
+  the user fixed. `planYaw`/`planPos` are session anchoring (view/companion), never model geometry.
 - **Continuous AR drags must NOT run the full `_emit` cascade per frame.** `project.touch()`→`_emit`
   solves all floors AND notifies every desktop listener (3D re-extrude, 2D redraw, DOM panels) —
   frame-rate-killing. Patterns: marker drag `moveMarker(...,{emit:false})`; edge drag
@@ -240,14 +254,14 @@ every AR-facing bit is **AR-unwalked**. All design is in memories `aperture-zone
 
 ## Commits (substantive only; doc-only omitted — `git log` has all)
 
-All pushed to `origin/main`; every push auto-deploys to Pages. **s26 (`356366a..e1a5548`):**
+All pushed to `origin/main`; every push auto-deploys to Pages. **s27 (`eed09c4..273e5fc`):**
 
-- `e1a5548` Clear a defined height via DEL (free Z); tri-state datum in height pads.
-- `bc7ec14` Add datum-relative heights; grab holds defined-dim axes (incl. Z).
-- `f943e45` Add furniture vertical extent: GLB foot elevation + placeholder `[foot,top]` band.
-- `356366a` Add AR sill/head aperture editor; fix heater to a bounded band.
+- `273e5fc` Add derived electrical circuits + breaker marker; document the workflow.
+- `f4362c5` Pivot LEFT-stick plan rotate about the headset; document AR s24–s26.
 
-**Earlier (shipped; behaviors are in `CLAUDE.md`/`docs`/memories):** s25 `eed2423..411249d` (desktop
+**Earlier (shipped; behaviors are in `CLAUDE.md`/`docs`/memories):** s26 `356366a..e1a5548` (AR
+vertical-authoring: aperture sill/head band editor, furniture foot/z + `[foot,top]` band,
+datum-relative heights + Z grab-lock, DEL frees Z, heater bounded band) · s25 `eed2423..411249d` (desktop
 output: furniture-dims filter, heater zone, per-export sheet language, saved-revision counter, +
 furniture-footprint & origin-dim fixes) · s24 `b5a7b6b..c620880` (aperture lane unified model + shared
 glyph, 4-way rotate, LEFT-stick plan rotate, pick-up-controllers prompt) · s23 `f0d89e1..04a5ab3`
@@ -285,22 +299,27 @@ Browser** for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), asset
 | `src/core/model.js` | `Floor`+`Project`; `_emit` solves + notifies; `setVertical`/`setMarkerVertical`/`setFurnitureVertical`/`setConduitNodeVertical`; conduit + furniture ops |
 | `src/core/constraints.js` | 2× 1-D X/Y solver; `solveMarkers`/`solveConduitNodes` (one-way pins); **`solveVerticalDatums`** (ceiling-pin resolve) |
 | `src/core/conduit.js` | Conduit graph + Dijkstra route; `conduitNetworkSegments`/`segmentSurface`; wires route over conduits |
-| `src/core/i18n.js` | EN/FR/ZH strings; `t(key,lang?)`; `aperture.*`/`furniture.*`/`z.*` (datum) keys |
+| `src/core/circuits.js` | **s27 (derived, not wired to output):** `deriveCircuits` — connected components of the device↔wire graph per breaker; conflict/unassigned classification + maps |
+| `src/core/i18n.js` | EN/FR/ZH strings; `t(key,lang?)`; `aperture.*`/`furniture.*`/`z.*` (datum) + `marker.breaker` keys |
 | `src/core/apertureGlyph.js` | **Sole** source of door/window/half-wall/**heater**/sliding plan glyphs + `resolveApertureOrient`; consumed by planSheet, dxf, mr |
 | `src/core/zoneColors.js` | `ZONE_KINDS`, colors, `APERTURE_DEFAULTS`, `FURNITURE_BAND`, `isAperture`, `apertureBounds`, `verticalBandFields` |
 | `src/core/geometry2d.js` | `computeFootprint` (skips furniture), room components/area |
-| `src/io/serialize.js` | v3 JSON; rect `sill/head/hinge/swing/foot/top`; marker/node/furniture `z`+`zDatum`/`zOff` (additive) |
+| `src/io/serialize.js` | v3 JSON; rect `sill/head/hinge/swing/foot/top`; marker/node/furniture `z`+`zDatum`/`zOff`; breaker `number`/`rating`/`poles` (all additive) |
 | `src/io/outputOptions.js` | 7 output-layer toggles (incl. `furnitureDims`) + format; persisted in `localStorage` |
 | `src/io/planSheet.js` / `src/io/dxf.js` | Print sheet / DXF; `drawZoneGlyph`/`writeZoneSymbol` call the aperture module; sheet strip stamps `Rev N`; `structuralDimLine` handles the origin datum |
 | `docs/ar-survey.md` | Kept-current AR structural reference (modes/inputs/dimensioning/traps) — **updated through s26 (session 27)** |
+| `docs/electrical-workflow.md` | **s27:** the three electrical lanes + conduit→wire→circuit authoring order + derivation rationale |
 | `docs/ar-qa-checklist.md` | On-device QA record (walked vs not) |
 
 ## Next step
 
-- **A — s26 VERTICAL-AUTHORING + s24/s25 AR BITS: WALK ON DEVICE + DOC IT (newest, all
-  build+headless-verified, NONE walked).** Do NOT rebuild — this is AR walking. **`docs/ar-survey.md`
-  is now updated through s26 (session 27)**, so the remaining task here is the on-device walk only.
-  Design: memories `aperture-zones` + `vertical-datum` + `ikea-3d-model-pipeline`. Walk, per feature:
+- **A — s24–s27 AR BITS: WALK ON DEVICE (newest, all build+headless-verified, NONE walked).** Do NOT
+  rebuild — this is AR walking only; **`docs/ar-survey.md` is current through s26** (s27's headset-pivot
+  is below). Design: memories `aperture-zones` + `vertical-datum` + `ikea-3d-model-pipeline`. Walk, per
+  feature:
+  - **(s27 headset-pivot rotate)** LEFT-stick ±20° should now swing the room **around where you're
+    standing** (the point under the headset stays fixed), not around the origin corner. Confirm it
+    feels right off-center; flag if 20°/flick is too coarse/fine.
   - **(s26 band pad)** PLAN EDIT → select an aperture → the numpad opens as a band editor; SWAP
     cycles SILL/HEAD (door/sliding = HEAD only, half-wall = SILL only, window/heater = both); ENTER
     writes; confirm a **heater** shows both SILL+HEAD (it's a bounded band now). NOTE band edits are
@@ -311,8 +330,7 @@ Browser** for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), asset
     a **ceiling-pinned** marker must follow a LEVEL height change; a **free** (never-height-set)
     marker grabs in full 3D. GLB **foot elevation** lifts the model; furniture grab stays floor-planar.
   - **(s24)** door A/X → 4 swing states (window 3-way, sliding 4-way); glyphs draw + match sheet;
-    **pick-up-controllers** prompt; **LEFT-stick ±20° plan rotate**; A/X-rotate-in-EDIT vs A/X-flip
-    (DIMS/TRANSLATE) don't collide.
+    **pick-up-controllers** prompt; A/X-rotate-in-EDIT vs A/X-flip (DIMS/TRANSLATE) don't collide.
   - **(s25)** heater radiator-fin glyph matches sheet; EXPORT **LANGUAGE** row cycles sheet language
     (preview+download); taller EXPORT panel (7 toggles + COMPARE + LANGUAGE + button) no clipping;
     `furnitureDims` toggle; furniture zone doesn't notch the room outline.
@@ -322,6 +340,16 @@ Browser** for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), asset
   needs a different affordance (a datum chip on the numpad display line, hit-tested in `keyAt`).
   (2) lights still default to absolute z=height, not auto ceiling-pinned — candidate default change.
   (3) no output surfaces sill/head/foot/top yet (glyph annotation would make the editors observable).
+- **C — CIRCUITS: SURFACE + AUTHOR (s27 groundwork landed; owner said "for documentation" for now, so
+  only on request).** `src/core/circuits.js` derives circuits but nothing uses it yet. To make it real:
+  (1) a proper **breaker glyph** (AR `markerFace`, `planSheet` `drawMarkerGlyph`, `dxf` `writeMarker` —
+  today it falls back to the outlet glyph); (2) **surface circuits in output** — per-circuit NUMBER
+  labels + a circuit schedule on the sheet (sheets are MONOCHROME by design — use numbers, not hue),
+  per-circuit color in AR/DXF layers, conflict/unassigned warnings — all behind the opt-in `wiring`
+  filter; (3) **AR breaker editing** of `number`/`rating`/`poles` (a small pad or desktop field —
+  currently a placed breaker gets fallback number = stable index, `rating` null). Deferred by choice:
+  tying a breaker to a `panel` enclosure via `panelId` (needs cross-marker remap on copy/paste).
+  Full design + rationale: `docs/electrical-workflow.md`.
 - **B — CONDUIT LANE + INPUT REWORK: FINISH ON-DEVICE QA.** Newest first, all unwalked:
   **(s23 input rework)** confirm the new muscle memory across every mode — **B/Y deletes** (PLAN EDIT
   zone, MARKER, FURNISH, CONDUIT EDIT segment vs node, WIRE, and a DIMS constraint), **A/X flips** in
@@ -350,12 +378,17 @@ Browser** for `rlog`, not the TWA). Quest APK project (`~/house-cad-apk`), asset
 
 ## Known open questions
 
-- **Every AR-side change from s22–s26 is AR-unwalked.** From s26: the band pad, the tri-state datum
-  toggle (SWAP) + free-Z (DEL) in the height pads, the Z grab-lock, and the GLB foot lift are all
-  build+headless only — feel/legibility/layout unverified in headset. From s25: EXPORT panel 7th
-  toggle + LANGUAGE row (canvas 836→896→948) fit/readability; heater glyph screen-only. From s24: A/X
-  rotates a selected aperture in PLAN EDIT (an `else if` after the DIMS/TRANSLATE flip, gated on
-  `edit` mode) — confirm no collision. From s23: delete moved off grip onto B/Y.
+- **Every AR-side change from s22–s27 is AR-unwalked.** From s27: LEFT-stick rotate now pivots about
+  the headset (feel off-center + 20°/flick granularity unverified). From s26: the band pad, the
+  tri-state datum toggle (SWAP) + free-Z (DEL) in the height pads, the Z grab-lock, and the GLB foot
+  lift are all build+headless only — feel/legibility/layout unverified in headset. From s25: EXPORT
+  panel 7th toggle + LANGUAGE row (canvas 836→896→948) fit/readability; heater glyph screen-only. From
+  s24: A/X rotates a selected aperture in PLAN EDIT (an `else if` after the DIMS/TRANSLATE flip, gated
+  on `edit` mode) — confirm no collision. From s23: delete moved off grip onto B/Y.
+- **Circuits (s27) are model-only and unexercised in the app.** `deriveCircuits` is verified by a
+  scratchpad script but is not called anywhere in the app — no UI, no output, not in `_emit`. `breaker`
+  markers render via the default (outlet) glyph. `deviceCount`/conflict/numbering semantics are design
+  guesses until surfaced (Next step C).
 - **Heater defaults are a guess (s25/s26):** amber; now a bounded band `sill:0, head:0.6`. Owner may
   want different. `heaterFinSegments` fin count/proportions screen-verified only.
 - **s26 defaults/feel are guesses:** furniture zone band `foot:0, top:0.9`; the `⊘`/`↑`/`↓` datum
