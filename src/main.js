@@ -36,6 +36,40 @@ const view = new View3D(document.getElementById('view3d'));
 const app = document.getElementById('app');
 const view3dHolder = document.getElementById('view3d-holder');
 const view3dToggle = document.getElementById('view3d-toggle');
+const view3dFloorList = document.getElementById('view3d-floor-list');
+let selected3DFloorId = null;
+
+function render3DFloorList() {
+  if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
+    selected3DFloorId = null;
+  }
+  view3dFloorList.replaceChildren();
+  const addButton = (label, floorId, elevation = null) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.toggle('active', selected3DFloorId === floorId);
+    const name = document.createElement('span');
+    name.textContent = label;
+    button.appendChild(name);
+    if (elevation != null) {
+      const elev = document.createElement('span');
+      elev.className = 'view3d-floor-elev';
+      elev.textContent = `${elevation >= 0 ? '+' : ''}${fmt(elevation)} ${unitLabel()}`;
+      button.appendChild(elev);
+    }
+    button.addEventListener('click', () => {
+      selected3DFloorId = floorId;
+      view.setFloorFilter(floorId);
+      render3DFloorList();
+    });
+    view3dFloorList.appendChild(button);
+  };
+  addButton('All floors', null);
+  for (const floor of [...project.floors].reverse()) {
+    addButton(localizedFloorName(floor.name), floor.id, floor.elevation);
+  }
+}
+
 function setDesktop3D(visible) {
   app.classList.toggle('show-3d', visible);
   view3dHolder.setAttribute('aria-hidden', String(!visible));
@@ -45,7 +79,11 @@ function setDesktop3D(visible) {
   if (visible) {
     // Wait for the formerly parked holder to receive its on-screen dimensions;
     // ResizeObserver updates the renderer and frameModel recenters the orbit.
-    requestAnimationFrame(() => view.frameModel());
+    render3DFloorList();
+    requestAnimationFrame(() => {
+      view.setFloorFilter(selected3DFloorId);
+      view.frameModel();
+    });
   }
 }
 view3dToggle.addEventListener('click', () => setDesktop3D(!app.classList.contains('show-3d')));
@@ -63,8 +101,12 @@ function rebuild() {
   const floorGeos = project.floors.map((f) => ({
     geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
     elevation: f.elevation,
+    floorId: f.id,
+    name: f.name,
   }));
   view.setGeometry(floorGeos);
+  view.setFloorFilter(selected3DFloorId);
+  render3DFloorList();
   currentGeometry = mergeFloorGeometries(floorGeos);
   if (firstBuild && floorGeos.some((g) => g.geometry)) {
     view.frameModel();
@@ -421,6 +463,7 @@ const syncUnitUI = () => {
   setHeightInput();
   updateProps();
   renderConstraints();
+  render3DFloorList();
   sketch.render();
 };
 onUnitChange(syncUnitUI);

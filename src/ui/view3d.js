@@ -72,6 +72,7 @@ export class View3D {
     // shown instead). setGeometry rebuilds on every model change, so it honors
     // this flag rather than a one-time visibility toggle.
     this.hideMesh = false;
+    this.floorFilter = null; // null = all floors; otherwise a floor id
 
     this._onResize = this._resize.bind(this);
     window.addEventListener('resize', this._onResize);
@@ -94,20 +95,34 @@ export class View3D {
       ? floors
       : (floors ? [{ geometry: floors, elevation: 0 }] : []);
 
-    for (const { geometry, elevation } of list) {
+    for (const { geometry, elevation, floorId, name } of list) {
       if (!geometry) continue;
       const mesh = new THREE.Mesh(geometry, this.material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.position.y = elevation || 0;
+      mesh.userData.floorId = floorId || null;
+      mesh.userData.floorName = name || '';
+      mesh.visible = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
       this.house.add(mesh);
     }
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
   }
 
+  setFloorFilter(floorId = null) {
+    this.floorFilter = floorId;
+    for (const mesh of this.house.children) {
+      mesh.visible = floorId == null || mesh.userData.floorId === floorId;
+    }
+    this.frameModel();
+  }
+
   frameModel() {
     if (!this.house.children.length) return;
-    const box = new THREE.Box3().setFromObject(this.house);
+    const box = new THREE.Box3();
+    for (const mesh of this.house.children) {
+      if (mesh.visible) box.expandByObject(mesh);
+    }
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
     this.controls.target.copy(center);

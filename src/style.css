@@ -169,6 +169,55 @@ body {
   font-weight: 600;
 }
 
+#view3d-floor-ctl {
+  position: absolute;
+  top: 34px;
+  left: 10px;
+  z-index: 5;
+  width: 176px;
+  padding: 4px;
+  color: var(--text);
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+.view3d-floor-title {
+  padding: 5px 7px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#view3d-floor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#view3d-floor-list button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#view3d-floor-list button:hover { background: #2c313b; }
+#view3d-floor-list button.active {
+  color: #0b1220;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.view3d-floor-elev { color: var(--muted); font-variant-numeric: tabular-nums; }
+#view3d-floor-list button.active .view3d-floor-elev { color: #0b1220; }
+
 #sketch {
   display: block;
   width: 100%;
