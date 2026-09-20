@@ -301,7 +301,9 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   while the grip remains pressed. It sits directly above the controller in a neutral upright pose;
   when the controller has no rotation, the sheet is a vertical plane facing back toward the user.
   Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
-  markers, dimension labels, and edit panels, but before the right-controller HUD at order 100.
+  markers, dimension labels, and edit panels, but before the right-controller HUD at order 100 and
+  the shared panel ray-pointer at order 110. The pointer itself is explicitly transparent-pass;
+  making it opaque would force it before the canvas panels regardless of `renderOrder`.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
   **LEFT thumbstick-x** rotates the placed plan **about the headset position** in **±20° steps**
   by updating `planYaw` plus `navOffset` (never `planPos`, which the spatial anchor restores each frame),

@@ -925,11 +925,14 @@ export function setupMR(view, project, getFootprint) {
   scene.add(numpad.group);
   const numpadCursor = new THREE.Mesh(
     new THREE.SphereGeometry(0.006, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0x60a5fa, depthTest: false, depthWrite: false }),
+    // Canvas panels and HUD sprites are transparent-pass objects. Keep the pointer
+    // in that same pass: an opaque pointer is rendered before every transparent
+    // panel regardless of renderOrder, so the panel can paint over its own cursor.
+    new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 1, depthTest: false, depthWrite: false }),
   );
-  // Above every ray-aimed panel (EXPORT is 80) while remaining below the sheet
-  // preview (90) and controller HUD (100).
-  numpadCursor.renderOrder = 85;
+  // The ray-hit pointer is the final overlay: above menus (80), companion sheet
+  // (90), and controller HUD (100), so every interactive panel shows its aim point.
+  numpadCursor.renderOrder = 110;
   numpadCursor.visible = false;
   scene.add(numpadCursor);
 
