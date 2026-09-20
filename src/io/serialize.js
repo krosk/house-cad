@@ -19,6 +19,7 @@ import {
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
 export const FILE_VERSION = 3;
+export const AUTOSAVE_KEY = 'house-cad:autosave:v1';
 export const FLOOR_CLIPBOARD_KEY = 'house-cad:floor-clipboard:v1';
 export const FLOOR_CLIPBOARD_VERSION = 1;
 

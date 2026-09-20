@@ -23,7 +23,7 @@ import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLa
 import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
 import { getVersionStatus } from '../core/versionCheck.js';
 import {
-  FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
+  AUTOSAVE_KEY, FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
@@ -4182,7 +4182,12 @@ export function setupMR(view, project, getFootprint) {
       }
       try {
         project.bumpRevision(); // deliberate save → advance the revision
-        localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data: serializeProject(project) }));
+        const data = serializeProject(project);
+        localStorage.setItem(slotKey(i), JSON.stringify({ savedAt: Date.now(), data }));
+        // bumpRevision intentionally does not emit a model change, so the debounced
+        // autosave listener will not run. Mirror this exact saved snapshot explicitly;
+        // otherwise startup restores the prior revision even though the slot is newer.
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
         overwriteSlot = null;
         hoverSlotAction = prevHoverSlotAction = null;
         slotFlash = `${t('slot.saved')} ${i + 1}`;

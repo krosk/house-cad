@@ -10,7 +10,7 @@ import { installRemoteLog } from './ui/remoteLog.js';
 
 installRemoteLog(); // dev-only: mirror console/errors to the dev server for headset debugging
 import {
-  FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
+  AUTOSAVE_KEY, FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from './io/serialize.js';
 import { buildShareUrl, decodeViewFromHash, loadView } from './io/shareView.js';
@@ -577,7 +577,7 @@ document.getElementById('save').addEventListener('click', () => {
   const data = JSON.stringify(serializeProject(project), null, 2);
   // Mirror to autosave right away so the new revision survives a reload without an
   // intervening edit (autosave only re-runs on project changes, which a save is not).
-  try { localStorage.setItem(LS_KEY, data); } catch { /* storage unavailable — ignore */ }
+  try { localStorage.setItem(AUTOSAVE_KEY, data); } catch { /* storage unavailable — ignore */ }
   download('house.json', data);
   sketch.onStatus?.(`Saved house.json (rev ${rev})`);
 });
@@ -833,10 +833,9 @@ function printSheets(svgs) {
 })();
 
 // ---- autosave to localStorage (survives page reload) ----
-const LS_KEY = 'house-cad:autosave:v1';
 // When the session was opened from a shared VIEW link, autosave is suppressed so the
 // viewer's own saved project is never silently clobbered by someone else's link. An
-// explicit Save (which writes LS_KEY directly) adopts it as their own.
+// explicit Save (which writes AUTOSAVE_KEY directly) adopts it as their own.
 // (`viewMode` itself is declared near the top — it's read during init.)
 let saveTimer = null;
 project.onChange(() => {
@@ -844,7 +843,7 @@ project.onChange(() => {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(serializeProject(project)));
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serializeProject(project)));
     } catch { /* storage unavailable / full — ignore */ }
   }, 400);
 });
@@ -877,7 +876,7 @@ function seedDemo() {
   }
   let restored = false;
   try {
-    const saved = localStorage.getItem(LS_KEY);
+    const saved = localStorage.getItem(AUTOSAVE_KEY);
     if (saved) {
       deserializeInto(project, JSON.parse(saved));
       restored = project.floors.some((f) => f.rectangles.length > 0);
