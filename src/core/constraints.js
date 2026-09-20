@@ -407,25 +407,3 @@ export function solveConduitNodes(project) {
 
   for (const n of nodes) n._full = n._locked.x && n._locked.y;
 }
-
-// One-way VERTICAL resolve. Any z-value pinned to the CEILING datum is recomputed
-// from its storey height (z = ceiling − offset), so it tracks floor-height edits;
-// the FLOOR datum stores the absolute z directly and needs no resolve (that is the
-// default, and the back-compat case — no `zDatum` means floor). Mirrors the one-way
-// marker/node pin passes: it reads heights, never changes them. Applies to markers,
-// GLB furniture items, and bare conduit nodes (marker-bound nodes follow their device).
-function applyCeilingDatum(obj, ceiling) {
-  if (obj?.zDatum !== 'ceiling') return;
-  obj.z = Math.max(0, ceiling - (obj.zOff || 0));
-}
-export function solveVerticalDatums(project) {
-  for (const f of project.floors) {
-    for (const m of f.markers || []) applyCeilingDatum(m, f.height);
-    for (const it of f.furniture || []) applyCeilingDatum(it, f.height);
-  }
-  for (const n of project.conduitNodes || []) {
-    if (n.markerId) continue; // marker-bound → follows the device, never pinned
-    const f = project.floors.find((fl) => fl.id === n.floorId);
-    if (f) applyCeilingDatum(n, f.height);
-  }
-}

@@ -27,6 +27,8 @@ import {
 } from '../io/serialize.js';
 import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from '../io/dxf.js';
+import { buildShareUrl } from '../io/shareView.js';
+import { qrToPngBlob } from '../io/qr.js';
 import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
 } from '../io/outputOptions.js';
@@ -249,10 +251,9 @@ export function setupMR(view, project, getFootprint) {
     }
 
     // swapLabel (optional) overrides the bottom-left SWAP cell's caption — used by
-    // the aperture pad (SILL/HEAD field cycler) and the height pads (FLOOR/CEILING
-    // datum toggle). delLabel (optional) overrides the DEL cell — the height pads use
-    // it for "free Z" (DEL clears the vertical dim, not the object). Null keeps the
-    // default FLIP / DEL labels.
+    // the aperture pad (SILL/HEAD field cycler) and the height pads (free↔floor datum
+    // toggle). delLabel (optional) overrides the DEL cell. Null keeps the default
+    // FLIP / DEL labels.
     function draw(title, buffer, hoverKey, swapLabel = null, delLabel = null) {
       const lbl = (kid) => (kid === 'swap' && swapLabel) ? swapLabel
         : (kid === 'del' && delLabel) ? delLabel : keyLabel(kid);
@@ -621,7 +622,8 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillText(`${t('export.active')} · ${floorName}`, 28, 99);
       ctx.fillStyle = '#e6edf3';
       ctx.font = 'bold 30px sans-serif';
-      const formatLabel = settings.format === 'coohom' ? 'COOHOM DXF' : settings.format.toUpperCase();
+      const formatLabel = settings.format === 'coohom' ? 'COOHOM DXF'
+        : settings.format === 'qr' ? 'QR · 3D VIEW' : settings.format.toUpperCase();
       ctx.fillText(`${t('export.format')} · ${formatLabel}`, 28, 152);
       ctx.fillStyle = '#768390';
       ctx.font = '21px sans-serif';
@@ -992,6 +994,16 @@ export function setupMR(view, project, getFootprint) {
   // pipeline. Async-loaded and skipped by clearPlanGeometry (see buildFurniture).
   const furnitureGroup = new THREE.Group();
   planGroup.add(furnitureGroup);
+  // Vertical (Z) dimensions: a static height readout for any object whose height is
+  // DEFINED (zDatum set). Its own group under planGroup — always visible like the X/Y dim
+  // lines, rebuilt by buildMarkers, and NON-interactive (height is typed on the pad, never
+  // dragged). The flat plan can't show Z, but in AR we're in 3D, so this is a slim
+  // vertical bar from the floor up to the object plus a value label at mid-height. Each
+  // dim takes the COLOR OF THE PIECE IT MARKS, matching that piece's X/Y dims: markers
+  // amber, conduit nodes cyan, apertures (door/window/half-wall/…) blue.
+  const zDimGroup = new THREE.Group();
+  planGroup.add(zDimGroup);
+  const zBarGeom = new THREE.BoxGeometry(0.008, 1, 0.008); // unit-height; scaled per object
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1858,10 +1870,80 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
+  // ---- Vertical (Z) dimension visuals (markers). Static, non-pickable: a slim bar from
+  // the floor to the glyph + a value label, for markers with a DEFINED height (zDatum).
+  // Labels reuse the shared dimLabelTexture cache (so clearZDims disposes the per-build
+  // SpriteMaterial but NOT its .map); bars share zBarGeom (never disposed, only scaled).
+  function clearZDims() {
+    for (const child of [...zDimGroup.children]) {
+      zDimGroup.remove(child);
+      child.material?.dispose(); // per-build bar material / sprite material
+      // geometry: bars share zBarGeom; labels are sprites — neither is per-build
+      // .map: labels point at the shared dimLabelTexture cache — never dispose here
+    }
+  }
+  // A slim vertical bar between two heights (lo→hi) at a plan point, in the piece's color.
+  function addZBar(x, y, lo, hi, colorHex) {
+    const h = hi - lo;
+    if (!(h > 1e-4)) return;
+    const bar = new THREE.Mesh(zBarGeom, new THREE.MeshBasicMaterial({
+      color: colorHex, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }));
+    bar.scale.y = h;
+    bar.position.set(x, lo + h / 2, -y);
+    bar.renderOrder = 17;
+    zDimGroup.add(bar);
+  }
+  // A value label at a given height, offset in +x so it clears the bar.
+  function addZLabel(x, y, atH, value, colorCss) {
+    const tex = dimLabelTexture(`${fmt(value)} ${unitLabel()}`, colorCss);
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    label.scale.set(0.16, 0.04, 1);
+    label.position.set(x + 0.055, atH, -y);
+    label.renderOrder = 34;
+    zDimGroup.add(label);
+  }
+  // Single-height dim (marker / node): bar floor→z, one label at mid-height. colorHex/
+  // colorCss = the marked piece's own dim color (amber marker / cyan conduit).
+  function addZDim(x, y, z, colorHex, colorCss) {
+    if (!(z > 1e-4)) return; // nothing to show for an object sitting on the floor
+    addZBar(x, y, 0, z, colorHex);
+    addZLabel(x, y, z / 2, z, colorCss);
+  }
+  function buildZDims() {
+    clearZDims();
+    // Markers → amber (their X/Y pin dims are amber).
+    for (const m of project.activeFloor.markers || []) {
+      if (m.zDatum) addZDim(m.x, m.y, m.z || 0, 0xff9f43, '#ff9f43');
+    }
+    // Bare conduit junctions on the active floor → purple (distinct from amber markers).
+    // Marker-bound nodes follow their device and are never dimensioned.
+    for (const n of project.conduitNodes || []) {
+      if (n.markerId || !n.zDatum) continue;
+      if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
+      addZDim(n.x, n.y, n.z || 0, 0xa78bfa, '#a78bfa');
+    }
+    // Apertures (door/window/half-wall/heater/sliding) → blue (their structural dims are
+    // blue), spanning the [sill,head] band at the aperture's center. An open-top kind
+    // (head:null, e.g. half-wall) rises to the storey ceiling; a zero sill (door/sliding)
+    // omits its label. Always shown — every aperture carries a band (unlike opt-in heights).
+    const ceiling = project.activeFloor.height || 0;
+    for (const r of project.activeFloor.rectangles || []) {
+      if (!isAperture(r.kind)) continue;
+      const lo = r.sill || 0;
+      const hi = r.head == null ? ceiling : r.head;
+      if (!(hi > lo + 1e-4)) continue;
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      addZBar(cx, cy, lo, hi, 0x79c0ff);
+      if (lo > 1e-4) addZLabel(cx, cy, lo, lo, '#79c0ff');        // sill (omit a zero sill)
+      if (r.head != null) addZLabel(cx, cy, hi, r.head, '#79c0ff'); // head (omit an open top)
+    }
+  }
+
   // Rebuild the editable active floor's marker layer.
   function buildMarkers() {
     clearMarkers();
     addFloorMarkers(project.activeFloor);
+    buildZDims();
   }
 
   function clearElectricalLinks() {
@@ -2032,6 +2114,7 @@ export function setupMR(view, project, getFootprint) {
         conduitGroup.add(leader);
       }
     }
+    buildZDims(); // cyan node height dims live in zDimGroup — refresh them on any node change
   }
 
   // Nearest conduit node ON THE ACTIVE FLOOR under the reticle, by plan projection.
@@ -2252,6 +2335,7 @@ export function setupMR(view, project, getFootprint) {
   function buildAllFloors(withDims = true) {
     clearPlanGeometry();
     clearMarkers();
+    clearZDims(); // Z-dims are an active-floor editing aid; the stacked overview omits them
     clearElectricalLinks();
     for (const floor of project.floors) {
       const elevation = floor.elevation;
@@ -2434,14 +2518,15 @@ export function setupMR(view, project, getFootprint) {
     selectedFurnitureId ? project.furniture.find((f) => f.id === selectedFurnitureId) : null;
   const furnitureTitle = () => {
     const f = selectedFurnitureObj();
-    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')} ${datumWord(furnitureDatum)}`;
+    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')} ${datumWord('floor')}`;
   };
-  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey, datumSwapLabel(furnitureDatum));
+  // Foot elevation is floor-referenced only (furniture drags in-plane, never in Z), so
+  // there is no datum toggle — the SWAP cell is inert (blank).
+  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey, ' ');
 
   function refreshFurniturePad() {
     const f = selectedFurnitureObj();
-    furnitureDatum = f?.zDatum === 'ceiling' ? 'ceiling' : 'floor';
-    furnitureBuffer = f ? fmt(furnitureDatum === 'ceiling' ? (f.zOff || 0) : (f.z || 0)) : '';
+    furnitureBuffer = f ? fmt(f.z || 0) : '';
     furniturePristine = true;
     redrawFurniturePad();
   }
@@ -2457,19 +2542,15 @@ export function setupMR(view, project, getFootprint) {
     if (!f) return;
     const val = parseFloat(furnitureBuffer);
     if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
-    project.setFurnitureVertical(f.id, furnitureDatum, toMeters(val));
-    rlog('furniture foot', { id: f.id, datum: furnitureDatum, m: +toMeters(val).toFixed(3) });
+    project.setFurnitureVertical(f.id, 'floor', toMeters(val));
+    rlog('furniture foot', { id: f.id, m: +toMeters(val).toFixed(3) });
     buildFurniture(); // z changed → the model re-seats at the new elevation
     refreshFurniturePad(); // keep it selected so it can be raised again
   }
 
   function pressFurnitureKey(k) {
     if (k === 'enter') { commitFurnitureFoot(); return; }
-    if (k === 'swap') { // toggle FLOOR/CEILING datum, keeping the physical height
-      const next = furnitureDatum === 'ceiling' ? 'floor' : 'ceiling';
-      furnitureBuffer = fmt(convertDatumValue(parseFloat(furnitureBuffer) || 0, furnitureDatum, next, project.height));
-      furnitureDatum = next; furniturePristine = false; redrawFurniturePad(); return;
-    }
+    if (k === 'swap') return; // foot is floor-referenced only — no datum toggle
     if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the item
     if (furniturePristine && k !== 'back') furnitureBuffer = '';
     furniturePristine = false;
@@ -2586,12 +2667,11 @@ export function setupMR(view, project, getFootprint) {
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
-  // Datum for each single-value height pad ('floor' = absolute above the floor; 'ceiling'
-  // = distance below the ceiling, tracked one-way as storey height changes). The SWAP
-  // cell toggles it; the typed value is the offset from the current datum.
+  // Datum for the marker / node height pads: 'floor' = a defined height above the floor
+  // (holds in a 3D grab), 'free' = undefined (grab moves Z). SWAP toggles the two; the
+  // typed value is always the floor-referenced height. (Furniture foot is floor-only.)
   let markerDatum = 'floor';
   let nodeDatum = 'floor';
-  let furnitureDatum = 'floor';
   // PLAN EDIT band pad: type a selected rect's vertical-band bounds (aperture sill/head
   // or furniture foot/top). One field at a time; the SWAP cell cycles which. Buffer
   // prefilled from the rect.
@@ -3298,35 +3378,27 @@ export function setupMR(view, project, getFootprint) {
     if (hoverKey) pressLevelKey(hoverKey);
   }
 
-  // ---- Vertical-datum helpers, shared by the single-value height pads (marker / node /
-  // furniture foot). The SWAP cell toggles the datum; the typed value is the OFFSET from
-  // it — up from the floor, or DOWN from the ceiling (so a "0.1 below ceiling" reads as a
-  // plain 0.1). datumWord labels the current datum + direction; datumSwapLabel names the
-  // datum SWAP switches to; convertDatumValue re-expresses the offset against the other
-  // datum while keeping the physical height constant.
-  // Datum can be 'free' (undefined — grab moves Z), 'floor' (absolute above the floor),
-  // or 'ceiling' (below the ceiling). SWAP cycles free→floor→ceiling→floor (free is only
-  // re-entered via DEL). convertDatumValue keeps the physical height across a floor↔ceiling
-  // toggle (a free→floor toggle needs none — the free display already shows the floor value).
-  const nextDatum = (d) => d === 'floor' ? 'ceiling' : 'floor';
-  const datumWord = (d) => d === 'ceiling' ? `↓ ${t('z.ceiling')}` : d === 'free' ? `⊘ ${t('z.free')}` : `↑ ${t('z.floor')}`;
+  // ---- Vertical helpers, shared by the marker / node height pads. Heights are
+  // floor-referenced ONLY: the typed value is the absolute height above the floor. The
+  // datum is just free vs defined — 'free' (undefined, so a 3D grab moves Z) or 'floor'
+  // (a defined height that holds in the grab, like an X/Y pin). The SWAP cell toggles
+  // free↔floor (the displayed value is unchanged); DEL frees Z; typing a value defines
+  // it (floor). datumWord labels the current state; datumSwapLabel names the SWAP target.
+  const nextDatum = (d) => d === 'floor' ? 'free' : 'floor';
+  const datumWord = (d) => d === 'free' ? `⊘ ${t('z.free')}` : `↑ ${t('z.floor')}`;
   const datumSwapLabel = (d) => `⇄ ${t(`z.${nextDatum(d)}`).toUpperCase()}`;
-  const convertDatumValue = (value, fromD, toD, height) => {
-    const abs = fromD === 'ceiling' ? height - value : value; // absolute z above the floor
-    return Math.max(0, toD === 'ceiling' ? height - abs : abs);
-  };
 
   // ---- EDIT marker height: a marker's inherent height, typed by hand on the DIMS numpad
-  // (reused, like LEVEL). SWAP toggles the FLOOR/CEILING datum; DEL deletes the marker.
+  // (reused, like LEVEL). Floor-referenced only; SWAP toggles free↔floor, DEL frees Z.
   // X/Y are pinned separately in DIMS — height is never a constraint axis.
   const markerTitle = () => `${t(`marker.${selectedMarker?.type ?? 'outlet'}`)}  ·  ${datumWord(markerDatum)}`;
-  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey, datumSwapLabel(markerDatum), t('z.freeKey'));
+  const redrawMarkerPad = () => numpad.draw(markerTitle(), markerBuffer, hoverKey, datumSwapLabel(markerDatum));
 
   function refreshMarkerPad() {
     // No datum = height never defined = FREE (grab moves Z). The buffer shows the current
     // floor-relative z (informational when free / editable when floor).
     markerDatum = selectedMarker?.zDatum ?? 'free';
-    markerBuffer = selectedMarker ? fmt(markerDatum === 'ceiling' ? (selectedMarker.zOff || 0) : selectedMarker.z) : '';
+    markerBuffer = selectedMarker ? fmt(selectedMarker.z) : '';
     markerPristine = true;
     redrawMarkerPad();
   }
@@ -3362,10 +3434,8 @@ export function setupMR(view, project, getFootprint) {
 
   function pressMarkerKey(k) {
     if (k === 'enter') { commitMarkerHeight(); return; }
-    if (k === 'swap') { // cycle the datum (free→floor→ceiling→floor), keeping the height
-      const next = nextDatum(markerDatum);
-      if (markerDatum !== 'free') markerBuffer = fmt(convertDatumValue(parseFloat(markerBuffer) || 0, markerDatum, next, project.height));
-      markerDatum = next; markerPristine = false; redrawMarkerPad(); return;
+    if (k === 'swap') { // toggle free↔floor, keeping the displayed floor-referenced height
+      markerDatum = nextDatum(markerDatum); markerPristine = false; redrawMarkerPad(); return;
     }
     if (k === 'del') { // DEL clears the Z DIM (frees Z for the grab); B/Y deletes the marker
       if (selectedMarker) {
@@ -3410,18 +3480,12 @@ export function setupMR(view, project, getFootprint) {
   const selectedConduitNodeObj = () =>
     (selectedConduitNodeId ? project.conduitNodes.find((n) => n.id === selectedConduitNodeId) : null) || null;
   const nodePadTitle = () => `${t('conduit.node')}  ·  ${datumWord(nodeDatum)}`;
-  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum), t('z.freeKey'));
-  // A node's ceiling is its OWN floor's height (nodes are whole-house, not always active).
-  const nodeCeiling = () => {
-    const n = selectedConduitNodeObj();
-    const f = n ? project.floors.find((fl) => fl.id === n.floorId) : null;
-    return f ? f.height : project.height;
-  };
+  const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum));
 
   function refreshNodePad() {
     const n = selectedConduitNodeObj();
     nodeDatum = n?.zDatum ?? 'free'; // no datum = free in the 3D carry
-    nodeBuffer = n ? fmt(nodeDatum === 'ceiling' ? (n.zOff || 0) : (n.z || 0)) : '';
+    nodeBuffer = n ? fmt(n.z || 0) : '';
     nodePristine = true;
     redrawNodePad();
   }
@@ -3455,10 +3519,8 @@ export function setupMR(view, project, getFootprint) {
 
   function pressNodeKey(k) {
     if (k === 'enter') { commitNodeHeight(); return; }
-    if (k === 'swap') { // cycle the datum (free→floor→ceiling→floor), keeping the height
-      const next = nextDatum(nodeDatum);
-      if (nodeDatum !== 'free') nodeBuffer = fmt(convertDatumValue(parseFloat(nodeBuffer) || 0, nodeDatum, next, nodeCeiling()));
-      nodeDatum = next; nodePristine = false; redrawNodePad(); return;
+    if (k === 'swap') { // toggle free↔floor, keeping the displayed floor-referenced height
+      nodeDatum = nextDatum(nodeDatum); nodePristine = false; redrawNodePad(); return;
     }
     if (k === 'del') { // DEL clears the Z DIM (frees Z for the 3D carry); B/Y deletes the node
       const n = selectedConduitNodeObj();
@@ -3735,9 +3797,9 @@ export function setupMR(view, project, getFootprint) {
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
       + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`;
     const rev = project.revision > 0 ? `-r${project.revision}` : ''; // omit for a never-saved project
-    return extension === 'json'
-      ? `house-debug-${stamp}.json`
-      : `plan-${floor}${rev}-${stamp}.${extension}`;
+    if (extension === 'json') return `house-debug-${stamp}.json`;
+    if (extension === 'qr.png') return `house-3dview${rev}-${stamp}.png`; // whole-house share, not a floor sheet
+    return `plan-${floor}${rev}-${stamp}.${extension}`;
   };
 
   // Briefly show a message on the mode label, then restore the breadcrumb.
@@ -3814,6 +3876,20 @@ export function setupMR(view, project, getFootprint) {
     const f = currentSheetFloor();
     const settings = getOutputSettings();
     const format = settings.format;
+    // QR is a WHOLE-HOUSE view-only share, not a per-floor sheet: encode the #view= link
+    // as a PNG so messaging apps can't truncate the long URL. Markers ride along when the
+    // markerIcons layer is on (they cost QR capacity). If the map is too big for even a
+    // max-capacity QR, say so rather than ship a broken image.
+    if (format === 'qr') {
+      const url = await buildShareUrl(project, { markers: settings.markerIcons });
+      const blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
+      if (!blob) { sheetFlash('map too large for QR'); rlog('qr too large', { chars: url.length }); return; }
+      const name = exportFileName(f, 'qr.png');
+      const result = await deliverExport(name, blob, 'image/png');
+      rlog('qr share', { name, chars: url.length, markers: settings.markerIcons, ok: result.ok, delivery: result.delivery });
+      sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'share blocked');
+      return;
+    }
     const extension = format === 'coohom' ? 'dxf' : format;
     const name = format === 'coohom'
       ? exportFileName(f, 'coohom.dxf')
@@ -5821,8 +5897,8 @@ export function setupMR(view, project, getFootprint) {
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
       : null;
     const exportStatus = modes[currentMode].id === 'export'
-      ? `${t('export.format')} · ${getOutputSettings().format === 'coohom'
-        ? 'COOHOM DXF' : getOutputSettings().format.toUpperCase()}` : null;
+      ? `${t('export.format')} · ${getOutputSettings().format === 'coohom' ? 'COOHOM DXF'
+        : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     const furnishStatus = modes[currentMode].id === 'furnish'
       ? (selectedFurnitureId ? t('furnish.selected')
         : currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))

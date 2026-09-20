@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "polygon-clipping": "^0.15.7",
+    "qrcode-generator": "^2.0.4",
     "three": "^0.170.0"
   },
   "devDependencies": {

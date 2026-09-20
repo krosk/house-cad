@@ -2,7 +2,9 @@
 // export. These are UI preferences rather than authored project data, so they
 // live in localStorage and old project saves remain unchanged.
 
-export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'coohom', 'json'];
+// 'qr' is the odd one out: a whole-house, view-only SHARE (a QR PNG of the #view= link),
+// not a per-floor sheet/CAD export. It ignores the per-floor layer toggles below.
+export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'coohom', 'json', 'qr'];
 export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,

@@ -9,7 +9,7 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, solveVerticalDatums } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
@@ -17,17 +17,15 @@ let _id = 0;
 const nextId = () => `r${++_id}`;
 
 // Write a vertical placement onto any z-bearing object (marker / furniture item /
-// conduit node). Setting a height DEFINES a vertical dim, so `zDatum` is stamped in
-// BOTH cases — that is what makes the value hold during a 3D grab (like an X/Y pin).
-// 'ceiling' stores the offset (distance below the ceiling), leaving the absolute z to
-// be resolved in _emit (solveVerticalDatums); 'floor' stores the absolute z directly.
-// An object with NO zDatum (e.g. a freshly dropped marker whose height was never set)
-// is free in Z and follows the grab.
+// conduit node). Heights are ALWAYS floor-referenced (z = absolute height above the
+// active floor). Setting a height DEFINES a vertical dim, so `zDatum` is stamped — that
+// is what makes the value hold during a 3D grab (like an X/Y pin). An object with NO
+// zDatum (e.g. a freshly dropped marker whose height was never set) is free in Z and
+// follows the grab.
 function setVertical(obj, datum, value) {
   if (!obj) return;
-  if (datum === 'free') { delete obj.zDatum; delete obj.zOff; return; } // un-define → free in grab; keep the current z
-  if (datum === 'ceiling') { obj.zDatum = 'ceiling'; obj.zOff = value; }
-  else { obj.zDatum = 'floor'; delete obj.zOff; obj.z = value; }
+  if (datum === 'free') { delete obj.zDatum; return; } // un-define → free in grab; keep the current z
+  obj.zDatum = 'floor'; obj.z = value;
 }
 
 // After loading a project, advance the counter past any loaded ids so newly
@@ -311,7 +309,6 @@ export class Project {
     this._recomputeElevations();
     for (const f of this.floors) { solve(f); solveMarkers(f); }
     solveConduitNodes(this); // whole-house node pins follow the walls, one-way
-    solveVerticalDatums(this); // ceiling-pinned heights track storey height, one-way
     for (const fn of this._listeners) fn(this);
   }
 
@@ -495,9 +492,9 @@ export class Project {
     this._emit();
   }
 
-  // Set a marker's vertical placement against a datum. datum 'floor' → value is the
-  // absolute height above the floor; 'ceiling' → value is the distance BELOW the
-  // ceiling (resolved in _emit, so it tracks storey-height edits).
+  // Set a marker's vertical placement. datum 'floor' → value is the absolute height
+  // above the floor (defines the dim, so it holds in a 3D grab); 'free' → un-defines
+  // the height (grab moves Z).
   setMarkerVertical(id, datum, value) {
     const m = this.markers.find((m) => m.id === id);
     if (!m) return;
@@ -716,8 +713,8 @@ export class Project {
     if (emit) this._emit();
   }
 
-  // Set a furniture item's foot elevation against a datum (see setMarkerVertical):
-  // 'floor' → absolute foot height; 'ceiling' → distance below the ceiling.
+  // Set a furniture item's foot elevation (see setMarkerVertical): 'floor' → absolute
+  // foot height above the floor; 'free' → un-defines it.
   setFurnitureVertical(id, datum, value) {
     const f = this.furniture.find((f) => f.id === id);
     if (!f) return;

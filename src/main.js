@@ -12,6 +12,7 @@ import {
   FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from './io/serialize.js';
+import { buildShareUrl, decodeViewFromHash, loadView } from './io/shareView.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
@@ -437,6 +438,23 @@ document.getElementById('save').addEventListener('click', () => {
   sketch.onStatus?.(`Saved house.json (rev ${rev})`);
 });
 
+// Copy a view-only 3D link: solved geometry in the URL fragment, no server, not editable.
+// Massing only by default so the link stays short (QR-able); markers are opt-in.
+document.getElementById('share-view').addEventListener('click', async () => {
+  try {
+    const url = await buildShareUrl(project, { markers: false });
+    let copied = false;
+    try { await navigator.clipboard?.writeText(url); copied = true; } catch { /* clipboard blocked */ }
+    const kb = (new Blob([url]).size / 1024).toFixed(1);
+    sketch.onStatus?.(copied
+      ? `Copied a view-only 3D link (${kb} KB). Paste to share — it's not editable.`
+      : `View link ready (${kb} KB) — copy failed; see console.`);
+    if (!copied) console.log('Share view URL:\n' + url);
+  } catch (err) {
+    alert(`Could not build a share link:\n${err.message}`);
+  }
+});
+
 const fileInput = document.getElementById('file-input');
 document.getElementById('load').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', async () => {
@@ -672,8 +690,13 @@ function printSheets(svgs) {
 
 // ---- autosave to localStorage (survives page reload) ----
 const LS_KEY = 'house-cad:autosave:v1';
+// When the session was opened from a shared VIEW link, autosave is suppressed so the
+// viewer's own saved project is never silently clobbered by someone else's link. An
+// explicit Save (which writes LS_KEY directly) adopts it as their own.
+let viewMode = false;
 let saveTimer = null;
 project.onChange(() => {
+  if (viewMode) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
@@ -688,8 +711,22 @@ function seedDemo() {
   project.addRectangle(new Rectangle({ x: -2, y: -1, w: 3, h: 2, op: 'subtract' }));
 }
 
-// Restore the last session if present, otherwise seed a demo house.
-(function init() {
+// A shared view link (#view=…) wins over autosave; otherwise restore the last session,
+// otherwise seed a demo house.
+(async function init() {
+  try {
+    const viewData = await decodeViewFromHash(location.hash);
+    if (viewData) {
+      loadView(project, viewData);
+      viewMode = true;
+      sketch.clearSelection();
+      view.frameModel();
+      sketch.onStatus?.('Opened a shared 3D view (read-only geometry — Save to keep or edit it).');
+      return;
+    }
+  } catch (err) {
+    console.warn('Ignoring an unreadable view link:', err.message);
+  }
   let restored = false;
   try {
     const saved = localStorage.getItem(LS_KEY);
