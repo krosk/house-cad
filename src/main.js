@@ -123,6 +123,7 @@ setupMR(view, project, (rectangles = project.rectangles) => computeFootprint(rec
 // independently and stacks at its elevation; export merges the whole stack.
 let firstBuild = true;
 let currentGeometry = null; // merged mesh of all floors, kept for export
+let desktopGeometryDirty = false;
 function rebuild() {
   const floorGeos = project.floors.map((f) => ({
     ...buildArchitecturalFloor(f),
@@ -149,7 +150,21 @@ function rebuild() {
     firstBuild = false;
   }
 }
-project.onChange(rebuild);
+project.onChange(() => {
+  // MR owns its flat plan/marker rebuilds explicitly. Rebuilding the hidden
+  // architectural model and legacy export mesh on every on-headset edit causes
+  // avoidable main-thread stalls, most visibly when dropping a marker.
+  if (view.renderer.xr.isPresenting) {
+    desktopGeometryDirty = true;
+    return;
+  }
+  rebuild();
+});
+view.renderer.xr.addEventListener('sessionend', () => {
+  if (!desktopGeometryDirty) return;
+  desktopGeometryDirty = false;
+  rebuild();
+});
 
 // ---- toolbar wiring ----
 const toolButtons = [...document.querySelectorAll('#tool-group button')];

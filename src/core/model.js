@@ -305,9 +305,12 @@ export class Project {
   // listeners so they see fully-solved, stacked geometry. Markers are resolved
   // in a one-way pass AFTER the rectangle solve (they read resolved wall edges
   // but never move them — see solveMarkers).
-  _emit() {
+  _emit({ solveRectangles = true } = {}) {
     this._recomputeElevations();
-    for (const f of this.floors) { solve(f); solveMarkers(f); }
+    for (const f of this.floors) {
+      if (solveRectangles) solve(f);
+      solveMarkers(f);
+    }
     solveConduitNodes(this); // whole-house node pins follow the walls, one-way
     for (const fn of this._listeners) fn(this);
   }
@@ -454,7 +457,10 @@ export class Project {
     if (!marker.id) marker.id = nextMarkerId();
     if (!marker._locked) marker._locked = { x: false, y: false };
     this.markers.push(marker);
-    this._emit();
+    // Marker creation cannot alter structural rectangles. Avoid the dense
+    // all-floor rectangle solve; marker pins still resolve in the lightweight
+    // one-way pass and listeners still receive the change.
+    this._emit({ solveRectangles: false });
     return marker;
   }
 

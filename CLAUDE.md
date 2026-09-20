@@ -61,6 +61,10 @@ Production builds emit an un-precached `version.json` beside `index.html`; `src/
 fetches it with `cache: no-store` plus a timestamp query and compares its complete build id with the
 compiled `__BUILD_ID__`. Desktop shows the state in the toolbar and the AR debug HUD includes it.
 
+While WebXR is presenting, `main.js` defers its hidden architectural/export mesh rebuild until
+`sessionend`; `mr.js` owns live AR rebuilding. Marker creation also skips the dense rectangle solve
+while retaining marker/node one-way resolution and normal change notification.
+
 Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
 They refresh only Sketch2D and the dimension panel: never feed them to `solve()`, rebuild 3D/export
 geometry, or persist them as model-driving constraints.

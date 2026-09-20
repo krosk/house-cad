@@ -638,8 +638,10 @@ function drawMarkerPins(be, L, floor, layers) {
         }
       }
       be.line(xa, y, xb, y, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
-      drawArrow(be, xa, y, Math.sign(xb - xa), 'x');
-      drawArrow(be, xb, y, Math.sign(xa - xb), 'x');
+      const dir = Math.sign(xb - xa) || 1;
+      const arrowDir = Math.abs(xb - xa) < ARROW * 2 ? -dir : dir;
+      drawArrow(be, xa, y, arrowDir, 'x');
+      drawArrow(be, xb, y, -arrowDir, 'x');
       drawLabelLeader(be, xa, xb, lx, y, 'x', { stroke: C_PIN, width: 0.15 });
       drawDimLabel(be, label, lx, y, C_PIN, C_MARK);
     } else {
@@ -658,8 +660,10 @@ function drawMarkerPins(be, L, floor, layers) {
         }
       }
       be.line(x, ya, x, yb, { stroke: C_PIN, width: 0.15, dash: DIM_DASH });
-      drawArrow(be, x, ya, Math.sign(yb - ya), 'y');
-      drawArrow(be, x, yb, Math.sign(ya - yb), 'y');
+      const dir = Math.sign(yb - ya) || 1;
+      const arrowDir = Math.abs(yb - ya) < ARROW * 2 ? -dir : dir;
+      drawArrow(be, x, ya, arrowDir, 'y');
+      drawArrow(be, x, yb, -arrowDir, 'y');
       drawLabelLeader(be, ya, yb, ly, x, 'y', { stroke: C_PIN, width: 0.15 });
       drawDimLabel(be, label, x, ly, C_PIN, C_MARK);
     }
