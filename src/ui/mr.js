@@ -211,6 +211,10 @@ export function setupMR(view, project, getFootprint) {
     return { sprite, setText };
   }
 
+  // Ray-aimed menus are foreground interaction surfaces. World annotations use
+  // orders through 34; the sheet uses 90 and the controller HUD uses 100.
+  const MENU_PANEL_RENDER_ORDER = 80;
+
   // S2 numpad: a canvas-textured panel you aim the controller ray at to enter
   // exact tape dimensions. Keys are hit-tested by the ray's UV on the plane (no
   // per-key meshes). Layout: a display line (field + typed value + unit) over a
@@ -225,7 +229,9 @@ export function setupMR(view, project, getFootprint) {
       new THREE.PlaneGeometry(0.30, 0.375),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
-    mesh.renderOrder = 20;
+    // A dimension/height keypad is a foreground interaction surface just like
+    // EXPORT; world marker badges (31–33) must never paint over its keys.
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
@@ -314,7 +320,7 @@ export function setupMR(view, project, getFootprint) {
       new THREE.PlaneGeometry(0.30, 0.375),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
-    mesh.renderOrder = 20;
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
@@ -488,7 +494,7 @@ export function setupMR(view, project, getFootprint) {
       new THREE.PlaneGeometry(0.24, 0.24),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
-    mesh.renderOrder = 20;
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
@@ -537,7 +543,7 @@ export function setupMR(view, project, getFootprint) {
       new THREE.PlaneGeometry(0.24, 0.24),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
-    mesh.renderOrder = 20;
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
@@ -589,7 +595,10 @@ export function setupMR(view, project, getFootprint) {
       new THREE.PlaneGeometry(0.32, 0.32 * H / W),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
     );
-    mesh.renderOrder = 20;
+    // Marker badges deliberately render above the floor overlay (31–33), so the
+    // foreground export surface must paint later or those world annotations
+    // bleed through its opaque-looking canvas.
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
     const group = new THREE.Group();
     group.add(mesh);
     group.visible = false;
@@ -912,7 +921,9 @@ export function setupMR(view, project, getFootprint) {
     new THREE.SphereGeometry(0.006, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0x60a5fa, depthTest: false, depthWrite: false }),
   );
-  numpadCursor.renderOrder = 21;
+  // Above every ray-aimed panel (EXPORT is 80) while remaining below the sheet
+  // preview (90) and controller HUD (100).
+  numpadCursor.renderOrder = 85;
   numpadCursor.visible = false;
   scene.add(numpadCursor);
 
