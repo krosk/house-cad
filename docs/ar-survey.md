@@ -130,15 +130,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · CONDUIT** (`id: marker_conduit`) — author the **whole-house conduit network** (on
   `Project`, not a floor): a graph of `conduitNodes` (bare junctions carrying `{x,y,z,floorId}`, or
   nodes bound to a device `markerId` that follow the live marker) joined by `conduitSegments`. Pen
-  model: `penNodeId` is the growing end. Trigger a device marker or an existing node to start the pen
-  there; trigger empty space to drop a junction (X/Y from the floor reticle, z from the tip, floorId =
-  active floor) and run a segment to it; trigger another node to join/branch/loop. Grip lifts the pen
-  (no deletion). **Cross-floor risers:** the floor directly above/below is drawn dimmed (`adjacentGroup`)
+  model: `penNodeId` is the growing end. The nearest active-floor device/node inside the reticle is
+  highlighted; **grip over a target cycles the combined overlap stack without changing geometry**, and
+  trigger commits only the highlighted target. Trigger empty space to drop a junction (X/Y from the
+  floor reticle, z from the tip, floorId = active floor) and run a segment to it; trigger another target
+  to join/branch/loop. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** the floor directly above/below is drawn dimmed (`adjacentGroup`)
   at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
   yellow); triggering one runs a segment across the slab — a **riser**. The network is drawn live in
-  `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`), colored per inferred surface
-  (`conduitNetworkSegments` + `segmentSurface`; risers violet), showing only segments touching the
-  active floor, with a node sphere per active-floor vertex (marker-bound dimmer). Readout: `START PEN`,
+  `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`) in uniform purple, showing only
+  segments touching the active floor, with a node sphere per active-floor vertex. Readout: `START PEN`,
   then `RUN CONDUIT`. **The intended conduit→wire→circuit workflow and the conduit/wire/control-link
   relationship are in `docs/electrical-workflow.md`.**
 - **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are

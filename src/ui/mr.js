@@ -2204,6 +2204,39 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // MARKER · CONDUIT uses one combined pick stack instead of hard-prioritizing every
+  // nearby conduit node over a device. Nearest-to-reticle wins; exact ties put markers
+  // first, then order vertical stacks high→low. Grip advances `afterKey`, while trigger
+  // commits only the currently highlighted target.
+  function conduitTargetAtFloorPoint(px, py, afterKey = null) {
+    const candidates = [];
+    project.markers.forEach((marker, order) => {
+      const distance = Math.hypot(px - marker.x, py - marker.y);
+      if (distance <= RETICLE_OUTER) candidates.push({
+        kind: 'marker', item: marker, key: `marker:${marker.id}`,
+        distance, z: marker.z || 0, order,
+      });
+    });
+    project.conduitNodes.forEach((node, order) => {
+      if (project.conduitNodeFloorId(node) !== project.activeFloorId) return;
+      // A marker-bound node is the same physical endpoint as its marker; presenting
+      // both would waste a cycle step without changing the pen target.
+      if (node.markerId && project.findMarker(node.markerId)?.floor?.id === project.activeFloorId) return;
+      const p = conduitNodePos(project, node);
+      const distance = Math.hypot(px - p.x, py - p.y);
+      if (distance <= RETICLE_OUTER) candidates.push({
+        kind: 'node', item: node, key: `node:${node.id}`,
+        distance, z: p.z || 0, order,
+      });
+    });
+    candidates.sort((a, b) => a.distance - b.distance
+      || (a.kind === b.kind ? 0 : a.kind === 'marker' ? -1 : 1)
+      || b.z - a.z || a.order - b.order);
+    if (!candidates.length) return null;
+    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
+    return candidates[(current + 1) % candidates.length];
+  }
+
   // Disambiguate junctions that share one floor projection (a vertical run's two ends,
   // or independent stacked nodes) — mirrors editMarkerAtFloorPoint. Given the hovered
   // node as the anchor, gather its stack (same plan x/y), order high-to-low by height,
@@ -2740,6 +2773,7 @@ export function setupMR(view, project, getFootprint) {
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
+  let conduitPickAfterKey = null;
   let hoverConduitNode = null;
   // Cross-floor authoring: the adjacent-floor target under the reticle this frame, if any
   // — {kind:'node'|'marker', id, floorId, x, y}. A CONDUIT/WIRE trigger connects to it.
@@ -4962,8 +4996,8 @@ export function setupMR(view, project, getFootprint) {
       // the pen. See help.marker_conduit.
       onTouch: (pos) => {
         if (!placed) return;
-        // Prefer an active-floor node, then an active-floor device, then an adjacent-floor
-        // target (→ a riser through the slab), then empty space on the active floor.
+        // The per-frame combined picker has already disambiguated active-floor nodes
+        // and devices by distance/cycle order. Adjacent targets and empty floor follow.
         let targetNodeId = hoverConduitNode?.id || null;
         if (!targetNodeId && hoverMarker) {
           targetNodeId = project.ensureConduitNodeAtMarker(hoverMarker.id).id;
@@ -5284,7 +5318,7 @@ export function setupMR(view, project, getFootprint) {
     selectedLinkSwitch = null; // ...and any electrical-link source switch
     wireFromMarker = null; // ...and any pending wire pair
     selectedRoutedWire = null; // ...and any routed-wire override selection
-    penNodeId = null; // ...and lift the conduit pen
+    penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
     selectedConduitNodeId = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
@@ -5718,7 +5752,7 @@ export function setupMR(view, project, getFootprint) {
   // Grip button: NON-destructive only — grab-drag a target (armed in onSqueezeStart), or
   // cancel/undo/back-out an in-progress gesture. Deletion lives on B/Y (deleteInMode).
   //  - MARKER LINK: clear the selected source switch without deleting links.
-  //  - MARKER CONDUIT: lift the pen (stop the run).
+  //  - MARKER CONDUIT: over a target, cycle the node/marker stack; elsewhere lift the pen.
   //  - MARKER WIRE: pop the last via override (B/Y deletes the wire).
   //  - PLAN/MARKER/CONDUIT DIMS: undo the last dim pick, step by step; else cycle a stack.
   //  - EDGE: cancel a pending locked edge.
@@ -5769,7 +5803,18 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     if (mode.id === 'marker_conduit') {
-      // Grip lifts the pen (stops the current run) without deleting geometry.
+      // Over a target, grip advances the combined node/marker pick stack without
+      // changing geometry. On empty space it retains its original pen-lift meaning.
+      if (hoverMarker) {
+        conduitPickAfterKey = `marker:${hoverMarker.id}`;
+        rlog('conduit target cycle', { after: conduitPickAfterKey });
+        return;
+      }
+      if (hoverConduitNode) {
+        conduitPickAfterKey = `node:${hoverConduitNode.id}`;
+        rlog('conduit target cycle', { after: conduitPickAfterKey });
+        return;
+      }
       if (penNodeId) { rlog('conduit pen lift', { node: penNodeId }); penNodeId = null; }
       return;
     }
@@ -6538,9 +6583,9 @@ export function setupMR(view, project, getFootprint) {
         }
       }
     } else if (modeId === 'marker_conduit') {
-      // CONDUIT authoring: aim the floor reticle. A conduit node under it wins over a
-      // device marker (both are valid pen targets). The pen node is amber, hover yellow;
-      // a live preview runs from the pen node to the tip.
+      // CONDUIT authoring: aim the floor reticle. Nodes and markers share one nearest-
+      // first pick stack; grip advances through overlaps and trigger commits. The pen node is amber,
+      // the next target yellow; a live preview runs from the pen node to the tip.
       hoverKey = null;
       numpadCursor.visible = false;
       const source = editCtl;
@@ -6551,8 +6596,10 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        hoverConduitNode = conduitNodeAtFloorPoint(px, py);
-        if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
+        const target = conduitTargetAtFloorPoint(px, py, conduitPickAfterKey);
+        if (target?.kind === 'node') hoverConduitNode = target.item;
+        else if (target?.kind === 'marker') hoverMarker = target.item;
+        else conduitPickAfterKey = null; // leaving the stack restarts it at nearest
         // Fall back to an adjacent-floor node/device → the next pen segment is a riser.
         if (!hoverConduitNode && !hoverMarker) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
       } else {
