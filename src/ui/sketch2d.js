@@ -42,6 +42,7 @@ export class Sketch2D {
     this.selectedId = null;
     this.onSelect = null; // callback(rect|null)
     this.onPickConstraint = null; // callback(constraintId) when a dimension is clicked
+    this.onMeasurementChange = null; // read-only measurement changed without a project rebuild
     this.onStatus = null; // callback(message) for transient hints
 
     this.draft = null; // {x0,y0,x1,y1} while drawing
@@ -488,8 +489,31 @@ export class Sketch2D {
       return;
     }
     const c = makeDistance(first.rect, first.edge, second.rect, second.edge);
-    this.project.addConstraint(c);
+    if (this.readOnly) {
+      // Shared-view dimensions are annotations over fixed geometry, not solver
+      // inputs. Keep them in the familiar constraint collection for rendering,
+      // but deliberately avoid Project._emit(): that would solve every floor and
+      // rebuild both architectural and export meshes for a simple measurement.
+      c.measurement = true;
+      this.project.constraints.push(c);
+      this.render();
+      this.onMeasurementChange?.();
+    } else {
+      this.project.addConstraint(c);
+    }
     this.onStatus?.(`Dimension added: ${Math.abs(c.value).toFixed(2)} m`);
+  }
+
+  removeMeasurement(id) {
+    if (!this.readOnly) return false;
+    // Removing an authored dimension in a shared view is likewise only a local
+    // annotation change: the already-loaded geometry remains immutable.
+    const i = this.project.constraints.findIndex((c) => c.id === id);
+    if (i < 0) return false;
+    this.project.constraints.splice(i, 1);
+    this.render();
+    this.onMeasurementChange?.();
+    return true;
   }
 
   // World-space positions of the 8 resize handles for a rectangle.

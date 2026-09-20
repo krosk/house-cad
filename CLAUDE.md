@@ -49,6 +49,10 @@ In POV, dragging only looks around and a simple tap animates back to the saved o
 is session-only and must not mutate project or shared-view data. The viewer initially isolates the
 project's active floor; POV reveals that floor's ceiling, which stays hidden in overview.
 
+Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
+They refresh only Sketch2D and the dimension panel: never feed them to `solve()`, rebuild 3D/export
+geometry, or persist them as model-driving constraints.
+
 ### The constraint solver (`src/core/constraints.js`) — the heart of the app
 
 The key insight: because every rectangle edge is axis-aligned, each edge is a single scalar (a left/right edge is an X-coord, a bottom/top edge is a Y-coord), so **the constraint problem decouples into two independent 1-D systems** (all x's, all y's). Each axis is solved as a small **weighted least-squares** problem via normal equations + Gaussian elimination — no general geometric/iterative solver.

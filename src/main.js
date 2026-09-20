@@ -229,7 +229,9 @@ function renderConstraints() {
         });
         swap.addEventListener('click', () => project.swapConstraint(c.id));
       }
-      del.addEventListener('click', () => project.removeConstraint(c.id));
+      del.addEventListener('click', () => {
+        if (!viewMode || !sketch.removeMeasurement(c.id)) project.removeConstraint(c.id);
+      });
 
       entry = { row, input, unit, tag };
       cxRows.set(c.id, entry);
@@ -248,6 +250,7 @@ function renderConstraints() {
   }
 }
 project.onChange(renderConstraints);
+sketch.onMeasurementChange = renderConstraints;
 
 // Clicking a dimension in the canvas focuses its panel field.
 sketch.onPickConstraint = (id) => {

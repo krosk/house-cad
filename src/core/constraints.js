@@ -268,7 +268,7 @@ export function solve(floor) {
     // pins are excluded — they reference a marker endpoint that is not a rect
     // variable, are resolved one-way in solveMarkers, and must never tug a wall.
     const axisConstraints = constraints.filter(
-      (c) => c.axis === axis && !isMarkerConstraint(c) && !isNodeConstraint(c),
+      (c) => c.axis === axis && !c.measurement && !isMarkerConstraint(c) && !isNodeConstraint(c),
     );
     for (const c of axisConstraints) {
       const ia = index.get(`${c.a.rect}:${c.a.edge}`);

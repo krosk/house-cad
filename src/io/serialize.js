@@ -101,7 +101,7 @@ export function serializeFloor(f) {
     name: f.name,
     height: f.height,
     rectangles: f.rectangles.map(serializeRect),
-    constraints: f.constraints.map(serializeConstraint),
+    constraints: f.constraints.filter((c) => !c.measurement).map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
     electricalLinks: (f.electricalLinks || []).map(serializeElectricalLink),
     // conduitNodes/conduitSegments/wires are whole-house (top level), not per-floor.
