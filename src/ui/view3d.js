@@ -4,6 +4,79 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  paint(ctx, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeat, repeat);
+  texture.anisotropy = anisotropy;
+  if (color) texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function woodTextures(anisotropy) {
+  const paint = (ctx, size, relief = false) => {
+    ctx.fillStyle = relief ? '#888' : '#b98550';
+    ctx.fillRect(0, 0, size, size);
+    const rows = 8;
+    const rowH = size / rows;
+    for (let row = 0; row < rows; row++) {
+      const y = row * rowH;
+      const offset = row % 2 ? size * 0.5 : 0;
+      for (let x = -offset; x < size; x += size) {
+        if (!relief) {
+          const shade = 174 + ((row * 23 + Math.round(x)) % 19);
+          ctx.fillStyle = `rgb(${shade},${Math.round(shade * 0.72)},${Math.round(shade * 0.43)})`;
+          ctx.fillRect(x + 1, y + 1, size - 2, rowH - 2);
+        }
+        ctx.strokeStyle = relief ? '#666' : 'rgba(65,37,18,.35)';
+        ctx.lineWidth = relief ? 3 : 1.5;
+        ctx.strokeRect(x, y, size, rowH);
+      }
+      // Long, low-contrast grain follows the board direction.
+      for (let line = 0; line < 5; line++) {
+        const gy = y + ((line * 13 + row * 7) % Math.max(1, rowH - 5)) + 2;
+        ctx.strokeStyle = relief ? 'rgba(150,150,150,.3)' : 'rgba(74,40,18,.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= size; x += 16) {
+          const wave = Math.sin((x + row * 31 + line * 17) * 0.035) * 2;
+          if (x === 0) ctx.moveTo(x, gy + wave); else ctx.lineTo(x, gy + wave);
+        }
+        ctx.stroke();
+      }
+    }
+  };
+  return {
+    map: canvasTexture(512, (ctx, size) => paint(ctx, size), { anisotropy }),
+    bumpMap: canvasTexture(512, (ctx, size) => paint(ctx, size, true), { color: false, anisotropy }),
+  };
+}
+
+function plasterTextures(anisotropy) {
+  const paint = (ctx, size, relief = false) => {
+    const image = ctx.createImageData(size, size);
+    for (let i = 0; i < image.data.length; i += 4) {
+      const p = i / 4;
+      // Deterministic fine mottling: enough to catch light without visual noise.
+      const noise = ((p * 73 + Math.floor(p / size) * 151) % 17) - 8;
+      const value = relief ? 128 + noise * 2 : 239 + Math.round(noise * 0.35);
+      image.data[i] = value;
+      image.data[i + 1] = relief ? value : value - 1;
+      image.data[i + 2] = relief ? value : value - 3;
+      image.data[i + 3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+  };
+  return {
+    map: canvasTexture(256, (ctx, size) => paint(ctx, size), { repeat: 3, anisotropy }),
+    bumpMap: canvasTexture(256, (ctx, size) => paint(ctx, size, true), { repeat: 3, color: false, anisotropy }),
+  };
+}
+
 export class View3D {
   constructor(container) {
     this.container = container;
@@ -81,21 +154,33 @@ export class View3D {
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
+    const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    const wood = woodTextures(anisotropy);
+    const plaster = plasterTextures(anisotropy);
     this.floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8995a3,
-      roughness: 0.95,
+      color: 0xffffff,
+      map: wood.map,
+      bumpMap: wood.bumpMap,
+      bumpScale: 0.012,
+      roughness: 0.72,
       metalness: 0,
       side: THREE.DoubleSide,
     });
     this.wallMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd7dee7,
-      roughness: 0.82,
+      color: 0xffffff,
+      map: plaster.map,
+      bumpMap: plaster.bumpMap,
+      bumpScale: 0.006,
+      roughness: 0.92,
       metalness: 0,
       side: THREE.DoubleSide,
     });
     this.ceilingMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe4e8ed,
-      roughness: 0.9,
+      color: 0xffffff,
+      map: plaster.map,
+      bumpMap: plaster.bumpMap,
+      bumpScale: 0.004,
+      roughness: 0.94,
       metalness: 0,
       side: THREE.DoubleSide,
     });
