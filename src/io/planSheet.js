@@ -17,12 +17,11 @@
 
 import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
-import { isMarkerConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
+import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
 import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
-import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 // Injected by Vite as the source revision + UTC build time. The fallback keeps
@@ -78,16 +77,6 @@ const C_DIM_BAD = '#111';    // conflicting dimension (stronger black, no color)
 const C_MARK = '#111';       // marker glyphs
 const C_PIN = '#111';        // marker floor-pin dimension; dashed pattern identifies the domain
 const C_ELECTRICAL = '#555'; // dotted switch-to-light route
-// As-built wires are monochrome; the inferred wall/ceiling/floor surface of each
-// run is distinguished by dash pattern alone (the sheet uses no route color).
-const WIRE_SURFACE_DASH = {
-  ceiling: [0.35, 0.9],        // fine dots — same lane as the control ceiling route
-  wall: [1.4, 0.6],            // long dashes
-  floor: [0.2, 0.5, 1.1, 0.5], // dot-dash
-};
-const WIRE_SURFACE_LABEL = { ceiling: 'in ceiling', wall: 'in wall', floor: 'in floor' };
-const C_CONDUIT = '#888';        // the shared conduit network (physical channels)
-const CONDUIT_DASH = [2.2, 1.0]; // one style for every channel; wires above read by surface dash
 const C_ZONE = '#111';       // architectural zone symbols
 
 const MARKER_LABELS = {
@@ -541,7 +530,7 @@ function drawDimensions(be, L, floor, layers) {
   const rects = floor.rectangles;
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
-    if (c.type !== 'distance' || isMarkerConstraint(c)) continue;
+    if (c.type !== 'distance' || isMarkerConstraint(c) || isNodeConstraint(c)) continue;
     if (skipFurnitureConstraint(c, rects, layers)) continue;
     if (displaysZero(c.value)) continue; // a 0.00 dimension is clutter
     const la = structuralDimLine(c.a, rects);
@@ -1225,51 +1214,6 @@ function drawElectricalLinks(be, L, floor) {
   }
 }
 
-// A riser glyph on a floor's plan: a small ring at the slab-penetration point plus a
-// tiny UP/DN tag toward the connected storey, so a slab crossing reads in mono.
-function drawRiserGlyph(be, L, r, stroke) {
-  be.circle(L.X(r.x), L.Y(r.y), 0.9, { fill: '#fff', stroke, width: 0.28 });
-  be.text(r.dir === 'up' ? 'UP' : 'DN', L.X(r.x) + 1.4, L.Y(r.y), { fill: '#000', size: 1.8, align: 'left', baseline: 'middle' });
-}
-
-// The whole-house conduit network filtered to this floor: intra-floor channels as plan
-// lines and slab crossings as riser glyphs. `project` (opts.project) supplies the
-// cross-floor network; without it nothing electrical draws. Node rings mark junctions
-// on this floor so they read on the sheet.
-function drawConduits(be, L, floor, project) {
-  if (!project) return;
-  const { runs, risers } = segmentsForFloor(floor, conduitNetworkSegments(project));
-  for (const s of runs) {
-    if (s.a.x === s.b.x && s.a.y === s.b.y) continue; // vertical drop collapses in plan
-    be.line(L.X(s.a.x), L.Y(s.a.y), L.X(s.b.x), L.Y(s.b.y), {
-      stroke: C_CONDUIT, width: 0.3, dash: CONDUIT_DASH, cap: 'round',
-    });
-  }
-  for (const node of project.conduitNodes || []) {
-    if (project.conduitNodeFloorId(node) !== floor.id) continue; // only this floor's junctions
-    const p = node.markerId ? project.findMarker(node.markerId)?.marker : node;
-    if (!p) continue;
-    be.circle(L.X(p.x), L.Y(p.y), 0.5, { fill: '#fff', stroke: C_CONDUIT, width: 0.18 });
-  }
-  for (const r of risers) drawRiserGlyph(be, L, r, C_CONDUIT);
-}
-
-// Wires routed over the conduit network, drawn per derived-route segment with a
-// surface-specific dash so wall/ceiling/floor runs are distinguishable in mono; slab
-// crossings collapse to riser glyphs. Filtered to this floor from the whole-house set.
-function drawRoutedWires(be, L, floor, project) {
-  if (!project) return;
-  const worldSegs = (project.wires || []).flatMap((wire) => wireRouteSegments(project, wire));
-  const { runs, risers } = segmentsForFloor(floor, worldSegs);
-  for (const s of runs) {
-    if (s.a.x === s.b.x && s.a.y === s.b.y) continue; // vertical rise/drop collapses in plan
-    be.line(L.X(s.a.x), L.Y(s.a.y), L.X(s.b.x), L.Y(s.b.y), {
-      stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[s.surface] || WIRE_SURFACE_DASH.wall, cap: 'round',
-    });
-  }
-  for (const r of risers) drawRiserGlyph(be, L, r, C_ELECTRICAL);
-}
-
 // One conventional floor-area chip per semantic ROOM component. Use the center
 // of its largest source rectangle as a stable point inside the union; this avoids
 // polygon-centroid labels falling outside an L-shaped room.
@@ -1375,43 +1319,6 @@ function drawStrip(be, L, floor, opts) {
       be.text(entry.label, x + 4.4, y,
         { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
       x += entry.width;
-    }
-  }
-  // Conduit + routed-wire key: a conduit sample (when this floor's network exists) plus
-  // one dashed wire sample per surface actually drawn, and a riser key when a slab
-  // crossing shows on this floor, so the plan's symbols can be read back. Shares the
-  // markerIcons gate + the whole-house network (opts.project) with the routes themselves.
-  if (layers.markerIcons && layers.wiring && opts.project) {
-    const conduitForFloor = segmentsForFloor(floor, conduitNetworkSegments(opts.project));
-    const wireForFloor = segmentsForFloor(floor,
-      (opts.project.wires || []).flatMap((wire) => wireRouteSegments(opts.project, wire)));
-    const hasConduit = conduitForFloor.runs.length > 0;
-    const hasRiser = conduitForFloor.risers.length > 0 || wireForFloor.risers.length > 0;
-    // Key only surfaces that actually draw a line in plan — a pure vertical
-    // rise/drop collapses to a point, so it contributes no visible dash to explain.
-    const wireSurfaces = [...new Set(wireForFloor.runs
-      .filter((s) => s.a.x !== s.b.x || s.a.y !== s.b.y)
-      .map((s) => s.surface))]
-      .sort();
-    const entries = [
-      ...(hasConduit ? [{ kind: 'conduit', label: 'Conduit' }] : []),
-      ...wireSurfaces.map((s) => ({ kind: 'wire', s, label: `Wire · ${WIRE_SURFACE_LABEL[s] || s}` })),
-      ...(hasRiser ? [{ kind: 'riser', label: 'Riser (to floor above/below)' }] : []),
-    ];
-    for (const row of wrapRows(entries, (entry) => 9 + be.measure(entry.label, 2.4) + 3)) {
-      let x = page.w - MARGIN - row.width;
-      const y = yBase + 4 + legendRow++ * 6;
-      for (const entry of row.entries) {
-        if (entry.kind === 'riser') {
-          be.circle(x + 3.5, y, 0.9, { fill: '#fff', stroke: C_CONDUIT, width: 0.28 });
-        } else {
-          be.line(x, y, x + 7, y, entry.kind === 'conduit'
-            ? { stroke: C_CONDUIT, width: 0.3, dash: CONDUIT_DASH, cap: 'round' }
-            : { stroke: C_ELECTRICAL, width: 0.28, dash: WIRE_SURFACE_DASH[entry.s] || WIRE_SURFACE_DASH.wall, cap: 'round' });
-        }
-        be.text(entry.label, x + 9, y, { fill: '#000', size: 2.4, align: 'left', baseline: 'middle' });
-        x += entry.width;
-      }
     }
   }
 }
@@ -1666,12 +1573,8 @@ function renderFloor(be, floor, opts = {}) {
   const L = layoutSheet(opts.layoutBBox || bbox, opts);
   drawFootprint(be, L, footprint);
   drawZones(be, L, floor, layers); // semantic fixed-zone/furniture symbols over the footprint
-  if (layers.markerIcons) { // routes/channels have no meaning without their endpoint glyphs
-    if (layers.wiring) { // conduit network + routed wires are an opt-in layer (default off)
-      drawConduits(be, L, floor, opts.project);     // whole-house network filtered to this floor
-      drawRoutedWires(be, L, floor, opts.project);  // wires routed over the conduits, per-surface dash
-    }
-    drawElectricalLinks(be, L, floor); // logical switch→light control legs (per-floor, always with icons)
+  if (layers.markerIcons) {
+    drawElectricalLinks(be, L, floor); // logical switch→light control legs; conduit topology is never printed
   }
   if (layers.planDims) drawDimensions(be, L, floor, layers);
   if (layers.markerDims) drawMarkerPins(be, L, floor, layers); // fixture-placement dimensions, under the glyphs

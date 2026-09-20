@@ -105,13 +105,10 @@ marker pins, and electrical routes without relying on color. AR interaction over
 `sharedScaleSheetOptions()` chooses orientation from authored geometry, fits geometry plus annotations,
 and rounds the ratio denominator upward (`1:56.7` → `1:57`). It shares scale, orientation, origin, and
 generation time across Print, SVG, and AR previews so pages can be superposed. Sheets include the
-footprint, structural and marker-pin dimensions, dotted electrical routes, fixture stacks, semantic
-door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. The whole-house conduit
-network + wires are an **opt-in layer** (the `wiring` output filter in `outputOptions.js`, default
-**off** — it's authoring scaffold that clutters a contractor sheet); when on, they are filtered per
-floor (`segmentsForFloor`): intra-floor runs draw in plan and a slab-piercing run collapses to a
-**riser glyph** (a ring + UP/DN tag, keyed in the legend) shown on both floors it connects. Markers
-and per-floor switch→light control links are unaffected by the `wiring` filter. FURNITURE defaults to
+footprint, structural and marker-pin dimensions, dotted switch→light control links, fixture stacks,
+semantic door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. Whole-house
+conduit nodes, conduit runs, routed wires, their pin dimensions, and risers are authoring data and
+are always excluded from sheets and sheet revision maps. FURNITURE defaults to
 hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
 remain stored and solved but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
 still do. Vertical marker stacks require strictly identical plan `x` and `y`; horizontal fixtures

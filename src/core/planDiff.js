@@ -16,7 +16,7 @@
 
 import { Project } from './model.js';
 import { deserializeInto } from '../io/serialize.js';
-import { isMarkerConstraint } from './constraints.js';
+import { isMarkerConstraint, isNodeConstraint } from './constraints.js';
 
 const TOL = 0.001; // meters; below 1 mm is float/solver noise, not a real change.
 
@@ -69,9 +69,10 @@ export function diffFloor(baseFloor, curFloor) {
     if (!curMarkers.has(base.id)) markers.removed.push({ id: base.id, base });
   }
 
-  // Only structural (non-marker) distance constraints read as "dimensions" a
-  // contractor cares about; marker-pin changes are reported via the marker itself.
-  const isDim = (c) => !isMarkerConstraint(c);
+  // Only structural distance constraints read as "dimensions" a contractor cares
+  // about. Marker pins are reported via their marker; conduit-node pins are
+  // authoring data and never belong on a sheet or its revision map.
+  const isDim = (c) => c.type === 'distance' && !isMarkerConstraint(c) && !isNodeConstraint(c);
   const baseDims = new Map((baseFloor?.constraints || []).filter(isDim).map((c) => [c.id, c]));
   const curDims = new Map((curFloor?.constraints || []).filter(isDim).map((c) => [c.id, c]));
   for (const cur of curDims.values()) {
