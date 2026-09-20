@@ -148,6 +148,27 @@ body {
   pointer-events: none;
 }
 
+/* Desktop 3D is a focused alternate view, parallel to START AR rather than a
+   permanently split editor pane. OrbitControls owns pointer input while open. */
+#app.show-3d #panes { display: none; }
+#app.show-3d #view3d-holder {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: auto;
+}
+#view3d-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1220;
+  font-weight: 600;
+}
+
 #sketch {
   display: block;
   width: 100%;

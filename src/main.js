@@ -30,6 +30,26 @@ let viewMode = false;
 const sketch = new Sketch2D(document.getElementById('sketch'), project);
 const view = new View3D(document.getElementById('view3d'));
 
+// Desktop presentation: switch the main surface between the plan editor and the
+// existing interactive Three.js renderer. Shared #view= links open in 3D by
+// default, but the viewer can return to the plan to take measurements.
+const app = document.getElementById('app');
+const view3dHolder = document.getElementById('view3d-holder');
+const view3dToggle = document.getElementById('view3d-toggle');
+function setDesktop3D(visible) {
+  app.classList.toggle('show-3d', visible);
+  view3dHolder.setAttribute('aria-hidden', String(!visible));
+  view3dToggle.classList.toggle('active', visible);
+  view3dToggle.textContent = visible ? '▦ View plan' : '◈ View 3D';
+  view3dToggle.title = visible ? 'Return to the floor plan' : 'Open the interactive 3D model';
+  if (visible) {
+    // Wait for the formerly parked holder to receive its on-screen dimensions;
+    // ResizeObserver updates the renderer and frameModel recenters the orbit.
+    requestAnimationFrame(() => view.frameModel());
+  }
+}
+view3dToggle.addEventListener('click', () => setDesktop3D(!app.classList.contains('show-3d')));
+
 // Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
 // immersive-ar is supported; no effect on the desktop app otherwise. MR renders
 // the flat floor plan, so it needs the current footprint on demand.
@@ -736,6 +756,7 @@ function seedDemo() {
       sketch.setReadOnly(true);
       setTool('pan');
       view.frameModel();
+      setDesktop3D(true);
       sketch.onStatus?.('Opened a shared 3D view — read-only. Pan/zoom to inspect; 📏 to measure.');
       return;
     }

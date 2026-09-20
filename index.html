@@ -56,6 +56,13 @@
           </aside>
         </section>
       </main>
+      <!-- Kept alive at all times because WebXR uses this renderer. On desktop
+           VIEW 3D brings it on-screen; otherwise CSS parks it off-screen at a
+           real size so its canvas/aspect remain valid for AR startup. -->
+      <section id="view3d-holder" aria-hidden="true">
+        <div id="view3d"></div>
+        <div class="pane-label">Model (3D)</div>
+      </section>
       <footer id="toolbar">
         <span class="brand">House&nbsp;CAD</span>
         <div class="group" id="tool-group">
@@ -111,13 +118,12 @@
             <button data-print="coohom" title="Download a simplified walls, doors, and windows DXF for Coohom recognition">Download Coohom DXF (this floor)</button>
           </div>
         </div>
+        <div class="group" id="view-group">
+          <button id="view3d-toggle" type="button" title="Open the interactive 3D model">◈ View 3D</button>
+        </div>
         <div class="group" id="ar-group"></div>
         <div class="group hint" id="hint">Drag on the grid to draw a rectangle.</div>
       </footer>
-      <!-- The 3D view is hidden from the desktop layout but must stay in the DOM:
-           the WebXR/AR session renders through this Three.js renderer. Parked
-           off-screen at a real size so the renderer keeps a valid canvas/aspect. -->
-      <div id="view3d-holder" aria-hidden="true"><div id="view3d"></div></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
