@@ -256,7 +256,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   AR therefore uses Android Web Share (when file sharing is supported) for subsequent exports.
   The share sheet is an intentional user-confirmed delivery step around that browser restriction;
   if Quest advertises Web Share but rejects it from immersive mode, delivery retries as a uniquely
-  named direct download rather than discarding the generated document.
+  named direct download rather than discarding the generated document. For Quest's site-level
+  **Batch download** permission, open House CAD in the normal 2D Quest Browser before entering AR
+  and press **Enable batch downloads**. Its one explicit browser click starts two tiny, disposable
+  `.txt` test downloads; the second causes Chromium to offer the permission prompt where it is
+  visible. Choose Allow, then relaunch the TWA. JavaScript cannot inspect or grant this permission.
   JSON uses `serializeProject` and contains the whole multi-floor persistent model; output-layer
   toggles do not filter or mutate this debugging snapshot.
   The panel is absent

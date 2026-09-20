@@ -558,6 +558,20 @@ function download(filename, data, mime = 'application/json') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Quest Chromium permits one synthetic download, then gates later files behind its
+// site-level "Batch download" permission. Web pages cannot request that permission
+// through navigator.permissions; Chromium offers it only in response to an actual
+// multi-download attempt. Run this from a normal 2D browser click (before entering
+// immersive AR), where the permission prompt is visible. The TWA shares this origin.
+document.getElementById('batch-downloads').addEventListener('click', (event) => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const body = 'House CAD batch-download permission test. This file may be deleted.\n';
+  download(`house-cad-download-test-1-${stamp}.txt`, body, 'text/plain');
+  download(`house-cad-download-test-2-${stamp}.txt`, body, 'text/plain');
+  event.currentTarget.textContent = '⇩ Check permission prompt';
+  sketch.onStatus?.('Quest Browser should ask to allow Batch downloads. Choose Allow, then relaunch House CAD AR.');
+});
+
 document.getElementById('save').addEventListener('click', () => {
   const rev = project.bumpRevision(); // deliberate save → advance the revision
   const data = JSON.stringify(serializeProject(project), null, 2);
