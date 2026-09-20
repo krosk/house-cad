@@ -657,7 +657,11 @@ teleport reticle; no last-active routing remains.
 - **XR reference-space**: in `sessionstart` request `local-floor` AND
   `renderer.xr.setReferenceSpace(localSpace)` (the type setter alone did NOT take through
   ARButton). Read world cam pos from `matrixWorld.elements` ([12],[13],[14]);
-  `getCamera().position` stays ~0.
+  `getCamera().position` stays ~0. The spatial anchor's **full pose** must be applied every frame:
+  `planPos` follows its position and `anchorYaw` follows its quaternion. Quest may translate and
+  rotate `local-floor` when it relocalizes after the headset sleeps; reading only anchor position
+  makes the plan jump or acquire a different orientation. `planYaw` and `navOffset` are stored in
+  the anchor frame, so teleport and left-stick viewer-pivot rotation survive that relocalization.
 - **Remote logging** (`rlog` → dev-only `POST /__log` → `quest-debug.log`, gitignored — never
   stage it) works only on the dev server, NOT on Pages/the APK. The release TWA has **no web
   console** — debug the `?ar=1` page in the plain Quest Browser or Oculus Remote Web Inspector.

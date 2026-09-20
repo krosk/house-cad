@@ -2631,6 +2631,7 @@ export function setupMR(view, project, getFootprint) {
   let localSpace = null;
   let currentFrame = null;
   let anchor = null;
+  let anchorPoseMissing = false;
   let placed = false;
   const saved = {};
   const planPos = new THREE.Vector3(); // last placed reference point (world)
@@ -2639,6 +2640,7 @@ export function setupMR(view, project, getFootprint) {
   // the physical passthrough camera and the surveyed anchor remain untouched.
   const navOffset = new THREE.Vector3();
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
+  let anchorYaw = 0;                   // spatial-anchor yaw in the current local-floor space
   let floorY = 0;                      // shared ground datum; derived from any storey's real floor in FLOOR
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
   let recalPts = [];                   // RECAL wall touches (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
@@ -2749,7 +2751,7 @@ export function setupMR(view, project, getFootprint) {
   let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
 
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
-  // (x, 0, -y), and planGroup adds planYaw + planPos; worldToLocal inverts both
+  // (x, 0, -y), and planGroup adds anchorYaw + planYaw + planPos; worldToLocal inverts all
   // (and tracks any drift correction folded into planPos). Undo the y-flip.
   const _local = new THREE.Vector3();
   function worldToPlan(world) {
@@ -2782,12 +2784,32 @@ export function setupMR(view, project, getFootprint) {
   const displayElevation = () => (allFloorsView ? 0 : activeElevation());
   const overlayY = () => planPos.y + displayElevation();
 
+  // navOffset lives in the SURVEY ANCHOR'S horizontal frame, not raw local-floor
+  // coordinates. Quest may relocalize local-floor after the headset sleeps; the
+  // anchor then reports a translated + rotated pose. Keeping navigation anchor-local
+  // makes teleport and viewer-pivot yaw follow that correction instead of jumping.
+  const planGroupWorldXZ = () => {
+    const c = Math.cos(anchorYaw), s = Math.sin(anchorYaw);
+    return {
+      x: planPos.x + navOffset.x * c + navOffset.z * s,
+      z: planPos.z - navOffset.x * s + navOffset.z * c,
+    };
+  };
+  const setNavOffsetForWorldXZ = (x, z) => {
+    const wx = x - planPos.x, wz = z - planPos.z;
+    const c = Math.cos(anchorYaw), s = Math.sin(anchorYaw);
+    // R_y(anchorYaw)^-1 · world delta.
+    navOffset.x = wx * c - wz * s;
+    navOffset.z = wx * s + wz * c;
+  };
+
   // Rebuild the plan's transform from its origin (planPos), yaw (planYaw), and the
   // selected display's elevation lift. Drive position/quaternion (not .matrix)
   // so Three keeps matrixWorld in sync.
   function applyPlanMatrix() {
-    planGroup.position.set(planPos.x + navOffset.x, overlayY(), planPos.z + navOffset.z);
-    planGroup.quaternion.setFromAxisAngle(UP, planYaw);
+    const p = planGroupWorldXZ();
+    planGroup.position.set(p.x, overlayY(), p.z);
+    planGroup.quaternion.setFromAxisAngle(UP, anchorYaw + planYaw);
     originGizmo.position.copy(planGroup.position); // gizmo rides the lifted origin + yaw
     originGizmo.quaternion.copy(planGroup.quaternion);
   }
@@ -2947,7 +2969,8 @@ export function setupMR(view, project, getFootprint) {
     const wx = wdx / wlen, wz = wdz / wlen;
     // Pick the plan axis whose CURRENT world direction best matches the touch, so
     // recal makes the small intended rotation (not a 90° flip to another edge).
-    const c0 = Math.cos(planYaw), s0 = Math.sin(planYaw);
+    const currentWorldYaw = anchorYaw + planYaw;
+    const c0 = Math.cos(currentWorldYaw), s0 = Math.sin(currentWorldYaw);
     let Pdx = 1, Pdy = 0, best = -Infinity;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const ex = dx * c0 - dy * s0;   // Ry(yaw)·(dx,0,-dy), horizontal x
@@ -4288,8 +4311,8 @@ export function setupMR(view, project, getFootprint) {
     if (!hit || !viewer) return;
     const head = viewer.transform.position;
     const { px, py } = worldToPlan(hit);
-    navOffset.x += head.x - hit.x;
-    navOffset.z += head.z - hit.z;
+    const groupPos = planGroupWorldXZ();
+    setNavOffsetForWorldXZ(groupPos.x + head.x - hit.x, groupPos.z + head.z - hit.z);
     applyPlanMatrix();
     if (inputSource?.handedness === 'left') leftTeleportReticle.visible = false;
     else reticle.visible = false;
@@ -5360,6 +5383,7 @@ export function setupMR(view, project, getFootprint) {
 
   function placeAt(x, y, z) {
     navOffset.set(0, 0, 0); // a fresh registration/recalibration exits virtual locomotion
+    anchorYaw = 0; // the newly requested anchor has identity orientation in this space
     planPos.set(x, y, z);
     planGroup.visible = true; // may have no zones yet — the origin gizmo is the placeholder
     originGizmo.visible = true;
@@ -5367,6 +5391,7 @@ export function setupMR(view, project, getFootprint) {
     placed = true;
     reticle.visible = false;
     anchor = null; // drop the old anchor so the frame loop won't snap us back
+    anchorPoseMissing = false;
     if (currentFrame?.createAnchor) {
       const xform = new XRRigidTransform({ x, y, z }, { x: 0, y: 0, z: 0, w: 1 });
       currentFrame.createAnchor(xform, localSpace)
@@ -5404,7 +5429,9 @@ export function setupMR(view, project, getFootprint) {
     planGroup.visible = false;
     placed = false;
     anchor = null;
+    anchorPoseMissing = false;
     planYaw = 0;
+    anchorYaw = 0;
     floorY = 0;
     navOffset.set(0, 0, 0);
     refreshFloorEditState(); // seed EDGE target + undo stack from the active floor
@@ -5432,6 +5459,7 @@ export function setupMR(view, project, getFootprint) {
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
     anchor = null;
+    anchorPoseMissing = false;
     reticle.visible = false;
     leftTeleportReticle.visible = false;
     sheetPanel.group.visible = false;
@@ -5844,14 +5872,13 @@ export function setupMR(view, project, getFootprint) {
       const pz = viewer?.transform.position.z ?? fallback[14];
       // Rotate the plan group's current world XZ about the headset pivot by d
       // (R_y: x' = x·cos + z·sin, z' = −x·sin + z·cos), then store the resulting
-      // group translation in navOffset (planGroup.position = planPos + navOffset).
-      const gx = planPos.x + navOffset.x, gz = planPos.z + navOffset.z;
+      // group translation in anchor-local navOffset.
+      const { x: gx, z: gz } = planGroupWorldXZ();
       const vx = gx - px, vz = gz - pz;
       const c = Math.cos(d), s = Math.sin(d);
       const nextX = px + (vx * c + vz * s);
       const nextZ = pz + (-vx * s + vz * c);
-      navOffset.x = nextX - planPos.x;
-      navOffset.z = nextZ - planPos.z;
+      setNavOffsetForWorldXZ(nextX, nextZ);
       planYaw += d;
       applyPlanMatrix();
       rlog('plan yaw about viewer', {
@@ -6685,14 +6712,31 @@ export function setupMR(view, project, getFootprint) {
       reticle.visible = false;
       edgeHi.visible = false;
     }
-    // Keep the placed plan locked to its anchor (the runtime corrects drift here),
-    // preserving the ALIGN yaw about the drift-corrected origin.
+    // Keep the placed plan locked to the COMPLETE anchor pose. In particular, Quest
+    // may rotate local-floor while relocalizing after headset sleep; ignoring the
+    // anchor quaternion preserves its position but makes the plan jump/turn around
+    // the new tracking origin. planYaw + navOffset remain anchor-relative.
     if (placed && anchor) {
       const pose = frame.getPose(anchor.anchorSpace, localSpace);
       if (pose) {
+        if (anchorPoseMissing) rlog('anchor pose recovered after tracking interruption');
+        anchorPoseMissing = false;
         const p = pose.transform.position;
         planPos.set(p.x, p.y, p.z);
+        const o = pose.transform.orientation;
+        _camQ.set(o.x, o.y, o.z, o.w);
+        _fwd.set(0, 0, -1).applyQuaternion(_camQ);
+        anchorYaw = Math.atan2(-_fwd.x, -_fwd.z);
+        planGroup.visible = true;
+        originGizmo.visible = true;
         applyPlanMatrix();
+      } else {
+        // Do not render one stale local-floor frame while Quest is still
+        // relocalizing. It can be metres/degrees away until the anchor pose returns.
+        if (!anchorPoseMissing) rlog('anchor pose unavailable; hiding placed plan');
+        anchorPoseMissing = true;
+        planGroup.visible = false;
+        originGizmo.visible = false;
       }
     }
   }
