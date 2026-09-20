@@ -129,9 +129,10 @@ Desktop Print creates one page per floor; print at 100% for true scale. Full AR 
 ### Change map (revision clouds vs a saved slot)
 
 `src/core/planDiff.js` diffs a **baseline snapshot** (a saved slot's serialized project) against the
-live project so a revised sheet shows a contractor what changed. Everything is matched by **stable id**
-(rectangles, markers, constraints all keep ids across revisions of one lineage), never geometrically,
-and compares **solved** geometry — `diffAgainstSnapshot()` deserializes the baseline into a throwaway
+live project so a revised sheet shows a contractor what changed. Markers and constraints are first
+matched by **stable id**. Unmatched removed/added markers are then reconciled one-to-one when their
+type and solved XYZ agree within 1 mm, so deleting and recreating the same fixture in place is not a
+false change. `diffAgainstSnapshot()` deserializes the baseline into a throwaway
 `Project` (which solves on load via `_emit`) and returns `Map<floorId, floorDiff>` classifying markers
 (added/removed/moved/retyped) and structural dimensions (added/removed/value-changed) with a 1 mm
 tolerance. Zone changes are intentionally excluded. It is pure model data — labels/units/numbering

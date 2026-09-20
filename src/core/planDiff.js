@@ -30,9 +30,11 @@ export function diffFloor(baseFloor, curFloor) {
 
   const baseMarkers = new Map((baseFloor?.markers || []).map((m) => [m.id, m]));
   const curMarkers = new Map((curFloor?.markers || []).map((m) => [m.id, m]));
+  const unmatchedAdded = [];
+  const unmatchedRemoved = [];
   for (const cur of curMarkers.values()) {
     const base = baseMarkers.get(cur.id);
-    if (!base) { markers.added.push({ id: cur.id, cur }); continue; }
+    if (!base) { unmatchedAdded.push(cur); continue; }
     const moved = !near(base.x, cur.x) || !near(base.y, cur.y) || !near(base.z, cur.z);
     const retyped = base.type !== cur.type;
     if (moved || retyped) {
@@ -40,8 +42,34 @@ export function diffFloor(baseFloor, curFloor) {
     }
   }
   for (const base of baseMarkers.values()) {
-    if (!curMarkers.has(base.id)) markers.removed.push({ id: base.id, base });
+    if (!curMarkers.has(base.id)) unmatchedRemoved.push(base);
   }
+
+  // A delete followed by recreating the same fixture gives it a fresh id, but is
+  // not a meaningful contractor change. Reconcile only the still-unmatched markers
+  // when type and solved XYZ coincide within the normal 1 mm diff tolerance. Build
+  // every candidate and take nearest pairs first so duplicate/stacked fixtures are
+  // cancelled deterministically one-to-one rather than depending on array order.
+  const candidates = [];
+  for (let ai = 0; ai < unmatchedAdded.length; ai++) {
+    const cur = unmatchedAdded[ai];
+    for (let ri = 0; ri < unmatchedRemoved.length; ri++) {
+      const base = unmatchedRemoved[ri];
+      if (base.type !== cur.type || !near(base.x, cur.x) || !near(base.y, cur.y) || !near(base.z, cur.z)) continue;
+      const dx = (base.x || 0) - (cur.x || 0);
+      const dy = (base.y || 0) - (cur.y || 0);
+      const dz = (base.z || 0) - (cur.z || 0);
+      candidates.push({ ai, ri, d2: dx * dx + dy * dy + dz * dz });
+    }
+  }
+  candidates.sort((a, b) => a.d2 - b.d2 || a.ai - b.ai || a.ri - b.ri);
+  const matchedAdded = new Set(), matchedRemoved = new Set();
+  for (const { ai, ri } of candidates) {
+    if (matchedAdded.has(ai) || matchedRemoved.has(ri)) continue;
+    matchedAdded.add(ai); matchedRemoved.add(ri);
+  }
+  unmatchedAdded.forEach((cur, i) => { if (!matchedAdded.has(i)) markers.added.push({ id: cur.id, cur }); });
+  unmatchedRemoved.forEach((base, i) => { if (!matchedRemoved.has(i)) markers.removed.push({ id: base.id, base }); });
 
   // Only structural distance constraints read as "dimensions" a contractor cares
   // about. Marker pins are reported via their marker; conduit-node pins are
