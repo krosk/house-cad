@@ -14,6 +14,8 @@
 - `packaging/quest-apk.md` — Quest APK runbook (read before any packaging work).
 - `docs/markers-plan.md` — the vertical-elements (markers) design + follow-on roadmap.
 - `docs/furniture-handoff.md` — furniture-in-AR (M1–M3) detail.
+- `docs/electrical-workflow.md` — the three electrical lanes (conduit / wire / control), the
+  intended conduit→wire→circuit authoring order, and how circuits derive (`src/core/circuits.js`).
 - Claude memory (auto-loads): `phase5-xr-intent`, `multi-floor-design`, `ar-2d-parity`,
   `quest-guardian-limitation` — Phase-5 rationale + XR gotchas; `conduit-wiring-model` +
   `cross-floor-conduit` — the electrical two-layer model and its cross-floor promotion;

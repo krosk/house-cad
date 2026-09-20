@@ -139,7 +139,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`), colored per inferred surface
   (`conduitNetworkSegments` + `segmentSurface`; risers violet), showing only segments touching the
   active floor, with a node sphere per active-floor vertex (marker-bound dimmer). Readout: `START PEN`,
-  then `RUN CONDUIT`.
+  then `RUN CONDUIT`. **The intended conduit→wire→circuit workflow and the conduit/wire/control-link
+  relationship are in `docs/electrical-workflow.md`.**
 - **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are
   always drawn, so no wire-select step). Trigger a node to **select** it; a free (bare) junction opens
   a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad: single-value

@@ -339,6 +339,7 @@ const STRINGS = {
   'marker.outlet_appliance': { en: 'appliance outlet', fr: 'prise électroménager', zh: '家电专用插座' },
   'marker.intercom': { en: 'intercom', fr: 'interphone', zh: '对讲机' },
   'marker.panel':    { en: 'panel',    fr: 'tableau',      zh: '配电箱' },
+  'marker.breaker':  { en: 'breaker',  fr: 'disjoncteur',  zh: '断路器' },
   'marker.switch':   { en: 'switch',   fr: 'interrupteur', zh: '开关' },
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },

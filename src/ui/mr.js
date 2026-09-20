@@ -2539,7 +2539,7 @@ export function setupMR(view, project, getFootprint) {
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
     'switch', 'light', 'ethernet', 'ethernet_dual', 'camera_ethernet', 'patch_panel', 'intercom',
-    'panel',
+    'panel', 'breaker',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one

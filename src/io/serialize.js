@@ -46,10 +46,22 @@ function serializeConstraint(c) {
 }
 // zDatum/zOff (ceiling-relative height) are omitted when absent → the marker reads as
 // a plain absolute z (floor datum), the back-compat default.
+// Breaker-only attributes (circuit identity/metadata lives on the breaker marker; see
+// core/circuits.js). Scalar + additive: only emitted when present, so other markers and
+// older files are unaffected. Circuit MEMBERSHIP is derived, never stored.
+function breakerFields(m) {
+  if (m.type !== 'breaker') return {};
+  const out = {};
+  if (m.number != null) out.number = m.number;
+  if (m.rating != null) out.rating = m.rating;
+  if (m.poles != null) out.poles = m.poles;
+  return out;
+}
+
 function serializeMarker(m) {
   const out = { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z };
   if (m.zDatum) { out.zDatum = m.zDatum; out.zOff = m.zOff || 0; }
-  return out;
+  return { ...out, ...breakerFields(m) };
 }
 function serializeRoute(route) {
   const mode = route?.mode || 'ceiling';
@@ -179,6 +191,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
     const copy = {
       id: nextMarkerId(), type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
       ...(m.zDatum ? { zDatum: m.zDatum, zOff: m.zOff || 0 } : {}),
+      ...breakerFields(m),
       _locked: { x: false, y: false },
     };
     markerIds.set(m.id, copy.id);
@@ -366,6 +379,7 @@ export function deserializeInto(project, data) {
     markers: (f.markers || []).map((m) => ({
       id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
       ...(m.zDatum ? { zDatum: m.zDatum, zOff: m.zOff || 0 } : {}),
+      ...breakerFields(m),
       _locked: { x: false, y: false },
     })),
     electricalLinks: (f.electricalLinks || []).map((link) => ({
