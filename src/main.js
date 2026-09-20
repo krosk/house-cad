@@ -107,6 +107,8 @@ function rebuild() {
     elevation: f.elevation,
     floorId: f.id,
     name: f.name,
+    height: f.height,
+    markers: f.markers,
   }));
   view.setGeometry(floorGeos);
   view.setFloorFilter(selected3DFloorId);

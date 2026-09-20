@@ -5354,11 +5354,13 @@ export function setupMR(view, project, getFootprint) {
     saved.floorVisible = view.floor?.visible;
     saved.controls = view.controls.enabled;
     saved.meshVisible = view.house?.visible;
+    saved.markerLightsVisible = view.markerLights?.visible;
 
     scene.background = null; // reveal passthrough
     if (view.grid) view.grid.visible = false;
     if (view.floor) view.floor.visible = false;
     if (view.house) view.house.visible = false; // hide the extruded walls
+    if (view.markerLights) view.markerLights.visible = false;
     view.hideMesh = true; // keep them hidden even as survey edits rebuild the mesh
     view.controls.enabled = false;
 
@@ -5419,6 +5421,7 @@ export function setupMR(view, project, getFootprint) {
     if (view.grid) view.grid.visible = saved.gridVisible ?? true;
     if (view.floor) view.floor.visible = saved.floorVisible ?? true;
     if (view.house) view.house.visible = saved.meshVisible ?? true;
+    if (view.markerLights) view.markerLights.visible = saved.markerLightsVisible ?? true;
     view.controls.enabled = saved.controls ?? true;
     view._resize(); // XR left the framebuffer at headset size
   });

@@ -94,6 +94,9 @@ export class View3D {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(w, h);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.9;
     this.renderer.xr.enabled = true; // harmless on desktop; required for WebXR
     container.appendChild(this.renderer.domElement);
 
@@ -184,10 +187,20 @@ export class View3D {
       metalness: 0,
       side: THREE.DoubleSide,
     });
+    this.lightFixtureGeometry = new THREE.CylinderGeometry(0.11, 0.11, 0.035, 24);
+    this.lightFixtureMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfff3df,
+      emissive: 0xffc27a,
+      emissiveIntensity: 1.8,
+      roughness: 0.45,
+      metalness: 0,
+    });
     // The house is a stack of one mesh per floor, each offset in Y by its
     // elevation. Kept in a group so multi-floor models frame/hide as a unit.
     this.house = new THREE.Group();
     this.scene.add(this.house);
+    this.markerLights = new THREE.Group();
+    this.scene.add(this.markerLights);
     // While MR is active the extruded walls must stay hidden (the flat plan is
     // shown instead). setGeometry rebuilds on every model change, so it honors
     // this flag rather than a one-time visibility toggle.
@@ -215,6 +228,7 @@ export class View3D {
   setGeometry(floors) {
     for (const m of this.house.children) m.geometry.dispose();
     this.house.clear();
+    this.markerLights.clear();
 
     const list = Array.isArray(floors)
       ? floors
@@ -241,14 +255,51 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
+      let shadowCount = 0;
+      for (const marker of entry.markers || []) {
+        if (marker.type !== 'light') continue;
+        const fixture = new THREE.Group();
+        fixture.userData.floorId = floorId || null;
+        fixture.userData.markerId = marker.id || null;
+        fixture.position.set(
+          Number(marker.x) || 0,
+          (elevation || 0) + (Number.isFinite(marker.z) ? marker.z : (entry.height || 2.5)),
+          -(Number(marker.y) || 0),
+        );
+
+        // A small emissive ceiling puck makes the source legible even where its
+        // illumination is washed out by daylight. The actual source sits just
+        // below the authored marker to avoid embedding it in the ceiling slab.
+        const puck = new THREE.Mesh(this.lightFixtureGeometry, this.lightFixtureMaterial);
+        puck.position.y = -0.025;
+        fixture.add(puck);
+
+        const source = new THREE.PointLight(0xffc58f, 70, 8, 2);
+        source.position.y = -0.08;
+        if (shadowCount < 2) {
+          source.castShadow = true;
+          source.shadow.mapSize.set(256, 256);
+          source.shadow.camera.near = 0.08;
+          source.shadow.camera.far = 8;
+          source.shadow.bias = -0.001;
+          shadowCount++;
+        }
+        fixture.add(source);
+        fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
+        this.markerLights.add(fixture);
+      }
     }
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
+    this.markerLights.visible = !this.hideMesh;
   }
 
   setFloorFilter(floorId = null) {
     this.floorFilter = floorId;
     for (const mesh of this.house.children) {
       mesh.visible = this._meshVisible(mesh);
+    }
+    for (const fixture of this.markerLights.children) {
+      fixture.visible = floorId == null || fixture.userData.floorId === floorId;
     }
     this.frameModel();
   }

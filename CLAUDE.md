@@ -51,6 +51,10 @@ project's active floor; POV reveals that floor's ceiling, which stays hidden in 
 Floor slabs use a lightweight procedural wood-plank material; walls and POV ceilings use neutral
 white procedural plaster. These CanvasTextures are generated locally (no network/assets), repeat in
 UV space, and use restrained bump/roughness so they remain mobile-friendly.
+Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
+puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
+authority; the fixture/light are presentation-only. At most two lights per floor cast low-resolution
+shadows to contain mobile rendering cost.
 
 Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
 They refresh only Sketch2D and the dimension panel: never feed them to `solve()`, rebuild 3D/export
