@@ -88,7 +88,6 @@ const STRINGS = {
   'rev.markerRetyped':{ en: '{from}→{to}',           fr: '{from}→{to}',             zh: '{from}→{to}' },
   'rev.dimChanged':   { en: 'Dim {from}→{to} {unit}', fr: 'Cote {from}→{to} {unit}', zh: '尺寸 {from}→{to} {unit}' },
   'rev.dimAdded':     { en: 'Dim added {value} {unit}', fr: 'Cote ajoutée {value} {unit}', zh: '新增尺寸 {value} {unit}' },
-  'rev.dimRemoved':   { en: 'Dim removed',           fr: 'Cote supprimée',          zh: '删除尺寸' },
   'floor.ground': { en: 'Ground floor', fr: 'Rez-de-chaussée', zh: '底层' },
   'floor.upper': { en: 'Upper floor', fr: 'Étage', zh: '上层' },
   'floor.basement': { en: 'Basement', fr: 'Sous-sol', zh: '地下室' },
@@ -404,7 +403,7 @@ export function t(key, lang = current) {
 // text follows the UI language in Print/SVG/PNG and the AR preview alike.
 export function revLabels(lang = current) {
   const keys = ['title', 'markerAdded', 'markerRemoved', 'markerMoved', 'markerRetyped',
-    'dimChanged', 'dimAdded', 'dimRemoved'];
+    'dimChanged', 'dimAdded'];
   return Object.fromEntries(keys.map((k) => [k, t(`rev.${k}`, lang)]));
 }
 

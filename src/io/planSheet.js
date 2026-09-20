@@ -1374,7 +1374,7 @@ const CLOUD_MERGE_GAP = 2 * CLOUD_OUTSET + CLOUD_R;
 const REV_TEXT_EN = {
   title: 'CHANGES',
   markerAdded: '{name} added', markerRemoved: '{name} removed', markerMoved: '{name} moved', markerRetyped: '{from}→{to}',
-  dimChanged: 'Dim {from}→{to} {unit}', dimAdded: 'Dim added {value} {unit}', dimRemoved: 'Dim removed',
+  dimChanged: 'Dim {from}→{to} {unit}', dimAdded: 'Dim added {value} {unit}',
 };
 
 // Quadratic bezier sample (the backends have no arc primitive; sampling as short
@@ -1520,7 +1520,6 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers(), opts 
     const dimShown = (c) => !skipFurnitureConstraint(c, floor.rectangles, layers);
     for (const { cur, from, to } of diff.dims.changed) if (dimShown(cur)) pushDim(dimAnchor(floor, cur), fill(R.dimChanged, { from: fmtSheetDim(from), to: fmtSheetDim(to), unit: u }));
     for (const { cur } of diff.dims.added) if (dimShown(cur)) pushDim(dimAnchor(floor, cur), fill(R.dimAdded, { value: fmtSheetDim(cur.value), unit: u }));
-    for (const _ of diff.dims.removed) pushDim(null, R.dimRemoved);
   }
 
   if (!items.length) return; // nothing survived the layer filter: no clouds, tags, or legend

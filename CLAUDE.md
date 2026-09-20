@@ -134,8 +134,10 @@ matched by **stable id**. Unmatched removed/added markers are then reconciled on
 type and solved XYZ agree within 1 mm, so deleting and recreating the same fixture in place is not a
 false change. `diffAgainstSnapshot()` deserializes the baseline into a throwaway
 `Project` (which solves on load via `_emit`) and returns `Map<floorId, floorDiff>` classifying markers
-(added/removed/moved/retyped) and structural dimensions (added/removed/value-changed) with a 1 mm
-tolerance. Zone changes are intentionally excluded. It is pure model data — labels/units/numbering
+(added/removed/moved/retyped) and meaningful structural-dimension changes with a 1 mm tolerance.
+Removed dimensions, zero-length additions, and informational dimensions added between unmoved edges
+are excluded; an added dimension appears only when one of its referenced edges moved. Zone changes
+are also intentionally excluded. It is pure model data — labels/units/numbering
 are composed by the sheet.
 `planSheet.js` draws it (`drawChangeMap`, gated by `opts.changeMap` = that `Map`): monochrome revision
 clouds (scalloped, sampled as line segments since the backends have no arc) + numbered revision-triangle

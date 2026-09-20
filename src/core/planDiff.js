@@ -15,7 +15,7 @@
 
 import { Project } from './model.js';
 import { deserializeInto } from '../io/serialize.js';
-import { isMarkerConstraint, isNodeConstraint } from './constraints.js';
+import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from './constraints.js';
 
 const TOL = 0.001; // meters; below 1 mm is float/solver noise, not a real change.
 
@@ -77,17 +77,35 @@ export function diffFloor(baseFloor, curFloor) {
   const isDim = (c) => c.type === 'distance' && !isMarkerConstraint(c) && !isNodeConstraint(c);
   const baseDims = new Map((baseFloor?.constraints || []).filter(isDim).map((c) => [c.id, c]));
   const curDims = new Map((curFloor?.constraints || []).filter(isDim).map((c) => [c.id, c]));
+  const coordOn = (floor, endpoint) => {
+    if (endpoint?.rect === ORIGIN_ID) return 0;
+    const id = endpoint?.rect?.id ?? endpoint?.rect;
+    const rect = (floor?.rectangles || []).find((r) => r.id === id);
+    return rect ? edgeCoord(rect, endpoint.edge) : null;
+  };
+  // An added dimension is a change annotation only when the geometry it describes
+  // actually changed. Adding a read-only/informational measurement between stable
+  // edges must not manufacture a revision. A missing baseline edge counts as new.
+  const addedDimDescribesMovedEdge = (c) => [c.a, c.b].some((endpoint) => {
+    const curCoord = coordOn(curFloor, endpoint);
+    const baseCoord = coordOn(baseFloor, endpoint);
+    return !Number.isFinite(curCoord) || !Number.isFinite(baseCoord) || !near(curCoord, baseCoord);
+  });
   for (const cur of curDims.values()) {
     const base = baseDims.get(cur.id);
-    if (!base) { dims.added.push({ id: cur.id, cur }); continue; }
+    if (!base) {
+      if (Math.abs(cur.value || 0) > TOL && addedDimDescribesMovedEdge(cur)) {
+        dims.added.push({ id: cur.id, cur });
+      }
+      continue;
+    }
     // Compare magnitude: the sign only encodes direction, not the measured length.
     if (!near(Math.abs(base.value), Math.abs(cur.value))) {
       dims.changed.push({ id: cur.id, base, cur, from: Math.abs(base.value), to: Math.abs(cur.value) });
     }
   }
-  for (const base of baseDims.values()) {
-    if (!curDims.has(base.id)) dims.removed.push({ id: base.id, base });
-  }
+  // Removed dimensions are drafting changes, not changes to the built geometry.
+  // Keep `removed` in the stable result shape, but deliberately leave it empty.
 
   return { markers, dims };
 }
