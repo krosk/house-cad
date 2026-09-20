@@ -38,34 +38,8 @@ const app = document.getElementById('app');
 const view3dHolder = document.getElementById('view3d-holder');
 const view3dToggle = document.getElementById('view3d-toggle');
 const view3dFloorList = document.getElementById('view3d-floor-list');
-const view3dWalk = document.getElementById('view3d-walk');
-const view3dWalkHint = document.getElementById('view3d-walk-hint');
-const view3dMovePad = document.getElementById('view3d-move-pad');
 let selected3DFloorId = null;
 let hasChosen3DFloor = false;
-
-function setWalkMode(enabled) {
-  view.setWalkMode(enabled);
-  view3dWalk.classList.toggle('active', enabled);
-  view3dWalk.setAttribute('aria-pressed', String(enabled));
-  view3dWalk.textContent = enabled ? '✕ Exit walk' : '◎ Walk';
-  view3dWalkHint.hidden = !enabled;
-  view3dMovePad.hidden = !enabled;
-}
-view.onWalkExit = () => setWalkMode(false);
-view3dWalk.addEventListener('click', () => setWalkMode(!view.walkMode));
-for (const button of view3dMovePad.querySelectorAll('button')) {
-  const direction = button.dataset.move;
-  const stop = () => view.setWalkMotion(direction, false);
-  button.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    view.setWalkMotion(direction, true);
-  });
-  button.addEventListener('pointerup', stop);
-  button.addEventListener('pointercancel', stop);
-  button.addEventListener('lostpointercapture', stop);
-}
 
 function render3DFloorList() {
   if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
@@ -105,7 +79,6 @@ function setDesktop3D(visible) {
   view3dToggle.classList.toggle('active', visible);
   view3dToggle.textContent = visible ? '▦ View plan' : '◈ View 3D';
   view3dToggle.title = visible ? 'Return to the floor plan' : 'Open the interactive 3D model';
-  if (!visible) setWalkMode(false);
   if (visible) {
     if (!hasChosen3DFloor) selected3DFloorId = project.activeFloorId || project.floors[0]?.id || null;
     // Wait for the formerly parked holder to receive its on-screen dimensions;

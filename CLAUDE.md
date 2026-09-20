@@ -43,10 +43,11 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
 
-Desktop/mobile View 3D also has a view-only WALK mode: click/tap an architectural floor to
-teleport to 1.65 m eye height, drag to look, and move with WASD/arrows or the touch D-pad. Camera
-state is session-only and must not mutate project or shared-view data. The viewer initially isolates
-the project's active floor; WALK reveals that floor's ceiling, which stays hidden in orbit overview.
+Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is locked top-down and a
+drag pans only on the plan plane; tapping a room animates the camera to a stationary 1.65 m POV.
+In POV, dragging only looks around and a simple tap animates back to the saved overview. Camera state
+is session-only and must not mutate project or shared-view data. The viewer initially isolates the
+project's active floor; POV reveals that floor's ceiling, which stays hidden in overview.
 
 ### The constraint solver (`src/core/constraints.js`) — the heart of the app
 

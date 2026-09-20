@@ -1,4 +1,4 @@
-// The 3D viewport: a Three.js scene with orbit controls and a ground grid.
+// The 3D viewport: a Three.js scene with constrained overview/POV navigation.
 // Call setGeometry() whenever the model changes to replace the house mesh.
 
 import * as THREE from 'three';
@@ -28,23 +28,25 @@ export class View3D {
     this.onXRFrame = null;
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
+    // Kept for the MR lifecycle, which temporarily saves/disables this field.
+    // Desktop navigation below is intentionally limited to two custom modes.
+    this.controls.enabled = false;
     this.controls.target.set(0, 1, 0);
 
-    // View-only first-person navigation. Camera state is local to this browser
-    // session and never enters the project or its shared-view payload.
-    this.walkMode = false;
+    // OVERVIEW: fixed top-down camera; dragging pans on the plan X/Y plane.
+    // POV: fixed position at eye height; dragging changes viewing direction.
+    // A tap animates between them. Nothing here enters project/share data.
+    this.navigationMode = 'overview';
     this.eyeHeight = 1.65;
-    this.walkSpeed = 2.2;
-    this.walkYaw = 0;
-    this.walkPitch = 0;
-    this.walkKeys = new Set();
-    this.walkPointer = null;
-    this.walkRaycaster = new THREE.Raycaster();
-    this.walkNdc = new THREE.Vector2();
-    this._walkDirection = new THREE.Vector3();
-    this._walkRight = new THREE.Vector3();
-    this._lastTime = null;
+    this.viewYaw = 0;
+    this.viewPitch = 0;
+    this.viewPointer = null;
+    this.viewRaycaster = new THREE.Raycaster();
+    this.viewNdc = new THREE.Vector2();
+    this._viewDirection = new THREE.Vector3();
+    this.overviewPose = null;
+    this.overviewDistance = 10;
+    this.cameraTransition = null;
 
     // Lighting.
     const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
@@ -116,12 +118,10 @@ export class View3D {
     this._animate = this._animate.bind(this);
     this.renderer.setAnimationLoop(this._animate);
 
-    this.renderer.domElement.addEventListener('pointerdown', this._walkPointerDown.bind(this));
-    this.renderer.domElement.addEventListener('pointermove', this._walkPointerMove.bind(this));
-    this.renderer.domElement.addEventListener('pointerup', this._walkPointerUp.bind(this));
-    this.renderer.domElement.addEventListener('pointercancel', this._walkPointerUp.bind(this));
-    window.addEventListener('keydown', this._walkKeyDown.bind(this));
-    window.addEventListener('keyup', this._walkKeyUp.bind(this));
+    this.renderer.domElement.addEventListener('pointerdown', this._viewPointerDown.bind(this));
+    this.renderer.domElement.addEventListener('pointermove', this._viewPointerMove.bind(this));
+    this.renderer.domElement.addEventListener('pointerup', this._viewPointerUp.bind(this));
+    this.renderer.domElement.addEventListener('pointercancel', this._viewPointerUp.bind(this));
   }
 
   // Accepts an array of { geometry, elevation } (one per floor) or a single
@@ -168,124 +168,132 @@ export class View3D {
     this.frameModel();
   }
 
-  setWalkMode(enabled) {
-    this.walkMode = Boolean(enabled);
-    this.controls.enabled = !this.walkMode;
-    this.walkKeys.clear();
-    this.walkPointer = null;
-    for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
-    if (this.walkMode) {
-      const direction = this.camera.getWorldDirection(new THREE.Vector3());
-      this.walkYaw = Math.atan2(-direction.x, -direction.z);
-      this.walkPitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
-      this._applyWalkLook();
-    } else {
-      // Hand control back to OrbitControls around the place being viewed,
-      // rather than its stale pre-walk target on the model overview.
-      const direction = this.camera.getWorldDirection(new THREE.Vector3());
-      this.controls.target.copy(this.camera.position).addScaledVector(direction, 3);
-      this.controls.update();
-    }
-  }
-
   _meshVisible(mesh) {
     const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
-    return onSelectedFloor && (mesh.userData.architecturalRole !== 'ceiling' || this.walkMode);
+    return onSelectedFloor && (mesh.userData.architecturalRole !== 'ceiling' || this.navigationMode === 'pov');
   }
 
-  setWalkMotion(direction, active) {
-    if (active) this.walkKeys.add(direction);
-    else this.walkKeys.delete(direction);
-  }
-
-  _walkKeyDown(event) {
-    if (!this.walkMode) return;
-    const direction = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' }[event.code];
-    if (!direction) {
-      if (event.code === 'Escape') this.onWalkExit?.();
-      return;
-    }
-    event.preventDefault();
-    this.walkKeys.add(direction);
-  }
-
-  _walkKeyUp(event) {
-    const direction = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' }[event.code];
-    if (direction) this.walkKeys.delete(direction);
-  }
-
-  _walkPointerDown(event) {
-    if (!this.walkMode || event.button !== 0) return;
+  _viewPointerDown(event) {
+    if (event.button !== 0 || this.cameraTransition) return;
     this.renderer.domElement.setPointerCapture(event.pointerId);
-    this.walkPointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, moved: false };
+    this.viewPointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, moved: false };
   }
 
-  _walkPointerMove(event) {
-    const p = this.walkPointer;
-    if (!this.walkMode || !p || p.id !== event.pointerId) return;
+  _viewPointerMove(event) {
+    const p = this.viewPointer;
+    if (!p || p.id !== event.pointerId || this.cameraTransition) return;
     const dx = event.clientX - p.x;
     const dy = event.clientY - p.y;
     p.x = event.clientX;
     p.y = event.clientY;
     if (Math.hypot(event.clientX - p.startX, event.clientY - p.startY) > 6) p.moved = true;
     if (!p.moved) return;
-    this.walkYaw -= dx * 0.005;
-    this.walkPitch = THREE.MathUtils.clamp(this.walkPitch - dy * 0.005, -Math.PI * 0.48, Math.PI * 0.48);
-    this._applyWalkLook();
+    if (this.navigationMode === 'overview') {
+      const visibleHeight = 2 * this.overviewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+      const metresPerPixel = visibleHeight / Math.max(1, this.renderer.domElement.clientHeight);
+      this.camera.position.x -= dx * metresPerPixel;
+      this.camera.position.z -= dy * metresPerPixel;
+      this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+    } else if (this.navigationMode === 'pov') {
+      this.viewYaw -= dx * 0.005;
+      this.viewPitch = THREE.MathUtils.clamp(this.viewPitch - dy * 0.005, -Math.PI * 0.48, Math.PI * 0.48);
+      this._applyPovLook();
+    }
   }
 
-  _walkPointerUp(event) {
-    const p = this.walkPointer;
+  _viewPointerUp(event) {
+    const p = this.viewPointer;
     if (!p || p.id !== event.pointerId) return;
-    if (this.walkMode && !p.moved) this._teleportFromPointer(event.clientX, event.clientY);
-    this.walkPointer = null;
+    if (!p.moved && !this.cameraTransition) {
+      if (this.navigationMode === 'overview') this._enterPovFromPointer(event.clientX, event.clientY);
+      else if (this.navigationMode === 'pov') this._returnToOverview();
+    }
+    this.viewPointer = null;
   }
 
-  _teleportFromPointer(clientX, clientY) {
+  _enterPovFromPointer(clientX, clientY) {
     const rect = this.renderer.domElement.getBoundingClientRect();
-    this.walkNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-    this.walkRaycaster.setFromCamera(this.walkNdc, this.camera);
+    this.viewNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.viewRaycaster.setFromCamera(this.viewNdc, this.camera);
     const floors = this.house.children.filter((mesh) => mesh.visible && mesh.userData.architecturalRole === 'floor');
-    const hit = this.walkRaycaster.intersectObjects(floors, false)[0];
+    const hit = this.viewRaycaster.intersectObjects(floors, false)[0];
     if (!hit) return;
-    this.camera.position.set(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
-    // A placed POV starts level even if the overview camera was looking steeply
-    // down at the plan. The current compass bearing is preserved.
-    this.walkPitch = 0;
-    this._applyWalkLook();
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+    const endPosition = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
+    const box = this._visibleBox();
+    const center = box?.getCenter(new THREE.Vector3()) || new THREE.Vector3(endPosition.x, endPosition.y, endPosition.z - 1);
+    center.y = endPosition.y;
+    if (center.distanceToSquared(endPosition) < 1e-6) center.z -= 1;
+    const matrix = new THREE.Matrix4().lookAt(endPosition, center, new THREE.Vector3(0, 1, 0));
+    const endQuaternion = new THREE.Quaternion().setFromRotationMatrix(matrix);
+    this._startTransition(endPosition, endQuaternion, 'pov');
   }
 
-  _applyWalkLook() {
-    const cosPitch = Math.cos(this.walkPitch);
-    this._walkDirection.set(
-      -Math.sin(this.walkYaw) * cosPitch,
-      Math.sin(this.walkPitch),
-      -Math.cos(this.walkYaw) * cosPitch,
+  _returnToOverview() {
+    if (!this.overviewPose) return;
+    for (const mesh of this.house.children) {
+      if (mesh.userData.architecturalRole === 'ceiling') mesh.visible = false;
+    }
+    this._startTransition(this.overviewPose.position, this.overviewPose.quaternion, 'overview');
+  }
+
+  _startTransition(position, quaternion, destination) {
+    this.cameraTransition = {
+      start: performance.now(), duration: 700, destination,
+      fromPosition: this.camera.position.clone(), fromQuaternion: this.camera.quaternion.clone(),
+      toPosition: position.clone(), toQuaternion: quaternion.clone(),
+    };
+    this.navigationMode = `transition-${destination}`;
+  }
+
+  _finishTransition(destination) {
+    this.navigationMode = destination;
+    this.cameraTransition = null;
+    this.camera.up.set(0, destination === 'pov' ? 1 : 0, destination === 'pov' ? 0 : -1);
+    if (destination === 'pov') {
+      const direction = this.camera.getWorldDirection(new THREE.Vector3());
+      this.viewYaw = Math.atan2(-direction.x, -direction.z);
+      this.viewPitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
+    }
+    for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+  }
+
+  _applyPovLook() {
+    const cosPitch = Math.cos(this.viewPitch);
+    this._viewDirection.set(
+      -Math.sin(this.viewYaw) * cosPitch,
+      Math.sin(this.viewPitch),
+      -Math.cos(this.viewYaw) * cosPitch,
     );
-    this.camera.lookAt(this.camera.position.clone().add(this._walkDirection));
+    this.camera.lookAt(this.camera.position.clone().add(this._viewDirection));
   }
 
-  _updateWalk(dt) {
-    if (!this.walkMode || !this.walkKeys.size) return;
-    this._walkDirection.set(-Math.sin(this.walkYaw), 0, -Math.cos(this.walkYaw));
-    this._walkRight.set(-this._walkDirection.z, 0, this._walkDirection.x);
-    const movement = new THREE.Vector3();
-    if (this.walkKeys.has('forward')) movement.add(this._walkDirection);
-    if (this.walkKeys.has('back')) movement.sub(this._walkDirection);
-    if (this.walkKeys.has('right')) movement.add(this._walkRight);
-    if (this.walkKeys.has('left')) movement.sub(this._walkRight);
-    if (movement.lengthSq()) this.camera.position.addScaledVector(movement.normalize(), this.walkSpeed * dt);
+  _visibleBox() {
+    const box = new THREE.Box3();
+    for (const mesh of this.house.children) {
+      if (mesh.visible && mesh.userData.architecturalRole !== 'ceiling') box.expandByObject(mesh);
+    }
+    return box.isEmpty() ? null : box;
   }
 
   frameModel() {
-    if (!this.house.children.length) return;
-    const box = new THREE.Box3();
-    for (const mesh of this.house.children) {
-      if (mesh.visible) box.expandByObject(mesh);
-    }
-    if (box.isEmpty()) return;
+    const box = this._visibleBox();
+    if (!box) return;
     const center = box.getCenter(new THREE.Vector3());
-    this.controls.target.copy(center);
+    const size = box.getSize(new THREE.Vector3());
+    const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const distanceForHeight = size.z / (2 * Math.tan(vFov / 2));
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const distanceForWidth = size.x / (2 * Math.tan(hFov / 2));
+    const distance = Math.max(2, distanceForHeight, distanceForWidth) * 1.12;
+    this.overviewDistance = distance;
+    this.navigationMode = 'overview';
+    this.cameraTransition = null;
+    this.camera.up.set(0, 0, -1);
+    this.camera.position.set(center.x, box.max.y + distance, center.z);
+    this.camera.lookAt(center.x, center.y, center.z);
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+    for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
   }
 
   _resize() {
@@ -297,12 +305,12 @@ export class View3D {
   }
 
   _animate(time, frame) {
-    // In an XR session the headset drives the camera, so skip orbit controls.
-    const dt = this._lastTime == null ? 0 : Math.min(0.1, (time - this._lastTime) / 1000);
-    this._lastTime = time;
-    if (!this.renderer.xr.isPresenting) {
-      if (this.walkMode) this._updateWalk(dt);
-      else this.controls.update();
+    if (!this.renderer.xr.isPresenting && this.cameraTransition) {
+      const a = Math.min(1, (time - this.cameraTransition.start) / this.cameraTransition.duration);
+      const eased = a * a * (3 - 2 * a);
+      this.camera.position.lerpVectors(this.cameraTransition.fromPosition, this.cameraTransition.toPosition, eased);
+      this.camera.quaternion.slerpQuaternions(this.cameraTransition.fromQuaternion, this.cameraTransition.toQuaternion, eased);
+      if (a >= 1) this._finishTransition(this.cameraTransition.destination);
     }
     if (frame && this.onXRFrame) this.onXRFrame(time, frame);
     this.renderer.render(this.scene, this.camera);
