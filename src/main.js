@@ -23,6 +23,10 @@ import { t, localizedFloorName, revLabels, getLang, LANGS, LANG_ORDER } from './
 
 const project = new Project();
 
+// True when this session was opened from a shared #view= link: the plan is
+// read-only. Declared early because renderConstraints() reads it during init.
+let viewMode = false;
+
 const sketch = new Sketch2D(document.getElementById('sketch'), project);
 const view = new View3D(document.getElementById('view3d'));
 
@@ -138,11 +142,19 @@ function renderConstraints() {
       row.append(tag, input, unit, swap, del);
       cxList.appendChild(row);
 
-      input.addEventListener('input', () => {
-        const v = parseFloat(input.value);
-        if (!Number.isNaN(v)) project.setConstraintMagnitude(c.id, toMeters(v));
-      });
-      swap.addEventListener('click', () => project.swapConstraint(c.id));
+      // In a view-only session a dimension is a MEASUREMENT of the fixed plan:
+      // the value/direction can't change (that would reshape geometry), only
+      // adding and deleting are allowed.
+      if (viewMode) {
+        input.readOnly = true;
+        swap.disabled = true;
+      } else {
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value);
+          if (!Number.isNaN(v)) project.setConstraintMagnitude(c.id, toMeters(v));
+        });
+        swap.addEventListener('click', () => project.swapConstraint(c.id));
+      }
       del.addEventListener('click', () => project.removeConstraint(c.id));
 
       entry = { row, input, unit, tag };
@@ -693,7 +705,7 @@ const LS_KEY = 'house-cad:autosave:v1';
 // When the session was opened from a shared VIEW link, autosave is suppressed so the
 // viewer's own saved project is never silently clobbered by someone else's link. An
 // explicit Save (which writes LS_KEY directly) adopts it as their own.
-let viewMode = false;
+// (`viewMode` itself is declared near the top — it's read during init.)
 let saveTimer = null;
 project.onChange(() => {
   if (viewMode) return;
@@ -719,9 +731,12 @@ function seedDemo() {
     if (viewData) {
       loadView(project, viewData);
       viewMode = true;
-      sketch.clearSelection();
+      // Read-only: hide every plan-editing affordance and lock the sketch to pan/zoom.
+      document.getElementById('app').classList.add('view-only');
+      sketch.setReadOnly(true);
+      setTool('pan');
       view.frameModel();
-      sketch.onStatus?.('Opened a shared 3D view (read-only geometry — Save to keep or edit it).');
+      sketch.onStatus?.('Opened a shared 3D view — read-only. Pan/zoom to inspect; 📏 to measure.');
       return;
     }
   } catch (err) {

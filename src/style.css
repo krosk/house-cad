@@ -440,3 +440,30 @@ body {
 .op-toggle.add { color: var(--add); }
 .op-toggle.subtract { color: var(--subtract); }
 #p-del:hover { border-color: var(--subtract); color: var(--subtract); }
+
+/* ---- view-only session (opened from a shared #view= link) ----
+   Read-only: hide every plan-editing affordance. Keep pan/zoom, unit display,
+   floor navigation, share/export/print (output, not mutation). The Dimension
+   tool + panel stay: a viewer may ADD dimensions to measure the fixed geometry
+   (they read the resolved plan back; their VALUE is not editable — see JS). */
+#app.view-only #tool-group [data-tool="add"],
+#app.view-only #tool-group [data-tool="subtract"],
+#app.view-only #tool-group [data-tool="select"],
+#app.view-only #toolbar .group:has(#height),
+#app.view-only #toolbar .group:has(#clear),
+#app.view-only #save,
+#app.view-only #load,
+#app.view-only #props,
+#app.view-only #fc-add-above,
+#app.view-only #fc-add-below,
+#app.view-only .fc-transfer {
+  display: none !important;
+}
+/* Dimension rows are measurements only: the value field is read-only and the
+   direction-swap is inert (both would reshape the plan). Delete stays enabled
+   so a viewer can clear a measurement they added. */
+#app.view-only .cx-row input,
+#app.view-only .cx-row .cx-swap {
+  pointer-events: none;
+  opacity: 0.6;
+}

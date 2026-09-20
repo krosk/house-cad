@@ -31,6 +31,7 @@ export class Sketch2D {
     this.project = project;
 
     this.tool = 'add'; // 'add' | 'subtract' | 'select' | 'dimension'
+    this.readOnly = false; // view-only sessions (shared link): pan/zoom only, no mutation
     this.snapStep = unitInfo().snap; // meters; follows the display unit
 
     // View transform.
@@ -64,7 +65,21 @@ export class Sketch2D {
     project.onChange(() => this.render());
   }
 
+  // View-only sessions can pan/zoom and MEASURE (add dimensions read back the
+  // fixed geometry) but never reshape the plan. Force pan initially and clear
+  // any selection so no geometry-editing affordance is reachable.
+  setReadOnly(v) {
+    this.readOnly = !!v;
+    if (this.readOnly) {
+      this.clearSelection?.();
+      this.setTool('pan');
+    }
+  }
+
   setTool(tool) {
+    // In read-only only pan (view) and dimension (measure) are allowed; add /
+    // subtract / select would mutate geometry, so they fall back to pan.
+    if (this.readOnly && tool !== 'pan' && tool !== 'dimension') tool = 'pan';
     this.tool = tool;
     this._dimFirst = null;
     this._hoverEdge = null;
@@ -522,7 +537,7 @@ export class Sketch2D {
     this.onSelect?.(rect || null);
   }
   deleteSelected() {
-    if (!this.selectedId) return;
+    if (this.readOnly || !this.selectedId) return;
     this.project.removeRectangle(this.selectedId);
     this._select(null);
   }
