@@ -675,8 +675,13 @@ export class Sketch2D {
         this._seg(sxb, cyb, sxb, sy + Math.sign(sy - cyb) * EXT_OVER);
         ctx.setLineDash([]);
         this._seg(sxa, sy, sxb, sy);
-        this._arrowH(sxa, sy, Math.sign(sxb - sxa) * arrow);
-        this._arrowH(sxb, sy, Math.sign(sxa - sxb) * arrow);
+        const dir = Math.sign(sxb - sxa) || 1;
+        // Normal spans keep the established outward-pointing arrowheads. When
+        // their two bases would collide, put the bases outside so the tips read
+        // inward across the narrow measured gap.
+        const arrowDir = Math.abs(sxb - sxa) < arrow * 2 ? -dir : dir;
+        this._arrowH(sxa, sy, arrowDir * arrow);
+        this._arrowH(sxb, sy, -arrowDir * arrow);
         const above = sy <= Math.min(cya, cyb);
         this._dimLabel(c, this.toScreen(dimLabelCoord(c, la.coord, lb.coord), 0).x, above ? sy - 4 : sy + 16);
       } else {
@@ -702,8 +707,10 @@ export class Sketch2D {
         this._seg(cxb, syb, sx + Math.sign(sx - cxb) * EXT_OVER, syb);
         ctx.setLineDash([]);
         this._seg(sx, sya, sx, syb);
-        this._arrowV(sx, sya, Math.sign(syb - sya) * arrow);
-        this._arrowV(sx, syb, Math.sign(sya - syb) * arrow);
+        const dir = Math.sign(syb - sya) || 1;
+        const arrowDir = Math.abs(syb - sya) < arrow * 2 ? -dir : dir;
+        this._arrowV(sx, sya, arrowDir * arrow);
+        this._arrowV(sx, syb, -arrowDir * arrow);
         this._dimLabel(c, sx, this.toScreen(0, dimLabelCoord(c, la.coord, lb.coord)).y);
       }
     }

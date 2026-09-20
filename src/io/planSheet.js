@@ -566,8 +566,10 @@ function drawDimensions(be, L, floor, layers) {
       }
       const lx = L.X(dimLabelCoord(c, la.coord, lb.coord));
       be.line(sxa, dimY, sxb, dimY, { stroke: color, width: 0.18, dash: DIM_DASH });
-      drawArrow(be, sxa, dimY, Math.sign(sxb - sxa), 'x');
-      drawArrow(be, sxb, dimY, Math.sign(sxa - sxb), 'x');
+      const dir = Math.sign(sxb - sxa) || 1;
+      const arrowDir = Math.abs(sxb - sxa) < ARROW * 2 ? -dir : dir;
+      drawArrow(be, sxa, dimY, arrowDir, 'x');
+      drawArrow(be, sxb, dimY, -arrowDir, 'x');
       drawLabelLeader(be, sxa, sxb, lx, dimY, 'x', { stroke: color, width: 0.18 });
       drawDimLabel(be, label, lx, dimY, color);
     } else {
@@ -584,8 +586,10 @@ function drawDimensions(be, L, floor, layers) {
       }
       const ly = L.Y(dimLabelCoord(c, la.coord, lb.coord));
       be.line(dimX, sya, dimX, syb, { stroke: color, width: 0.18, dash: DIM_DASH });
-      drawArrow(be, dimX, sya, Math.sign(syb - sya), 'y');
-      drawArrow(be, dimX, syb, Math.sign(sya - syb), 'y');
+      const dir = Math.sign(syb - sya) || 1;
+      const arrowDir = Math.abs(syb - sya) < ARROW * 2 ? -dir : dir;
+      drawArrow(be, dimX, sya, arrowDir, 'y');
+      drawArrow(be, dimX, syb, -arrowDir, 'y');
       drawLabelLeader(be, sya, syb, ly, dimX, 'y', { stroke: color, width: 0.18 });
       drawDimLabel(be, label, dimX, ly, color);
     }
