@@ -95,6 +95,7 @@ const MARKER_LABELS = {
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
   switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
+  tv_antenna: 'TV antenna',
   camera_ethernet: 'Camera Ethernet',
   patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
 };
@@ -672,6 +673,12 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.line(cx - r * 0.7, cy - r * 0.7, cx + r * 0.7, cy + r * 0.7, { stroke: C_MARK, width: 0.2 });
     be.line(cx - r * 0.7, cy + r * 0.7, cx + r * 0.7, cy - r * 0.7, { stroke: C_MARK, width: 0.2 });
+  } else if (type === 'tv_antenna') {
+    // Coaxial TV outlet with the familiar V-shaped aerial crown.
+    be.circle(cx, cy + r * 0.15, r * 0.72, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    be.circle(cx, cy + r * 0.15, r * 0.25, { fill: '#fff', stroke: C_MARK, width: 0.16 });
+    be.line(cx, cy - r * 0.57, cx - r * 0.52, cy - r, { stroke: C_MARK, width: 0.18 });
+    be.line(cx, cy - r * 0.57, cx + r * 0.52, cy - r, { stroke: C_MARK, width: 0.18 });
   } else if (type === 'ethernet') {
     // Front view of an RJ45 socket: the eight contacts and the wider latch
     // recess make this read as a network port instead of a generic rectangle.

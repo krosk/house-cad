@@ -50,6 +50,7 @@ const LAYERS = [
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET_DUAL', 7, 'CONTINUOUS'],
+  ['MARKER_TV_ANTENNA', 7, 'CONTINUOUS'],
   ['MARKER_CAMERA_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_PATCH_PANEL', 7, 'CONTINUOUS'],
   ['ELECTRICAL_ROUTE', 4, 'DOTTED'],
@@ -351,6 +352,11 @@ function writeMarker(w, marker) {
     w.circle(layer, x, y, r);
     w.line(layer, x - r * 0.7, y - r * 0.7, x + r * 0.7, y + r * 0.7);
     w.line(layer, x - r * 0.7, y + r * 0.7, x + r * 0.7, y - r * 0.7);
+  } else if (marker.type === 'tv_antenna') {
+    w.circle(layer, x, y - r * 0.15, r * 0.72);
+    w.circle(layer, x, y - r * 0.15, r * 0.25);
+    w.line(layer, x, y + r * 0.57, x - r * 0.52, y + r);
+    w.line(layer, x, y + r * 0.57, x + r * 0.52, y + r);
   } else if (marker.type === 'ethernet') {
     w.polyline(layer, [[x - r, y - r * 0.7], [x + r, y - r * 0.7], [x + r, y + r * 0.7], [x - r, y + r * 0.7]]);
     for (let i = 0; i < 8; i++) {

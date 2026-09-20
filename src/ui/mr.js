@@ -307,7 +307,7 @@ export function setupMR(view, project, getFootprint) {
 
   // SAVE/LOAD slot menu: same ray-aimed canvas panel as the numpad, but the cells
   // are persistence slots (2 cols x 3 rows = 6). A filled slot shows when it was
-  // saved and how many rectangles it holds; empty slots read "empty". One panel is
+  // saved, its revision, and how many rectangles it holds; empty slots read "empty". One panel is
   // reused by both modes — draw() recolors/retitles for SAVE (green) vs LOAD (blue).
   const SLOT_COLS = 2, SLOT_ROWS = 3, SLOT_COUNT = SLOT_COLS * SLOT_ROWS;
   function makeSlotMenu() {
@@ -351,7 +351,7 @@ export function setupMR(view, project, getFootprint) {
       return null;
     }
 
-    // metaFor(i) -> {rects, when} | null ; accent is the mode's color as '#rrggbb'.
+    // metaFor(i) -> {rects, when, revision} | null ; accent is the mode's color as '#rrggbb'.
     function draw(title, accent, hoverSlot, metaFor, confirmSlot = null, hoverAction = null) {
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.94)';
@@ -369,7 +369,7 @@ export function setupMR(view, project, getFootprint) {
         if (meta) {
           ctx.fillStyle = '#8b949e';
           ctx.font = '25px sans-serif';
-          ctx.fillText(`${meta.rects} ${t('slot.rects')}  ·  ${meta.when}`, W / 2, 186);
+          ctx.fillText(`${t('sheet.revision')} ${meta.revision}  ·  ${meta.rects} ${t('slot.rects')}  ·  ${meta.when}`, W / 2, 186);
         }
         for (const [id, r] of Object.entries(ACTIONS)) {
           const hot = id === hoverAction;
@@ -397,6 +397,11 @@ export function setupMR(view, project, getFootprint) {
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         ctx.fillText(`${t('slot.slot')} ${i + 1}`, x + 18, y + 14);
         if (meta) {
+          ctx.fillStyle = hot ? '#0d1117' : accent;
+          ctx.font = 'bold 24px sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${t('sheet.revision')} ${meta.revision}`, x + w - 18, y + 16);
+          ctx.textAlign = 'left';
           ctx.fillStyle = hot ? '#0d1117' : '#e6edf3';
           ctx.font = 'bold 32px sans-serif';
           ctx.fillText(`${meta.rects} ${t('slot.rects')}`, x + 18, y + h - 78);
@@ -1620,6 +1625,18 @@ export function setupMR(view, project, getFootprint) {
       }
       return;
     }
+    if (type === 'tv_antenna') {
+      // Coaxial TV wall outlet: concentric socket plus a small aerial crown.
+      ctx.beginPath(); ctx.arc(64, 66, 18, 0, Math.PI * 2);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#64748b'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(64, 66, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(64, 48); ctx.lineTo(51, 34);
+      ctx.moveTo(64, 48); ctx.lineTo(77, 34);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#334155'; ctx.stroke();
+      return;
+    }
     if (type === 'ethernet') {
       // Front view of an RJ45 jack: a framed socket, eight contacts, and the
       // distinctive centered latch recess (matching the plan-sheet symbol).
@@ -2630,7 +2647,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = [
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
-    'switch', 'light', 'ethernet', 'ethernet_dual', 'camera_ethernet', 'patch_panel', 'intercom',
+    'switch', 'light', 'ethernet', 'ethernet_dual', 'tv_antenna', 'camera_ethernet', 'patch_panel', 'intercom',
     'panel', 'breaker',
   ];
   let currentMarkerType = MARKER_TYPES[0];
@@ -3655,8 +3672,8 @@ export function setupMR(view, project, getFootprint) {
     } catch { return null; }
   }
 
-  // Slot summary for the menu cell: rectangle count (all floors) + a short local
-  // date/time. null for an empty slot.
+  // Slot summary for the menu cell: saved revision, rectangle count (all floors),
+  // and a short local date/time. Pre-revision slots read Rev 0.
   function slotMeta(i) {
     const o = readSlot(i);
     if (!o) return null;
@@ -3665,7 +3682,8 @@ export function setupMR(view, project, getFootprint) {
     const when = Number.isFinite(d.getTime())
       ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       : '?';
-    return { rects, when };
+    const revision = Number.isFinite(o.data.revision) ? o.data.revision : 0;
+    return { rects, when, revision };
   }
 
   const slotTitle = () => overwriteSlot != null

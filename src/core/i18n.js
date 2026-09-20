@@ -342,6 +342,7 @@ const STRINGS = {
   'marker.light':    { en: 'light',    fr: 'luminaire',    zh: '灯' },
   'marker.ethernet': { en: 'ethernet', fr: 'réseau',       zh: '网口' },
   'marker.ethernet_dual': { en: 'dual ethernet', fr: 'double réseau', zh: '双网口' },
+  'marker.tv_antenna': { en: 'TV antenna', fr: 'prise antenne TV', zh: '电视天线插座' },
   'marker.camera_ethernet': { en: 'camera ethernet', fr: 'caméra ethernet', zh: '以太网摄像头' },
   'marker.patch_panel': { en: 'patch panel', fr: 'panneau de brassage', zh: '配线架' },
   'marker.height':   { en: 'height',   fr: 'hauteur',      zh: '高度' },
