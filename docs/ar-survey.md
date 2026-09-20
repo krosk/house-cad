@@ -141,21 +141,22 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   segments touching the active floor, with a node sphere per active-floor vertex. Readout: `START PEN`,
   then `RUN CONDUIT`. **The intended conduit→wire→circuit workflow and the conduit/wire/control-link
   relationship are in `docs/electrical-workflow.md`.**
-- **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network with a **flat** selection (nodes are
-  always drawn, so no wire-select step). Trigger a node to **select** it; a free (bare) junction opens
+- **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network through an explicit combined selection.
+  With nothing selected, **grip cycles every node/conduit segment under the reticle**; trigger selects
+  the yellow candidate. Selecting a free (bare) junction opens
   a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad: single-value
-  datum pad, **SWAP toggles FLOOR/CEILING**, **DEL frees Z** (`⊘ FREE Z`, clears the height dim — it
-  no longer deletes the node), ENTER commits z and keeps it selected). Trigger a **segment** between nodes
-  to **split** it with a new junction at the reticle (`splitConduitSegment`). Trigger empty space to
-  deselect. **Grip-drag a node moves it**, direct vs remote chosen at grip-press by the real 3D
+  datum pad, **SWAP toggles FLOOR/FREE**, **DEL frees Z** (`⊘ FREE Z`, clears the height dim — it
+  no longer deletes the node), ENTER commits z and keeps it selected). Trigger again deselects.
+  **Only a selected node can be grip-dragged**, direct vs remote chosen at grip-press by the real 3D
   distance from the tip to the node sphere (`WAYPOINT_GRAB_M`): **direct** (in reach) carries it 1:1
   in full 3D; **remote** (far) has the floor reticle drive X/Y while z is held and typed on the pad.
   **A node with a defined `zDatum` holds its Z even in the direct carry** (`nz = n.zDatum ? n.z :
   tipZ`, matching the marker grab), so a height-defined junction slides only in X/Y.
   Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
-  immovable** (they follow their device) and have no pad — selecting one just arms it. **B/Y deletes
-  the selected node + its segments, or the hovered segment alone** (`deleteInMode` → `removeConduitNode`
-  / `removeConduitSegment`; `via` references are dropped). Readout: `PICK NODE`, then `EDIT NODE`.
+  immovable** (they follow their device) and have no pad. **B/Y deletes only the explicit selection**:
+  a selected node + its incident segments, or a selected conduit segment alone (`deleteInMode` →
+  `removeConduitNode` / `removeConduitSegment`; `via` references are dropped). Readout: `PICK NODE / CONDUIT`,
+  then `EDIT NODE` or `CONDUIT SELECTED`.
 - **CONDUIT · DIMS** (`id: conduit_dims`) — dimension a **bare junction to a wall** so it tracks that
   wall on every edit. It shares the DIMS numpad machinery with PLAN/OUTLET DIMS via a third
   ref kind, `node` (see the `modeDomain`/`dimDomain` helpers): first trigger a bare junction
@@ -177,6 +178,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   markers to define one (`project.addWire`, which resolves markers house-wide, auto shortest route drawn
   at once); the created wire becomes selected. **Cross-floor wires:** an adjacent-floor device (dimmed
   in `adjacentGroup`) can be either endpoint, so a wire may span storeys over a riser. While a
+  During both `PICK START` and `PICK END`, **grip cycles all active/adjacent-floor marker candidates
+  under the reticle without committing**, and trigger chooses the yellow endpoint. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
   override); grip **pops the last via** (`popWireVia`), and **B/Y deletes the wire** (`removeWire`).
   Trigger an existing wire to re-select it; repeated triggers cycle every wire whose route overlaps

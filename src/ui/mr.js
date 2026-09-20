@@ -2237,24 +2237,6 @@ export function setupMR(view, project, getFootprint) {
     return candidates[(current + 1) % candidates.length];
   }
 
-  // Disambiguate junctions that share one floor projection (a vertical run's two ends,
-  // or independent stacked nodes) — mirrors editMarkerAtFloorPoint. Given the hovered
-  // node as the anchor, gather its stack (same plan x/y), order high-to-low by height,
-  // and return the one AFTER the current selection, so repeat triggers cycle it.
-  function cycleConduitNodeInStack(anchor, currentId) {
-    if (!anchor) return null;
-    const p0 = conduitNodePos(project, anchor);
-    const stack = project.conduitNodes
-      .filter((n) => project.conduitNodeFloorId(n) === project.activeFloorId)
-      .map((n) => ({ n, p: conduitNodePos(project, n) }))
-      .filter(({ p }) => p.x === p0.x && p.y === p0.y)
-      .sort((a, b) => (b.p.z || 0) - (a.p.z || 0))
-      .map(({ n }) => n);
-    if (stack.length < 2) return anchor;
-    const idx = stack.findIndex((n) => n.id === currentId);
-    return stack[idx < 0 ? 0 : (idx + 1) % stack.length];
-  }
-
   // Ordered vertical stack (high→low z) of DIMS-eligible first-ref targets sharing the
   // floor point under the reticle: bare conduit junctions in CONDUIT DIMS, markers in
   // MARKER DIMS. Returns [{kind,id}] (empty for PLAN DIMS or an empty point). Used so
@@ -2294,16 +2276,33 @@ export function setupMR(view, project, getFootprint) {
     return true;
   }
 
-  // Nearest conduit SEGMENT touching the active floor (id), ignoring collapsed vertical
-  // segments with no plan extent; used by CONDUIT EDIT to split a run.
-  function conduitSegmentAtFloorPoint(px, py) {
-    let best = null, bestD = WIRE_PICK_M;
-    for (const seg of conduitNetworkSegments(project)) {
-      if (!touchesActiveFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
-      const d = planPointToSegment(px, py, seg.a, seg.b);
-      if (d < bestD) { bestD = d; best = seg.id; }
-    }
-    return best;
+  // CONDUIT · EDIT selection stack: nodes and conduit segments compete by plan
+  // distance, then grip advances through every overlap before trigger selects one.
+  // A vertical segment collapses to a plan point but remains selectable here.
+  function conduitEditTargetAtFloorPoint(px, py, afterKey = null) {
+    const candidates = [];
+    project.conduitNodes.forEach((node, order) => {
+      if (project.conduitNodeFloorId(node) !== project.activeFloorId) return;
+      const p = conduitNodePos(project, node);
+      const distance = Math.hypot(px - p.x, py - p.y);
+      if (distance <= RETICLE_OUTER) candidates.push({
+        kind: 'node', id: node.id, key: `node:${node.id}`, distance, z: p.z || 0, order,
+      });
+    });
+    conduitNetworkSegments(project).forEach((seg, order) => {
+      if (!touchesActiveFloor(seg)) return;
+      const distance = planPointToSegment(px, py, seg.a, seg.b);
+      if (distance <= WIRE_PICK_M) candidates.push({
+        kind: 'segment', id: seg.id, key: `segment:${seg.id}`,
+        distance, z: Math.max(seg.a.z || 0, seg.b.z || 0), order,
+      });
+    });
+    candidates.sort((a, b) => a.distance - b.distance
+      || (a.kind === b.kind ? 0 : a.kind === 'node' ? -1 : 1)
+      || b.z - a.z || a.order - b.order);
+    if (!candidates.length) return null;
+    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
+    return candidates[(current + 1) % candidates.length];
   }
 
   // Live conduit-node drag, mirroring the waypoint drag: 'direct' carries the node
@@ -2442,7 +2441,8 @@ export function setupMR(view, project, getFootprint) {
       const a = child.userData.adjacent;
       if (!a) continue;
       const hot = hoverAdjacent && hoverAdjacent.kind === a.kind && hoverAdjacent.id === a.id;
-      const endpoint = a.kind === 'marker' && selectedEndpointIds?.has(a.id);
+      const endpoint = a.kind === 'marker'
+        && (selectedEndpointIds?.has(a.id) || wireFromMarker?.id === a.id);
       child.material.color.setHex(hot || endpoint ? 0xffe14d : 0x64748b);
       child.scale.setScalar(hot || endpoint ? 1.6 : 1);
     }
@@ -2770,6 +2770,7 @@ export function setupMR(view, project, getFootprint) {
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
   // MARKER · WIRE (routed): the pending first endpoint of a new wire pair.
   let wireFromMarker = null;
+  let wireEndpointPickAfterKey = null;
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
@@ -2779,8 +2780,10 @@ export function setupMR(view, project, getFootprint) {
   // — {kind:'node'|'marker', id, floorId, x, y}. A CONDUIT/WIRE trigger connects to it.
   let hoverAdjacent = null;
   let conduitPreviewLine = null; // live pen preview (pen node → tip), lives in conduitGroup
-  // CONDUIT · EDIT: the selected node (moved/deleted) + per-frame hovered segment id.
+  // CONDUIT · EDIT: grip cycles a combined node/segment stack before trigger selection.
   let selectedConduitNodeId = null;
+  let selectedConduitSegmentId = null;
+  let conduitEditPickAfterKey = null;
   let hoverConduitSegmentId = null;
   let nodeBuffer = '';        // CONDUIT EDIT height pad: the selected free junction's z
   let nodePristine = false;
@@ -3660,9 +3663,16 @@ export function setupMR(view, project, getFootprint) {
   // just become the selection (grip deletes, but there is no height to edit).
   function selectConduitNode(id) {
     selectedConduitNodeId = id;
+    selectedConduitSegmentId = null;
     const n = selectedConduitNodeObj();
     if (n && !n.markerId) activateNodePad();
     else deactivateNumpad();
+  }
+
+  function selectConduitSegment(id) {
+    selectedConduitNodeId = null;
+    selectedConduitSegmentId = id;
+    deactivateNumpad();
   }
 
   function commitNodeHeight() {
@@ -4443,6 +4453,24 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
+  // MARKER · WIRE endpoint picker. Grip advances `afterKey`; trigger commits the
+  // yellow marker as PICK START or PICK END. Nearby and vertically stacked devices
+  // share one distance-then-height ordered cycle.
+  function wireMarkerAtFloorPoint(px, py, afterKey = null) {
+    const floors = [project.activeFloor, ...adjacentFloors()].filter(Boolean);
+    const candidates = floors.flatMap((floor, floorOrder) => (floor.markers || []).map((marker, order) => ({
+        marker, floorId: floor.id, floorOrder, order, key: `marker:${marker.id}`,
+        distance: Math.hypot(px - marker.x, py - marker.y),
+        z: (floor.elevation || 0) + (marker.z || 0),
+      })))
+      .filter((candidate) => candidate.distance <= RETICLE_OUTER)
+      .sort((a, b) => a.distance - b.distance || b.z - a.z
+        || a.floorOrder - b.floorOrder || a.order - b.order);
+    if (!candidates.length) return null;
+    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
+    return candidates[(current + 1) % candidates.length];
+  }
+
   // MARKER · EDIT disambiguates any marker types sharing the exact same floor
   // projection. Once one is selected, keep the amber selection on it and preview
   // the next marker in height order under the yellow reticle; another trigger
@@ -5023,28 +5051,27 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'conduit_edit', color: 0xa78bfa, // edit the conduit network (move/split/delete nodes)
-      // Flat selection (nodes are always drawn): trigger a node to select it (a free
-      // junction opens its height pad), trigger a segment between nodes to split it,
-      // trigger empty space to deselect. Grip-drag a node moves it (direct vs remote,
-      // like WIRE EDIT); grip away deletes the selected node + its segments.
-      onTouch: (pos) => {
+      id: 'conduit_edit', color: 0xa78bfa, // select/move/delete conduit nodes or segments
+      // With nothing selected, grip cycles overlapping nodes/segments and trigger
+      // selects the highlighted candidate. Only a selected node may then be grip-dragged;
+      // B/Y deletes the selected node or segment. Trigger again deselects.
+      onTouch: () => {
         if (!placed) return;
         if (selectedConduitNodeObj() && numpad.group.visible && hoverKey) { pressNodeKey(hoverKey); return; }
-        if (hoverConduitNode) { // cycle a vertical stack: advance past the current selection
-          const pick = cycleConduitNodeInStack(hoverConduitNode, selectedConduitNodeId) || hoverConduitNode;
-          selectConduitNode(pick.id); rlog('conduit node select', { id: pick.id }); return;
-        }
-        if (hoverConduitSegmentId) { // split the segment with a new junction
-          const { px, py } = worldToPlan(pos);
-          const z = Math.max(0, pos.y - overlayY());
-          const node = project.splitConduitSegment(hoverConduitSegmentId, { x: px, y: py, z });
-          buildConduits();
-          if (node) selectConduitNode(node.id);
-          rlog('conduit split', { seg: hoverConduitSegmentId, node: node?.id });
+        if (selectedConduitNodeId || selectedConduitSegmentId) {
+          rlog('conduit deselect', { node: selectedConduitNodeId, segment: selectedConduitSegmentId });
+          selectConduitNode(null);
           return;
         }
-        if (selectedConduitNodeId) { selectConduitNode(null); rlog('conduit node deselect'); }
+        if (hoverConduitNode) {
+          selectConduitNode(hoverConduitNode.id);
+          rlog('conduit node select', { id: hoverConduitNode.id });
+          return;
+        }
+        if (hoverConduitSegmentId) {
+          selectConduitSegment(hoverConduitSegmentId);
+          rlog('conduit segment select', { id: hoverConduitSegmentId });
+        }
       },
     },
     {
@@ -5068,13 +5095,13 @@ export function setupMR(view, project, getFootprint) {
             rlog('wire via add', { wire: selectedRoutedWire.id, node: hoverConduitNode.id });
             return;
           }
-          if (endMarker) { selectedRoutedWire = null; wireFromMarker = endMarker; rlog('wire from', { id: endMarker.id }); return; }
+          if (endMarker) { selectedRoutedWire = null; wireFromMarker = endMarker; wireEndpointPickAfterKey = null; rlog('wire from', { id: endMarker.id }); return; }
           if (hoverRoutedWire && hoverRoutedWire.id !== selectedRoutedWire.id) { selectedRoutedWire = hoverRoutedWire; rlog('wire reselect', { id: hoverRoutedWire.id }); return; }
           selectedRoutedWire = null; rlog('wire deselect'); return;
         }
         // No pending pair: a marker starts a new wire; an existing wire selects for override.
         if (!wireFromMarker) {
-          if (endMarker) { wireFromMarker = endMarker; rlog('wire from', { id: endMarker.id }); return; }
+          if (endMarker) { wireFromMarker = endMarker; wireEndpointPickAfterKey = null; rlog('wire from', { id: endMarker.id }); return; }
           if (hoverRoutedWire) { selectedRoutedWire = hoverRoutedWire; rlog('wire select', { id: hoverRoutedWire.id }); return; }
           return;
         }
@@ -5084,6 +5111,7 @@ export function setupMR(view, project, getFootprint) {
           if (result.ok) {
             selectedRoutedWire = result.wire;
             wireFromMarker = null;
+            wireEndpointPickAfterKey = null;
             buildRoutedWires();
             rlog('wire create', { from: result.wire.fromMarkerId, to: result.wire.toMarkerId, id: result.wire.id });
           }
@@ -5316,10 +5344,11 @@ export function setupMR(view, project, getFootprint) {
     lastHudAt = -Infinity;
     selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
     selectedLinkSwitch = null; // ...and any electrical-link source switch
-    wireFromMarker = null; // ...and any pending wire pair
+    wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
     selectedRoutedWire = null; // ...and any routed-wire override selection
     penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
-    selectedConduitNodeId = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
+    selectedConduitNodeId = null; selectedConduitSegmentId = null;
+    conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
     selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
@@ -5659,7 +5688,8 @@ export function setupMR(view, project, getFootprint) {
       rlog('grip-drag furniture', { id: hoverFurnitureId });
       return;
     }
-    if (id === 'conduit_edit' && hoverConduitNode && !hoverConduitNode.markerId) {
+    if (id === 'conduit_edit' && selectedConduitNodeId
+        && hoverConduitNode?.id === selectedConduitNodeId && !hoverConduitNode.markerId) {
       const handle = conduitGroup.children.find((c) =>
         c.userData.conduitNodeId === hoverConduitNode.id && c.userData.conduitNodeRole === 'node');
       if (!handle) return;
@@ -5724,9 +5754,10 @@ export function setupMR(view, project, getFootprint) {
       return true;
     }
     if (mode.id === 'conduit_edit') {
-      if (hoverConduitSegmentId) { // one leg of a branch, leaving its end nodes
-        rlog('conduit segment delete', { id: hoverConduitSegmentId });
-        project.removeConduitSegment(hoverConduitSegmentId);
+      if (selectedConduitSegmentId) { // one leg of a branch, leaving its end nodes
+        rlog('conduit segment delete', { id: selectedConduitSegmentId });
+        project.removeConduitSegment(selectedConduitSegmentId);
+        selectedConduitSegmentId = null;
         buildConduits();
         return true;
       }
@@ -5818,6 +5849,17 @@ export function setupMR(view, project, getFootprint) {
       if (penNodeId) { rlog('conduit pen lift', { node: penNodeId }); penNodeId = null; }
       return;
     }
+    if (mode.id === 'conduit_edit') {
+      if (selectedConduitNodeId || selectedConduitSegmentId) return;
+      if (hoverConduitNode) {
+        conduitEditPickAfterKey = `node:${hoverConduitNode.id}`;
+        rlog('conduit edit target cycle', { after: conduitEditPickAfterKey });
+      } else if (hoverConduitSegmentId) {
+        conduitEditPickAfterKey = `segment:${hoverConduitSegmentId}`;
+        rlog('conduit edit target cycle', { after: conduitEditPickAfterKey });
+      }
+      return;
+    }
     if (mode.id === 'marker_wire') {
       // Grip pops the last via override (non-destructive undo); B/Y deletes the wire.
       if (selectedRoutedWire && (selectedRoutedWire.via || []).length) {
@@ -5826,7 +5868,25 @@ export function setupMR(view, project, getFootprint) {
         rlog('wire via pop', { id: selectedRoutedWire.id });
         return;
       }
-      if (wireFromMarker) { rlog('wire from cleared', { id: wireFromMarker.id }); wireFromMarker = null; }
+      if (!selectedRoutedWire && hoverMarker) {
+        wireEndpointPickAfterKey = `marker:${hoverMarker.id}`;
+        rlog('wire endpoint cycle', {
+          phase: wireFromMarker ? 'end' : 'start', after: wireEndpointPickAfterKey,
+        });
+        return;
+      }
+      if (!selectedRoutedWire && hoverAdjacent?.kind === 'marker') {
+        wireEndpointPickAfterKey = `marker:${hoverAdjacent.id}`;
+        rlog('wire endpoint cycle', {
+          phase: wireFromMarker ? 'end' : 'start', after: wireEndpointPickAfterKey,
+        });
+        return;
+      }
+      if (wireFromMarker) {
+        rlog('wire from cleared', { id: wireFromMarker.id });
+        wireFromMarker = null;
+        wireEndpointPickAfterKey = null;
+      }
       return;
     }
     if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -6092,8 +6152,8 @@ export function setupMR(view, project, getFootprint) {
       : modes[currentMode].id === 'marker_conduit'
       ? (penNodeId ? t('conduit.run') : t('conduit.pickStart'))
       : modes[currentMode].id === 'conduit_edit'
-      ? (hoverConduitSegmentId ? t('conduit.editSeg')
-        : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickNode'))
+      ? (selectedConduitSegmentId ? t('conduit.editSeg')
+        : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickTarget'))
       : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
@@ -6518,10 +6578,14 @@ export function setupMR(view, project, getFootprint) {
           hoverConduitNode = conduitNodeAtFloorPoint(px, py);
           if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
         } else {
-          hoverMarker = markerAtFloorPoint(px, py);
-          // An adjacent-floor device becomes the endpoint if nothing on this floor is under
-          // the reticle → the wire spans storeys.
-          if (!hoverMarker) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
+          const endpoint = wireMarkerAtFloorPoint(px, py, wireEndpointPickAfterKey);
+          if (endpoint?.floorId === project.activeFloorId) hoverMarker = endpoint.marker;
+          else if (endpoint) hoverAdjacent = {
+            kind: 'marker', id: endpoint.marker.id, floorId: endpoint.floorId,
+          };
+          if (!endpoint) {
+            wireEndpointPickAfterKey = null;
+          }
         }
         if (!hoverMarker && !hoverConduitNode && !hoverAdjacent) {
           hoverRoutedWire = routedWireAtFloorPoint(px, py, selectedRoutedWire?.id || null);
@@ -6559,9 +6623,20 @@ export function setupMR(view, project, getFootprint) {
       }
       routedWirePreviewLine.material.color.setHex(wireTypeColor({ type: currentWireType }));
       if (wireFromMarker) {
-        const a = { x: wireFromMarker.x, y: wireFromMarker.y, z: wireFromMarker.z || 0 };
+        const fromFound = project.findMarker(wireFromMarker.id);
+        const a = {
+          x: wireFromMarker.x, y: wireFromMarker.y,
+          z: (fromFound?.floor?.elevation || 0) - activeElevation() + (wireFromMarker.z || 0),
+        };
         let b = null;
         if (hoverMarker && hoverMarker.id !== wireFromMarker.id) b = { x: hoverMarker.x, y: hoverMarker.y, z: hoverMarker.z || 0 };
+        else if (hoverAdjacent?.kind === 'marker' && hoverAdjacent.id !== wireFromMarker.id) {
+          const found = project.findMarker(hoverAdjacent.id);
+          if (found) b = {
+            x: found.marker.x, y: found.marker.y,
+            z: (found.floor.elevation || 0) - activeElevation() + (found.marker.z || 0),
+          };
+        }
         else { const tipW = tipPosition(source); if (tipW) { const { px, py } = worldToPlan(tipW); b = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) }; } }
         routedWirePreviewLine.visible = !!b;
         if (b) {
@@ -6637,15 +6712,17 @@ export function setupMR(view, project, getFootprint) {
         conduitPreviewLine.visible = false;
       }
     } else if (modeId === 'conduit_edit') {
-      // CONDUIT EDIT: aim the floor reticle. A node wins over a segment for hover.
-      // When the selected free junction's height pad is open and under the ray, the
-      // pad owns the pointer; otherwise the reticle picks a node (select/move/delete)
-      // or a segment (split). A live grip drag is applied here so the node follows.
+      // CONDUIT EDIT is two-stage: grip cycles the combined node/segment stack while
+      // nothing is selected; trigger selects the yellow candidate. Only afterward can
+      // a selected node be grip-dragged or either selected object be deleted with B/Y.
       hoverKey = null;
       numpadCursor.visible = false;
       const source = editCtl;
       if (selectedConduitNodeId && !project.conduitNodes.some((n) => n.id === selectedConduitNodeId)) {
         selectConduitNode(null);
+      }
+      if (selectedConduitSegmentId && !project.conduitSegments.some((s) => s.id === selectedConduitSegmentId)) {
+        selectedConduitSegmentId = null;
       }
       if (selectedConduitNodeObj() && numpad.group.visible) {
         const panelHit = rayPanelHit(source);
@@ -6665,34 +6742,41 @@ export function setupMR(view, project, getFootprint) {
           reticle.visible = true;
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
-          hoverConduitNode = conduitNodeAtFloorPoint(px, py);
-          if (!hoverConduitNode) hoverConduitSegmentId = conduitSegmentAtFloorPoint(px, py);
+          if (!selectedConduitNodeId && !selectedConduitSegmentId) {
+            const target = conduitEditTargetAtFloorPoint(px, py, conduitEditPickAfterKey);
+            if (target?.kind === 'node') {
+              hoverConduitNode = project.conduitNodes.find((n) => n.id === target.id) || null;
+            } else if (target?.kind === 'segment') {
+              hoverConduitSegmentId = target.id;
+            } else {
+              conduitEditPickAfterKey = null;
+            }
+          } else if (selectedConduitNodeId) {
+            const node = conduitNodeAtFloorPoint(px, py);
+            if (node?.id === selectedConduitNodeId) hoverConduitNode = node;
+          }
         } else {
           reticle.visible = false;
         }
       }
       if (selectedConduitNodeObj() && hoverKey !== prevHoverKey) { redrawNodePad(); prevHoverKey = hoverKey; }
-      // Preview the node the NEXT trigger will select (yellow) — for a vertical stack
-      // that's the one after the current selection, not just the nearest sphere.
-      const nextNode = cycleConduitNodeInStack(hoverConduitNode, selectedConduitNodeId);
-      // Recolor node sphere + its floor dot: selected amber, next-pick yellow, marker-bound dim, else white.
+      // Recolor node sphere + floor dot: selected amber, candidate yellow, else purple.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
         if (!id) continue;
-        const node = project.conduitNodes.find((n) => n.id === id);
-        const color = id === selectedConduitNodeId ? 0xfbbf24 : id === nextNode?.id ? 0xffe14d
-          : node?.markerId ? 0x94a3b8 : 0xffffff;
+        const color = id === selectedConduitNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
+          : CONDUIT_COLOR;
         child.material.color.setHex(color);
-        child.scale.setScalar(id === selectedConduitNodeId || id === nextNode?.id ? 1.5 : 1);
+        child.scale.setScalar(id === selectedConduitNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
       }
-      // Highlight the hovered segment (trigger=split / grip=delete target): recolor it
-      // yellow like a hovered node — an 8% opacity nudge was too subtle to target by.
+      // Selected segment amber; current pre-selection candidate yellow.
       for (const child of conduitGroup.children) {
         const segId = child.userData.conduitSegmentId;
         if (!segId) continue;
-        const hovered = segId === hoverConduitSegmentId;
-        child.material.color.setHex(hovered ? 0xffe14d : child.userData.baseColor);
-        child.material.opacity = hovered ? 1 : 0.92;
+        const selected = segId === selectedConduitSegmentId;
+        const hovered = !selected && segId === hoverConduitSegmentId;
+        child.material.color.setHex(selected ? 0xfbbf24 : hovered ? 0xffe14d : child.userData.baseColor);
+        child.material.opacity = selected || hovered ? 1 : 0.92;
       }
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon

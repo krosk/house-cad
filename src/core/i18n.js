@@ -158,9 +158,9 @@ const STRINGS = {
     zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
   },
   'help.marker_wire': {
-    en: 'Route a wire over the conduit network. Thumbstick up/down chooses electrical or Ethernet (and changes a selected wire). Trigger two device markers to define it; the shortest conduit route is drawn at once. Repeated triggers cycle wires sharing a conduit. Trigger conduit nodes for optional via overrides; grip removes the last via, and B/Y deletes the selected wire.',
-    fr: 'Faites cheminer un câble dans le réseau de gaines. Joystick haut/bas choisit électrique ou Ethernet (et modifie le câble sélectionné). Gâchette sur deux appareils pour le définir ; le trajet de gaine le plus court est tracé. Des pressions répétées parcourent les câbles partageant une gaine. Les nœuds ajoutent des passages VIA facultatifs ; la poignée retire le dernier, B/Y supprime le câble.',
-    zh: '让线路沿管路网络走线。摇杆上/下选择电力或以太网（也可更改选中的线路）。对两个设备标记扣动扳机即可按最短管路布线。重复扣动可循环选择共享管路的线路。选择管路节点可添加可选经由点；握把移除最后一个，B/Y 删除线路。',
+    en: 'Route a wire over the conduit network. Thumbstick up/down chooses electrical or Ethernet. During PICK START and PICK END, grip cycles overlapping device markers and trigger commits the yellow endpoint. Repeated triggers cycle existing wires sharing a conduit. For a selected wire, trigger nodes to add optional vias, grip removes the last via, and B/Y deletes it.',
+    fr: 'Faites cheminer un câble dans les gaines. Joystick haut/bas choisit électrique ou Ethernet. Pendant CHOISIR DÉBUT/FIN, la poignée parcourt les appareils superposés et la gâchette valide la cible jaune. Des gâchettes répétées parcourent les câbles partageant une gaine. Pour un câble sélectionné, les nœuds ajoutent des VIA, la poignée retire le dernier et B/Y le supprime.',
+    zh: '让线路沿管路网络走线。摇杆上/下选择电力或以太网。在选择起点和终点时，握把循环重叠设备，扳机确认黄色端点。重复扣动可循环共享管路的已有线路。线路选中后，选择节点添加经由点，握把移除最后一个，B/Y 删除。',
   },
   'help.marker_conduit': {
     en: 'Build the whole-house conduit network. The nearest device or node under the reticle is highlighted; grip cycles overlaps without drawing, and trigger commits the highlighted target. Trigger empty space to drop a junction. Dimmed adjacent-floor targets create risers. Grip on empty space lifts the pen.',
@@ -173,9 +173,9 @@ const STRINGS = {
     zh: '将管路接头相对某面墙标注尺寸，使其在每次编辑时都跟随该墙。对自由接头扣动扳机以选取，再对墙边扣动扳机；数字键盘设定距离（A/X 翻转方向，B/Y 删除该尺寸）。选取前，握把可在垂直堆叠的接头间循环。分别锁定 X 和 Y 以完全固定。绑定到设备的节点在此为惰性——它们跟随该设备。',
   },
   'help.conduit_edit': {
-    en: 'Edit the conduit network. Trigger a node to select it (free junctions open a height pad), grip-drag a node to move it (near = 3D carry, far = floor reticle + typed height). B/Y deletes the selected node and its segments; hover a segment (highlights yellow) and press B/Y to delete just that segment, or trigger it to split it with a new junction. Marker-bound nodes follow their device.',
-    fr: 'Modifiez le réseau de gaines. Gâchette sur un nœud pour le sélectionner (les jonctions libres ouvrent un pavé de hauteur), poignée-glisser pour le déplacer (près = 3D, loin = réticule sol + hauteur saisie). B/Y supprime le nœud choisi et ses segments ; visez un segment (surligné en jaune) et appuyez sur B/Y pour ne supprimer que ce segment, ou gâchette pour le scinder par une nouvelle jonction. Les nœuds liés à un appareil suivent celui-ci.',
-    zh: '编辑管路网络。扣动扳机选择节点（自由接头会打开高度键盘），按住握把拖动可移动节点（近=三维搬运，远=地面标线+输入高度）。B/Y 删除所选节点及其段；瞄准某段（高亮为黄色）按 B/Y 可仅删除该段，或扣动扳机用新接头将其分割。绑定到设备的节点跟随该设备。',
+    en: 'Edit the conduit network. With nothing selected, grip cycles overlapping nodes and conduit segments; trigger selects the yellow target. A selected free node can be grip-dragged (near = 3D, far = floor reticle) or deleted with B/Y. B/Y deletes a selected conduit segment. Trigger again deselects. Marker-bound nodes cannot move.',
+    fr: 'Modifiez le réseau de gaines. Sans sélection, la poignée parcourt les nœuds et gaines superposés ; la gâchette sélectionne la cible jaune. Une jonction libre sélectionnée se déplace avec poignée-glisser (près = 3D, loin = réticule sol) ou se supprime avec B/Y. B/Y supprime une gaine sélectionnée. Une nouvelle gâchette désélectionne.',
+    zh: '编辑管路网络。未选择时，握把循环选择重叠的节点和管段；扳机选择黄色目标。选中的自由节点可用握把拖动（近=三维，远=地面准星）或按 B/Y 删除。B/Y 删除选中的管段。再次扣动可取消选择。绑定设备的节点不可移动。',
   },
   'help.furnish': {
     en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; B/Y deletes the selection. Models load on the fly.',
@@ -357,8 +357,9 @@ const STRINGS = {
   'conduit.run':     { en: 'RUN CONDUIT', fr: 'TIRER GAINE',        zh: '布管' },
   'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },
   'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
+  'conduit.pickTarget': { en: 'PICK NODE / CONDUIT', fr: 'CHOISIR NŒUD / GAINE', zh: '选择节点 / 管段' },
   'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
-  'conduit.editSeg':  { en: 'SEGMENT — TRIGGER SPLIT / B DEL', fr: 'SEGMENT — GÂCHETTE DIVISER / B SUPPR', zh: '管段 — 扳机分割 / B 删除' },
+  'conduit.editSeg':  { en: 'CONDUIT SELECTED · B DELETE', fr: 'GAINE SÉLECTIONNÉE · B SUPPR', zh: '已选择管段 · B 删除' },
 };
 
 let current = 'en';
