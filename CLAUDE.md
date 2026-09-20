@@ -132,10 +132,10 @@ Desktop Print creates one page per floor; print at 100% for true scale. Full AR 
 live project so a revised sheet shows a contractor what changed. Everything is matched by **stable id**
 (rectangles, markers, constraints all keep ids across revisions of one lineage), never geometrically,
 and compares **solved** geometry — `diffAgainstSnapshot()` deserializes the baseline into a throwaway
-`Project` (which solves on load via `_emit`) and returns `Map<floorId, floorDiff>` classifying zones
-(added/removed/moved/resized/retyped), markers (added/removed/moved/retyped), and structural dimensions
-(added/removed/value-changed) with a 1 mm tolerance. It is pure model data — labels/units/numbering are
-composed by the sheet.
+`Project` (which solves on load via `_emit`) and returns `Map<floorId, floorDiff>` classifying markers
+(added/removed/moved/retyped) and structural dimensions (added/removed/value-changed) with a 1 mm
+tolerance. Zone changes are intentionally excluded. It is pure model data — labels/units/numbering
+are composed by the sheet.
 `planSheet.js` draws it (`drawChangeMap`, gated by `opts.changeMap` = that `Map`): monochrome revision
 clouds (scalloped, sampled as line segments since the backends have no arc) + numbered revision-triangle
 tags + a keyed `REV — CHANGES` legend, drawn over the sheet but under the strip. Because all sheet

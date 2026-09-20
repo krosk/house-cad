@@ -402,8 +402,7 @@ export function t(key, lang = current) {
 // the (i18n-agnostic) plan sheet interpolates. Pass as opts.revLabels so the diff
 // text follows the UI language in Print/SVG/PNG and the AR preview alike.
 export function revLabels(lang = current) {
-  const keys = ['title', 'zoneAdded', 'zoneRemoved', 'zoneRetyped', 'zoneResized', 'zoneMoved',
-    'zoneChanged', 'markerAdded', 'markerRemoved', 'markerMoved', 'markerRetyped',
+  const keys = ['title', 'markerAdded', 'markerRemoved', 'markerMoved', 'markerRetyped',
     'dimChanged', 'dimAdded', 'dimRemoved'];
   return Object.fromEntries(keys.map((k) => [k, t(`rev.${k}`, lang)]));
 }

@@ -1337,7 +1337,6 @@ function drawStrip(be, L, floor, opts) {
 // (src/core/planDiff.js) in opts.changeMap. Everything below is in PAGE MM.
 // ---------------------------------------------------------------------------
 const C_REV = '#000';       // revision markup is monochrome, drawn a touch bolder
-const C_GHOST = '#999';     // vanished (removed) geometry, drawn faint
 const CLOUD_R = 1.6;        // scallop radius on paper (mm), a fixed annotation size
 const CLOUD_OUTSET = 1.4;   // clouds sit just outside the changed region (mm)
 const REV_TAG = 3.6;        // revision-triangle side (mm)
@@ -1346,11 +1345,9 @@ const REV_TAG = 3.6;        // revision-triangle side (mm)
 const CLOUD_MERGE_GAP = 2 * CLOUD_OUTSET + CLOUD_R;
 // English fallback for the change-map label templates. Callers pass a localized set
 // as opts.revLabels (see revLabels() in i18n.js); planSheet interpolates the
-// {kind}/{name}/{from}/{to}/{value}/{unit} placeholders since it owns unit display.
+// {name}/{from}/{to}/{value}/{unit} placeholders since it owns unit display.
 const REV_TEXT_EN = {
   title: 'CHANGES',
-  zoneAdded: 'Zone added ({kind})', zoneRemoved: 'Zone removed ({kind})', zoneRetyped: 'Zone {from}→{to}',
-  zoneResized: 'Zone resized', zoneMoved: 'Zone moved', zoneChanged: 'Zone changed',
   markerAdded: '{name} added', markerRemoved: '{name} removed', markerMoved: '{name} moved', markerRetyped: '{from}→{to}',
   dimChanged: 'Dim {from}→{to} {unit}', dimAdded: 'Dim added {value} {unit}', dimRemoved: 'Dim removed',
 };
@@ -1471,35 +1468,17 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers(), opts 
   // standalone). fill() interpolates {placeholder} tokens per the current language.
   const R = { ...REV_TEXT_EN, ...(opts.revLabels || {}) };
   const fill = (tmpl, vars) => tmpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
-  const kindLabel = (k) => opts.zoneLabel?.(k) || (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Zone');
   const markerLabel = (type) => opts.markerLabel?.(type) || MARKER_LABELS[type] || 'Marker';
-  // A zone kind is only worth flagging when the sheet actually draws it — furniture
-  // is layer-gated, so its edits stay off a sheet that omits furniture.
-  const zoneShown = (kind) => kind !== 'furniture' || layers.furniture;
 
   // Collect every change as an item, layer-filtered, BEFORE drawing so co-located
   // changes can be clustered. box = page-mm cloud region (null for dims, which carry a
-  // tag only); tag = page-mm tag anchor (dims only; box items are tagged per cluster);
-  // ghost = model bounds of a vanished zone to outline faintly.
+  // tag only); tag = page-mm tag anchor (dims only; box items are tagged per cluster).
   const items = [];
-  const zoneBox = (b) => [L.X(b.x0), L.Y(b.y1), L.X(b.x1), L.Y(b.y0)]; // Y flips: y0<y1 in page mm
-  const pushZone = (b, label, ghost = null) => items.push({ box: zoneBox(b), label, ghost });
   const pushPoint = (x, y, label) => {
     const r = 3, px = L.X(x), py = L.Y(y);
     items.push({ box: [px - r, py - r, px + r, py + r], label });
   };
   const pushDim = (anchor, label) => items.push({ box: null, tag: anchor ? [L.X(anchor.x), L.Y(anchor.y)] : null, label });
-
-  for (const { base } of diff.rects.removed)
-    if (zoneShown(base.kind)) pushZone(base.bounds, fill(R.zoneRemoved, { kind: kindLabel(base.kind) }), base.bounds);
-  for (const { cur } of diff.rects.added)
-    if (zoneShown(cur.kind)) pushZone(cur.bounds, fill(R.zoneAdded, { kind: kindLabel(cur.kind) }));
-  for (const { cur, base, change } of diff.rects.changed) {
-    if (!zoneShown(cur.kind) && !zoneShown(base.kind)) continue; // a retype touching a shown kind still counts
-    const label = change === 'retyped' ? fill(R.zoneRetyped, { from: kindLabel(base.kind), to: kindLabel(cur.kind) })
-      : change === 'resized' ? R.zoneResized : change === 'moved' ? R.zoneMoved : R.zoneChanged;
-    pushZone(cur.bounds, label);
-  }
 
   if (layers.markerIcons) { // no glyph on the sheet → its add/move/retype means nothing to the reader
     for (const { cur } of diff.markers.added) pushPoint(cur.x, cur.y, fill(R.markerAdded, { name: markerLabel(cur.type) }));
@@ -1520,12 +1499,6 @@ function drawChangeMap(be, L, floor, diff, layers = resolveOutputLayers(), opts 
   }
 
   if (!items.length) return; // nothing survived the layer filter: no clouds, tags, or legend
-
-  // Faint ghosts of vanished zones, under the clouds.
-  for (const { ghost: b } of items) {
-    if (!b) continue;
-    be.rect(L.X(b.x0), L.Y(b.y1), (b.x1 - b.x0) * L.mmPerM, (b.y1 - b.y0) * L.mmPerM, { stroke: C_GHOST, width: 0.3 });
-  }
 
   // Cluster the boxed changes: each cluster is ONE location, so it draws one cloud,
   // one numbered tag, and one grouped legend entry (its members' labels together).
