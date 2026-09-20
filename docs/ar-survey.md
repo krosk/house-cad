@@ -65,8 +65,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
   through overlapping zones), B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
-  through `ZONE_KINDS` (room→wall→insulation→door→halfwall→heater→sliding→window→stairs→cabinet→
-  furniture). **When the selection is an aperture** (door/window/halfwall/heater/sliding), **A/X
+  through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs→cabinet→
+  furniture). **When the selection is an aperture** (door/garage/window/halfwall/heater/sliding), **A/X
   rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge; halfwall/heater
   return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
   bounds — see "Apertures & vertical bands". Selecting a **furniture** placeholder zone opens the same
@@ -337,7 +337,7 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
   **FURNISH** = rotate the selected GLB item, or cycle the drop article if none selected
   (`cycleFurnish`); **PLAN · ADD** = the kind to add over `ZONE_KINDS`
-  (room/wall/insulation/door/halfwall/heater/sliding/window/stairs/cabinet/furniture, `cycleZoneKind`);
+  (room/wall/insulation/door/garage/halfwall/heater/sliding/window/stairs/cabinet/furniture, `cycleZoneKind`);
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
   baseline) or LANGUAGE row (→ cycles the sheet language), which take precedence.
@@ -394,9 +394,11 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
 
 ## Apertures & vertical bands (PLAN EDIT band pad)
 
-**Apertures** (`door`/`window`/`halfwall`/`heater`/`sliding`) are subtract zone kinds sharing **one
+**Apertures** (`door`/`garage`/`window`/`halfwall`/`heater`/`sliding`) are subtract zone kinds sharing **one
 vertical model** and **one glyph source**. Each carries a `[sill, head]` opening band plus, on
 door/sliding, `hinge` (opening side along the wall axis) × `swing` (which wall face the leaf sweeps).
+Garage doors have no jamb hinge: `swing` selects which face is inward, and their sectional overhead
+footprint projects 2.10 m from that zone edge plus 0.15 m beyond each jamb.
 Kinds differ only in which part is solid: a door is open `[0..head]` (solid lintel), a window open
 `[sill..head]`, a **half wall** solid `[0..sill]` with `head:null` = open to the ceiling, a **heater**
 a **bounded solid `[sill,head]` band** (default `0`/`0.6`, amber, radiator-fin glyph, `HEATER` DXF
@@ -404,7 +406,7 @@ layer — s26 fix: NOT a `head:null` half-wall clone; a heater has a top and doe
 a **sliding** door a rail whose panel is inferred as the opening + a fixed 10 cm overhang. Defaults
 live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
 
-- **All plan symbols come from `src/core/apertureGlyph.js`** (`doorSwingSegments`,
+- **All plan symbols come from `src/core/apertureGlyph.js`** (`doorSwingSegments`, `garageDoorSegments`,
   `windowCasementSegments`, `halfWallHatchSegments`, `heaterFinSegments`, `slidingDoorSegments` +
   `resolveApertureOrient`), consumed by `planSheet.js`, `dxf.js`, AND `mr.js` (`addApertureGlyphs`, in
   `planGroup`) so print / DXF / AR **cannot diverge**. Arcs are sampled as line segments (no backend
@@ -412,11 +414,11 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   page keeps left/right and in/out correct — never bake orientation into the glyph functions.
 - **A/X rotates the selected aperture** in PLAN EDIT (`rotateAperture`): door/sliding cycle 4 states
   `[left,in]→[right,in]→[right,out]→[left,out]`, window cycles 3 hinge states `left→right→both`.
-  Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
+  Garage toggles its inward face (`in↔out`). Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
   not collide with A/X = FLIP in DIMS/TRANSLATE.
 - **Band pad** — selecting a band-carrying rect in PLAN EDIT opens the reused DIMS numpad as a band
   editor (`activateBandPad`/`syncBandPad`/`commitBandField`). `verticalBandFields(rect)` is the
-  authoritative per-kind field list: apertures → `apertureBounds` (door/sliding = HEAD only since sill
+  authoritative per-kind field list: apertures → `apertureBounds` (door/garage/sliding = HEAD only since sill
   is structurally 0; halfwall = SILL only since head is null; window/heater = both); furniture zone →
   `[foot,top]`; else `[]`. The **SWAP cell cycles the field** (only when ≥2 fields; label names the
   field it switches to, namespaced `aperture.*` vs `furniture.*`); ENTER writes `rect[field]` with a

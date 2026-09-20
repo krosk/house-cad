@@ -33,6 +33,7 @@ const STRINGS = {
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.insulation': { en: 'INSULATION', fr: 'ISOLATION', zh: '保温层' },
   'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
+  'mode.garage':   { en: 'GARAGE DOOR', fr: 'PORTE GARAGE', zh: '车库门' },
   'mode.halfwall': { en: 'HALF WALL', fr: 'DEMI-MUR', zh: '矮墙' },
   'mode.heater': { en: 'HEATER', fr: 'RADIATEUR', zh: '暖气' },
   'mode.sliding':  { en: 'SLIDING', fr: 'COULISSANT', zh: '推拉门' },

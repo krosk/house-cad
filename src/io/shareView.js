@@ -24,7 +24,7 @@ const HASH_KEY = 'view';
 // pass through untouched so ids/flags stay exact.
 const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3) : v);
 
-// Aperture band + hinge fields only exist on door/window/half-wall/heater/sliding; a
+// Aperture band + orientation fields only exist on door/garage/window/half-wall/heater/sliding; a
 // plain zone carries none, so they are emitted only when present.
 const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top'];
 

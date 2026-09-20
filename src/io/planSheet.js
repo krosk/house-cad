@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -252,7 +252,17 @@ function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
   const add = (x, y) => { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; };
   for (const poly of footprint) for (const ring of poly) for (const [x, y] of ring) add(x, y);
   // Raw rect bounds too, so an all-subtract or otherwise empty footprint still frames.
-  for (const r of printableRectangles(floor, layers)) { const b = r.bounds; add(b.x0, b.y0); add(b.x1, b.y1); }
+  for (const r of printableRectangles(floor, layers)) {
+    const b = r.bounds;
+    add(b.x0, b.y0); add(b.x1, b.y1);
+    if (zoneKind(r) === 'garage') {
+      const { perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
+      for (const [ax, ay, bx, by] of garageDoorSegments(b.x1 - b.x0, b.y1 - b.y0,
+        { depth: 2.10, side: 0.15, perp })) {
+        add(b.x0 + ax, b.y0 + ay); add(b.x0 + bx, b.y0 + by);
+      }
+    }
+  }
   // Marker positions affect fit only when their glyphs or dimensions are visible.
   // Electrical routes are tied to markerIcons and therefore add no independent fit.
   if (layers.markerIcons || layers.markerDims) {
@@ -315,6 +325,13 @@ function geometryBBox(floor, footprint, layers = resolveOutputLayers()) {
   for (const r of printableRectangles(floor, layers)) {
     const b = r.bounds;
     add(b.x0, b.y0); add(b.x1, b.y1);
+    if (zoneKind(r) === 'garage') {
+      const { perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
+      for (const [ax, ay, bx, by] of garageDoorSegments(b.x1 - b.x0, b.y1 - b.y0,
+        { depth: 2.10, side: 0.15, perp })) {
+        add(b.x0 + ax, b.y0 + ay); add(b.x0 + bx, b.y0 + by);
+      }
+    }
   }
   if (layers.markerIcons) {
     for (const m of floor.markers || []) add(m.x, m.y);
@@ -396,7 +413,7 @@ function drawFootprint(be, L, footprint) {
 // sit over the corresponding cutouts in the computed footprint so a door,
 // window, stair or cabinet no longer prints as an anonymous rectangular hole.
 // The same function draws the compact legend samples below.
-function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1, over = 0) {
+function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1, over = 0, mmPerM = 1) {
   if (!(w > 0 && h > 0)) return;
   const x1 = x + w, y1 = y + h;
   const horizontal = w >= h;
@@ -412,6 +429,14 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
     // In the compact legend, cap the arc reach to the sample height so it can't
     // overflow into the row above.
     segs(doorSwingSegments(w, h, hingeEnd, { perp, reach: compact ? Math.min(w, h) : undefined }), 0.22);
+  } else if (kind === 'garage') {
+    const depth = compact ? Math.min(w, h) * 0.7 : 2.10 * mmPerM;
+    const side = compact ? Math.min(w, h) * 0.08 : 0.15 * mmPerM;
+    // Fold the compact sample into its box so it cannot collide with adjacent
+    // legend rows; full-size drawings project from the actual wall face.
+    segs(compact
+      ? garageDoorSegments(w, 0, { depth: h, side, perp: 1 })
+      : garageDoorSegments(w, h, { depth, side, perp }), 0.16);
   } else if (kind === 'halfwall') {
     // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
     segs(halfWallHatchSegments(w, h), 0.13);
@@ -480,7 +505,7 @@ function drawZones(be, L, floor, layers) {
       be,
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
-      kind, hingeEnd, false, perp, over,
+      kind, hingeEnd, false, perp, over, Math.abs(L.X(1) - L.X(0)),
     );
   }
 }

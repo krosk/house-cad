@@ -38,7 +38,7 @@ import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, verticalBandFields } from '../core/zoneColors.js';
-import { doorSwingSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -1505,6 +1505,7 @@ export function setupMR(view, project, getFootprint) {
         const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
         const { hingeEnd, perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
         const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
+          : k === 'garage' ? garageDoorSegments(bw, bh, { depth: 2.10, side: 0.15, perp })
           : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
             : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
               : k === 'heater' ? heaterFinSegments(bw, bh)
@@ -1951,9 +1952,9 @@ export function setupMR(view, project, getFootprint) {
       if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
       addZDim(n.x, n.y, n.z || 0, 0xa78bfa, '#a78bfa');
     }
-    // Apertures (door/window/half-wall/heater/sliding) → blue (their structural dims are
+    // Apertures (door/garage/window/half-wall/heater/sliding) → blue (their structural dims are
     // blue), spanning the [sill,head] band at the aperture's center. An open-top kind
-    // (head:null, e.g. half-wall) rises to the storey ceiling; a zero sill (door/sliding)
+    // (head:null, e.g. half-wall) rises to the storey ceiling; a zero sill (door/garage/sliding)
     // omits its label. Always shown — every aperture carries a band (unlike opt-in heights).
     const ceiling = project.activeFloor.height || 0;
     for (const r of project.activeFloor.rectangles || []) {
@@ -4471,7 +4472,7 @@ export function setupMR(view, project, getFootprint) {
   // Selecting a rect that carries a vertical band opens the reused DIMS numpad to type
   // its bounds; the SWAP cell becomes a field toggle. Two kinds of band share this pad:
   //   • apertures — opening band [sill, head] (which bounds are editable is per-kind:
-  //     window/heater = SILL+HEAD, door/sliding = HEAD only, half wall = SILL only);
+  //     window/heater = SILL+HEAD, door/garage/sliding = HEAD only, half wall = SILL only);
   //   • furniture placeholders — solid body band [foot, top] (both bounds).
   // Bounds are always [lower, upper] in field order; the commit keeps them ordered.
   // Aperture hinge/swing stay on A/X rotate; B/Y deletes the whole zone.
@@ -4501,7 +4502,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function activateBandPad() {
-    bandField = bandFields(selectedRect)[0] || 'sill'; // door/sliding open on HEAD
+    bandField = bandFields(selectedRect)[0] || 'sill'; // door/garage/sliding open on HEAD
     placePanel(numpad.group);
     numpad.group.visible = true;
     refreshBandPad();

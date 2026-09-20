@@ -150,6 +150,12 @@ export class Rectangle {
   // desktop panel). A door has 4: hinge left/right × swing in/out. A window has 3:
   // hinge left → right → both. Half walls / non-apertures have nothing to rotate.
   rotateAperture(dir = 1) {
+    // A garage door has no jamb hinge: rotation only chooses which wall face its
+    // 2.1 m overhead footprint extends into.
+    if (this.kind === 'garage') {
+      this.swing = this.swing === 'in' ? 'out' : 'in';
+      return true;
+    }
     // Doors and sliding doors share the 4-state hinge×swing cycle (for a slider,
     // hinge = slide direction and swing = which wall face the rail sits on).
     if (this.kind === 'door' || this.kind === 'sliding') {

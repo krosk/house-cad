@@ -119,6 +119,38 @@ export function slidingDoorSegments(w, h, hingeEnd = 'lo', { over = 0, perp = 1 
   return out;
 }
 
+// Motorized sectional garage door. The authored box is the wall opening; its
+// overhead footprint begins at the chosen wall face and projects `depth` into the
+// room, extending `side` beyond each jamb. Cross-lines show the individual door
+// sections and the centre rail identifies the motorized overhead travel.
+export function garageDoorSegments(w, h, { depth = 2.1, side = 0.15, perp = 1, sections = 5 } = {}) {
+  const out = [];
+  const horizontal = w >= h;
+  const dir = perp >= 0 ? 1 : -1;
+  if (horizontal) {
+    const edge = dir > 0 ? h : 0;
+    const end = edge + dir * depth;
+    const x0 = -side, x1 = w + side;
+    out.push([x0, edge, x1, edge], [x1, edge, x1, end], [x1, end, x0, end], [x0, end, x0, edge]);
+    for (let i = 1; i < sections; i++) {
+      const y = edge + (dir * depth * i) / sections;
+      out.push([x0, y, x1, y]);
+    }
+    out.push([w / 2, edge, w / 2, end]); // centre motor/guide rail
+  } else {
+    const edge = dir > 0 ? w : 0;
+    const end = edge + dir * depth;
+    const y0 = -side, y1 = h + side;
+    out.push([edge, y0, edge, y1], [edge, y1, end, y1], [end, y1, end, y0], [end, y0, edge, y0]);
+    for (let i = 1; i < sections; i++) {
+      const x = edge + (dir * depth * i) / sections;
+      out.push([x, y0, x, y1]);
+    }
+    out.push([edge, h / 2, end, h / 2]);
+  }
+  return out;
+}
+
 // Half wall: uniform same-direction diagonal hatch (a poché of solid material) —
 // the inverse of the door's empty swing. Same-direction strokes distinguish it
 // from insulation's alternating zigzag. No hinge (opens upward everywhere).

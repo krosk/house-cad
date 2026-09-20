@@ -6,13 +6,14 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'halfwall', 'heater', 'sliding', 'window', 'stairs', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'stairs', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
   wall:    0xff6b6b, // red
   insulation: 0xe879f9, // magenta
   door:    0x4ade80, // green
+  garage:  0x16a34a, // dark green — motorized sectional garage door
   halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
@@ -37,6 +38,7 @@ export const ZONE_COLORS = {
 // have no swing.
 export const APERTURE_DEFAULTS = {
   door:     { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
+  garage:   { sill: 0,   head: 2.1,  hinge: null,   swing: 'in' },
   window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
   halfwall: { sill: 1.1, head: null, hinge: null   },
   // Wall-mounted heater (radiator): a BOUNDED solid object, NOT open to the ceiling
@@ -63,7 +65,7 @@ export function isAperture(kind) {
 export function apertureBounds(rect) {
   if (!rect || !isAperture(rect.kind)) return [];
   const fields = [];
-  if (rect.kind !== 'door' && rect.kind !== 'sliding') fields.push('sill');
+  if (rect.kind !== 'door' && rect.kind !== 'garage' && rect.kind !== 'sliding') fields.push('sill');
   if (rect.head !== null && rect.head !== undefined) fields.push('head');
   return fields;
 }

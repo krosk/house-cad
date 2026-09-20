@@ -328,16 +328,17 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', stairs: '🪜 Stairs', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
   // Rotate control: only apertures have an orientation. Show the current state so
   // it's clear what each click changes (door: hinge·swing, window: hinge side).
-  const aperture = isAperture(r.kind) && r.hinge != null;
+  const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage';
   pApertureRow.hidden = !aperture;
   if (aperture) {
-    const state = (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
+    const state = r.kind === 'garage' ? r.swing
+      : (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;
   }
 }

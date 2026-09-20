@@ -24,7 +24,7 @@ export const FLOOR_CLIPBOARD_VERSION = 1;
 
 function serializeRect(r) {
   const out = { id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op, kind: r.kind };
-  // Aperture fields (opening band + hinge) only exist on door/window/half wall;
+  // Aperture fields (opening band + orientation) only exist on aperture zones;
   // omit them everywhere else so plain zones stay compact. Missing on load →
   // the Rectangle constructor re-applies the per-kind default (back-compat).
   if (r.sill !== undefined) out.sill = r.sill;

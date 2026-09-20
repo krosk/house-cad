@@ -13,14 +13,14 @@ import { zoneKind } from './zoneColors.js';
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
 const EPS = 1e-7;
-const WALL_ZONE_KINDS = new Set(['wall', 'door', 'window', 'halfwall', 'sliding']);
+const WALL_ZONE_KINDS = new Set(['wall', 'door', 'garage', 'window', 'halfwall', 'sliding']);
 
 const validBounds = (b) => b && b.x1 - b.x0 > EPS && b.y1 - b.y0 > EPS;
 const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 function openingBand(rect, storeyHeight) {
   const kind = zoneKind(rect);
-  if (kind === 'door' || kind === 'sliding') {
+  if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
     return [0, clipped(rect.head ?? 2.1, 0, storeyHeight)];
   }
   if (kind === 'window') {
