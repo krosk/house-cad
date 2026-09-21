@@ -622,8 +622,10 @@ teleport reticle; no last-active routing remains.
 - **Dim-label textures are cached** by text+color (`dimTexCache`, evicted in `buildDimensions`,
   bounded at 64). `buildPlan` no longer disposes the shared sprite `.map`. This makes the DIMS
   dim-offset grip-drag a per-frame cache hit.
-- **EDGE grip-drag** calls `buildPlan(false)` (skips `buildDimensions`, the dominant cost); the
-  full rebuild is restored on drag release (`onSqueezeEnd`).
+- **PLAN EDGE picking is deliberate**: every edge inside the reticle is ordered by fixed plan
+  geometry (vertical/increasing X, then horizontal/increasing Y). Grip cycles, the first trigger
+  locks the highlighted edge, grip can then drag only that locked edge, and the second trigger
+  snaps it to the touched wall coordinate. A merely hovered edge is never draggable.
 - Dynamically-rewritten highlight meshes (`edgeHi`/`edgeHi2`/`rectHi`) set `frustumCulled=false`
   (their vertices are rewritten in world space each frame; an origin-centered bounding sphere
   would get them culled on head-turn).

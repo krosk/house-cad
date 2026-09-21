@@ -2762,6 +2762,7 @@ export function setupMR(view, project, getFootprint) {
   const surveyed = [];      // Rectangle ids this session, in creation order (for undo)
   let activeRect = null;    // the rectangle whose edges EDGE mode edits (last dropped)
   let selectedEdge = null;  // {rectId, edge} locked, awaiting a wall touch
+  let edgePickKey = null;   // retained PLAN EDGE candidate; grip advances it before trigger lock
   let edgeSnapPrompt = false; // EDGE label currently shows the "snap to wall" state (edge locked)
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
   let selectedRect = null;  // PLAN mode: the persistently-selected zone (survives aim)
@@ -2821,9 +2822,10 @@ export function setupMR(view, project, getFootprint) {
   let hoverRef = null;      // reference under the ray this frame (edge or origin)
   let hoverFloorPt = null;  // {px,py} reticle floor point this frame during DIMS ref-pick
   let dimStackPick = null;  // in DIMS first-ref phase, the chosen member id of a vertical stack (grip cycles it)
+  let planDimPickKey = null; // retained PLAN DIMS edge/origin candidate; grip advances it
   let dimOffsetPt = null;   // {px,py} captured when a pair completes -> new dim's default line placement
   let hoverDim = null;      // dim value panel under the ray this frame (to select/edit a constraint)
-  let gripDrag = null;      // active grip-drag: dim (DIMS), edge (EDGE), or marker (OUTLET)
+  let gripDrag = null;      // active grip-drag: selected edge, dim panel, marker, furniture, or conduit node
   let dimBuffer = '';       // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
@@ -2958,6 +2960,93 @@ export function setupMR(view, project, getFootprint) {
       }
     }
     return best;
+  }
+
+  const edgeRefKey = (ref) => ref ? `${ref.rectId}:${ref.edge}` : null;
+
+  // Deterministic edge candidates for deliberate grip cycling. Pointer distance only
+  // decides membership in the reticle, never order: vertical edges increase by X,
+  // then horizontal edges increase by Y, with stable segment/id tie-breakers.
+  function orderedEdgesAtPoint(px, py) {
+    const candidates = [];
+    for (const r of project.rectangles) {
+      const b = r.bounds;
+      const segs = [
+        ['left', b.x0, b.y0, b.x0, b.y1], ['right', b.x1, b.y0, b.x1, b.y1],
+        ['bottom', b.x0, b.y0, b.x1, b.y0], ['top', b.x0, b.y1, b.x1, b.y1],
+      ];
+      for (const [edge, ax, ay, bx, by] of segs) {
+        if (ptSegDist(px, py, ax, ay, bx, by) >= EDGE_PICK_M) continue;
+        const vertical = isXEdge(edge);
+        candidates.push({
+          ref: { rectId: r.id, edge }, axisOrder: vertical ? 0 : 1,
+          coord: vertical ? ax : ay,
+          lo: vertical ? Math.min(ay, by) : Math.min(ax, bx),
+          hi: vertical ? Math.max(ay, by) : Math.max(ax, bx),
+          id: String(r.id),
+        });
+      }
+    }
+    return candidates
+      .sort((a, b) => a.axisOrder - b.axisOrder || a.coord - b.coord || a.lo - b.lo || a.hi - b.hi
+        || a.id.localeCompare(b.id) || a.ref.edge.localeCompare(b.ref.edge))
+      .map(({ ref }) => ref);
+  }
+
+  function retainedEdgeAtPoint(px, py, key) {
+    const refs = orderedEdgesAtPoint(px, py);
+    return refs.find((ref) => edgeRefKey(ref) === key) || refs[0] || null;
+  }
+
+  function cycleEdgePick() {
+    if (!hoverFloorPt) return false;
+    const refs = orderedEdgesAtPoint(hoverFloorPt.px, hoverFloorPt.py);
+    if (refs.length < 2) return false;
+    const currentKey = edgeRefKey(hoverEdge) || edgePickKey;
+    const current = refs.findIndex((ref) => edgeRefKey(ref) === currentKey);
+    const next = refs[(current < 0 ? 0 : current + 1) % refs.length];
+    edgePickKey = edgeRefKey(next);
+    hoverEdge = next;
+    rlog('edge target cycle', { key: edgePickKey });
+    return true;
+  }
+
+  const planDimRefKey = (ref) => ref?.kind === 'origin'
+    ? 'origin'
+    : ref?.kind === 'edge' ? `edge:${ref.rectId}:${ref.edge}` : null;
+
+  // PLAN DIMS deliberately does not rank overlapping edges by pointer distance: that
+  // made the highlighted edge jump whenever a hand shook around a shared wall/corner.
+  // Gather everything inside the reticle and use a geometry-only order: origin, then
+  // vertical edges by increasing X, then horizontal edges by increasing Y. Segment
+  // bounds and persistent ids provide deterministic tie-breakers for coincident edges.
+  function planDimRefsAtPoint(px, py) {
+    const candidates = [];
+    if (Math.hypot(px, py) < 0.12) candidates.push({ ref: { kind: 'origin' }, axisOrder: -1, coord: 0, lo: 0, hi: 0, id: '' });
+    for (const edgeRef of orderedEdgesAtPoint(px, py)) {
+      candidates.push({ ref: { kind: 'edge', ...edgeRef } });
+    }
+    return candidates.map(({ ref }) => ref)
+      .filter((ref) => !dimRefA || (!refsEqual(ref, dimRefA) && refsCompatible(dimRefA, ref)));
+  }
+
+  function planDimRefAtPoint(px, py) {
+    const refs = planDimRefsAtPoint(px, py);
+    if (!refs.length) return null;
+    return refs.find((ref) => planDimRefKey(ref) === planDimPickKey) || refs[0];
+  }
+
+  function cyclePlanDimPick() {
+    if (!hoverFloorPt) return false;
+    const refs = planDimRefsAtPoint(hoverFloorPt.px, hoverFloorPt.py);
+    if (refs.length < 2) return false;
+    const currentKey = planDimRefKey(hoverRef) || planDimPickKey;
+    const current = refs.findIndex((ref) => planDimRefKey(ref) === currentKey);
+    const next = refs[(current < 0 ? 0 : current + 1) % refs.length];
+    planDimPickKey = planDimRefKey(next);
+    hoverRef = next; // immediate visual response; the next XR frame retains this key
+    rlog('plan dim target cycle', { key: planDimPickKey });
+    return true;
   }
 
   // All zones containing a plan point, TOPMOST (last-created) first — PLAN mode's
@@ -3232,6 +3321,7 @@ export function setupMR(view, project, getFootprint) {
   function resetDim() {
     dimRefA = dimRefB = null;
     dimStackPick = null;
+    planDimPickKey = null;
     editingId = null;
     dimOffsetPt = null;
     dimBuffer = '';
@@ -3325,10 +3415,9 @@ export function setupMR(view, project, getFootprint) {
     return false;
   }
 
-  // Live update for an active grip-drag, from the reticle's floor point (px,py):
-  // in DIMS, the perpendicular component places the line while the parallel component
-  // places the value box along that line; in EDGE, move the grabbed edge. Rebuilt each
-  // frame while held.
+  // Live update for a dimension-panel or selected-edge grip-drag. A dim uses the
+  // perpendicular component for its line and the parallel component for its label;
+  // an edge follows the reticle only after trigger has explicitly locked it.
   // Place a dimension's perpendicular line marker at the plan floor point (px,py) —
   // the signed offset the dim line sits at. Origin dims store the absolute coord;
   // edge<->edge dims store it relative to the outer edge (the auto-stack baseline),
@@ -3381,16 +3470,9 @@ export function setupMR(view, project, getFootprint) {
       const rect = project.rectangles.find((r) => r.id === gripDrag.rectId);
       if (!rect) return;
       setEdge(rect, gripDrag.edge, px, py);
-      // Re-solve for live feedback WITHOUT the full desktop listener cascade (3D
-      // re-extrude / 2D redraw / DOM), which is invisible in AR and tanks the frame
-      // rate. onSqueezeEnd commits once via project.touch() so the desktop catches up.
+      // Keep live dragging inside the AR renderer. Release emits one model update so
+      // desktop/output listeners catch up without running their work every XR frame.
       project.solveSilently();
-      // buildPlan(false) rebuilds the changed geometry (fill/strips/zone fills) and
-      // skips buildDimensions; markers + electrical persist in their own uncleared
-      // groups. Re-add the dimensions so they stay LIVE (following the moving edge)
-      // instead of vanishing during the drag — cheap, because dragging an edge never
-      // changes a constraint's value, so every label texture is a cache hit and only
-      // the dashed line geometry moves.
       buildPlan(false);
       buildDimensions(project.activeFloor);
       applyPlanMatrix();
@@ -3748,6 +3830,7 @@ export function setupMR(view, project, getFootprint) {
       const pinKind = domain === 'marker' ? 'marker' : domain === 'node' ? 'node' : null;
       if (pinKind ? hoverRef.kind !== pinKind : (hoverRef.kind === 'marker' || hoverRef.kind === 'node')) return;
       dimRefA = hoverRef;
+      planDimPickKey = null; // begin the second reference at its stable first candidate
       rlog('dim A', { domain: modeId, ref: refLabel(hoverRef) });
       redrawNumpad();
       return;
@@ -4604,6 +4687,7 @@ export function setupMR(view, project, getFootprint) {
     surveyed.push(rect.id);
     activeRect = rect;
     selectedEdge = null;
+    edgePickKey = null;
     buildPlan();       // re-read footprint (now includes the new rect); keeps transform
     applyPlanMatrix(); // buildPlan swaps geometry only; reassert position/yaw
     rlog('drop rect', { id: rect.id, kind, op, px: +px.toFixed(3), py: +py.toFixed(3) });
@@ -4920,7 +5004,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: (pos) => {
         if (!placed) return;
         if (!selectedEdge) {
-          if (hoverEdge) { selectedEdge = hoverEdge; rlog('edge locked', { edge: hoverEdge.edge, rect: hoverEdge.rectId }); }
+          if (hoverEdge) {
+            selectedEdge = hoverEdge;
+            edgePickKey = null;
+            rlog('edge locked', { edge: hoverEdge.edge, rect: hoverEdge.rectId });
+          }
           return;
         }
         const rect = project.rectangles.find((r) => r.id === selectedEdge.rectId);
@@ -4930,6 +5018,7 @@ export function setupMR(view, project, getFootprint) {
           rlog('edge set', { edge: selectedEdge.edge, px: +px.toFixed(3), py: +py.toFixed(3) });
         }
         selectedEdge = null;
+        edgePickKey = null;
         project.touch();   // rectangle mutated in place -> re-solve + notify
         buildPlan();
         applyPlanMatrix();
@@ -5356,7 +5445,7 @@ export function setupMR(view, project, getFootprint) {
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
-    selectedEdge = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
+    selectedEdge = null; edgePickKey = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
     pasteConfirmFloorId = null;
@@ -5457,6 +5546,7 @@ export function setupMR(view, project, getFootprint) {
     for (const r of project.rectangles) surveyed.push(r.id); // active floor, creation order
     activeRect = project.rectangles[project.rectangles.length - 1] || null;
     selectedEdge = null;
+    edgePickKey = null;
     selectedRect = null; // EDIT selection is per-floor; drop it on a floor switch
     roomComponentCacheKey = '';
     roomComponentCache = null;
@@ -5675,13 +5765,17 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Grip PRESS: if the pointer is over a draggable target, start a grip-drag instead
-  // of an undo — a domain-matched dim value panel, an edge, or an outlet.
+  // of a cycle/reset — a domain-matched dim value panel or a selected outlet.
   function onSqueezeStart(event) {
     if (!isControllerSource(event?.data)) return;
     if (event?.data?.handedness === 'left') return; // companion grip has no editing role
     const id = modes[currentMode].id;
     if (isDimMode(id) && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
-    if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
+    if (id === 'edge' && selectedEdge) {
+      gripDrag = { kind: 'edge', rectId: selectedEdge.rectId, edge: selectedEdge.edge };
+      rlog('grip-drag selected edge', selectedEdge);
+      return;
+    }
     if (id === 'marker' && selectedMarker && hoverMarker?.id === selectedMarker.id && setControllerRay(event.data)) {
       const sprite = markerGroup.children.find(
         (s) => s.userData.markerId === hoverMarker.id && s.userData.markerRole === 'wall',
@@ -5819,7 +5913,10 @@ export function setupMR(view, project, getFootprint) {
     }
     if (isDimMode(mode.id)) { // undo the last dimension pick, step by step
       if (dimRefB || editingId) { dimRefB = null; editingId = null; dimBuffer = ''; bufferPristine = false; redrawNumpad(); rlog('dim B cancelled'); return; }
-      if (dimRefA) { dimRefA = null; redrawNumpad(); rlog('dim A cancelled'); return; }
+      // PLAN DIMS uses grip as an explicit target cycler in BOTH reference phases.
+      // Only fall back to cancelling A when there is no overlap to advance through.
+      if (mode.id === 'plan_dims' && cyclePlanDimPick()) return;
+      if (dimRefA) { dimRefA = null; planDimPickKey = null; redrawNumpad(); rlog('dim A cancelled'); return; }
       // Nothing picked yet: grip cycles a vertical stack under the reticle so a stacked
       // node/marker can be singled out before its first-ref pick.
       if (cycleDimStackPick()) return;
@@ -5919,9 +6016,16 @@ export function setupMR(view, project, getFootprint) {
       }
       return;
     }
-    if (mode.id === 'edge' && selectedEdge) { // cancel a pending locked edge (no rect removal)
-      selectedEdge = null;
-      rlog('edge lock cancelled');
+    if (mode.id === 'edge') {
+      if (selectedEdge) { // cancel a pending locked edge (no rect removal)
+        selectedEdge = null;
+        edgePickKey = null;
+        rlog('edge lock cancelled');
+        return;
+      }
+      // First stage: advance through every edge inside the reticle without moving it.
+      // Trigger is the separate confirmation that locks the highlighted candidate.
+      cycleEdgePick();
       return;
     }
     if (mode.id === 'register' && registerPts.length) { // back out the last REGISTER point
@@ -6338,18 +6442,22 @@ export function setupMR(view, project, getFootprint) {
       showTranslateEdge(translateTargets.y?.ref, 0xfbbf24);
       showTranslateEdge(translateEdge || hoverEdge, translateEdge ? 0xfbbf24 : 0xffe14d);
     } else if (modeId === 'edge') {
-      // EDGE mode: ray a floor point, pick the edge segment the beam lands on across
-      // ALL zones, ring the aim point. edgeAtPoint uses true segment distance + a
-      // cap, so the highlight tracks the edge under your reticle (open floor = none).
+      // EDGE mode is two-stage. Before trigger lock, grip cycles the stable geometry-
+      // ordered set inside the reticle. After lock, the controller tip supplies the
+      // real-wall coordinate on the second trigger.
       const hit = rayFloorHit(editCtl);
       if (hit) {
         const { px, py } = worldToPlan(hit);
-        hoverEdge = edgeAtPoint(px, py); // {rectId, edge} | null
+        hoverFloorPt = { px, py };
+        hoverEdge = selectedEdge ? null : retainedEdgeAtPoint(px, py, edgePickKey);
+        if (!hoverEdge && !selectedEdge) edgePickKey = null;
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
-        if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed edge to the reticle
+        if (gripDrag?.kind === 'edge') applyGripDrag(px, py);
       } else {
         hoverEdge = null;
+        hoverFloorPt = null;
+        if (!selectedEdge) edgePickKey = null;
         reticle.visible = false;
       }
       // Once an edge is locked, retitle/recolor the mode to YELLOW "SNAP TO WALL" so
@@ -6462,11 +6570,11 @@ export function setupMR(view, project, getFootprint) {
           hoverDim = dimRefA ? null : dimLabelAtPoint(px, py, modeDomain(modeId));
           if (!hoverDim) {
             if (modeId === 'plan_dims') {
-              // Pick the origin in PLAN space, not against the raw registered world
-              // position. TELEPORT shifts planGroup with navOffset, so comparing to
-              // planPos left the visible origin ring behind its stale hit target.
-              if (Math.hypot(px, py) < 0.12) hoverRef = { kind: 'origin' };
-              else { const e = edgeAtPoint(px, py); if (e) hoverRef = { kind: 'edge', rectId: e.rectId, edge: e.edge }; }
+              // Retain the grip-selected candidate while it remains in the reticle.
+              // Candidate order is geometry-fixed, never pointer-distance-ranked, so
+              // hand shake cannot reorder coincident/shared edges between presses.
+              hoverRef = planDimRefAtPoint(px, py);
+              if (!hoverRef) planDimPickKey = null;
             } else if (!dimRefA) {
               // First pick is the domain's dependent target: an outlet, or a bare junction.
               // Honor grip-cycled stack selection: default to the top of the vertical
