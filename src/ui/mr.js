@@ -638,6 +638,7 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillStyle = '#e6edf3';
       ctx.font = 'bold 30px sans-serif';
       const formatLabel = settings.format === 'coohom' ? 'COOHOM DXF'
+        : settings.format === 'link' ? 'LINK · 3D VIEW'
         : settings.format === 'qr' ? 'QR · 3D VIEW' : settings.format.toUpperCase();
       ctx.fillText(`${t('export.format')} · ${formatLabel}`, 28, 152);
       ctx.fillStyle = '#768390';
@@ -4017,6 +4018,32 @@ export function setupMR(view, project, getFootprint) {
 
   let directExportCount = 0;
 
+  // Clipboard writes must start directly inside the trigger's user-activation turn.
+  // Building the compressed view URL is asynchronous, so keep the current variant
+  // warm instead of awaiting compression after the trigger. Project change events
+  // invalidate ONLY this cache; AR visuals still rebuild explicitly elsewhere.
+  let shareUrlCache = null; // { url, markers }
+  let shareUrlGeneration = 0;
+  let shareUrlTimer = null;
+  async function refreshShareUrl(generation, markers) {
+    try {
+      const url = await buildShareUrl(project, { markers });
+      if (generation === shareUrlGeneration) shareUrlCache = { url, markers };
+    } catch (error) {
+      if (generation === shareUrlGeneration) shareUrlCache = null;
+      rlog('share URL precompute failed', String(error?.message || error));
+    }
+  }
+  function scheduleShareUrlRefresh() {
+    shareUrlCache = null;
+    const generation = ++shareUrlGeneration;
+    const markers = getOutputSettings().markerIcons;
+    clearTimeout(shareUrlTimer);
+    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers), 0);
+  }
+  project.onChange(scheduleShareUrlRefresh);
+  scheduleShareUrlRefresh();
+
   // Chromium permits the first synthetic file download from an immersive page,
   // then may gate later files behind its "multiple automatic downloads" setting.
   // Android Web Share is a user-confirmed delivery path and is not subject to that
@@ -4136,18 +4163,42 @@ export function setupMR(view, project, getFootprint) {
     const f = currentSheetFloor();
     const settings = getOutputSettings();
     const format = settings.format;
-    // QR is a WHOLE-HOUSE view-only share, not a per-floor sheet: encode the #view= link
-    // as a PNG so messaging apps can't truncate the long URL. Markers ride along when the
-    // markerIcons layer is on (they cost QR capacity). If the map is too big for even a
-    // max-capacity QR, say so rather than ship a broken image.
+    // LINK and QR are separate whole-house view-only exports. LINK uses the warmed
+    // cache so writeText starts inside the trigger activation; it never silently
+    // substitutes a file. QR independently creates and delivers its PNG.
+    if (format === 'link') {
+      const cached = shareUrlCache?.markers === settings.markerIcons ? shareUrlCache.url : null;
+      if (cached && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(cached);
+          rlog('share URL copied', { chars: cached.length, markers: settings.markerIcons });
+          sheetFlash('URL COPIED');
+          return;
+        } catch (error) {
+          rlog('share URL copy failed', String(error?.message || error));
+        }
+      }
+      scheduleShareUrlRefresh();
+      sheetFlash('URL COPY FAILED');
+      return;
+    }
     if (format === 'qr') {
-      const url = await buildShareUrl(project, { markers: settings.markerIcons });
-      const blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
-      if (!blob) { sheetFlash('map too large for QR'); rlog('qr too large', { chars: url.length }); return; }
+      let url;
+      let blob;
+      try {
+        const cached = shareUrlCache?.markers === settings.markerIcons ? shareUrlCache.url : null;
+        url = cached || await buildShareUrl(project, { markers: settings.markerIcons });
+        blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
+      } catch (error) {
+        rlog('qr generation failed', String(error?.message || error));
+        sheetFlash('QR EXPORT FAILED');
+        return;
+      }
+      if (!blob) { sheetFlash('QR FAILED · TOO LARGE'); rlog('qr too large', { chars: url.length }); return; }
       const name = exportFileName(f, 'qr.png');
       const result = await deliverExport(name, blob, 'image/png');
       rlog('qr share', { name, chars: url.length, markers: settings.markerIcons, ok: result.ok, delivery: result.delivery });
-      sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'share blocked');
+      sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'QR EXPORT FAILED');
       return;
     }
     const extension = format === 'coohom' ? 'dxf' : format;
@@ -5534,6 +5585,7 @@ export function setupMR(view, project, getFootprint) {
   // and the left-controller sheet immediately; the authored project is untouched.
   onOutputSettingsChange(() => {
     sheetDirty = true;
+    scheduleShareUrlRefresh(); // marker-icons toggle changes the shared-view payload
     if (exportMenu.group.visible) redrawExportMenu();
     if (sheetPanel.group.visible) redrawSheet();
   });
@@ -6322,6 +6374,7 @@ export function setupMR(view, project, getFootprint) {
       : null;
     const exportStatus = modes[currentMode].id === 'export'
       ? `${t('export.format')} · ${getOutputSettings().format === 'coohom' ? 'COOHOM DXF'
+        : getOutputSettings().format === 'link' ? 'LINK · 3D VIEW'
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     const furnishStatus = modes[currentMode].id === 'furnish'
       ? (selectedFurnitureId ? t('furnish.selected')

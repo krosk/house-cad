@@ -31,30 +31,37 @@ const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top'];
 // Project → compact view object. `markers` opts them in (they roughly double the size
 // and cost the QR-code comfort margin), so the default is massing only.
 export function serializeView(project, { markers = false } = {}) {
+  const kinds = [...new Set(project.floors.flatMap((f) => f.rectangles.map((r) => r.kind || 'room')))];
+  const markerTypes = markers
+    ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.type || 'outlet')))]
+    : [];
   return {
     app: VIEW_APP,
     v: VIEW_SCHEMA,
     // Elevation is DERIVED from storey heights + the ground floor, so it is never stored
     // — only the ground/active floor indices (array order is the stacking order).
-    ground: Math.max(0, project.floors.findIndex((f) => f.id === project.groundFloorId)),
-    active: Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId)),
-    floors: project.floors.map((f) => {
-      const o = { name: f.name, height: mm(f.height) };
-      o.rects = f.rectangles.map((r) => {
-        const rc = { x: mm(r.x), y: mm(r.y), w: mm(r.w), h: mm(r.h) };
-        if (r.op && r.op !== 'add') rc.op = r.op;      // 'add' is the default
-        if (r.kind && r.kind !== 'room') rc.kind = r.kind; // 'room' is the default
-        for (const k of APERTURE_KEYS) if (r[k] != null) rc[k] = mm(r[k]);
+    g: Math.max(0, project.floors.findIndex((f) => f.id === project.groundFloorId)),
+    i: Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId)),
+    k: kinds,
+    t: markerTypes,
+    // Positional arrays keep a large marker set within QR version 40 after deflate.
+    // version 40 even after deflate. Trailing defaults are removed before encoding.
+    f: project.floors.map((f) => {
+      const rects = f.rectangles.map((r) => {
+        const rc = [mm(r.x), mm(r.y), mm(r.w), mm(r.h), r.op === 'subtract' ? 1 : 0, kinds.indexOf(r.kind || 'room')];
+        for (const key of APERTURE_KEYS) rc.push(r[key] == null ? null : mm(r[key]));
+        while (rc.length > 6 && rc.at(-1) == null) rc.pop();
         return rc;
       });
+      const floor = [f.name, mm(f.height), rects];
       if (markers) {
-        o.markers = f.markers.map((m) => {
-          const mk = { t: m.type, x: mm(m.x), y: mm(m.y), z: mm(m.z) };
-          if (m.zDatum) mk.d = 1; // a defined (grab-locking / dimensioned) height
+        floor.push(f.markers.map((m) => {
+          const mk = [markerTypes.indexOf(m.type || 'outlet'), mm(m.x), mm(m.y), mm(m.z)];
+          if (m.zDatum) mk.push(1); // a defined (grab-locking / dimensioned) height
           return mk;
-        });
+        }));
       }
-      return o;
+      return floor;
     }),
   };
 }
@@ -62,11 +69,23 @@ export function serializeView(project, { markers = false } = {}) {
 // Compact view object → full deserialize schema (with fresh ids, constraints:[]), then
 // load into the project. Throws on a non-view object.
 export function loadView(project, view) {
-  if (!view || typeof view !== 'object' || view.app !== VIEW_APP) {
+  if (!view || typeof view !== 'object' || view.app !== VIEW_APP
+      || view.v !== VIEW_SCHEMA || !Array.isArray(view.f)) {
     throw new Error('Not a house-cad view link.');
   }
   let rid = 0, mid = 0; // ids only need to be present + unique (nothing references them)
-  const floors = (view.floors || []).map((f, i) => ({
+  const sourceFloors = view.f.map((f) => ({
+    name: f[0], height: f[1],
+    rects: (f[2] || []).map((r) => ({
+      x: r[0], y: r[1], w: r[2], h: r[3], op: r[4] === 1 ? 'subtract' : 'add',
+      kind: view.k?.[r[5]] || 'room',
+      ...Object.fromEntries(APERTURE_KEYS.flatMap((key, index) => r[index + 6] == null ? [] : [[key, r[index + 6]]])),
+    })),
+    markers: (f[3] || []).map((m) => ({
+      t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
+    })),
+  }));
+  const floors = sourceFloors.map((f, i) => ({
     id: `f${i + 1}`,
     name: f.name || `Floor ${i + 1}`,
     height: typeof f.height === 'number' ? f.height : 2.8,
@@ -84,8 +103,10 @@ export function loadView(project, view) {
     furniture: [],
   }));
   if (!floors.length) throw new Error('View link has no floors.');
-  const gi = Number.isInteger(view.ground) && view.ground < floors.length ? view.ground : 0;
-  const ai = Number.isInteger(view.active) && view.active < floors.length ? view.active : gi;
+  const groundIndex = view.g;
+  const activeIndex = view.i;
+  const gi = Number.isInteger(groundIndex) && groundIndex < floors.length ? groundIndex : 0;
+  const ai = Number.isInteger(activeIndex) && activeIndex < floors.length ? activeIndex : gi;
   deserializeInto(project, {
     app: 'house-cad', version: FILE_VERSION,
     groundFloorId: floors[gi].id, activeFloorId: floors[ai].id,

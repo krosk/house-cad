@@ -645,9 +645,10 @@ teleport reticle; no last-active routing remains.
   the numpad stayed open and no floor dim drew). Guard edge lookups; skip marker pins where the 2D
   view doesn't draw them.
 - **`View3D.setGeometry` rebuilds meshes every change** — MR uses `hideMesh` + `view.house` (the
-  floor Group), not `view.mesh`. `mr.js` does NOT subscribe to `project.onChange`; it rebuilds
-  overlays manually via `buildPlan()`/`applyPlanMatrix()`, so any model-changing action (incl.
-  LOAD, height edits, floor switch) must call them itself.
+  floor Group), not `view.mesh`. `mr.js` does NOT use `project.onChange` to rebuild visuals; it
+  rebuilds overlays manually via `buildPlan()`/`applyPlanMatrix()`, so any model-changing action
+  (incl. LOAD, height edits, floor switch) must call them itself. The sole lightweight subscription
+  only invalidates/precomputes the clipboard share-link cache so trigger activation is preserved.
 - **The solver can produce negative w/h** unless normalized. `edgeCoord` reads raw x/w while
   every picker/highlight reads normalized min/max; the solver write-back normalizes
   (`src/core/constraints.js`). Don't reintroduce a raw negative-size path.
