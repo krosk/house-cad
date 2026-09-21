@@ -671,6 +671,10 @@ teleport reticle; no last-active routing remains.
   rotate `local-floor` when it relocalizes after the headset sleeps; reading only anchor position
   makes the plan jump or acquire a different orientation. `planYaw` and `navOffset` are stored in
   the anchor frame, so teleport and left-stick viewer-pivot rotation survive that relocalization.
+- **Startup placement is provisional**: after three valid viewer-pose frames, the active floor's
+  plan origin is placed vertically below the headset, its floor is estimated 1.50 m below the
+  camera, and plan +Y follows the viewer's horizontal heading. This makes the plan immediately
+  visible on entry; FLOOR/ORIGIN/RECAL remain authoritative and replace/refine that estimate.
 - **Remote logging** (`rlog` → dev-only `POST /__log` → `quest-debug.log`, gitignored — never
   stage it) works only on the dev server, NOT on Pages/the APK. The release TWA has **no web
   console** — debug the `?ar=1` page in the plain Quest Browser or Oculus Remote Web Inspector.

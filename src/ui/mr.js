@@ -2729,6 +2729,9 @@ export function setupMR(view, project, getFootprint) {
   let planYaw = 0;                     // plan rotation about vertical, set by REGISTER
   let anchorYaw = 0;                   // spatial-anchor yaw in the current local-floor space
   let floorY = 0;                      // shared ground datum; derived from any storey's real floor in FLOOR
+  const STARTUP_EYE_HEIGHT = 1.5;      // provisional floor estimate until explicit calibration
+  let startupPlacementPending = false;
+  let startupPoseFrames = 0;
   let registerPts = [];                // REGISTER 3-point gesture: [P1,P2 along a wall, P3 on the perpendicular wall]
   let recalPts = [];                   // RECAL wall touches (world {x,z}): [P1,P2 along wall 1, P3 on wall 2]
   let recalCorner = null;              // {cx, cy, a, b} selected corner; after lock a=wall 1 end, b=wall 2 end
@@ -5593,6 +5596,8 @@ export function setupMR(view, project, getFootprint) {
     // Force Three to RENDER with this exact space (not just the type setter, which
     // didn't take through ARButton) so render origin == our measurement origin.
     renderer.xr.setReferenceSpace(localSpace);
+    startupPlacementPending = true;
+    startupPoseFrames = 0;
     view.onXRFrame = onXRFrame;
   });
 
@@ -5601,6 +5606,8 @@ export function setupMR(view, project, getFootprint) {
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
     anchor = null;
     anchorPoseMissing = false;
+    startupPlacementPending = false;
+    startupPoseFrames = 0;
     reticle.visible = false;
     leftTeleportReticle.visible = false;
     sheetPanel.group.visible = false;
@@ -6123,6 +6130,34 @@ export function setupMR(view, project, getFootprint) {
 
   function onXRFrame(time, frame) {
     currentFrame = frame;
+    // Give tracking a few frames to settle, then expose the plan immediately with a
+    // provisional placement: active-floor origin directly below the initial headset,
+    // 1.50 m down, with plan +Y aligned to the viewer's horizontal forward direction.
+    // FLOOR/ORIGIN/RECAL remain authoritative and replace this estimate normally.
+    if (startupPlacementPending && localSpace) {
+      const viewer = frame.getViewerPose(localSpace);
+      if (viewer) {
+        startupPoseFrames++;
+        if (startupPoseFrames >= 3) {
+          const p = viewer.transform.position;
+          const q = viewer.transform.orientation;
+          _camQ.set(q.x, q.y, q.z, q.w);
+          _fwd.set(0, 0, -1).applyQuaternion(_camQ);
+          _fwd.y = 0;
+          if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
+          else _fwd.normalize();
+          planYaw = Math.atan2(-_fwd.x, -_fwd.z); // local plan +Y (world -Z at yaw 0) faces forward
+          floorY = p.y - STARTUP_EYE_HEIGHT - activeElevation();
+          placeAt(p.x, floorY, p.z);
+          startupPlacementPending = false;
+          rlog('startup provisional placement', {
+            x: +p.x.toFixed(3), floorY: +floorY.toFixed(3), z: +p.z.toFixed(3),
+            eyeHeight: STARTUP_EYE_HEIGHT,
+            yaw: +planYaw.toFixed(3), activeElevation: +activeElevation().toFixed(3),
+          });
+        }
+      }
+    }
     pollModeCycle(frame, time);
     const editCtl = editorSource(frame);
     // No physical controller in the editor role → the headset is in hand tracking
