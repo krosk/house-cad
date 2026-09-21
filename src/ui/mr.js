@@ -1990,6 +1990,7 @@ export function setupMR(view, project, getFootprint) {
   // Keep the physical carrier visually separate from what it carries. Surface remains
   // inferred routing metadata, but does not recolor either layer in AR.
   const CONDUIT_COLOR = 0xa78bfa;
+  const CONDUIT_NODE_COLOR = 0xffffff;
   const WIRE_TYPE_COLOR = { electrical: 0xf59e0b, ethernet: 0x38bdf8 };
   const wireTypeColor = (wire) => WIRE_TYPE_COLOR[wire?.type] || WIRE_TYPE_COLOR.electrical;
 
@@ -2155,7 +2156,7 @@ export function setupMR(view, project, getFootprint) {
     for (const node of project.conduitNodes || []) {
       if (project.conduitNodeFloorId(node) !== project.activeFloorId) continue; // this floor's junctions
       const p = planLocalZ(conduitNodePos(project, node));
-      const baseNodeColor = CONDUIT_COLOR;
+      const baseNodeColor = CONDUIT_NODE_COLOR;
       const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
         color: baseNodeColor,
         depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
@@ -2181,7 +2182,7 @@ export function setupMR(view, project, getFootprint) {
           new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(p.x, 0.016, -p.y), new THREE.Vector3(p.x, p.z, -p.y)]),
           new THREE.LineBasicMaterial({
-            color: CONDUIT_COLOR, transparent: true, opacity: 0.5,
+            color: CONDUIT_NODE_COLOR, transparent: true, opacity: 0.5,
             depthTest: false, depthWrite: false,
           }));
         leader.renderOrder = 14;
@@ -6626,14 +6627,12 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       highlightAdjacentTargets();
-      // Show the conduit nodes as context; hovered via target yellow, existing vias
-      // cyan, else dim (marker-bound) / white (free junction).
+      // Show conduit nodes as white context; hovered target yellow, existing vias cyan.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
         if (!id) continue;
-        const node = project.conduitNodes.find((n) => n.id === id);
         const viaOn = selectedRoutedWire && (selectedRoutedWire.via || []).includes(id);
-        const color = id === hoverConduitNode?.id ? 0xffe14d : viaOn ? 0x22d3ee : CONDUIT_COLOR;
+        const color = id === hoverConduitNode?.id ? 0xffe14d : viaOn ? 0x22d3ee : CONDUIT_NODE_COLOR;
         child.material.color.setHex(color);
         child.scale.setScalar(id === hoverConduitNode?.id ? 1.5 : 1);
       }
@@ -6713,12 +6712,12 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       highlightAdjacentTargets();
-      // Recolor node spheres: pen amber, hovered yellow, otherwise conduit purple.
+      // Recolor node spheres: pen amber, hovered yellow, otherwise white.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
         if (!id || child === conduitPreviewLine) continue;
         const color = id === penNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
-          : CONDUIT_COLOR;
+          : CONDUIT_NODE_COLOR;
         child.material.color.setHex(color);
         child.scale.setScalar(id === penNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
       }
@@ -6792,12 +6791,12 @@ export function setupMR(view, project, getFootprint) {
         }
       }
       if (selectedConduitNodeObj() && hoverKey !== prevHoverKey) { redrawNodePad(); prevHoverKey = hoverKey; }
-      // Recolor node sphere + floor dot: selected amber, candidate yellow, else purple.
+      // Recolor node sphere + floor dot: selected amber, candidate yellow, else white.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
         if (!id) continue;
         const color = id === selectedConduitNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
-          : CONDUIT_COLOR;
+          : CONDUIT_NODE_COLOR;
         child.material.color.setHex(color);
         child.scale.setScalar(id === selectedConduitNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
       }
