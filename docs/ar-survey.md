@@ -63,8 +63,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **EDGE** — two presses per wall: 1st (aiming at an edge of ANY zone) LOCKS it; 2nd (tip on
   the real wall) snaps the locked edge to it. Once locked, the label/reticle turn yellow
   "SNAP TO WALL". Grip cancels a pending lock.
-- **PLAN · EDIT** (`id: edit`) — the plan editing domain. Select a zone (trigger; press again cycles down
-  through overlapping zones), B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
+- **PLAN · EDIT** (`id: edit`) — the plan editing domain. With nothing selected, grip cycles overlapping
+  zones and trigger confirms the yellow candidate; trigger again deselects. B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
   through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs→cabinet→
   furniture). **When the selection is an aperture** (door/garage/window/halfwall/heater/sliding), **A/X
   rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge; halfwall/heater
@@ -100,25 +100,24 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   that changes while cycling. A **floor reticle**
   tracks the aimed floor point and the marker under it is picked through its **flat floor icon**
   (`markerAtFloorPoint`, reticle-radius gated) — a stable plan-space target, not the floating wall
-  billboard. When markers share exact X/Y, repeated triggers cycle them highest-to-lowest; the
-  current selection stays amber while the next candidate previews yellow. Both the selected floor
+  billboard. When markers overlap, grip cycles them before selection and trigger confirms the yellow
+  candidate. Both the selected floor
   icon and wall glyph are outlined, and the height pad refreshes for each cycled marker.
   Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
   hovered marker opens its **height pad** (a single-value datum pad — see "Vertical authoring"): the
   typed value is an offset, **SWAP toggles the FLOOR/CEILING datum** (`↑ floor` / `↓ ceiling`), and
   **DEL frees Z** (`⊘ FREE Z`) — clearing the height dim so the grab moves Z again. ENTER commits the
-  height, closes the pad, and clears the selection. **Grip-drag grabs the HOVERED marker** (no prior
-  select) and moves it in 3D, but **every axis carrying a defined dim stays locked**: X/Y from
+  height, closes the pad, and clears the selection. **Only the selected marker can be grip-dragged**
+  in 3D, but **every axis carrying a defined dim stays locked**: X/Y from
   `marker._locked` (its distance pins) and **Z whenever a `zDatum` is set** (`nz = marker.zDatum ?
   marker.z : tipZ`). So a fully-pinned marker with a defined height doesn't move at all under grab; a
   free (never-height-set) marker grabs in full 3D; a ceiling-pinned marker's z follows a LEVEL height
   change. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
-- **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Aim at a switch's
-  floor icon and trigger to select it; when switches share the exact same X/Y, repeated triggers
-  cycle them from highest to lowest (amber = current source, yellow = next), then aiming at and
-  triggering one or more light icons toggles each control link. Pairwise links allow one switch to
+- **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Grip cycles eligible
+  overlapping switches (then lights), and trigger confirms the yellow candidate. Triggering one or
+  more selected light icons toggles each control link. Pairwise links allow one switch to
   control many lights and a light to be controlled by multiple switches. Grip clears the source
   selection without deleting data. The selected switch is amber, its linked lights are cyan, the
   hovered switch/light is yellow (other marker types are never LINK targets), and the separate
@@ -182,11 +181,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   under the reticle without committing**, and trigger chooses the yellow endpoint. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
   override); grip **pops the last via** (`popWireVia`), and **B/Y deletes the wire** (`removeWire`).
-  Trigger an existing wire to re-select it; repeated triggers cycle every wire whose route overlaps
-  under the reticle (the selected ribbon is yellow and rendered foremost); trigger empty space to deselect. The
+  With no endpoint pending, grip also cycles every existing wire whose route overlaps under the
+  reticle and trigger selects the yellow ribbon; trigger empty space deselects it. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
-  `routedWireGroup` colored per inferred segment surface (ceiling cyan, wall amber, floor green, riser
-  violet), showing the legs touching the active floor. A
+  `routedWireGroup` as narrow ribbons colored by nature (electrical amber, Ethernet cyan), showing
+  the legs touching the active floor. A
   live amber preview threads the pending pair (first endpoint → hovered marker/tip). Readout:
   `PICK START`, `PICK END`, then `VIA · <n>`. The wall/ceiling/floor surface of each segment is
   **inferred** from geometry (`segmentSurface`), never stored. This REPLACES the removed

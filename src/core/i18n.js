@@ -138,9 +138,9 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. Aim and trigger to select; trigger again cycles buried zones. B/Y deletes; thumbstick up/down cycles the zone type.',
-    fr: 'Modifiez seulement le plan. Visez et gâchette pour choisir ; répétez pour les zones dessous. B/Y : supprime ; joystick haut/bas : type de zone.',
-    zh: '仅编辑平面。瞄准并扣动扳机选择；再次扣动可循环下层区域。B/Y 删除；摇杆上/下切换区域类型。',
+    en: 'Edit the plan only. With nothing selected, grip cycles overlapping zones and trigger confirms the yellow target. B/Y deletes; thumbstick up/down changes type; trigger again deselects.',
+    fr: 'Modifiez seulement le plan. Sans sélection, la poignée parcourt les zones superposées et la gâchette valide la cible jaune. B/Y supprime ; joystick haut/bas change le type ; une nouvelle gâchette désélectionne.',
+    zh: '仅编辑平面。未选择时，握把循环重叠区域，扳机确认黄色目标。B/Y 删除；摇杆上/下更改类型；再次扣动取消选择。',
   },
   'help.translate': {
     en: 'Relocate the active floor rigidly. Pick an X edge and a Y edge, entering each desired distance from origin. FLIP changes side; the complete floor moves only after both are set.',
@@ -148,19 +148,19 @@ const STRINGS = {
     zh: '整体平移当前楼层。选择一条 X 方向边和一条 Y 方向边，并分别输入其到原点的目标距离。“翻转”可改变所在侧；两项均设定后才移动整个楼层。',
   },
   'help.marker': {
-    en: 'Edit markers only. Trigger repeatedly to cycle markers stacked at one position. Thumbstick up/down picks or changes type. Trigger empty space to place; ENTER saves height. Grip-drag moves one; B/Y deletes the selected one.',
-    fr: 'Modifiez seulement les marqueurs. Répétez la gâchette pour parcourir ceux empilés au même point. Joystick haut/bas : type. Gâchette dans le vide : poser ; VALIDER enregistre la hauteur. Poignée-glisser : déplacer ; B/Y : supprimer.',
-    zh: '仅编辑标记。在同一位置重复扣动扳机可循环选择堆叠标记。摇杆上/下选择或更改类型。对空处扣动扳机放置；按确定保存高度。按住握把拖动；B/Y 删除所选标记。',
+    en: 'Edit markers only. With nothing selected, grip cycles overlapping markers and trigger confirms the yellow target. Only a selected marker can be grip-dragged. Thumbstick up/down changes type; ENTER saves height; B/Y deletes.',
+    fr: 'Modifiez seulement les marqueurs. Sans sélection, la poignée parcourt les marqueurs superposés et la gâchette valide la cible jaune. Seul un marqueur sélectionné se déplace avec poignée-glisser. Joystick haut/bas change le type ; VALIDER enregistre la hauteur ; B/Y supprime.',
+    zh: '仅编辑标记。未选择时，握把循环重叠标记，扳机确认黄色目标。只有选中的标记可用握把拖动。摇杆上/下更改类型；确定保存高度；B/Y 删除。',
   },
   'help.marker_link': {
-    en: 'Link electrical controls. Trigger a switch, then trigger lights to add or remove their connection. Grip clears the selected switch. Routes rise to the ceiling automatically.',
-    fr: 'Reliez les commandes électriques. Gâchette sur un interrupteur, puis sur les luminaires pour ajouter ou retirer leur liaison. La poignée efface l’interrupteur choisi. Le chemin monte automatiquement au plafond.',
-    zh: '连接电气控制。先扣动扳机选择开关，再选择灯具以添加或移除连接。按住手柄键可清除所选开关。线路会自动上升到天花板。',
+    en: 'Link electrical controls. Grip cycles eligible overlapping switches or lights; trigger confirms the yellow target. Choose a switch, then toggle its lights. Grip on empty space clears the switch.',
+    fr: 'Reliez les commandes électriques. La poignée parcourt les interrupteurs ou luminaires superposés ; la gâchette valide la cible jaune. Choisissez un interrupteur puis activez ses luminaires. Poignée dans le vide : effacer la sélection.',
+    zh: '连接电气控制。握把循环符合条件的重叠开关或灯具；扳机确认黄色目标。先选择开关，再切换其灯具。在空处按握把可清除开关。',
   },
   'help.marker_wire': {
-    en: 'Route a wire over the conduit network. Thumbstick up/down chooses electrical or Ethernet. During PICK START and PICK END, grip cycles overlapping device markers and trigger commits the yellow endpoint. Repeated triggers cycle existing wires sharing a conduit. For a selected wire, trigger nodes to add optional vias, grip removes the last via, and B/Y deletes it.',
-    fr: 'Faites cheminer un câble dans les gaines. Joystick haut/bas choisit électrique ou Ethernet. Pendant CHOISIR DÉBUT/FIN, la poignée parcourt les appareils superposés et la gâchette valide la cible jaune. Des gâchettes répétées parcourent les câbles partageant une gaine. Pour un câble sélectionné, les nœuds ajoutent des VIA, la poignée retire le dernier et B/Y le supprime.',
-    zh: '让线路沿管路网络走线。摇杆上/下选择电力或以太网。在选择起点和终点时，握把循环重叠设备，扳机确认黄色端点。重复扣动可循环共享管路的已有线路。线路选中后，选择节点添加经由点，握把移除最后一个，B/Y 删除。',
+    en: 'Route a wire over the conduit network. Thumbstick up/down chooses electrical or Ethernet. Grip cycles overlapping endpoints or existing wires; trigger confirms the yellow target. For a selected wire, trigger nodes to add optional vias, grip removes the last via, and B/Y deletes it.',
+    fr: 'Faites cheminer un câble dans les gaines. Joystick haut/bas choisit électrique ou Ethernet. La poignée parcourt les extrémités ou câbles superposés ; la gâchette valide la cible jaune. Pour un câble sélectionné, les nœuds ajoutent des VIA, la poignée retire le dernier et B/Y le supprime.',
+    zh: '让线路沿管路网络走线。摇杆上/下选择电力或以太网。握把循环重叠端点或已有线路；扳机确认黄色目标。线路选中后，选择节点添加经由点，握把移除最后一个，B/Y 删除。',
   },
   'help.marker_conduit': {
     en: 'Build the whole-house conduit network. The nearest device or node under the reticle is highlighted; grip cycles overlaps without drawing, and trigger commits the highlighted target. Trigger empty space to drop a junction. Dimmed adjacent-floor targets create risers. Grip on empty space lifts the pen.',

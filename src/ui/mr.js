@@ -2762,12 +2762,15 @@ export function setupMR(view, project, getFootprint) {
   let hoverEdge = null;     // {rectId, edge} under the ray across ALL zones (per frame)
   let selectedRect = null;  // PLAN mode: the persistently-selected zone (survives aim)
   let hoverStack = [];      // PLAN mode: zones under the ray this frame, topmost-first
+  let planEditPickAfterId = null;
   let roomComponentCacheKey = '';
   let roomComponentCache = null;
   let roomAreaHud = null;   // m² shown in the info panel for the selected room component
   let selectedMarker = null; // OUTLET mode: marker being height-edited
+  let markerEditPickAfterId = null;
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
+  let markerLinkPickAfterId = null;
   // MARKER · WIRE (routed): the pending first endpoint of a new wire pair.
   let wireFromMarker = null;
   let wireEndpointPickAfterKey = null;
@@ -2790,6 +2793,7 @@ export function setupMR(view, project, getFootprint) {
   // MARKER · WIRE (routed): the selected wire (for via override) + per-frame hover.
   let selectedRoutedWire = null;
   let hoverRoutedWire = null;
+  let routedWirePickAfterId = null;
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
@@ -4475,7 +4479,7 @@ export function setupMR(view, project, getFootprint) {
   // projection. Once one is selected, keep the amber selection on it and preview
   // the next marker in height order under the yellow reticle; another trigger
   // advances the selection and refreshes its height editor.
-  function editMarkerAtFloorPoint(px, py) {
+  function editMarkerAtFloorPoint(px, py, afterId = null) {
     const marker = markerAtFloorPoint(px, py);
     if (!marker) return null;
     const stack = project.markers
@@ -4484,7 +4488,7 @@ export function setupMR(view, project, getFootprint) {
       .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
       .map(({ candidate }) => candidate);
     if (stack.length < 2) return marker;
-    const selectedIndex = stack.findIndex((candidate) => candidate.id === selectedMarker?.id);
+    const selectedIndex = stack.findIndex((candidate) => candidate.id === afterId);
     return stack[selectedIndex < 0 ? 0 : (selectedIndex + 1) % stack.length];
   }
 
@@ -4494,24 +4498,15 @@ export function setupMR(view, project, getFootprint) {
   // each trigger. The amber source remains selected while the yellow reticle
   // advances; aiming at a light exits the stack naturally and makes that light
   // the link target.
-  function linkMarkerAtFloorPoint(px, py) {
-    let marker = null;
-    let bestD = RETICLE_OUTER;
-    for (const candidate of project.markers) {
-      if (candidate.type !== 'switch' && candidate.type !== 'light') continue;
-      const d = Math.hypot(px - candidate.x, py - candidate.y);
-      if (d < bestD) { bestD = d; marker = candidate; }
-    }
-    if (!marker) return null;
-    const stackedSwitches = project.markers
-      .map((candidate, index) => ({ candidate, index }))
-      .filter(({ candidate }) => candidate.type === 'switch'
-        && candidate.x === marker.x && candidate.y === marker.y)
-      .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
-      .map(({ candidate }) => candidate);
-    if (stackedSwitches.length < 2) return marker;
-    const selectedIndex = stackedSwitches.findIndex((candidate) => candidate.id === selectedLinkSwitch?.id);
-    return stackedSwitches[selectedIndex < 0 ? 0 : (selectedIndex + 1) % stackedSwitches.length];
+  function linkMarkerAtFloorPoint(px, py, afterId = null) {
+    const wanted = selectedLinkSwitch ? 'light' : 'switch';
+    const candidates = project.markers
+      .map((marker, order) => ({ marker, order, distance: Math.hypot(px - marker.x, py - marker.y) }))
+      .filter(({ marker, distance }) => marker.type === wanted && distance <= RETICLE_OUTER)
+      .sort((a, b) => a.distance - b.distance || (b.marker.z || 0) - (a.marker.z || 0) || a.order - b.order);
+    if (!candidates.length) return null;
+    const current = candidates.findIndex(({ marker }) => marker.id === afterId);
+    return candidates[(current + 1) % candidates.length].marker;
   }
 
   function outlineMarker(marker, role = 'wall', color = 0xffe14d) {
@@ -4948,9 +4943,12 @@ export function setupMR(view, project, getFootprint) {
         // (mirrors MARKER). Aiming at the floor (hoverKey null) falls through to zone
         // stack-cycling below.
         if (selectedRect && numpad.group.visible && hoverKey) { pressBandKey(hoverKey); return; }
+        if (selectedRect) {
+          selectedRect = null; deactivateNumpad(); updateRoomAreaHud();
+          rlog('edit deselect'); return;
+        }
         if (!hoverStack.length) return;
-        const i = selectedRect ? hoverStack.indexOf(selectedRect) : -1;
-        selectedRect = i >= 0 ? hoverStack[(i + 1) % hoverStack.length] : hoverStack[0];
+        selectedRect = hoverStack[0];
         syncBandPad(); // a band-carrying rect opens its pad; a plain room tears it down
         updateRoomAreaHud();
         setModeInfo();
@@ -4974,6 +4972,7 @@ export function setupMR(view, project, getFootprint) {
       onTouch: (pos) => {
         if (!placed) return;
         if (selectedMarker && numpad.group.visible && hoverKey) { pressMarkerKey(hoverKey); return; }
+        if (selectedMarker) { selectedMarker = null; deactivateNumpad(); rlog('marker deselect'); return; }
         if (hoverMarker) {
           selectedMarker = hoverMarker;
           activateMarkerPad();
@@ -4982,7 +4981,6 @@ export function setupMR(view, project, getFootprint) {
         }
         // First empty-space trigger leaves an existing edit before another marker
         // can be dropped, avoiding accidental duplicates while operating the pad.
-        if (selectedMarker) { selectedMarker = null; deactivateNumpad(); return; }
         const { px, py } = worldToPlan(pos);
         // Lights live on the ceiling (unreachable to tip-capture), so default their z to
         // the storey height; other fixtures capture z from the controller tip height.
@@ -5003,6 +5001,7 @@ export function setupMR(view, project, getFootprint) {
         if (!placed || !hoverMarker) return;
         if (hoverMarker.type === 'switch') {
           selectedLinkSwitch = hoverMarker;
+          markerLinkPickAfterId = null;
           rlog('link switch selected', { id: hoverMarker.id });
           return;
         }
@@ -5102,7 +5101,10 @@ export function setupMR(view, project, getFootprint) {
         // No pending pair: a marker starts a new wire; an existing wire selects for override.
         if (!wireFromMarker) {
           if (endMarker) { wireFromMarker = endMarker; wireEndpointPickAfterKey = null; rlog('wire from', { id: endMarker.id }); return; }
-          if (hoverRoutedWire) { selectedRoutedWire = hoverRoutedWire; rlog('wire select', { id: hoverRoutedWire.id }); return; }
+          if (hoverRoutedWire) {
+            selectedRoutedWire = hoverRoutedWire; routedWirePickAfterId = null;
+            rlog('wire select', { id: hoverRoutedWire.id }); return;
+          }
           return;
         }
         // Second endpoint → create the wire (auto shortest route) and select it.
@@ -5336,16 +5338,16 @@ export function setupMR(view, project, getFootprint) {
     currentMode = (i + modes.length) % modes.length;
     registerPts = []; // leaving/entering a mode resets the REGISTER 3-point gesture
     recalPts = []; recalCorner = null; recalLocked = false; // ... and the RECAL gesture
-    selectedRect = null; // clear the EDIT selection when changing modes
+    selectedRect = null; planEditPickAfterId = null; // clear the EDIT selection/picker
     bandBuffer = ''; bandField = 'sill'; // ...and any vertical band being typed (pad torn down below)
     roomComponentCacheKey = '';
     roomComponentCache = null;
     roomAreaHud = null;
     lastHudAt = -Infinity;
-    selectedMarker = null; // ...and any marker being height-edited (its pad is torn down below)
-    selectedLinkSwitch = null; // ...and any electrical-link source switch
+    selectedMarker = null; markerEditPickAfterId = null; // ...and marker edit picker
+    selectedLinkSwitch = null; markerLinkPickAfterId = null; // ...and link picker/source
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
-    selectedRoutedWire = null; // ...and any routed-wire override selection
+    selectedRoutedWire = null; routedWirePickAfterId = null; // ...and routed-wire selection picker
     penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
@@ -5672,7 +5674,7 @@ export function setupMR(view, project, getFootprint) {
     const id = modes[currentMode].id;
     if (isDimMode(id) && !dimRefA && hoverDim) { gripDrag = { kind: 'dim', cId: hoverDim.userData.cId }; rlog('grip-drag dim', { id: hoverDim.userData.cId }); return; }
     if (id === 'edge' && hoverEdge) { gripDrag = { kind: 'edge', rectId: hoverEdge.rectId, edge: hoverEdge.edge }; rlog('grip-drag edge', hoverEdge); return; }
-    if (id === 'marker' && hoverMarker && setControllerRay(event.data)) {
+    if (id === 'marker' && selectedMarker && hoverMarker?.id === selectedMarker.id && setControllerRay(event.data)) {
       const sprite = markerGroup.children.find(
         (s) => s.userData.markerId === hoverMarker.id && s.userData.markerRole === 'wall',
       );
@@ -5828,9 +5830,24 @@ export function setupMR(view, project, getFootprint) {
       if (translateTargets.x) { translateTargets.x = null; rlog('translate X cancelled'); return; }
       return;
     }
+    if (mode.id === 'edit' && !selectedRect && hoverStack.length) {
+      planEditPickAfterId = hoverStack[0].id;
+      rlog('plan edit target cycle', { after: planEditPickAfterId });
+      return;
+    }
+    if (mode.id === 'marker' && !selectedMarker && hoverMarker) {
+      markerEditPickAfterId = hoverMarker.id;
+      rlog('marker edit target cycle', { after: markerEditPickAfterId });
+      return;
+    }
     if (mode.id === 'marker_link') {
+      if (hoverMarker) {
+        markerLinkPickAfterId = hoverMarker.id;
+        rlog('marker link target cycle', { after: markerLinkPickAfterId });
+        return;
+      }
       if (selectedLinkSwitch) rlog('link switch cleared', { id: selectedLinkSwitch.id });
-      selectedLinkSwitch = null;
+      selectedLinkSwitch = null; markerLinkPickAfterId = null;
       return;
     }
     if (mode.id === 'marker_conduit') {
@@ -5880,6 +5897,11 @@ export function setupMR(view, project, getFootprint) {
         rlog('wire endpoint cycle', {
           phase: wireFromMarker ? 'end' : 'start', after: wireEndpointPickAfterKey,
         });
+        return;
+      }
+      if (!selectedRoutedWire && !wireFromMarker && hoverRoutedWire) {
+        routedWirePickAfterId = hoverRoutedWire.id;
+        rlog('routed wire target cycle', { after: routedWirePickAfterId });
         return;
       }
       if (wireFromMarker) {
@@ -6502,6 +6524,13 @@ export function setupMR(view, project, getFootprint) {
         if (hit) {
           const { px, py } = worldToPlan(hit);
           hoverStack = rectsAtPoint(px, py);
+          if (!selectedRect && hoverStack.length) {
+            const current = hoverStack.findIndex((rect) => rect.id === planEditPickAfterId);
+            if (current >= 0) hoverStack = [
+              ...hoverStack.slice(current + 1), ...hoverStack.slice(0, current + 1),
+            ];
+            else planEditPickAfterId = null;
+          }
           reticle.visible = true;
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         } else {
@@ -6532,7 +6561,8 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = true;
         reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        hoverMarker = linkMarkerAtFloorPoint(px, py);
+        hoverMarker = linkMarkerAtFloorPoint(px, py, markerLinkPickAfterId);
+        if (!hoverMarker) markerLinkPickAfterId = null;
       } else {
         reticle.visible = false;
       }
@@ -6587,8 +6617,10 @@ export function setupMR(view, project, getFootprint) {
             wireEndpointPickAfterKey = null;
           }
         }
-        if (!hoverMarker && !hoverConduitNode && !hoverAdjacent) {
-          hoverRoutedWire = routedWireAtFloorPoint(px, py, selectedRoutedWire?.id || null);
+        if (!selectedRoutedWire && !wireFromMarker
+            && !hoverMarker && !hoverConduitNode && !hoverAdjacent) {
+          hoverRoutedWire = routedWireAtFloorPoint(px, py, routedWirePickAfterId);
+          if (!hoverRoutedWire) routedWirePickAfterId = null;
         }
       } else {
         reticle.visible = false;
@@ -6806,7 +6838,13 @@ export function setupMR(view, project, getFootprint) {
           reticle.visible = true;
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
-          hoverMarker = editMarkerAtFloorPoint(px, py);
+          if (selectedMarker) {
+            const picked = markerAtFloorPoint(px, py);
+            hoverMarker = picked?.id === selectedMarker.id ? picked : null;
+          } else {
+            hoverMarker = editMarkerAtFloorPoint(px, py, markerEditPickAfterId);
+            if (!hoverMarker) markerEditPickAfterId = null;
+          }
         } else {
           reticle.visible = false;
         }
