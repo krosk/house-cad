@@ -6648,18 +6648,29 @@ export function setupMR(view, project, getFootprint) {
           }
         }
       }
-      // CONDUIT DIMS: enlarge the node(s) this pair references (self-resetting per frame,
-      // since this branch doesn't rebuild the conduit spheres).
+      // CONDUIT DIMS: highlight referenced nodes as well as edges. In particular, a
+      // hovered value panel previews BOTH endpoints in cyan; previously its edge lit
+      // up but its node was omitted from the node-state loop.
       if (modeId === 'conduit_dims') {
-        const litNodeIds = new Set([dimRefA, dimRefB ?? hoverRef]
+        const selectedNodeIds = new Set([dimRefA, dimRefB]
+          .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
+        const hoverNodeIds = new Set([hoverRef]
+          .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
+        const panelNodeIds = new Set((hoverDim
+          ? [hoverDim.userData.refA, hoverDim.userData.refB] : [])
           .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
         for (const child of conduitGroup.children) {
           const id = child.userData.conduitNodeId;
-          if (id != null) child.scale.setScalar(litNodeIds.has(id) ? 1.5 : 1);
+          if (id == null) continue;
+          const color = panelNodeIds.has(id) ? 0x22d3ee
+            : selectedNodeIds.has(id) ? 0xfbbf24
+            : hoverNodeIds.has(id) ? 0xffe14d : CONDUIT_NODE_COLOR;
+          child.material.color.setHex(color);
+          child.scale.setScalar(panelNodeIds.has(id) || selectedNodeIds.has(id) || hoverNodeIds.has(id) ? 1.5 : 1);
         }
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
-      // When hovering a dim panel, preview BOTH its edges (cyan) so you see how it's defined.
+      // When hovering a dim panel, preview BOTH its references (cyan) so you see how it's defined.
       let ei = 0;
       const slots = [edgeHi, edgeHi2];
       const showRef = (ref, color) => {

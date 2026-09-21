@@ -25,6 +25,37 @@ import { checkForUpdate, onVersionStatus, startVersionChecks } from './core/vers
 
 const project = new Project();
 
+// Small global activity light for work that can otherwise look like a frozen UI.
+// Yield through a painted frame before starting synchronous-heavy work so the light
+// is actually visible rather than being painted only after that work finishes.
+const workIndicator = document.getElementById('work-indicator');
+const workLabel = document.getElementById('work-label');
+let activeWork = 0;
+function beginWork(label = 'WORKING') {
+  activeWork += 1;
+  workLabel.textContent = label;
+  workIndicator.hidden = false;
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    activeWork = Math.max(0, activeWork - 1);
+    if (!activeWork) workIndicator.hidden = true;
+  };
+}
+const allowWorkLightPaint = () => new Promise((resolve) => {
+  requestAnimationFrame(() => setTimeout(resolve, 0));
+});
+async function withWork(label, task) {
+  const end = beginWork(label);
+  try {
+    await allowWorkLightPaint();
+    return await task();
+  } finally {
+    end();
+  }
+}
+
 // True when this session was opened from a shared #view= link: the plan is
 // read-only. Declared early because renderConstraints() reads it during init.
 let viewMode = false;
@@ -124,6 +155,7 @@ setupMR(view, project, (rectangles = project.rectangles) => computeFootprint(rec
 let firstBuild = true;
 let currentGeometry = null; // merged mesh of all floors, kept for export
 let desktopGeometryDirty = false;
+let rebuildQueued = false;
 function rebuild() {
   const floorGeos = project.floors.map((f) => ({
     ...buildArchitecturalFloor(f),
@@ -150,6 +182,17 @@ function rebuild() {
     firstBuild = false;
   }
 }
+function scheduleRebuild() {
+  if (rebuildQueued) return;
+  rebuildQueued = true;
+  withWork('UPDATING MODEL', () => {
+    rebuildQueued = false;
+    rebuild(); // reads the latest model, coalescing every change before this turn
+  }).catch((error) => {
+    rebuildQueued = false;
+    console.error('Model rebuild failed:', error);
+  });
+}
 project.onChange(() => {
   // MR owns its flat plan/marker rebuilds explicitly. Rebuilding the hidden
   // architectural model and legacy export mesh on every on-headset edit causes
@@ -158,12 +201,12 @@ project.onChange(() => {
     desktopGeometryDirty = true;
     return;
   }
-  rebuild();
+  scheduleRebuild();
 });
 view.renderer.xr.addEventListener('sessionend', () => {
   if (!desktopGeometryDirty) return;
   desktopGeometryDirty = false;
-  rebuild();
+  scheduleRebuild();
 });
 
 // ---- toolbar wiring ----

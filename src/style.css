@@ -30,6 +30,43 @@ body {
   flex-direction: column;
 }
 
+/* Global, non-blocking activity signal. It deliberately does not intercept input:
+   the plan stays inspectable while a derived model/export is being prepared. */
+#work-indicator {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  color: #f8d477;
+  background: rgba(15, 18, 24, 0.9);
+  border: 1px solid rgba(248, 212, 119, 0.45);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+#work-indicator[hidden] { display: none; }
+.work-light {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f8c34e;
+  box-shadow: 0 0 0 0 rgba(248, 195, 78, 0.7);
+  animation: work-pulse 1s ease-out infinite;
+}
+@keyframes work-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(248, 195, 78, 0.7); }
+  70%, 100% { box-shadow: 0 0 0 7px rgba(248, 195, 78, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-light { animation: none; }
+}
+
 /* ---- toolbar ---- */
 #toolbar {
   display: flex;

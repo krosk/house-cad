@@ -52,6 +52,7 @@ export class Sketch2D {
     this._pointers = new Map(); // pointerId -> {px,py}; drives multi-touch
     this._gesture = null; // {mid,dist} while two-finger pan/pinch is active
     this._coarse = false; // last pointer was touch/pen → use fatter hit targets
+    this._renderFrame = 0; // coalesce high-rate mobile pan/pinch events to display frames
 
     this._dimFirst = null; // first edge picked for a dimension {rect, edge}
     this._hoverEdge = null; // edge under cursor (dimension tool)
@@ -258,6 +259,7 @@ export class Sketch2D {
 
     if (!this._drag) {
       // Hover cursor feedback in select mode.
+      let hoverChanged = false;
       if (this.tool === 'select') {
         const sel = this.selectedId
           ? this.project.rectangles.find((r) => r.id === this.selectedId)
@@ -271,18 +273,22 @@ export class Sketch2D {
           const hit = this._hitTest(world.x, world.y);
           this.canvas.style.cursor = hit ? 'move' : 'default';
         }
+        hoverChanged = true;
       } else if (this.tool === 'dimension') {
         this._hoverEdge = this._hitEdge(px, py);
         this.canvas.style.cursor = this._hoverEdge ? 'pointer' : 'crosshair';
+        hoverChanged = true;
       }
-      this.render();
+      // PAN has no hover visual. Redrawing it for every unpressed pointer move is
+      // pure work, particularly on phones that emit synthetic/coalesced moves.
+      if (hoverChanged) this._requestRender();
       return;
     }
 
     if (this._drag.mode === 'pan') {
       this.originX = this._drag.ox + (px - this._drag.px);
       this.originY = this._drag.oy + (py - this._drag.py);
-      this.render();
+      this._requestRender();
     } else if (this._drag.mode === 'draw') {
       this.draft.x1 = this.snap(world.x);
       this.draft.y1 = this.snap(world.y);
@@ -426,7 +432,7 @@ export class Sketch2D {
 
     this._gesture.mid = mid;
     this._gesture.dist = dist;
-    this.render();
+    this._requestRender();
   }
 
   // Discard an in-flight single-pointer action (used when a 2nd finger lands).
@@ -572,7 +578,21 @@ export class Sketch2D {
   }
 
   // ---- rendering ----
+  _requestRender() {
+    if (this._renderFrame) return;
+    this._renderFrame = requestAnimationFrame(() => {
+      this._renderFrame = 0;
+      this.render();
+    });
+  }
+
   render() {
+    // An explicit render (pointer-up, resize, model change) supersedes a queued
+    // interaction frame and guarantees the final transform is painted immediately.
+    if (this._renderFrame) {
+      cancelAnimationFrame(this._renderFrame);
+      this._renderFrame = 0;
+    }
     const ctx = this.ctx;
     const w = this._cssW;
     const h = this._cssH;
