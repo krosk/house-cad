@@ -62,6 +62,7 @@ let viewMode = false;
 
 const sketch = new Sketch2D(document.getElementById('sketch'), project);
 const view = new View3D(document.getElementById('view3d'));
+view.setDesktopActive(false); // initial surface is the plan; park the off-screen WebGL loop
 
 const versionStatus = document.getElementById('version-status');
 const VERSION_LABEL = {
@@ -132,6 +133,7 @@ function setDesktop3D(visible) {
   view3dToggle.classList.toggle('active', visible);
   view3dToggle.textContent = visible ? '▦ View plan' : '◈ View 3D';
   view3dToggle.title = visible ? 'Return to the floor plan' : 'Open the interactive 3D model';
+  view.setDesktopActive(visible);
   if (visible) {
     if (!hasChosen3DFloor) selected3DFloorId = project.activeFloorId || project.floors[0]?.id || null;
     // Wait for the formerly parked holder to receive its on-screen dimensions;

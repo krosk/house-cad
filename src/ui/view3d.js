@@ -214,12 +214,39 @@ export class View3D {
     this._ro.observe(container);
 
     this._animate = this._animate.bind(this);
-    this.renderer.setAnimationLoop(this._animate);
+    this.desktopActive = true;
+    this._loopRunning = false;
+    this._startLoop = () => {
+      if (this._loopRunning) return;
+      this.renderer.setAnimationLoop(this._animate);
+      this._loopRunning = true;
+    };
+    this._stopLoop = () => {
+      if (!this._loopRunning || this.renderer.xr.isPresenting) return;
+      this.renderer.setAnimationLoop(null);
+      this._loopRunning = false;
+    };
+    this._startLoop();
+    // AR always owns a live XR animation loop. After it exits, return to the
+    // requested desktop state rather than resuming an invisible render loop.
+    this.renderer.xr.addEventListener('sessionstart', this._startLoop);
+    this.renderer.xr.addEventListener('sessionend', () => {
+      if (!this.desktopActive) this._stopLoop();
+    });
 
     this.renderer.domElement.addEventListener('pointerdown', this._viewPointerDown.bind(this));
     this.renderer.domElement.addEventListener('pointermove', this._viewPointerMove.bind(this));
     this.renderer.domElement.addEventListener('pointerup', this._viewPointerUp.bind(this));
     this.renderer.domElement.addEventListener('pointercancel', this._viewPointerUp.bind(this));
+  }
+
+  // The renderer is shared with WebXR, but the desktop plan does not need its
+  // parked 3D canvas to consume GPU continuously. Visible 3D and AR run it;
+  // plan view stops it completely until either one is requested again.
+  setDesktopActive(active) {
+    this.desktopActive = !!active;
+    if (this.desktopActive || this.renderer.xr.isPresenting) this._startLoop();
+    else this._stopLoop();
   }
 
   // Accepts an array of { geometry, elevation } (one per floor) or a single
