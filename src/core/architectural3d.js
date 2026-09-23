@@ -139,6 +139,38 @@ function boxesGeometry(boxes) {
   return merged;
 }
 
+// Aperture zones describe the full opening footprint, which is often thicker
+// than the visible leaf/glass. Reduce only the wall-depth axis so inserts sit
+// clearly inside the carved opening rather than looking like another wall block.
+function apertureInsertBox(rect, z0, z1, depth = 0.035) {
+  const b = rect.bounds;
+  const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+  const cx = (b.x0 + b.x1) / 2;
+  const cy = (b.y0 + b.y1) / 2;
+  return alongX
+    ? { x0: b.x0, x1: b.x1, y0: cy - depth / 2, y1: cy + depth / 2, z0, z1 }
+    : { x0: cx - depth / 2, x1: cx + depth / 2, y0: b.y0, y1: b.y1, z0, z1 };
+}
+
+function apertureInsertGeometries(floor) {
+  const height = Math.max(0, floor?.height || 0);
+  const doors = [];
+  const windows = [];
+  for (const rect of floor?.rectangles || []) {
+    if (!validBounds(rect.bounds)) continue;
+    const kind = zoneKind(rect);
+    if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
+      const head = clipped(rect.head ?? 2.1, 0, height);
+      if (head > EPS) doors.push(apertureInsertBox(rect, 0.015, Math.max(0.015, head - 0.015)));
+    } else if (kind === 'window') {
+      const sill = clipped(rect.sill ?? 0.9, 0, height);
+      const head = clipped(rect.head ?? 2.1, 0, height);
+      if (head - sill > EPS) windows.push(apertureInsertBox(rect, sill, head, 0.018));
+    }
+  }
+  return { doorGeometry: boxesGeometry(doors), windowGeometry: boxesGeometry(windows) };
+}
+
 export function buildArchitecturalFloor(floor, opts = {}) {
   const rooms = (floor?.rectangles || []).filter((rect) => zoneKind(rect) === 'room');
   const roomFootprint = computeFootprint(rooms);
@@ -151,5 +183,6 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const ceilingGeometry = floorGeometry?.clone() || null;
   if (ceilingGeometry) ceilingGeometry.translate(0, (floor?.height || 0) + slabThickness, 0);
   const wallGeometry = boxesGeometry(architecturalWallBoxes(floor, opts));
-  return { floorGeometry, wallGeometry, ceilingGeometry };
+  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor);
+  return { floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry };
 }
