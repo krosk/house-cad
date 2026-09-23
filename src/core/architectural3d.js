@@ -37,7 +37,6 @@ function openingBand(rect, storeyHeight) {
 
 function exteriorWallSources(roomFootprint, thickness) {
   const sources = [];
-  const half = thickness / 2;
   const seen = new Set();
   for (const polygon of roomFootprint) {
     for (const ring of polygon) {
@@ -48,15 +47,22 @@ function exteriorWallSources(roomFootprint, thickness) {
         if (seen.has(key)) continue;
         seen.add(key);
         if (Math.abs(ax - bx) <= EPS) {
+          // polygon-clipping orients every boundary so the occupied room lies
+          // on the LEFT of its directed edge. The wall therefore grows only
+          // to the RIGHT: the authored line remains the finished room face.
+          const outward = by > ay ? 1 : -1;
           sources.push({
-            x0: ax - half, x1: ax + half,
-            y0: Math.min(ay, by) - half, y1: Math.max(ay, by) + half,
+            x0: outward > 0 ? ax : ax - thickness,
+            x1: outward > 0 ? ax + thickness : ax,
+            y0: Math.min(ay, by), y1: Math.max(ay, by),
             source: 'exterior',
           });
         } else if (Math.abs(ay - by) <= EPS) {
+          const outward = bx > ax ? -1 : 1;
           sources.push({
-            x0: Math.min(ax, bx) - half, x1: Math.max(ax, bx) + half,
-            y0: ay - half, y1: ay + half,
+            x0: Math.min(ax, bx), x1: Math.max(ax, bx),
+            y0: outward > 0 ? ay : ay - thickness,
+            y1: outward > 0 ? ay + thickness : ay,
             source: 'exterior',
           });
         }
