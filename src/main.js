@@ -86,8 +86,8 @@ versionStatus.addEventListener('click', async () => {
 startVersionChecks();
 
 // Desktop presentation: switch the main surface between the plan editor and the
-// existing interactive Three.js renderer. Shared #view= links open in 3D by
-// default, but the viewer can return to the plan to take measurements.
+// existing interactive Three.js renderer. Shared #view= links open on the
+// fitted plan first; the viewer can opt into 3D with the same toggle.
 const app = document.getElementById('app');
 const view3dHolder = document.getElementById('view3d-holder');
 const view3dToggle = document.getElementById('view3d-toggle');
@@ -912,8 +912,11 @@ function seedDemo() {
       sketch.setReadOnly(true);
       setTool('pan');
       view.frameModel();
-      setDesktop3D(true);
-      sketch.onStatus?.('Opened a shared 3D view — read-only. Pan/zoom to inspect; 📏 to measure.');
+      setDesktop3D(false);
+      // Loading can precede the canvas's final responsive layout. Frame on the
+      // next painted layout so the imported floor is centered in its real area.
+      requestAnimationFrame(() => sketch.frameActiveFloor());
+      sketch.onStatus?.('Opened a shared view — read-only. Pan/zoom to inspect; ◈ opens 3D.');
       return;
     }
   } catch (err) {

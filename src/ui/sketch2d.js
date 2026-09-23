@@ -486,6 +486,37 @@ export class Sketch2D {
     this.render();
   }
 
+  // Fit the active floor's authored plan into the current canvas. This is kept
+  // explicit rather than tied to model changes so ordinary editing never
+  // unexpectedly resets a user's pan/zoom.
+  frameActiveFloor() {
+    const rectangles = this.project.rectangles;
+    if (!rectangles.length || !this._cssW || !this._cssH) return false;
+
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const rect of rectangles) {
+      const b = rect.bounds;
+      x0 = Math.min(x0, b.x0);
+      y0 = Math.min(y0, b.y0);
+      x1 = Math.max(x1, b.x1);
+      y1 = Math.max(y1, b.y1);
+    }
+
+    const padding = Math.min(72, Math.max(24, Math.min(this._cssW, this._cssH) * 0.08));
+    const availableW = Math.max(1, this._cssW - padding * 2);
+    const availableH = Math.max(1, this._cssH - padding * 2);
+    const worldW = Math.max(0.25, x1 - x0);
+    const worldH = Math.max(0.25, y1 - y0);
+    this.scale = Math.min(400, Math.max(4, Math.min(availableW / worldW, availableH / worldH)));
+
+    const centerX = (x0 + x1) / 2;
+    const centerY = (y0 + y1) / 2;
+    this.originX = this._cssW / 2 - centerX * this.scale;
+    this.originY = this._cssH / 2 + centerY * this.scale;
+    this.render();
+    return true;
+  }
+
   // ---- edge picking (dimension tool) ----
   // Returns {rect, edge, axis} for the nearest rectangle edge within threshold.
   _hitEdge(px, py) {
