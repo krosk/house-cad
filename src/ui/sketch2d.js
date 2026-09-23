@@ -53,6 +53,7 @@ export class Sketch2D {
     this._gesture = null; // {mid,dist} while two-finger pan/pinch is active
     this._coarse = false; // last pointer was touch/pen → use fatter hit targets
     this._renderFrame = 0; // coalesce high-rate mobile pan/pinch events to display frames
+    this._panVisual = { x: 0, y: 0 }; // compositor-only preview; committed on pointer-up
 
     this._dimFirst = null; // first edge picked for a dimension {rect, edge}
     this._hoverEdge = null; // edge under cursor (dimension tool)
@@ -107,6 +108,7 @@ export class Sketch2D {
 
   // ---- sizing ----
   _resize() {
+    this._clearPanPreview();
     const dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
@@ -155,7 +157,12 @@ export class Sketch2D {
 
   _localXY(e) {
     const r = this.canvas.getBoundingClientRect();
-    return { px: e.clientX - r.left, py: e.clientY - r.top };
+    // getBoundingClientRect includes the temporary CSS pan translation. Add it
+    // back so pointer coordinates remain in the canvas' untransformed frame.
+    return {
+      px: e.clientX - r.left + this._panVisual.x,
+      py: e.clientY - r.top + this._panVisual.y,
+    };
   }
 
   _onDown(e) {
@@ -180,7 +187,10 @@ export class Sketch2D {
 
     if (panning) {
       this.canvas.style.cursor = 'grabbing';
-      this._drag = { mode: 'pan', px, py, ox: this.originX, oy: this.originY };
+      this._drag = {
+        mode: 'pan', px, py, ox: this.originX, oy: this.originY,
+        clientX: e.clientX, clientY: e.clientY,
+      };
       return;
     }
 
@@ -254,6 +264,20 @@ export class Sketch2D {
       return;
     }
 
+    // A one-finger pan changes no drawing content. Let the browser compositor move
+    // the existing canvas bitmap, then perform one canonical redraw on release.
+    // This avoids repeatedly rasterizing the complete high-DPI plan on smartphones.
+    if (this._drag?.mode === 'pan') {
+      const dx = e.clientX - this._drag.clientX;
+      const dy = e.clientY - this._drag.clientY;
+      this.originX = this._drag.ox + dx;
+      this.originY = this._drag.oy + dy;
+      this._panVisual.x = dx;
+      this._panVisual.y = dy;
+      this.canvas.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      return;
+    }
+
     const world = this.toWorld(px, py);
     this._cursor = world;
 
@@ -285,11 +309,7 @@ export class Sketch2D {
       return;
     }
 
-    if (this._drag.mode === 'pan') {
-      this.originX = this._drag.ox + (px - this._drag.px);
-      this.originY = this._drag.oy + (py - this._drag.py);
-      this._requestRender();
-    } else if (this._drag.mode === 'draw') {
+    if (this._drag.mode === 'draw') {
       this.draft.x1 = this.snap(world.x);
       this.draft.y1 = this.snap(world.y);
       this.render();
@@ -350,6 +370,7 @@ export class Sketch2D {
     if (this._drag.mode === 'pan' && this.tool === 'pan') {
       this.canvas.style.cursor = 'grab';
     }
+    if (this._drag.mode === 'pan') this._clearPanPreview();
     if (this._drag.mode === 'draw') {
       const d = this.draft;
       const w = Math.abs(d.x1 - d.x0);
@@ -441,8 +462,16 @@ export class Sketch2D {
       this._drag.rect._dragging = false;
       this.project.touch();
     }
+    if (this._drag?.mode === 'pan') this._clearPanPreview();
     this._drag = null;
     this.draft = null;
+  }
+
+  _clearPanPreview() {
+    if (!this.canvas) return;
+    this.canvas.style.transform = '';
+    this._panVisual.x = 0;
+    this._panVisual.y = 0;
   }
 
   // Zoom about the viewport center by a factor (on-screen +/- buttons).

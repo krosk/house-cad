@@ -265,6 +265,7 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  will-change: transform;
 }
 #view3d { width: 100%; height: 100%; }
 #view3d canvas { touch-action: none; }
