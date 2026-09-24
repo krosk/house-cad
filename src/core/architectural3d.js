@@ -174,15 +174,26 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
   if (height <= EPS) return [];
   const rectangles = floor?.rectangles || [];
   const rooms = rectangles.filter((rect) => zoneKind(rect) === 'room' && validBounds(rect.bounds));
-  const roomFootprint = computeFootprint(rooms);
-  const inferred = exteriorWallSources(roomFootprint, wallThickness);
-  const roomCuts = roomFootprint.flatMap((polygon) => polygon.flatMap((ring) => ring));
+  const stairs = rectangles.filter((rect) => {
+    const kind = zoneKind(rect);
+    return (kind === 'stairs_up' || kind === 'stairs_down') && validBounds(rect.bounds);
+  });
+  // Stairs are holes in the horizontal slab, but they are circulation space for
+  // wall inference. Union them with rooms as positive areas so a shared room↔stair
+  // edge stays open, while the staircase's exposed outer perimeter still gets walls.
+  const circulationRects = [
+    ...rooms,
+    ...stairs.map((rect) => ({ bounds: rect.bounds, op: 'add', kind: 'room' })),
+  ];
+  const circulationFootprint = computeFootprint(circulationRects);
+  const inferred = exteriorWallSources(circulationFootprint, wallThickness);
+  const roomCuts = circulationFootprint.flatMap((polygon) => polygon.flatMap((ring) => ring));
   // A candidate from one room may cross a narrow gap and reach another room.
   // Clip every inferred strip against the complete room union first, then union
   // the survivors so opposing faces produce one wall rather than overlapping solids.
   const clippedInferred = unionRectSources(inferred, {
     cuts: roomCuts,
-    excludeFootprint: roomFootprint,
+    excludeFootprint: circulationFootprint,
   });
   const explicit = [];
   for (const rect of rectangles) {
