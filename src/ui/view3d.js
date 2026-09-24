@@ -93,7 +93,7 @@ export class View3D {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(w, h);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
@@ -127,16 +127,18 @@ export class View3D {
     // Lighting.
     const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(12, 20, 8);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    this.sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    this.sun.position.set(12, 20, 8);
+    this.sun.castShadow = false;
+    this.sun.visible = false;
+    this.sun.shadow.mapSize.set(2048, 2048);
     const s = 30;
-    sun.shadow.camera.left = -s;
-    sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s;
-    sun.shadow.camera.bottom = -s;
-    this.scene.add(sun);
+    this.sun.shadow.camera.left = -s;
+    this.sun.shadow.camera.right = s;
+    this.sun.shadow.camera.top = s;
+    this.sun.shadow.camera.bottom = -s;
+    this.scene.add(this.sun);
+    this.lightingEnabled = false;
 
     // Ground grid + subtle floor to catch shadows. Kept as fields so the MR
     // module can hide them during passthrough.
@@ -328,6 +330,7 @@ export class View3D {
         source.shadow.camera.near = 0.08;
         source.shadow.camera.far = 8;
         source.shadow.bias = -0.001;
+        source.visible = this.lightingEnabled;
         fixture.add(source);
         fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
         this.markerLights.add(fixture);
@@ -348,6 +351,18 @@ export class View3D {
     }
     this._updateLightShadows();
     this.frameModel();
+  }
+
+  // Performance switch for older mobile GPUs. Keep the low-cost hemisphere light
+  // so textured materials remain legible; disable direct lights and every shadow
+  // render pass when off. Marker fixture meshes remain visible as plan context.
+  setLightingEnabled(enabled) {
+    this.lightingEnabled = !!enabled;
+    this.renderer.shadowMap.enabled = this.lightingEnabled;
+    this.sun.visible = this.lightingEnabled;
+    this.sun.castShadow = this.lightingEnabled;
+    this.floor.receiveShadow = this.lightingEnabled;
+    this._updateLightShadows();
   }
 
   _meshVisible(mesh) {
@@ -446,8 +461,9 @@ export class View3D {
     for (const fixture of this.markerLights.children) {
       const source = fixture.children.find((child) => child.isPointLight);
       if (!source) continue;
+      source.visible = this.lightingEnabled;
       source.castShadow = false;
-      if (this.navigationMode === 'pov' && fixture.visible && this.markerLights.visible) {
+      if (this.lightingEnabled && this.navigationMode === 'pov' && fixture.visible && this.markerLights.visible) {
         const position = source.getWorldPosition(new THREE.Vector3());
         candidates.push({ source, distance: position.distanceToSquared(this.camera.position) });
       }

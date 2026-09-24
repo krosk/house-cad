@@ -245,6 +245,25 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
+#view3d-lighting {
+  width: 100%;
+  margin-top: 5px;
+  padding: 7px 8px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  background: #181b21;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+#view3d-lighting[aria-pressed="true"] {
+  color: #0b1220;
+  background: #ffd166;
+  border-color: #ffd166;
+  font-weight: 600;
+}
 #view3d-floor-list button:hover { background: #2c313b; }
 #view3d-floor-list button.active {
   color: #0b1220;

@@ -92,8 +92,22 @@ const app = document.getElementById('app');
 const view3dHolder = document.getElementById('view3d-holder');
 const view3dToggle = document.getElementById('view3d-toggle');
 const view3dFloorList = document.getElementById('view3d-floor-list');
+const view3dLighting = document.getElementById('view3d-lighting');
 let selected3DFloorId = null;
 let hasChosen3DFloor = false;
+let desktopLightingEnabled = false;
+
+function setDesktopLighting(enabled) {
+  desktopLightingEnabled = !!enabled;
+  view.setLightingEnabled(desktopLightingEnabled);
+  view3dLighting.setAttribute('aria-pressed', String(desktopLightingEnabled));
+  view3dLighting.textContent = desktopLightingEnabled ? '☀ Lighting on' : '☼ Lighting off';
+  view3dLighting.title = desktopLightingEnabled
+    ? 'Disable sunlight, marker lights, and dynamic shadows'
+    : 'Enable sunlight, marker lights, and dynamic shadows';
+}
+view3dLighting.addEventListener('click', () => setDesktopLighting(!desktopLightingEnabled));
+setDesktopLighting(false);
 
 function render3DFloorList() {
   if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
