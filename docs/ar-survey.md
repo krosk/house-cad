@@ -129,11 +129,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · CONDUIT** (`id: marker_conduit`) — author the **whole-house conduit network** (on
   `Project`, not a floor): a graph of `conduitNodes` (bare junctions carrying `{x,y,z,floorId}`, or
   nodes bound to a device `markerId` that follow the live marker) joined by `conduitSegments`. Pen
-  model: `penNodeId` is the growing end. The nearest active-floor device/node inside the reticle is
+  model: `penNodeId` is the growing end. The nearest eligible device/node inside the reticle is
   highlighted; **grip over a target cycles the combined overlap stack without changing geometry**, and
   trigger commits only the highlighted target. Trigger empty space to drop a junction (X/Y from the
-  floor reticle, z from the tip, floorId = active floor) and run a segment to it; trigger another target
-  to join/branch/loop. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** the floor directly above/below is drawn dimmed (`adjacentGroup`)
+  floor reticle, z from the tip, floorId = active floor—or the tip's storey in ALL FLOORS) and run a segment to it; trigger another target
+  to join/branch/loop. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** enter
+  **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Every storey's nodes/devices are
+  directly pickable in one vertical stack; grip cycles overlaps and a trigger joins the chosen pair.
+  Empty-space junctions are assigned to the storey whose vertical band contains the controller tip.
+  In a normal single-floor view, the floor directly above/below is also drawn dimmed (`adjacentGroup`)
   at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
   yellow); triggering one runs a segment across the slab — a **riser**. The network is drawn live in
   `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`) in uniform purple, showing only
@@ -142,7 +146,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   relationship are in `docs/electrical-workflow.md`.**
 - **CONDUIT · EDIT** (`id: conduit_edit`) — edit the network through an explicit combined selection.
   With nothing selected, **grip cycles every node/conduit segment under the reticle**; trigger selects
-  the yellow candidate. Selecting a free (bare) junction opens
+  the yellow candidate. The current candidate remains highlighted across per-frame candidate-list
+  changes whenever it is still eligible, so hand jitter cannot silently reorder the hover selection;
+  only grip advances it. Selecting a free (bare) junction opens
   a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad: single-value
   datum pad, **SWAP toggles FLOOR/FREE**, **DEL frees Z** (`⊘ FREE Z`, clears the height dim — it
   no longer deletes the node), ENTER commits z and keeps it selected). Trigger again deselects.
@@ -490,9 +496,12 @@ basement negative). See `multi-floor-design` memory for the settled design.
   Heights are entered **by hand** — Quest can't measure the vertical offset. The pad's SWAP/DEL
   keys are inert. Labels read `LEVEL · <FloorName>` or `LEVEL · ALL FLOORS`.
 - **ALL FLOORS** renders every floor's footprint, edge state, dimensions, and markers at its
-  derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged, hides
-  the height pad, and skips the complete PLAN and MARKER groups during horizontal mode traversal.
-  Flick down in LEVEL to return to the top real floor and restore those editing groups.
+  derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged and hides
+  the height pad. Architecture, marker placement, dimensions, and furniture remain read-only, but
+  the whole-house topology tools **MARKER · CONDUIT**, **CONDUIT · EDIT**, and **MARKER · WIRE**
+  remain available. They render and pick nodes/devices/routes across every storey, so a segment
+  between floors becomes a riser without changing active floor. Flick down in LEVEL to return to
+  the top real floor and restore every editing group.
 - `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the selected
   single-floor or stacked overlay. It re-shows the LEVEL pad only for real floors (the
   `refreshFloorEditState` reset hides it first).

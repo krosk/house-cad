@@ -979,8 +979,8 @@ export function setupMR(view, project, getFootprint) {
   const planGroup = new THREE.Group();
   planGroup.visible = false;
   // LEVEL exposes one pseudo-selection above the highest real floor. It leaves
-  // activeFloorId untouched, renders the complete stack, and makes the authoring
-  // groups unavailable until a real floor is selected again.
+  // activeFloorId untouched and renders the complete stack. Architectural editing
+  // stays locked there, but whole-house conduit/wire tools remain available.
   let allFloorsView = false;
 
   // Marker glyphs (wall-anchored annotations) live in their own group under planGroup
@@ -1003,9 +1003,9 @@ export function setupMR(view, project, getFootprint) {
   const routedWireGroup = new THREE.Group();
   routedWireGroup.visible = false;
   planGroup.add(routedWireGroup);
-  // Cross-floor authoring targets: the floor directly above/below, dimmed at its true
-  // height, so a CONDUIT pen can close a riser onto its nodes/devices and a WIRE can span
-  // storeys. Shown only in CONDUIT/WIRE modes; rebuilt on demand, not by clearPlanGeometry.
+  // Cross-floor authoring targets: in a single-floor view the floor directly above/below
+  // is dimmed at its true height. ALL FLOORS already renders every marker/node directly,
+  // so it does not need this duplicate target layer.
   const adjacentGroup = new THREE.Group();
   adjacentGroup.visible = false;
   planGroup.add(adjacentGroup);
@@ -2129,9 +2129,10 @@ export function setupMR(view, project, getFootprint) {
   // conduitGroup/routedWireGroup ride planGroup (already lifted by activeElevation), so
   // strip the active-floor lift off each z to place geometry correctly; a riser's far
   // end then sits at ±storey height above/below the active overlay.
-  const planLocalZ = (p) => ({ x: p.x, y: p.y, z: (p.z || 0) - activeElevation() });
+  const planLocalZ = (p) => ({ x: p.x, y: p.y, z: (p.z || 0) - displayElevation() });
   // A segment/wire-leg belongs to the active-floor view if either end is on it.
-  const touchesActiveFloor = (s) => s.aFloorId === project.activeFloorId || s.bFloorId === project.activeFloorId;
+  const touchesActiveFloor = (s) => allFloorsView
+    || s.aFloorId === project.activeFloorId || s.bFloorId === project.activeFloorId;
 
   const conduitNodeGeom = new THREE.SphereGeometry(0.022, 12, 12);
   // Flat disc laid on the floor at a node's plan projection — the real aim target for
@@ -2155,7 +2156,8 @@ export function setupMR(view, project, getFootprint) {
       conduitGroup.add(line);
     }
     for (const node of project.conduitNodes || []) {
-      if (project.conduitNodeFloorId(node) !== project.activeFloorId) continue; // this floor's junctions
+      const floorId = project.conduitNodeFloorId(node);
+      if (!allFloorsView && floorId !== project.activeFloorId) continue;
       const p = planLocalZ(conduitNodePos(project, node));
       const baseNodeColor = CONDUIT_NODE_COLOR;
       const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
@@ -2173,15 +2175,17 @@ export function setupMR(view, project, getFootprint) {
         color: baseNodeColor, opacity: node.markerId ? 0.5 : 0.7,
         transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
       }));
-      dot.position.set(p.x, 0.016, -p.y);
+      const nodeFloor = project.floors.find((floor) => floor.id === floorId);
+      const floorZ = allFloorsView ? (nodeFloor?.elevation || 0) + 0.016 : 0.016;
+      dot.position.set(p.x, floorZ, -p.y);
       dot.renderOrder = 15;
       dot.userData.conduitNodeId = node.id;
       dot.userData.conduitNodeRole = 'floor';
       conduitGroup.add(dot);
-      if (Math.abs(p.z - 0.016) > 0.03) { // draw a leader only when the sphere is clear of the floor
+      if (Math.abs(p.z - floorZ) > 0.03) { // draw a leader only when the sphere is clear of the floor
         const leader = new THREE.Line(
           new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(p.x, 0.016, -p.y), new THREE.Vector3(p.x, p.z, -p.y)]),
+            new THREE.Vector3(p.x, floorZ, -p.y), new THREE.Vector3(p.x, p.z, -p.y)]),
           new THREE.LineBasicMaterial({
             color: CONDUIT_NODE_COLOR, transparent: true, opacity: 0.5,
             depthTest: false, depthWrite: false,
@@ -2191,14 +2195,15 @@ export function setupMR(view, project, getFootprint) {
         conduitGroup.add(leader);
       }
     }
-    buildZDims(); // cyan node height dims live in zDimGroup — refresh them on any node change
+    if (!allFloorsView) buildZDims(); // stacked topology view omits active-floor-only Z dims
   }
 
-  // Nearest conduit node ON THE ACTIVE FLOOR under the reticle, by plan projection.
+  // Nearest eligible conduit node under the reticle, by plan projection. ALL FLOORS
+  // exposes the whole vertical stack; normal views remain scoped to the active floor.
   function conduitNodeAtFloorPoint(px, py) {
     let best = null, bestD = RETICLE_OUTER;
     for (const node of project.conduitNodes) {
-      if (project.conduitNodeFloorId(node) !== project.activeFloorId) continue;
+      if (!allFloorsView && project.conduitNodeFloorId(node) !== project.activeFloorId) continue;
       const p = conduitNodePos(project, node);
       const d = Math.hypot(px - p.x, py - p.y);
       if (d < bestD) { bestD = d; best = node; }
@@ -2212,18 +2217,20 @@ export function setupMR(view, project, getFootprint) {
   // commits only the currently highlighted target.
   function conduitTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
-    project.markers.forEach((marker, order) => {
-      const distance = Math.hypot(px - marker.x, py - marker.y);
-      if (distance <= RETICLE_OUTER) candidates.push({
-        kind: 'marker', item: marker, key: `marker:${marker.id}`,
-        distance, z: marker.z || 0, order,
-      });
-    });
+    const targetFloors = allFloorsView ? project.floors : [project.activeFloor];
+    targetFloors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
+        const distance = Math.hypot(px - marker.x, py - marker.y);
+        if (distance <= RETICLE_OUTER) candidates.push({
+          kind: 'marker', item: marker, key: `marker:${marker.id}`,
+          distance, z: (floor.elevation || 0) + (marker.z || 0), order: floorOrder * 100000 + order,
+        });
+      }));
     project.conduitNodes.forEach((node, order) => {
-      if (project.conduitNodeFloorId(node) !== project.activeFloorId) return;
+      const floorId = project.conduitNodeFloorId(node);
+      if (!allFloorsView && floorId !== project.activeFloorId) return;
       // A marker-bound node is the same physical endpoint as its marker; presenting
       // both would waste a cycle step without changing the pen target.
-      if (node.markerId && project.findMarker(node.markerId)?.floor?.id === project.activeFloorId) return;
+      if (node.markerId && project.findMarker(node.markerId)?.floor?.id === floorId) return;
       const p = conduitNodePos(project, node);
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({
@@ -2281,10 +2288,10 @@ export function setupMR(view, project, getFootprint) {
   // CONDUIT · EDIT selection stack: nodes and conduit segments compete by plan
   // distance, then grip advances through every overlap before trigger selects one.
   // A vertical segment collapses to a plan point but remains selectable here.
-  function conduitEditTargetAtFloorPoint(px, py, afterKey = null) {
+  function conduitEditTargetAtFloorPoint(px, py, currentKey = null, cycleAfterKey = null) {
     const candidates = [];
     project.conduitNodes.forEach((node, order) => {
-      if (project.conduitNodeFloorId(node) !== project.activeFloorId) return;
+      if (!allFloorsView && project.conduitNodeFloorId(node) !== project.activeFloorId) return;
       const p = conduitNodePos(project, node);
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({
@@ -2303,8 +2310,13 @@ export function setupMR(view, project, getFootprint) {
       || (a.kind === b.kind ? 0 : a.kind === 'node' ? -1 : 1)
       || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
-    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
-    return candidates[(current + 1) % candidates.length];
+    // Reticle jitter may reorder this distance-sorted list. Preserve the current
+    // highlight whenever it is still present; only an explicit grip cycles it.
+    if (cycleAfterKey) {
+      const current = candidates.findIndex((candidate) => candidate.key === cycleAfterKey);
+      return candidates[current < 0 ? 0 : (current + 1) % candidates.length];
+    }
+    return candidates.find((candidate) => candidate.key === currentKey) || candidates[0];
   }
 
   // Live conduit-node drag, mirroring the waypoint drag: 'direct' carries the node
@@ -2319,8 +2331,11 @@ export function setupMR(view, project, getFootprint) {
       const tip = tipPosition(inputSource);
       if (!tip) return;
       const plan = worldToPlan(tip);
+      const floorId = project.conduitNodeFloorId(n);
+      const floorElevation = project.floors.find((floor) => floor.id === floorId)?.elevation || 0;
       // A datum-pinned node holds its height even in the 3D carry (defined dim wins).
-      nx = plan.px; ny = plan.py; nz = n.zDatum ? (n.z || 0) : Math.max(0, tip.y - overlayY());
+      nx = plan.px; ny = plan.py; nz = n.zDatum ? (n.z || 0)
+        : Math.max(0, tip.y - planPos.y - floorElevation);
     } else {
       const hit = rayFloorHit(inputSource);
       if (!hit) return;
@@ -2394,7 +2409,7 @@ export function setupMR(view, project, getFootprint) {
     for (const child of [...adjacentGroup.children]) {
       adjacentGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
     }
-    if (modeId !== 'marker_conduit' && modeId !== 'marker_wire') return;
+    if (allFloorsView || (modeId !== 'marker_conduit' && modeId !== 'marker_wire')) return;
     const wantNodes = modeId === 'marker_conduit';
     const addDot = (wp, adjacent, opacity) => {
       const p = planLocalZ(wp);
@@ -2473,17 +2488,8 @@ export function setupMR(view, project, getFootprint) {
       if (withDims) buildDimensions(floor, elevation, false);
       if (withDims) addFloorMarkers(floor, elevation, false);
     }
-    // Whole-house conduit network + wires, drawn ONCE at absolute world Z (the stacked
-    // view is seated at the ground datum, so p.z maps straight to height). Risers read as
-    // vertical runs between storeys. Drawn into planGroup so clearPlanGeometry sweeps them.
-    for (const seg of conduitNetworkSegments(project)) {
-      planGroup.add(makeRouteLine([seg.a, seg.b], CONDUIT_COLOR));
-    }
-    for (const wire of project.wires || []) {
-      for (const seg of wireRouteSegments(project, wire)) {
-        planGroup.add(makeWireRibbon(seg.a, seg.b, wireTypeColor(wire)));
-      }
-    }
+    // Whole-house topology is rendered by conduitGroup/routedWireGroup in the
+    // corresponding interactive ALL FLOORS tools, avoiding a duplicate inert copy.
     return planGroup.children.length > 0;
   }
 
@@ -2792,7 +2798,8 @@ export function setupMR(view, project, getFootprint) {
   // CONDUIT · EDIT: grip cycles a combined node/segment stack before trigger selection.
   let selectedConduitNodeId = null;
   let selectedConduitSegmentId = null;
-  let conduitEditPickAfterKey = null;
+  let conduitEditHoverKey = null;     // stable while the highlighted candidate remains eligible
+  let conduitEditPickAfterKey = null; // one-frame grip request to advance past this candidate
   let hoverConduitSegmentId = null;
   let nodeBuffer = '';        // CONDUIT EDIT height pad: the selected free junction's z
   let nodePristine = false;
@@ -4599,7 +4606,9 @@ export function setupMR(view, project, getFootprint) {
   // yellow marker as PICK START or PICK END. Nearby and vertically stacked devices
   // share one distance-then-height ordered cycle.
   function wireMarkerAtFloorPoint(px, py, afterKey = null) {
-    const floors = [project.activeFloor, ...adjacentFloors()].filter(Boolean);
+    const floors = allFloorsView
+      ? project.floors
+      : [project.activeFloor, ...adjacentFloors()].filter(Boolean);
     const candidates = floors.flatMap((floor, floorOrder) => (floor.markers || []).map((marker, order) => ({
         marker, floorId: floor.id, floorOrder, order, key: `marker:${marker.id}`,
         distance: Math.hypot(px - marker.x, py - marker.y),
@@ -5180,8 +5189,19 @@ export function setupMR(view, project, getFootprint) {
         }
         if (!targetNodeId) {
           const { px, py } = worldToPlan(pos);
-          const z = Math.max(0, pos.y - overlayY());
-          targetNodeId = project.addConduitNode({ x: px, y: py, z, emit: false }).id;
+          let floor = project.activeFloor;
+          let z = Math.max(0, pos.y - overlayY());
+          if (allFloorsView) {
+            const absoluteZ = Math.max(0, pos.y - planPos.y);
+            floor = project.floors.reduce((best, candidate) => {
+              const lo = candidate.elevation || 0;
+              const hi = lo + (candidate.height || 0);
+              const distance = absoluteZ < lo ? lo - absoluteZ : absoluteZ > hi ? absoluteZ - hi : 0;
+              return !best || distance < best.distance ? { floor: candidate, distance } : best;
+            }, null)?.floor || project.activeFloor;
+            z = Math.max(0, Math.min(floor.height || Infinity, absoluteZ - (floor.elevation || 0)));
+          }
+          targetNodeId = project.addConduitNode({ x: px, y: py, z, floorId: floor.id, emit: false }).id;
         }
         if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId, { emit: false });
         penNodeId = targetNodeId;
@@ -5190,7 +5210,7 @@ export function setupMR(view, project, getFootprint) {
         // skip the costly buildPlan()/dimension rebuild — only the conduit layer changed.
         project.touch();
         buildConduits(); buildAdjacentTargets('marker_conduit');
-        rlog('conduit pen', { node: penNodeId, riser: !!hoverAdjacent });
+        rlog('conduit pen', { node: penNodeId, riser: !!hoverAdjacent || allFloorsView });
       },
     },
     {
@@ -5494,7 +5514,7 @@ export function setupMR(view, project, getFootprint) {
     selectedRoutedWire = null; routedWirePickAfterId = null; // ...and routed-wire selection picker
     penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
-    conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
+    conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
     selectedEdge = null; edgePickKey = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
@@ -5530,16 +5550,18 @@ export function setupMR(view, project, getFootprint) {
     adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire';
   }
 
-  // In the read-only building overview, mode traversal jumps across both editing
-  // categories as a unit. SETUP and PROJECT remain available (including LEVEL,
-  // which is how the user returns to a real floor).
+  // The stacked overview remains read-only for architecture and marker placement,
+  // but the whole-house topology tools are deliberately available there: every
+  // storey's existing devices/nodes can be joined without changing active floor.
+  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire']);
   const modeAvailable = (index) => {
     const id = modes[index].id;
     if (MODE_HIDDEN.has(id)) return false; // parked tools: never a cycle stop
     const group = MODE_GROUP[id];
     // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
     // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
-    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'furnish' || id === 'translate')) return false;
+    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'furnish' || id === 'translate')
+        && !ALL_FLOORS_TOPOLOGY.has(id)) return false;
     return true;
   };
   function stepMode(direction) {
@@ -6817,7 +6839,7 @@ export function setupMR(view, project, getFootprint) {
           if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
         } else {
           const endpoint = wireMarkerAtFloorPoint(px, py, wireEndpointPickAfterKey);
-          if (endpoint?.floorId === project.activeFloorId) hoverMarker = endpoint.marker;
+          if (endpoint && (allFloorsView || endpoint.floorId === project.activeFloorId)) hoverMarker = endpoint.marker;
           else if (endpoint) hoverAdjacent = {
             kind: 'marker', id: endpoint.marker.id, floorId: endpoint.floorId,
           };
@@ -6864,15 +6886,21 @@ export function setupMR(view, project, getFootprint) {
         const fromFound = project.findMarker(wireFromMarker.id);
         const a = {
           x: wireFromMarker.x, y: wireFromMarker.y,
-          z: (fromFound?.floor?.elevation || 0) - activeElevation() + (wireFromMarker.z || 0),
+          z: (fromFound?.floor?.elevation || 0) - displayElevation() + (wireFromMarker.z || 0),
         };
         let b = null;
-        if (hoverMarker && hoverMarker.id !== wireFromMarker.id) b = { x: hoverMarker.x, y: hoverMarker.y, z: hoverMarker.z || 0 };
+        if (hoverMarker && hoverMarker.id !== wireFromMarker.id) {
+          const found = project.findMarker(hoverMarker.id);
+          b = {
+            x: hoverMarker.x, y: hoverMarker.y,
+            z: (found?.floor?.elevation || 0) - displayElevation() + (hoverMarker.z || 0),
+          };
+        }
         else if (hoverAdjacent?.kind === 'marker' && hoverAdjacent.id !== wireFromMarker.id) {
           const found = project.findMarker(hoverAdjacent.id);
           if (found) b = {
             x: found.marker.x, y: found.marker.y,
-            z: (found.floor.elevation || 0) - activeElevation() + (found.marker.z || 0),
+            z: (found.floor.elevation || 0) - displayElevation() + (found.marker.z || 0),
           };
         }
         else { const tipW = tipPosition(source); if (tipW) { const { px, py } = worldToPlan(tipW); b = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) }; } }
@@ -6981,13 +7009,17 @@ export function setupMR(view, project, getFootprint) {
           reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           if (!selectedConduitNodeId && !selectedConduitSegmentId) {
-            const target = conduitEditTargetAtFloorPoint(px, py, conduitEditPickAfterKey);
+            const target = conduitEditTargetAtFloorPoint(
+              px, py, conduitEditHoverKey, conduitEditPickAfterKey,
+            );
+            conduitEditPickAfterKey = null; // consume the explicit grip-cycle request
+            conduitEditHoverKey = target?.key || null;
             if (target?.kind === 'node') {
               hoverConduitNode = project.conduitNodes.find((n) => n.id === target.id) || null;
             } else if (target?.kind === 'segment') {
               hoverConduitSegmentId = target.id;
             } else {
-              conduitEditPickAfterKey = null;
+              conduitEditHoverKey = null;
             }
           } else if (selectedConduitNodeId) {
             const node = conduitNodeAtFloorPoint(px, py);
@@ -6995,6 +7027,7 @@ export function setupMR(view, project, getFootprint) {
           }
         } else {
           reticle.visible = false;
+          if (!selectedConduitNodeId && !selectedConduitSegmentId) conduitEditHoverKey = null;
         }
       }
       if (selectedConduitNodeObj() && hoverKey !== prevHoverKey) { redrawNodePad(); prevHoverKey = hoverKey; }

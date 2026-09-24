@@ -50,7 +50,10 @@ through it. So the model keeps them separate:
 The pivotal mechanic in **step 2**: penning **onto a device marker** binds a conduit node
 to that device (`ensureConduitNodeAtMarker`) — that is how a device gets *onto the graph*.
 Penning empty space drops a **bare junction**; segments join nodes. A segment whose ends
-sit on two storeys is a **riser** through the slab.
+sit on two storeys is a **riser** through the slab. To author one, select `ALL FLOORS` in
+`LEVEL`, return to `MARKER · CONDUIT`, and trigger the two nodes/devices at their true
+storey elevations. Grip cycles vertically overlapping candidates. The same stacked workspace
+supports `CONDUIT · EDIT` and `MARKER · WIRE`; other plan and marker editing remains locked.
 
 ## The dependency rules (the part people trip on)
 
