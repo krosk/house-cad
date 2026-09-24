@@ -229,6 +229,13 @@ export class View3D {
       roughness: 0.45,
       metalness: 0,
     });
+    // Reusable low-poly electrical fixture parts. Marker instances only allocate
+    // Groups/Meshes; geometry and materials stay shared across rebuilds.
+    this.markerBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
+    this.markerSocketGeometry = new THREE.CylinderGeometry(1, 1, 1, 18).rotateX(Math.PI / 2);
+    this.markerWhiteMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.62 });
+    this.markerDarkMaterial = new THREE.MeshStandardMaterial({ color: 0x26313a, roughness: 0.58 });
+    this.markerAccentMaterials = new Map();
     // The house is a stack of one mesh per floor, each offset in Y by its
     // elevation. Kept in a group so multi-floor models frame/hide as a unit.
     this.house = new THREE.Group();
@@ -299,6 +306,7 @@ export class View3D {
       const {
         geometry, floorGeometry, wallGeometry, ceilingGeometry,
         doorGeometry, windowGeometry, outlineGeometry, stairGeometry, elevation, floorId, name,
+        constraints, rectangles,
       } = entry;
       const parts = geometry
         ? [[geometry, this.material, 'massing']]
@@ -333,32 +341,19 @@ export class View3D {
         this.house.add(lines);
       }
       for (const marker of entry.markers || []) {
-        if (marker.type !== 'light') continue;
-        const fixture = new THREE.Group();
+        const fixture = marker.type === 'light'
+          ? this._lightMarkerFixture(marker)
+          : this._wallMarkerFixture(marker, { constraints, rectangles });
         fixture.userData.floorId = floorId || null;
         fixture.userData.markerId = marker.id || null;
         fixture.position.set(
           Number(marker.x) || 0,
-          (elevation || 0) + (Number.isFinite(marker.z) ? marker.z : (entry.height || 2.5)),
+          (elevation || 0) + (Number.isFinite(marker.z)
+            ? marker.z
+            : (marker.type === 'light' ? (entry.height || 2.5) : 1.1)),
           -(Number(marker.y) || 0),
         );
 
-        // A small emissive ceiling puck makes the source legible even where its
-        // illumination is washed out by daylight. The actual source sits just
-        // below the authored marker to avoid embedding it in the ceiling slab.
-        const puck = new THREE.Mesh(this.lightFixtureGeometry, this.lightFixtureMaterial);
-        puck.position.y = -0.025;
-        fixture.add(puck);
-
-        const source = new THREE.PointLight(0xffc58f, 70, 8, 2);
-        source.position.y = -0.08;
-        source.castShadow = false;
-        source.shadow.mapSize.set(256, 256);
-        source.shadow.camera.near = 0.08;
-        source.shadow.camera.far = 8;
-        source.shadow.bias = -0.001;
-        source.visible = this.lightingEnabled;
-        fixture.add(source);
         fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
         this.markerLights.add(fixture);
       }
@@ -366,6 +361,114 @@ export class View3D {
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
     this.markerLights.visible = !this.hideMesh;
     this._updateLightShadows();
+  }
+
+  _markerAccent(type) {
+    const colors = {
+      outlet: 0xd8dee5, outlet_shutter: 0x60a5fa, outlet_aircon: 0x38bdf8,
+      outlet_cooktop: 0xef4444, outlet_oven: 0xf97316,
+      outlet_water_heater: 0x06b6d4, outlet_appliance: 0xeab308,
+      switch: 0xcbd5e1, ethernet: 0x3b82f6, ethernet_dual: 0x2563eb,
+      tv_antenna: 0xa855f7, camera_ethernet: 0x14b8a6,
+      patch_panel: 0x6366f1, intercom: 0x84cc16, panel: 0xf59e0b, breaker: 0xef4444,
+    };
+    const color = colors[type] ?? 0x94a3b8;
+    if (!this.markerAccentMaterials.has(color)) {
+      this.markerAccentMaterials.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.55 }));
+    }
+    return this.markerAccentMaterials.get(color);
+  }
+
+  _lightMarkerFixture() {
+    const fixture = new THREE.Group();
+    // A small emissive ceiling puck makes the source legible even in basic mode.
+    const puck = new THREE.Mesh(this.lightFixtureGeometry, this.lightFixtureMaterial);
+    puck.position.y = -0.025;
+    fixture.add(puck);
+    const source = new THREE.PointLight(0xffc58f, 70, 8, 2);
+    source.position.y = -0.08;
+    source.castShadow = false;
+    source.shadow.mapSize.set(256, 256);
+    source.shadow.camera.near = 0.08;
+    source.shadow.camera.far = 8;
+    source.shadow.bias = -0.001;
+    source.visible = this.lightingEnabled;
+    fixture.add(source);
+    return fixture;
+  }
+
+  _markerWallAxis(marker, entry) {
+    for (const c of entry.constraints || []) {
+      if (c.a?.marker !== marker.id && c.b?.marker !== marker.id) continue;
+      const ref = c.a?.marker === marker.id ? c.b : c.a;
+      if (ref?.edge === 'left' || ref?.edge === 'right') return 'x';
+      if (ref?.edge === 'top' || ref?.edge === 'bottom') return 'y';
+    }
+    let best = { distance: Infinity, axis: 'y' };
+    for (const rect of entry.rectangles || []) {
+      const b = rect.bounds;
+      for (const [distance, axis] of [
+        [Math.abs(marker.x - b.x0), 'x'], [Math.abs(marker.x - b.x1), 'x'],
+        [Math.abs(marker.y - b.y0), 'y'], [Math.abs(marker.y - b.y1), 'y'],
+      ]) if (distance < best.distance) best = { distance, axis };
+    }
+    return best.axis;
+  }
+
+  _wallMarkerFixture(marker, entry) {
+    const fixture = new THREE.Group();
+    const type = marker.type || 'outlet';
+    const size = type === 'panel' ? [0.38, 0.50, 0.055]
+      : type === 'patch_panel' ? [0.30, 0.14, 0.045]
+        : type === 'intercom' ? [0.13, 0.22, 0.038]
+          : type === 'breaker' ? [0.10, 0.18, 0.04]
+            : type === 'camera_ethernet' ? [0.11, 0.09, 0.06]
+              : [0.085, 0.085, 0.022];
+    const body = new THREE.Mesh(this.markerBoxGeometry, this.markerWhiteMaterial);
+    body.scale.set(...size);
+    body.castShadow = true;
+    fixture.add(body);
+    const frontZ = size[2] / 2 + 0.005;
+    const addBox = (x, y, w, h, d = 0.008, material = this.markerDarkMaterial) => {
+      const mesh = new THREE.Mesh(this.markerBoxGeometry, material);
+      mesh.scale.set(w, h, d); mesh.position.set(x, y, frontZ + d / 2); fixture.add(mesh);
+    };
+    const addSocket = (x, y, radius, material = this.markerDarkMaterial) => {
+      const mesh = new THREE.Mesh(this.markerSocketGeometry, material);
+      mesh.scale.set(radius, radius, 0.006); mesh.position.set(x, y, frontZ + 0.003); fixture.add(mesh);
+    };
+    const accent = this._markerAccent(type);
+    if (type === 'switch') {
+      addBox(0, 0, 0.045, 0.057, 0.009, accent);
+      addBox(0, 0, 0.038, 0.002, 0.011, this.markerDarkMaterial);
+    } else if (type === 'ethernet' || type === 'ethernet_dual') {
+      const ys = type === 'ethernet_dual' ? [-0.018, 0.018] : [0];
+      for (const y of ys) { addBox(0, y, 0.044, 0.022, 0.008, accent); addBox(0, y, 0.028, 0.010); }
+    } else if (type === 'patch_panel') {
+      for (let i = 0; i < 6; i++) addBox(-0.105 + i * 0.042, 0, 0.028, 0.035, 0.008, i % 2 ? accent : this.markerDarkMaterial);
+    } else if (type === 'panel') {
+      addBox(0, 0, 0.30, 0.39, 0.012, accent);
+      for (let i = -2; i <= 2; i++) addBox(0, i * 0.058, 0.24, 0.012, 0.014, this.markerDarkMaterial);
+    } else if (type === 'breaker') {
+      addBox(0, 0.035, 0.055, 0.055, 0.012, accent);
+      addBox(0, -0.045, 0.04, 0.045, 0.014, this.markerDarkMaterial);
+    } else if (type === 'intercom') {
+      for (let i = -1; i <= 1; i++) addBox(0, 0.045 + i * 0.018, 0.065, 0.006);
+      addSocket(0, -0.055, 0.018, accent);
+    } else if (type === 'camera_ethernet') {
+      addBox(0, 0, 0.075, 0.045, 0.045, accent);
+      addSocket(0, 0, 0.018, this.markerDarkMaterial);
+    } else if (type === 'tv_antenna') {
+      addSocket(0, 0, 0.024, accent); addSocket(0, 0, 0.010, this.markerDarkMaterial);
+    } else {
+      // Every outlet variant keeps the recognizable circular socket while its
+      // application-specific accent identifies shutter/HVAC/high-current uses.
+      addSocket(0, 0, 0.026, accent);
+      addSocket(0, 0, 0.014, this.markerDarkMaterial);
+      addBox(0, 0.020, 0.006, 0.011, 0.008, this.markerWhiteMaterial); // Type-E earth pin
+    }
+    if (this._markerWallAxis(marker, entry) === 'x') fixture.rotation.y = Math.PI / 2;
+    return fixture;
   }
 
   setFloorFilter(floorId = null) {

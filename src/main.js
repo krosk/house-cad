@@ -184,6 +184,8 @@ function rebuild() {
     name: f.name,
     height: f.height,
     markers: f.markers,
+    constraints: f.constraints,
+    rectangles: f.rectangles,
   }));
   view.setGeometry(floorGeos);
   view.setFloorFilter(selected3DFloorId);
