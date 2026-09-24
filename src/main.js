@@ -173,8 +173,12 @@ let currentGeometry = null; // merged mesh of all floors, kept for export
 let desktopGeometryDirty = false;
 let rebuildQueued = false;
 function rebuild() {
-  const floorGeos = project.floors.map((f) => ({
-    ...buildArchitecturalFloor(f),
+  const floorGeos = project.floors.map((f, index) => ({
+    ...buildArchitecturalFloor(f, {
+      downRise: index > 0
+        ? Math.max(0.2, (f.elevation || 0) - (project.floors[index - 1].elevation || 0))
+        : (f.height || 2.8),
+    }),
     elevation: f.elevation,
     floorId: f.id,
     name: f.name,

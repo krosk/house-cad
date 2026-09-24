@@ -203,6 +203,15 @@ export class View3D {
       depthTest: true,
       depthWrite: false,
     });
+    this.stairMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc7955f,
+      map: wood.map,
+      bumpMap: wood.bumpMap,
+      bumpScale: 0.008,
+      roughness: 0.76,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
     this.ceilingMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: plaster.map,
@@ -289,7 +298,7 @@ export class View3D {
     for (const entry of list) {
       const {
         geometry, floorGeometry, wallGeometry, ceilingGeometry,
-        doorGeometry, windowGeometry, outlineGeometry, elevation, floorId, name,
+        doorGeometry, windowGeometry, outlineGeometry, stairGeometry, elevation, floorId, name,
       } = entry;
       const parts = geometry
         ? [[geometry, this.material, 'massing']]
@@ -298,6 +307,7 @@ export class View3D {
           [wallGeometry, this.wallMaterial, 'walls'],
           [doorGeometry, this.doorMaterial, 'doors'],
           [windowGeometry, this.windowMaterial, 'windows'],
+          [stairGeometry, this.stairMaterial, 'stairs'],
           [ceilingGeometry, this.ceilingMaterial, 'ceiling'],
         ];
       for (const [partGeometry, material, role] of parts) {

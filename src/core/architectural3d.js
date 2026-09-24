@@ -305,9 +305,53 @@ function apertureInsertGeometries(floor) {
   return { doorGeometry: boxesGeometry(doors), windowGeometry: boxesGeometry(windows) };
 }
 
+// Lightweight procedural staircase: one merged thin tread per riser. The long
+// rectangle axis is the run. STAIRS UP climbs min→max along that axis; STAIRS DOWN
+// represents the same convention from the storey above, descending max→min.
+// Keeping treads as thin slabs (rather than a solid stepped mass) makes both the
+// direction and the opening below readable while staying cheap on mobile GPUs.
+function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
+  const geometries = [];
+  for (const rect of floor?.rectangles || []) {
+    const kind = zoneKind(rect);
+    if ((kind !== 'stairs_up' && kind !== 'stairs_down') || !validBounds(rect.bounds)) continue;
+    const b = rect.bounds;
+    const width = b.x1 - b.x0, depth = b.y1 - b.y0;
+    const horizontal = width >= depth;
+    const run = horizontal ? width : depth;
+    const cross = horizontal ? depth : width;
+    const rise = Math.max(0.2, kind === 'stairs_down' ? downRise : (floor.height || 2.8));
+    const count = Math.max(3, Math.min(24, Math.ceil(rise / 0.18)));
+    const treadRun = run / count;
+    const slab = Math.min(0.05, rise / count * 0.3);
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0 : i / (count - 1);
+      const level = kind === 'stairs_up' ? t * rise : -rise + t * rise;
+      const geometry = horizontal
+        ? new THREE.BoxGeometry(treadRun, slab, cross)
+        : new THREE.BoxGeometry(cross, slab, treadRun);
+      const planX = horizontal ? b.x0 + treadRun * (i + 0.5) : (b.x0 + b.x1) / 2;
+      const planY = horizontal ? (b.y0 + b.y1) / 2 : b.y0 + treadRun * (i + 0.5);
+      geometry.translate(planX, level - slab / 2, -planY);
+      geometries.push(geometry);
+    }
+  }
+  if (!geometries.length) return null;
+  const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries);
+  if (geometries.length > 1) geometries.forEach((geometry) => geometry.dispose());
+  merged.computeVertexNormals();
+  return merged;
+}
+
 export function buildArchitecturalFloor(floor, opts = {}) {
   const rooms = (floor?.rectangles || []).filter((rect) => zoneKind(rect) === 'room');
-  const roomFootprint = computeFootprint(rooms);
+  const stairs = (floor?.rectangles || []).filter((rect) => {
+    const kind = zoneKind(rect);
+    return kind === 'stairs_up' || kind === 'stairs_down';
+  });
+  // Stair zones are the only subtract zones that cut the presentation slabs:
+  // walls/doors/windows sit on the floor, while a staircase needs a real opening.
+  const roomFootprint = computeFootprint([...rooms, ...stairs]);
   const slabThickness = opts.slabThickness ?? ARCH_SLAB_THICKNESS;
   const floorGeometry = extrudeFootprint(roomFootprint, slabThickness);
   if (floorGeometry) floorGeometry.translate(0, -slabThickness, 0); // finished floor remains at local Y=0
@@ -320,5 +364,9 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const wallGeometry = boxesGeometry(wallBoxes);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
   const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor);
-  return { floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry, outlineGeometry };
+  const stairGeometry = stairsGeometry(floor, opts);
+  return {
+    floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
+    outlineGeometry, stairGeometry,
+  };
 }
