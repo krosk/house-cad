@@ -145,6 +145,65 @@ function boxesGeometry(boxes) {
   return merged;
 }
 
+// Extract only real axis-aligned creases from the UNION of the generated wall
+// boxes. EdgesGeometry cannot be used here: the opening splitter creates many
+// adjacent boxes, and it would reveal every coplanar implementation seam.
+// Around a genuine crease, occupancy of the four quadrants perpendicular to the
+// edge is 1/3 (outer/inner corner) or two diagonal quadrants. Two adjacent occupied
+// quadrants are merely one flat face and are intentionally suppressed.
+function boxesOutlineGeometry(boxes) {
+  if (!boxes.length) return null;
+  const groups = new Map();
+  const q = (v) => Math.round(v / EPS) * EPS;
+  const add = (axis, a, b, lo, hi) => {
+    const key = `${axis}:${q(a)}:${q(b)}`;
+    let group = groups.get(key);
+    if (!group) groups.set(key, group = { axis, a: q(a), b: q(b), cuts: new Set() });
+    group.cuts.add(q(lo)); group.cuts.add(q(hi));
+  };
+  for (const b of boxes) {
+    for (const y of [b.y0, b.y1]) for (const z of [b.z0, b.z1]) add('x', y, z, b.x0, b.x1);
+    for (const x of [b.x0, b.x1]) for (const z of [b.z0, b.z1]) add('y', x, z, b.y0, b.y1);
+    for (const x of [b.x0, b.x1]) for (const y of [b.y0, b.y1]) add('z', x, y, b.z0, b.z1);
+  }
+  const inside = (x, y, z) => boxes.some((b) => x > b.x0 + EPS && x < b.x1 - EPS
+    && y > b.y0 + EPS && y < b.y1 - EPS && z > b.z0 + EPS && z < b.z1 - EPS);
+  const delta = 1e-5;
+  const positions = [];
+  const emit = (x0, y0, z0, x1, y1, z1) => positions.push(x0, z0, -y0, x1, z1, -y1);
+  for (const group of groups.values()) {
+    const cuts = [...group.cuts].sort((a, b) => a - b);
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const lo = cuts[i], hi = cuts[i + 1];
+      if (hi - lo <= EPS) continue;
+      const mid = (lo + hi) / 2;
+      let occupied;
+      if (group.axis === 'x') occupied = [
+        inside(mid, group.a - delta, group.b - delta), inside(mid, group.a + delta, group.b - delta),
+        inside(mid, group.a - delta, group.b + delta), inside(mid, group.a + delta, group.b + delta),
+      ];
+      else if (group.axis === 'y') occupied = [
+        inside(group.a - delta, mid, group.b - delta), inside(group.a + delta, mid, group.b - delta),
+        inside(group.a - delta, mid, group.b + delta), inside(group.a + delta, mid, group.b + delta),
+      ];
+      else occupied = [
+        inside(group.a - delta, group.b - delta, mid), inside(group.a + delta, group.b - delta, mid),
+        inside(group.a - delta, group.b + delta, mid), inside(group.a + delta, group.b + delta, mid),
+      ];
+      const count = occupied.filter(Boolean).length;
+      const diagonal = count === 2 && ((occupied[0] && occupied[3]) || (occupied[1] && occupied[2]));
+      if (count !== 1 && count !== 3 && !diagonal) continue;
+      if (group.axis === 'x') emit(lo, group.a, group.b, hi, group.a, group.b);
+      else if (group.axis === 'y') emit(group.a, lo, group.b, group.a, hi, group.b);
+      else emit(group.a, group.b, lo, group.a, group.b, hi);
+    }
+  }
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  return geometry;
+}
+
 // Aperture zones describe the full opening footprint, which is often thicker
 // than the visible leaf/glass. Reduce only the wall-depth axis so inserts sit
 // clearly inside the carved opening rather than looking like another wall block.
@@ -188,7 +247,9 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // the exterior orbit remains an unobstructed architectural overview.
   const ceilingGeometry = floorGeometry?.clone() || null;
   if (ceilingGeometry) ceilingGeometry.translate(0, (floor?.height || 0) + slabThickness, 0);
-  const wallGeometry = boxesGeometry(architecturalWallBoxes(floor, opts));
+  const wallBoxes = architecturalWallBoxes(floor, opts);
+  const wallGeometry = boxesGeometry(wallBoxes);
+  const outlineGeometry = boxesOutlineGeometry(wallBoxes);
   const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor);
-  return { floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry };
+  return { floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry, outlineGeometry };
 }

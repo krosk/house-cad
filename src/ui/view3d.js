@@ -196,6 +196,13 @@ export class View3D {
       depthWrite: false,
       side: THREE.DoubleSide,
     });
+    this.outlineMaterial = new THREE.LineBasicMaterial({
+      color: 0x59616b,
+      transparent: true,
+      opacity: 0.72,
+      depthTest: true,
+      depthWrite: false,
+    });
     this.ceilingMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: plaster.map,
@@ -282,7 +289,7 @@ export class View3D {
     for (const entry of list) {
       const {
         geometry, floorGeometry, wallGeometry, ceilingGeometry,
-        doorGeometry, windowGeometry, elevation, floorId, name,
+        doorGeometry, windowGeometry, outlineGeometry, elevation, floorId, name,
       } = entry;
       const parts = geometry
         ? [[geometry, this.material, 'massing']]
@@ -304,6 +311,16 @@ export class View3D {
         mesh.userData.architecturalRole = role;
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
+      }
+      if (outlineGeometry) {
+        const lines = new THREE.LineSegments(outlineGeometry, this.outlineMaterial);
+        lines.position.y = elevation || 0;
+        lines.renderOrder = 2;
+        lines.userData.floorId = floorId || null;
+        lines.userData.floorName = name || '';
+        lines.userData.architecturalRole = 'outlines';
+        lines.visible = this._meshVisible(lines);
+        this.house.add(lines);
       }
       for (const marker of entry.markers || []) {
         if (marker.type !== 'light') continue;
@@ -362,12 +379,15 @@ export class View3D {
     this.sun.visible = true;
     this.sun.castShadow = this.lightingEnabled;
     this.floor.receiveShadow = this.lightingEnabled;
+    for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
   }
 
   _meshVisible(mesh) {
     const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
-    return onSelectedFloor && (mesh.userData.architecturalRole !== 'ceiling' || this.navigationMode === 'pov');
+    const role = mesh.userData.architecturalRole;
+    if (role === 'outlines' && this.lightingEnabled) return false;
+    return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');
   }
 
   _viewPointerDown(event) {
