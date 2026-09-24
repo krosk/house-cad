@@ -18,6 +18,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Public runtime endpoint used to fetch IKEA rotera GLBs. This is not a
+      # credential; the Worker itself restricts both origins and URL shape.
+      VITE_IKEA_PROXY: https://ikea-rotera-proxy.krosk.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
