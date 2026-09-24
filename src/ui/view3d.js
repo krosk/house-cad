@@ -130,7 +130,7 @@ export class View3D {
     this.sun = new THREE.DirectionalLight(0xffffff, 1.6);
     this.sun.position.set(12, 20, 8);
     this.sun.castShadow = false;
-    this.sun.visible = false;
+    this.sun.visible = true; // retained in basic mode: directional shading is cheap and reveals corners
     this.sun.shadow.mapSize.set(2048, 2048);
     const s = 30;
     this.sun.shadow.camera.left = -s;
@@ -353,13 +353,13 @@ export class View3D {
     this.frameModel();
   }
 
-  // Performance switch for older mobile GPUs. Keep the low-cost hemisphere light
-  // so textured materials remain legible; disable direct lights and every shadow
-  // render pass when off. Marker fixture meshes remain visible as plan context.
+  // Performance switch for older mobile GPUs. Basic mode keeps the hemisphere plus
+  // one shadowless directional light so corners remain readable, while disabling
+  // marker point lights and every shadow render pass. Fixture meshes remain visible.
   setLightingEnabled(enabled) {
     this.lightingEnabled = !!enabled;
     this.renderer.shadowMap.enabled = this.lightingEnabled;
-    this.sun.visible = this.lightingEnabled;
+    this.sun.visible = true;
     this.sun.castShadow = this.lightingEnabled;
     this.floor.receiveShadow = this.lightingEnabled;
     this._updateLightShadows();

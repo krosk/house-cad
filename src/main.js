@@ -101,10 +101,10 @@ function setDesktopLighting(enabled) {
   desktopLightingEnabled = !!enabled;
   view.setLightingEnabled(desktopLightingEnabled);
   view3dLighting.setAttribute('aria-pressed', String(desktopLightingEnabled));
-  view3dLighting.textContent = desktopLightingEnabled ? '☀ Lighting on' : '☼ Lighting off';
+  view3dLighting.textContent = desktopLightingEnabled ? '☀ Full lighting' : '☼ Basic lighting';
   view3dLighting.title = desktopLightingEnabled
-    ? 'Disable sunlight, marker lights, and dynamic shadows'
-    : 'Enable sunlight, marker lights, and dynamic shadows';
+    ? 'Use one shadowless directional light for better performance'
+    : 'Enable marker lights and dynamic shadows';
 }
 view3dLighting.addEventListener('click', () => setDesktopLighting(!desktopLightingEnabled));
 setDesktopLighting(false);
