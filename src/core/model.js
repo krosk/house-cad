@@ -108,7 +108,8 @@ export class Rectangle {
     // `op` remains the boolean-geometry behavior. `kind` preserves user intent so
     // Non-room zone kinds share subtract behavior today and can diverge later.
     const inferredKind = op === 'subtract' ? 'wall' : 'room';
-    this.kind = ZONE_KINDS.includes(kind) ? kind : inferredKind;
+    const normalizedKind = kind === 'stairs' ? 'stairs_up' : kind;
+    this.kind = ZONE_KINDS.includes(normalizedKind) ? normalizedKind : inferredKind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     // Aperture kinds (door/window/half wall) carry an opening band [sill, head]
     // and a `hinge` side. Explicit values win (deserialize/clone); otherwise the
@@ -132,6 +133,7 @@ export class Rectangle {
   // no per-instance editor yet, so a retype adopts the target kind's presets);
   // retyping to a non-aperture kind clears the aperture fields entirely.
   setKind(kind) {
+    if (kind === 'stairs') kind = 'stairs_up';
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];

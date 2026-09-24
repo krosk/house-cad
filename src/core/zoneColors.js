@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'stairs', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'stairs_up', 'stairs_down', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -18,7 +18,8 @@ export const ZONE_COLORS = {
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
   window:  0x22d3ee, // cyan
-  stairs:  0xfbbf24, // yellow
+  stairs_up:   0xfbbf24, // yellow — arrow follows the existing/legacy stair direction
+  stairs_down: 0xf59e0b, // amber — inverse arrow
   cabinet: 0xa78bfa, // purple
   furniture: 0xfb923c, // orange
 };
@@ -89,6 +90,7 @@ const FALLBACK = ZONE_COLORS.room;
 // authored before the kind field (kind absent) still map sensibly: any subtract
 // is a wall, anything else a room.
 export function zoneKind(rect) {
+  if (rect?.kind === 'stairs') return 'stairs_up'; // legacy saves/views
   if (rect && ZONE_KINDS.includes(rect.kind)) return rect.kind;
   return rect?.op === 'subtract' ? 'wall' : 'room';
 }

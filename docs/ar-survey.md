@@ -53,7 +53,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.
 - **ADD** (`id: drop`) — one action: add a starter rectangle at the standing position.
   **Thumbstick up/down picks the kind** (`cycleZoneKind`, wraps over `ZONE_KINDS`): ROOM = add;
-  everything else = subtract — WALL, INSULATION, DOOR, HALFWALL, HEATER, SLIDING, WINDOW, STAIRS,
+  everything else = subtract — WALL, INSULATION, DOOR, HALFWALL, HEATER, SLIDING, WINDOW, STAIRS UP/DOWN,
   CABINET, FURNITURE. DOOR/WINDOW/HALFWALL/HEATER/SLIDING are the **aperture family** (one shared
   `[sill,head]` band + glyph model — see "Apertures & vertical bands" below). The rectangle persists
   `kind` independently from its boolean `op`, preserving semantic identity for later type-specific
@@ -65,7 +65,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   "SNAP TO WALL". Grip cancels a pending lock.
 - **PLAN · EDIT** (`id: edit`) — the plan editing domain. With nothing selected, grip cycles overlapping
   zones and trigger confirms the yellow candidate; trigger again deselects. B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
-  through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs→cabinet→
+  through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs up→stairs down→cabinet→
   furniture). **When the selection is an aperture** (door/garage/window/halfwall/heater/sliding), **A/X
   rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge; halfwall/heater
   return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
@@ -356,7 +356,7 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
   **FURNISH** = rotate the selected GLB item, or cycle the drop article if none selected
   (`cycleFurnish`); **PLAN · ADD** = the kind to add over `ZONE_KINDS`
-  (room/wall/insulation/door/garage/halfwall/heater/sliding/window/stairs/cabinet/furniture, `cycleZoneKind`);
+  (room/wall/insulation/door/garage/halfwall/heater/sliding/window/stairs up/stairs down/cabinet/furniture, `cycleZoneKind`);
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
   baseline) or LANGUAGE row (→ cycles the sheet language), which take precedence.

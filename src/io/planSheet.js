@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs: 'Stairs', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -461,22 +461,26 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
         line(i % 2 ? x : x1, ya, i % 2 ? x1 : x, yb, 0.13);
       }
     }
-  } else if (kind === 'stairs') {
-    // Five tread divisions plus an arrow showing the run direction.
+  } else if (kind === 'stairs_up' || kind === 'stairs_down') {
+    // Five tread divisions plus an arrow showing ascent/descent. Legacy STAIRS
+    // migrates to STAIRS UP, so its established arrow direction is preserved.
+    const up = kind === 'stairs_up';
     for (let i = 1; i < 6; i++) {
       if (horizontal) line(x + (w * i) / 6, y, x + (w * i) / 6, y1, 0.13);
       else line(x, y + (h * i) / 6, x1, y + (h * i) / 6, 0.13);
     }
     if (horizontal) {
-      const cy = y + h / 2, tip = x + w * 0.82;
-      line(x + w * 0.18, cy, tip, cy, 0.25);
-      line(tip, cy, x + w * 0.68, y + h * 0.25, 0.25);
-      line(tip, cy, x + w * 0.68, y + h * 0.75, 0.25);
+      const cy = y + h / 2, tail = x + w * (up ? 0.18 : 0.82), tip = x + w * (up ? 0.82 : 0.18);
+      const back = x + w * (up ? 0.68 : 0.32);
+      line(tail, cy, tip, cy, 0.25);
+      line(tip, cy, back, y + h * 0.25, 0.25);
+      line(tip, cy, back, y + h * 0.75, 0.25);
     } else {
-      const cx = x + w / 2, tip = y + h * 0.18;
-      line(cx, y + h * 0.82, cx, tip, 0.25);
-      line(cx, tip, x + w * 0.25, y + h * 0.32, 0.25);
-      line(cx, tip, x + w * 0.75, y + h * 0.32, 0.25);
+      const cx = x + w / 2, tail = y + h * (up ? 0.82 : 0.18), tip = y + h * (up ? 0.18 : 0.82);
+      const back = y + h * (up ? 0.32 : 0.68);
+      line(cx, tail, cx, tip, 0.25);
+      line(cx, tip, x + w * 0.25, back, 0.25);
+      line(cx, tip, x + w * 0.75, back, 0.25);
     }
   } else if (kind === 'cabinet') {
     // Cabinet carcass/front: crossed diagonals distinguish it from openings.

@@ -38,7 +38,8 @@ const STRINGS = {
   'mode.heater': { en: 'HEATER', fr: 'RADIATEUR', zh: '暖气' },
   'mode.sliding':  { en: 'SLIDING', fr: 'COULISSANT', zh: '推拉门' },
   'mode.window':   { en: 'WINDOW', fr: 'FENÊTRE',  zh: '窗' },
-  'mode.stairs':   { en: 'STAIRS', fr: 'ESCALIER', zh: '楼梯' },
+  'mode.stairs_up':   { en: 'STAIRS UP', fr: 'ESCALIER MONTANT', zh: '上行楼梯' },
+  'mode.stairs_down': { en: 'STAIRS DOWN', fr: 'ESCALIER DESCENDANT', zh: '下行楼梯' },
   'mode.cabinet':  { en: 'CABINET', fr: 'PLACARD', zh: '柜子' },
   'mode.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
@@ -128,9 +129,9 @@ const STRINGS = {
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
   },
   'help.drop': {
-    en: 'Thumbstick up/down picks ROOM, WALL, INSULATION, DOOR, WINDOW, STAIRS, CABINET, or FURNITURE. All except ROOM subtract for now. Trigger drops the box where you stand.',
-    fr: 'Joystick haut/bas : PIÈCE, MUR, ISOLATION, PORTE, FENÊTRE, ESCALIER, PLACARD ou MOBILIER. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
-    zh: '摇杆上/下：选择房间、墙、保温层、门、窗、楼梯、柜子或家具。除房间外目前均执行减去。扣动扳机放置该盒。',
+    en: 'Thumbstick up/down picks the plan type, including STAIRS UP and STAIRS DOWN. All except ROOM subtract for now. Trigger drops the box where you stand.',
+    fr: 'Joystick haut/bas : choisissez le type du plan, dont ESCALIER MONTANT et DESCENDANT. Tous sauf PIÈCE soustraient pour l’instant. La gâchette pose le bloc.',
+    zh: '摇杆上/下选择平面类型，包括上行楼梯和下行楼梯。除房间外目前均执行减去。扣动扳机放置该盒。',
   },
   'help.edge': {
     en: 'Aim at an edge and trigger to lock it, then touch the real wall to snap it there. Grip cancels a lock.',
