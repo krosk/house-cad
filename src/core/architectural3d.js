@@ -72,6 +72,65 @@ function exteriorWallSources(roomFootprint, thickness) {
   return sources;
 }
 
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInFootprint(x, y, footprint) {
+  return footprint.some((polygon) => polygon.length && pointInRing(x, y, polygon[0])
+    && !polygon.slice(1).some((hole) => pointInRing(x, y, hole)));
+}
+
+// Resolve a set of axis-aligned rectangles into non-overlapping boxes. Optional
+// cut coordinates let room boundaries split candidate strips before cells whose
+// midpoint lies in free-room space are rejected. Adjacent retained cells are
+// merged again, keeping the eventual mesh compact.
+function unionRectSources(sources, { cuts = [], excludeFootprint = null } = {}) {
+  if (!sources.length) return [];
+  const xs = new Set(), ys = new Set();
+  for (const b of sources) { xs.add(b.x0); xs.add(b.x1); ys.add(b.y0); ys.add(b.y1); }
+  for (const [x, y] of cuts) { xs.add(x); ys.add(y); }
+  const X = [...xs].sort((a, b) => a - b);
+  const Y = [...ys].sort((a, b) => a - b);
+  const complete = [];
+  let active = new Map();
+  for (let yi = 0; yi < Y.length - 1; yi++) {
+    const y0 = Y[yi], y1 = Y[yi + 1], my = (y0 + y1) / 2;
+    const runs = [];
+    let runStart = null;
+    for (let xi = 0; xi < X.length - 1; xi++) {
+      const x0 = X[xi], x1 = X[xi + 1], mx = (x0 + x1) / 2;
+      const covered = sources.some((b) => mx > b.x0 - EPS && mx < b.x1 + EPS
+        && my > b.y0 - EPS && my < b.y1 + EPS);
+      const keep = covered && !(excludeFootprint && pointInFootprint(mx, my, excludeFootprint));
+      if (keep && runStart == null) runStart = x0;
+      if (runStart != null && (!keep || xi === X.length - 2)) {
+        runs.push({ x0: runStart, x1: keep && xi === X.length - 2 ? x1 : x0 });
+        runStart = null;
+      }
+    }
+    const next = new Map();
+    for (const run of runs) {
+      if (run.x1 - run.x0 <= EPS) continue;
+      const key = `${run.x0}:${run.x1}`;
+      const previous = active.get(key);
+      const box = previous && Math.abs(previous.y1 - y0) <= EPS
+        ? previous : { ...run, y0, y1: y0, source: 'resolved' };
+      box.y1 = y1;
+      next.set(key, box);
+    }
+    for (const [key, box] of active) if (!next.has(key)) complete.push(box);
+    active = next;
+  }
+  complete.push(...active.values());
+  return complete;
+}
+
 function splitWallByOpenings(source, storeyHeight, openings) {
   const overlaps = openings.flatMap((opening) => {
     const b = opening.rect.bounds;
@@ -116,15 +175,25 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
   const rectangles = floor?.rectangles || [];
   const rooms = rectangles.filter((rect) => zoneKind(rect) === 'room' && validBounds(rect.bounds));
   const roomFootprint = computeFootprint(rooms);
-  const sources = exteriorWallSources(roomFootprint, wallThickness);
+  const inferred = exteriorWallSources(roomFootprint, wallThickness);
+  const roomCuts = roomFootprint.flatMap((polygon) => polygon.flatMap((ring) => ring));
+  // A candidate from one room may cross a narrow gap and reach another room.
+  // Clip every inferred strip against the complete room union first, then union
+  // the survivors so opposing faces produce one wall rather than overlapping solids.
+  const clippedInferred = unionRectSources(inferred, {
+    cuts: roomCuts,
+    excludeFootprint: roomFootprint,
+  });
+  const explicit = [];
   for (const rect of rectangles) {
     const kind = zoneKind(rect);
     if (!WALL_ZONE_KINDS.has(kind) || !validBounds(rect.bounds)) continue;
     // An aperture zone is itself a wall segment carrying an opening band. This
     // matters for interior doors/windows authored between adjacent wall pieces,
     // where there may be no overlapping generic WALL rectangle to carve.
-    sources.push({ ...rect.bounds, source: kind === 'wall' ? 'interior' : `aperture:${kind}` });
+    explicit.push({ ...rect.bounds, source: kind === 'wall' ? 'interior' : `aperture:${kind}` });
   }
+  const sources = unionRectSources([...clippedInferred, ...explicit]);
   const openings = rectangles.flatMap((rect) => {
     const band = openingBand(rect, height);
     return band && validBounds(rect.bounds) ? [{ rect, z0: band[0], z1: band[1] }] : [];
