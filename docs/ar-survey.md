@@ -132,7 +132,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   highlighted; **grip over a target cycles the combined overlap stack without changing geometry**, and
   trigger commits only the highlighted target. Trigger empty space to drop a junction (X/Y from the
   floor reticle, z from the tip, floorId = active floor—or the tip's storey in ALL FLOORS) and run a segment to it; trigger another target
-  to join/branch/loop. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** enter
+  to join/branch/loop. **Trigger an existing run** (picked by its floor projection, like CONDUIT
+  EDIT; the hovered run turns yellow and the preview snaps to the split point) to **branch from it**:
+  `splitConduitSegment` inserts a T-junction whose height comes from the run (interpolated; a
+  vertical run uses the tip height, clamped), never from the hand. Runs attached to the pen node and
+  points within the reticle radius of a run's end are not offered (target that node instead).
+  **B/Y undoes the last pen step** (`undoConduitPenStep`): it removes the segment and junction that
+  step *created* (pre-existing items are never removed; `addConduitSegment`/
+  `ensureConduitNodeAtMarker` may return existing ones), re-joins a split run, and moves the pen back.
+  Repeated presses walk back; the history clears on mode change. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** enter
   **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Every storey's nodes/devices are
   directly pickable in one vertical stack; grip cycles overlaps and a trigger joins the chosen pair.
   Empty-space junctions are assigned to the storey whose vertical band contains the controller tip.

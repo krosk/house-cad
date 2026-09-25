@@ -170,9 +170,9 @@ const STRINGS = {
     zh: '绘制节点式管道网络。摇杆上/下选择冷水、热水、供暖供水或回水。扣动设备、节点或空白处来延伸管道；握把循环目标或抬笔。B/Y 删除选中的管段。',
   },
   'help.marker_conduit': {
-    en: 'Build the whole-house conduit network. In ALL FLOORS, every storey is pickable for risers. The nearest device or node under the reticle is highlighted; grip cycles overlaps without drawing, and trigger commits the highlighted target. Trigger empty space to drop a junction. Grip on empty space lifts the pen.',
-    fr: 'Construisez le réseau de gaines. Dans TOUS LES ÉTAGES, chaque niveau est sélectionnable pour créer les colonnes. L’appareil ou nœud le plus proche sous le réticule est surligné ; la poignée parcourt les chevauchements sans tracer, puis la gâchette valide la cible. Gâchette dans le vide : poser une jonction. Poignée dans le vide : lever le tracé.',
-    zh: '构建整屋管路网络。在“所有楼层”中，每层均可选取以创建立管。准星内最近的设备或节点会高亮；握把只循环选择重叠目标，扳机才确认目标。对空处扣动可放置接头。在空处按握把可抬笔。',
+    en: 'Build the whole-house conduit network. In ALL FLOORS, every storey is pickable for risers. The nearest device or node under the reticle is highlighted; grip cycles overlaps without drawing, and trigger commits the highlighted target. Trigger empty space to drop a junction; trigger an existing run to branch from it (T-junction at the run\'s height). B/Y undoes the last step. Grip on empty space lifts the pen.',
+    fr: 'Construisez le réseau de gaines. Dans TOUS LES ÉTAGES, chaque niveau est sélectionnable pour créer les colonnes. L’appareil ou nœud le plus proche sous le réticule est surligné ; la poignée parcourt les chevauchements sans tracer, puis la gâchette valide la cible. Gâchette dans le vide : poser une jonction ; gâchette sur une gaine existante : y brancher un T (à la hauteur de la gaine). B/Y annule la dernière étape. Poignée dans le vide : lever le tracé.',
+    zh: '构建整屋管路网络。在“所有楼层”中，每层均可选取以创建立管。准星内最近的设备或节点会高亮；握把只循环选择重叠目标，扳机才确认目标。对空处扣动可放置接头；对已有管路扣动可从其分支（在该管路高度形成 T 形接头）。B/Y 撤销上一步。在空处按握把可抬笔。',
   },
   'help.conduit_dims': {
     en: 'Dimension a conduit junction to a wall so it tracks that wall on every edit. Trigger a bare junction to pick it, then trigger a wall edge; the numpad sets the distance (A/X flips the side, B/Y removes the pin). Grip cycles vertically stacked junctions before picking. Pin X and Y separately for a full lock. Marker-bound nodes are inert here — they follow their device.',

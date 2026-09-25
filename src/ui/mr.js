@@ -2260,12 +2260,63 @@ export function setupMR(view, project, getFootprint) {
         distance, z: p.z || 0, order,
       });
     });
+    // Existing runs, picked by their floor projection like CONDUIT EDIT: triggering one
+    // splits it into a T-junction. Skipped near a run's ends (target that node
+    // instead) and for runs already attached to the pen node.
+    conduitNetworkSegments(project).forEach((seg, order) => {
+      if (!touchesActiveFloor(seg)) return;
+      const source = project.conduitSegments.find((s) => s.id === seg.id);
+      if (penNodeId && source && (source.a === penNodeId || source.b === penNodeId)) return;
+      const distance = planPointToSegment(px, py, seg.a, seg.b);
+      if (distance > WIRE_PICK_M) return;
+      const split = conduitSplitPoint(seg, px, py);
+      if (!split) return;
+      candidates.push({
+        kind: 'segment', item: split, key: `segment:${seg.id}`,
+        distance, z: split.worldZ, order,
+      });
+    });
+    const KIND_RANK = { marker: 0, node: 1, segment: 2 };
     candidates.sort((a, b) => a.distance - b.distance
-      || (a.kind === b.kind ? 0 : a.kind === 'marker' ? -1 : 1)
+      || KIND_RANK[a.kind] - KIND_RANK[b.kind]
       || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex((candidate) => candidate.key === afterKey);
     return candidates[(current + 1) % candidates.length];
+  }
+
+  // Where triggering run `seg` (a conduitNetworkSegments entry, world-Z ends) under the
+  // floor point (px, py) would place a T-junction. Plan X/Y = the reticle projected
+  // onto the run; height comes from the RUN, never the hand (interpolated along it).
+  // A vertical run projects to a point, so its height is the controller tip's,
+  // clamped to the run. The junction's storey is the one whose band holds that
+  // height (a riser can split on either floor). Returns null within reach of an end.
+  function conduitSplitPoint(seg, px, py) {
+    const dx = seg.b.x - seg.a.x, dy = seg.b.y - seg.a.y, len2 = dx * dx + dy * dy;
+    const zLo = Math.min(seg.a.z || 0, seg.b.z || 0), zHi = Math.max(seg.a.z || 0, seg.b.z || 0);
+    let x, y, worldZ;
+    if (len2 < 1e-6) {
+      const tip = tipPosition(editCtl);
+      if (!tip) return null;
+      worldZ = Math.max(zLo, Math.min(zHi, tip.y - planPos.y));
+      if (worldZ - zLo < RETICLE_OUTER || zHi - worldZ < RETICLE_OUTER) return null;
+      x = seg.a.x; y = seg.a.y;
+    } else {
+      const t = Math.max(0, Math.min(1, ((px - seg.a.x) * dx + (py - seg.a.y) * dy) / len2));
+      x = seg.a.x + t * dx; y = seg.a.y + t * dy;
+      if (Math.hypot(x - seg.a.x, y - seg.a.y) < RETICLE_OUTER
+        || Math.hypot(x - seg.b.x, y - seg.b.y) < RETICLE_OUTER) return null;
+      worldZ = (seg.a.z || 0) + t * ((seg.b.z || 0) - (seg.a.z || 0));
+    }
+    const floors = seg.aFloorId === seg.bFloorId
+      ? [project.floors.find((f) => f.id === seg.aFloorId)]
+      : project.floors.filter((f) => f.id === seg.aFloorId || f.id === seg.bFloorId);
+    const floor = floors.filter(Boolean).reduce((best, f) => {
+      const lo = f.elevation || 0, hi = lo + (f.height || 0);
+      const d = worldZ < lo ? lo - worldZ : worldZ > hi ? worldZ - hi : 0;
+      return !best || d < best.d ? { f, d } : best;
+    }, null)?.f || project.activeFloor;
+    return { segmentId: seg.id, x, y, worldZ, floorId: floor.id, z: Math.max(0, worldZ - (floor.elevation || 0)) };
   }
 
   // Ordered vertical stack (high→low z) of DIMS-eligible first-ref targets sharing the
@@ -2914,6 +2965,11 @@ export function setupMR(view, project, getFootprint) {
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
   let conduitPickAfterKey = null;
+  // B/Y undo for the pen: one entry per trigger step, newest last. Records only what
+  // the step CREATED (addConduitSegment / ensureConduitNodeAtMarker can return an
+  // existing item), so undo never removes conduit that existed before the step.
+  let conduitPenHistory = [];
+  let hoverPenSplit = null; // the run (and split point) the pen would T into this frame
   let hoverConduitNode = null;
   // Cross-floor authoring: the adjacent-floor target under the reticle this frame, if any
   // — {kind:'node'|'marker', id, floorId, x, y}. A CONDUIT/WIRE trigger connects to it.
@@ -5330,9 +5386,22 @@ export function setupMR(view, project, getFootprint) {
         if (!placed) return;
         // The per-frame combined picker has already disambiguated active-floor nodes
         // and devices by distance/cycle order. Adjacent targets and empty floor follow.
+        const prevPen = penNodeId;
+        const nodesBefore = new Set(project.conduitNodes.map((n) => n.id));
+        const segmentsBefore = new Set(project.conduitSegments.map((s) => s.id));
         let targetNodeId = hoverConduitNode?.id || null;
         if (!targetNodeId && hoverMarker) {
           targetNodeId = project.ensureConduitNodeAtMarker(hoverMarker.id).id;
+        }
+        let split = null;
+        if (!targetNodeId && !hoverMarker && hoverPenSplit) {
+          // T-junction: split the run and branch from the new junction.
+          const source = project.conduitSegments.find((s) => s.id === hoverPenSplit.segmentId);
+          if (source) {
+            split = { a: source.a, b: source.b };
+            const { x, y, z, floorId } = hoverPenSplit;
+            targetNodeId = project.splitConduitSegment(source.id, { x, y, z, floorId })?.id || null;
+          }
         }
         if (!targetNodeId && hoverAdjacent) {
           targetNodeId = hoverAdjacent.kind === 'node'
@@ -5355,7 +5424,14 @@ export function setupMR(view, project, getFootprint) {
           }
           targetNodeId = project.addConduitNode({ x: px, y: py, z, floorId: floor.id, emit: false }).id;
         }
-        if (penNodeId && penNodeId !== targetNodeId) project.addConduitSegment(penNodeId, targetNodeId, { emit: false });
+        const seg = penNodeId && penNodeId !== targetNodeId
+          ? project.addConduitSegment(penNodeId, targetNodeId, { emit: false }) : null;
+        conduitPenHistory.push({
+          prevPen,
+          nodeId: nodesBefore.has(targetNodeId) ? null : targetNodeId,
+          segmentId: seg && !segmentsBefore.has(seg.id) ? seg.id : null,
+          split, // the run {a, b} this step split at nodeId, re-joined on undo
+        });
         penNodeId = targetNodeId;
         // One solve + notify for the whole pen step (node + segment + any marker bind),
         // instead of an _emit per mutation. A conduit node touches no plan geometry, so
@@ -5718,7 +5794,7 @@ export function setupMR(view, project, getFootprint) {
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
     selectedRoutedWire = null; routedWirePickAfterId = null; // ...and routed-wire selection picker
     pipePenNodeId = null; pipePickAfterKey = null; hoverPipeNode = null; selectedPipe = null; pendingPipeMerge = null;
-    penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
+    penNodeId = null; conduitPickAfterKey = null; conduitPenHistory = []; hoverPenSplit = null; // ...and lift/reset the conduit pen picker + its undo
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
@@ -6117,6 +6193,38 @@ export function setupMR(view, project, getFootprint) {
   //  - PLAN EDIT: the selected zone.  - MARKER EDIT: the selected marker.
   //  - FURNISH: the selected furniture.  - CONDUIT EDIT: the hovered segment (keeps its
   //    nodes) else the selected node + its segments.  - WIRE: the selected wire.
+  // MARKER · CONDUIT B/Y: undo the newest pen step — remove the segment it created,
+  // then the node it created if nothing else now uses it, and move the pen back to
+  // where that step started. Repeated presses walk back step by step. Steps whose
+  // items were since removed elsewhere just no-op their missing parts.
+  function undoConduitPenStep() {
+    const step = conduitPenHistory.pop();
+    if (!step) return false;
+    const segmentId = step.segmentId
+      && project.conduitSegments.some((s) => s.id === step.segmentId) ? step.segmentId : null;
+    const nodeId = step.nodeId && project.conduitNodes.some((n) => n.id === step.nodeId)
+      && !project.conduitSegments.some((s) => s.id !== segmentId && (s.a === step.nodeId || s.b === step.nodeId))
+      ? step.nodeId : null;
+    if (segmentId) project.removeConduitSegment(segmentId);
+    if (nodeId) project.removeConduitNode(nodeId);
+    else if (step.split && step.nodeId && project.conduitNodes.some((n) => n.id === step.nodeId)) {
+      // A T-junction step: once the branch is gone, the junction carries exactly the
+      // two halves of the original run → remove it and restore the single run.
+      const incident = project.conduitSegments.filter((s) => s.a === step.nodeId || s.b === step.nodeId);
+      const halves = incident.length === 2 && incident.every((s) =>
+        [s.a, s.b].includes(step.split.a) || [s.a, s.b].includes(step.split.b));
+      if (halves) {
+        project.removeConduitNode(step.nodeId);
+        project.addConduitSegment(step.split.a, step.split.b);
+      }
+    }
+    penNodeId = step.prevPen && project.conduitNodes.some((n) => n.id === step.prevPen) ? step.prevPen : null;
+    conduitPickAfterKey = null;
+    buildConduits(); buildAdjacentTargets('marker_conduit');
+    rlog('conduit pen undo', { segmentId, nodeId, pen: penNodeId });
+    return true;
+  }
+
   function deleteInMode() {
     const mode = modes[currentMode];
     if (mode.id === 'edit') {
@@ -6142,6 +6250,7 @@ export function setupMR(view, project, getFootprint) {
       rlog('furniture delete', { id });
       return true;
     }
+    if (mode.id === 'marker_conduit') return undoConduitPenStep();
     if (mode.id === 'conduit_edit') {
       if (selectedConduitSegmentId) { // one leg of a branch, leaving its end nodes
         rlog('conduit segment delete', { id: selectedConduitSegmentId });
@@ -7260,7 +7369,7 @@ export function setupMR(view, project, getFootprint) {
       numpadCursor.visible = false;
       const source = editCtl;
       if (penNodeId && !project.conduitNodes.some((n) => n.id === penNodeId)) penNodeId = null;
-      hoverConduitNode = null; hoverMarker = null; hoverAdjacent = null;
+      hoverConduitNode = null; hoverMarker = null; hoverAdjacent = null; hoverPenSplit = null;
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
@@ -7269,9 +7378,10 @@ export function setupMR(view, project, getFootprint) {
         const target = conduitTargetAtFloorPoint(px, py, conduitPickAfterKey);
         if (target?.kind === 'node') hoverConduitNode = target.item;
         else if (target?.kind === 'marker') hoverMarker = target.item;
+        else if (target?.kind === 'segment') hoverPenSplit = target.item;
         else conduitPickAfterKey = null; // leaving the stack restarts it at nearest
         // Fall back to an adjacent-floor node/device → the next pen segment is a riser.
-        if (!hoverConduitNode && !hoverMarker) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
+        if (!hoverConduitNode && !hoverMarker && !hoverPenSplit) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
       } else {
         reticle.visible = false;
       }
@@ -7285,9 +7395,17 @@ export function setupMR(view, project, getFootprint) {
         child.material.color.setHex(color);
         child.scale.setScalar(id === penNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
       }
+      // The run a trigger would split into a T-junction previews yellow.
+      for (const child of conduitGroup.children) {
+        const segId = child.userData.conduitSegmentId;
+        if (!segId) continue;
+        const hovered = segId === hoverPenSplit?.segmentId;
+        child.material.color.setHex(hovered ? 0xffe14d : child.userData.baseColor);
+        child.material.opacity = hovered ? 1 : 0.92;
+      }
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
-      // Pen preview: pen node → current tip.
+      // Pen preview: pen node → current tip (or → the T-junction point on a hovered run).
       if (!conduitPreviewLine) {
         conduitPreviewLine = makeRouteLine([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], CONDUIT_COLOR);
         conduitPreviewLine.frustumCulled = false;
@@ -7299,7 +7417,9 @@ export function setupMR(view, project, getFootprint) {
       if (penNode && tipW) {
         const from = planLocalZ(conduitNodePos(project, penNode)); // world Z → active-plan-local
         const { px, py } = worldToPlan(tipW);
-        const to = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
+        const to = hoverPenSplit
+          ? planLocalZ({ x: hoverPenSplit.x, y: hoverPenSplit.y, z: hoverPenSplit.worldZ })
+          : { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
         conduitPreviewLine.visible = true;
         conduitPreviewLine.geometry.setFromPoints([from, to].map((p) => new THREE.Vector3(p.x, p.z, -p.y)));
         conduitPreviewLine.computeLineDistances();

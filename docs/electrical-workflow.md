@@ -41,6 +41,7 @@ through it. So the model keeps them separate:
 ```
 1. Place device markers        MARKER · EDIT     outlets, switches, lights, panel, breakers
 2. Run the conduit network     MARKER · CONDUIT  pen device → junction → device; cross-slab = riser
+   (branch / fix)              MARKER · CONDUIT  trigger an existing run → T-junction; B/Y undoes a step
    (refine)                    CONDUIT · EDIT    move / split / delete nodes & segments, set node height
    (survey to walls)           CONDUIT · DIMS    pin a bare junction to a wall so it tracks edits
 3. Declare wires               MARKER · WIRE     choose electrical/Ethernet, then pick two devices
