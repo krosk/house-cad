@@ -66,8 +66,8 @@ rectangles (add/subtract, ordered)
 
 The desktop **View 3D** presentation no longer uses that legacy massing mesh directly. Its shared
 `src/core/architectural3d.js` interpretation treats ROOM unions as thin floor slabs, derives an
-exterior wall shell from exposed room boundaries, renders explicit WALL zones as interior solids,
-and cuts DOOR/WINDOW/SLIDING/HALFWALL vertical bands into overlapping wall segments. This module is
+exterior wall shell from exposed room boundaries, renders explicit WALL and INSULATION (interior
+lining) zones as solids, and cuts DOOR/WINDOW/SLIDING/HALFWALL vertical bands into overlapping wall segments. This module is
 deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains on the legacy
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
@@ -82,9 +82,15 @@ white procedural plaster. These CanvasTextures are generated locally (no network
 UV space, and use restrained bump/roughness so they remain mobile-friendly.
 Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
 puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
-authority; the fixture/light are presentation-only. At most two visible lights cast low-resolution
+authority; the fixture/light are presentation-only.
+At most two visible lights cast low-resolution
 shadows to contain mobile rendering cost. Shadow allocation is contextual: overhead uses none, and
 POV assigns shadows to the two light sources nearest the camera.
+Every other marker renders as one standard **8 cm × 8 cm faceplate** (`MARKER_FACE`; the light puck is
+8 cm across too) with per-type detailing inside that face. `wallMarkerPlacements()` attaches each
+plate to the nearest exposed side of the resolved wall boxes at the marker's height (within 30 cm),
+facing away from that wall, so room-side, exterior, and jamb-mounted fixtures all face open air.
+It is presentation-only: marker data is never changed.
 
 Production builds emit an un-precached `version.json` beside `index.html`; `src/core/versionCheck.js`
 fetches it with `cache: no-store` plus a timestamp query and compares its complete build id with the

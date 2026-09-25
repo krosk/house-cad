@@ -13,7 +13,10 @@ import { zoneKind } from './zoneColors.js';
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
 const EPS = 1e-7;
-const WALL_ZONE_KINDS = new Set(['wall', 'door', 'garage', 'window', 'halfwall', 'sliding']);
+// Solid wall material in 3D. INSULATION is an interior lining authored over the room
+// edge (markers are pinned to its inner face), so it renders as wall too; without it
+// the room read 18–21 cm too deep and lining-mounted outlets had no surface.
+const WALL_ZONE_KINDS = new Set(['wall', 'insulation', 'door', 'garage', 'window', 'halfwall', 'sliding']);
 
 const validBounds = (b) => b && b.x1 - b.x0 > EPS && b.y1 - b.y0 > EPS;
 const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -247,7 +250,7 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
     // An aperture zone is itself a wall segment carrying an opening band. This
     // matters for interior doors/windows authored between adjacent wall pieces,
     // where there may be no overlapping generic WALL rectangle to carve.
-    explicit.push({ ...rect.bounds, source: kind === 'wall' ? 'interior' : `aperture:${kind}` });
+    explicit.push({ ...rect.bounds, source: kind === 'wall' || kind === 'insulation' ? 'interior' : `aperture:${kind}` });
   }
   const sources = unionRectSources([...clippedInferred, ...explicit]);
   const openings = rectangles.flatMap((rect) => {
@@ -401,6 +404,50 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
   return merged;
 }
 
+// Every wall-mounted marker renders as one standard faceplate (owner spec: 8 cm ×
+// 8 cm, the same "typical fixture face" the plan sheet's stack tolerance assumes).
+export const MARKER_FACE = 0.08;
+// A marker this close to a wall surface is presented flush on it. Authored markers
+// are usually dimensioned exactly onto a face, but AR tip placement can leave one a
+// few cm inside the wall mass (buried) or just off it.
+const MARKER_SNAP = 0.3;
+
+// Presentation placement for each wall-mounted (non-light) marker: attach it to the
+// nearest EXPOSED vertical side of the resolved wall boxes at the marker's height,
+// facing away from that wall. Using the real wall solids (openings already cut)
+// covers room faces, exterior faces (outdoor cameras/outlets face outward), and door
+// jambs alike. A side shared by two adjacent boxes is an internal seam, not a
+// surface, so it is skipped. Beyond MARKER_SNAP the marker keeps its position and
+// only takes the nearest surface's facing. Marker data is never changed.
+export function wallMarkerPlacements(floor, wallBoxes = architecturalWallBoxes(floor)) {
+  const placements = new Map();
+  const solidAt = (x, y, z) => wallBoxes.some((w) => x > w.x0 && x < w.x1
+    && y > w.y0 && y < w.y1 && z > w.z0 && z < w.z1);
+  for (const marker of floor?.markers || []) {
+    if (marker.type === 'light') continue;
+    const mx = Number(marker.x) || 0, my = Number(marker.y) || 0;
+    const z = clipped(Number.isFinite(marker.z) ? marker.z : 1.1, 0.01, Math.max(0.01, (floor?.height || 2.5) - 0.01));
+    const candidates = [];
+    for (const w of wallBoxes) {
+      if (z < w.z0 || z > w.z1) continue;
+      const cx = clipped(mx, w.x0, w.x1), cy = clipped(my, w.y0, w.y1);
+      for (const [px, py, nx, ny] of [
+        [w.x0, cy, -1, 0], [w.x1, cy, 1, 0], [cx, w.y0, 0, -1], [cx, w.y1, 0, 1],
+      ]) candidates.push({ d: Math.hypot(mx - px, my - py), px, py, nx, ny });
+    }
+    candidates.sort((p, q) => p.d - q.d);
+    const best = candidates.find((c) => !solidAt(c.px + c.nx * 0.002, c.py + c.ny * 0.002, z));
+    placements.set(marker.id, best
+      ? {
+        x: best.d <= MARKER_SNAP ? best.px : mx,
+        y: best.d <= MARKER_SNAP ? best.py : my,
+        nx: best.nx, ny: best.ny, snapped: best.d <= MARKER_SNAP,
+      }
+      : { x: mx, y: my, nx: 0, ny: -1, snapped: false });
+  }
+  return placements;
+}
+
 export function buildArchitecturalFloor(floor, opts = {}) {
   const rooms = (floor?.rectangles || []).filter((rect) => zoneKind(rect) === 'room');
   const stairs = (floor?.rectangles || []).filter((rect) => {
@@ -425,6 +472,6 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
-    outlineGeometry, stairGeometry,
+    outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, wallBoxes),
   };
 }
