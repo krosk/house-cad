@@ -157,7 +157,7 @@ export function setupMR(view, project, getFootprint) {
       ctx.font = '28px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      lines.forEach((line, i) => ctx.fillText(line, 20, 20 + i * 36));
+      lines.forEach((line, i) => ctx.fillText(line, 20, 18 + i * 32)); // 9 lines fit the 320 px canvas
       tex.needsUpdate = true;
     };
     return { sprite, setLines };
@@ -6843,6 +6843,9 @@ export function setupMR(view, project, getFootprint) {
           : getVersionStatus().state}`,
         // The EXIT bar takes the fps line's slot while held, so the HUD never outgrows its canvas.
         exitProgress > 0 ? `EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}` : `fps:    ${fpsText}`,
+        // Last frame's renderer totals (autoReset: one render per XR frame), to tell a
+        // draw-call-bound slowdown from a triangle-bound one.
+        `draw:   ${renderer.info.render.calls} calls, ${(renderer.info.render.triangles / 1000).toFixed(1)}k tris`,
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
