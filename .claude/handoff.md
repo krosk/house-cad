@@ -84,7 +84,8 @@ Read `docs/product-intent.md` before planning AR work.
    no way to pick conduits or wires). The reticle now lands on your storey's floor when you aim down,
    and on the floor of the storey above when you aim up. Picking favours that storey, and grip cycles
    outward to farther storeys. A strict per-storey filter blocked a basement breaker → upstairs outlet
-   wire, so it was replaced by ranking. The rule is in `docs/ar-survey.md`. The same commit fixes a latent ReferenceError when the pen hovers a riser.
+   wire, so it was replaced by ranking. LEFT stick up/down in ALL FLOORS teleports one storey
+   while keeping the mode (`navLift`/`groundY()`). The rules are in `docs/ar-survey.md`. The same commit fixes a latent ReferenceError when the pen hovers a riser.
    Build-verified only.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
@@ -182,7 +183,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the unconfirmed work**, then update `docs/ar-qa-checklist.md`:
   - breaker glyph;
-  - ALL FLOORS reticle + per-storey picking (up/down);
+  - ALL FLOORS reticle, storey-ranked picking, LEFT stick-y storey teleport;
   - conduit pen undo + T-junction;
   - Z-dim look;
   - 3D-viewer wall/door and faceplate fixes (desktop);

@@ -2626,7 +2626,7 @@ export function setupMR(view, project, getFootprint) {
     if (len2 < 1e-6) {
       const tip = tipPosition(frameEditCtl);
       if (!tip) return null;
-      worldZ = Math.max(zLo, Math.min(zHi, tip.y - planPos.y));
+      worldZ = Math.max(zLo, Math.min(zHi, tip.y - groundY()));
       if (worldZ - zLo < RETICLE_OUTER || zHi - worldZ < RETICLE_OUTER) return null;
       x = seg.a.x; y = seg.a.y;
     } else {
@@ -2739,7 +2739,7 @@ export function setupMR(view, project, getFootprint) {
       const floorElevation = project.floors.find((floor) => floor.id === floorId)?.elevation || 0;
       // A datum-pinned node holds its height even in the 3D carry (defined dim wins).
       nx = plan.px; ny = plan.py; nz = n.zDatum ? (n.z || 0)
-        : Math.max(0, tip.y - planPos.y - floorElevation);
+        : Math.max(0, tip.y - groundY() - floorElevation);
     } else {
       const hit = rayFloorHit(inputSource);
       if (!hit) return;
@@ -3490,7 +3490,14 @@ export function setupMR(view, project, getFootprint) {
   // parent group on the registered ground datum because each child is already
   // lifted by its own elevation.
   const displayElevation = () => (allFloorsView ? 0 : activeElevation());
-  const overlayY = () => planPos.y + displayElevation();
+  // ALL FLOORS vertical teleport (left stick up/down): the whole stack drops by navLift
+  // meters so another storey's floor sits under the user's feet, like navOffset does
+  // horizontally. Navigation only (never model data); zero outside ALL FLOORS.
+  let navLift = 0;
+  // World Y of the (possibly virtually shifted) ground datum. Every world-Y ↔ absolute
+  // Z conversion goes through this, never planPos.y directly.
+  const groundY = () => planPos.y - navLift;
+  const overlayY = () => groundY() + displayElevation();
 
   // navOffset lives in the SURVEY ANCHOR'S horizontal frame, not raw local-floor
   // coordinates. Quest may relocalize local-floor after the headset sleeps; the
@@ -5185,13 +5192,34 @@ export function setupMR(view, project, getFootprint) {
   // directly above — never further, so the reticle stays near and readable. Returns
   // that floor or null (aimed up from the top storey).
   function allFloorsReticleFloor() {
-    const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
+    const { floors, mine } = storeyAtHead();
     if (!floors.length) return null;
+    return _rd.y < 0 ? floors[mine] : floors[mine + 1] || null;
+  }
+
+  // Floors bottom→top and the index of the one holding the headset ("my storey"),
+  // measured against the virtually shifted datum so a vertical teleport moves it.
+  function storeyAtHead() {
+    const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
     const viewer = currentFrame?.getViewerPose(localSpace);
-    const headZ = viewer ? viewer.transform.position.y - planPos.y : 0;
+    const headZ = viewer ? viewer.transform.position.y - groundY() : 0;
     let mine = 0;
     for (let i = 0; i < floors.length; i++) if ((floors[i].elevation || 0) <= headZ) mine = i;
-    return _rd.y < 0 ? floors[mine] : floors[mine + 1] || null;
+    return { floors, mine };
+  }
+
+  // ALL FLOORS left stick up/down: step "my storey" one floor up/down without leaving
+  // the current mode. The target storey's floor lands where my storey's floor was,
+  // so the step is exact even when the user physically stands on an upper floor.
+  // Pending picks (e.g. a wire's first endpoint) survive; that is the point.
+  function teleportStorey(delta) {
+    if (!allFloorsView || !placed) return;
+    const { floors, mine } = storeyAtHead();
+    const from = floors[mine], to = floors[mine + delta];
+    if (!from || !to) return;
+    navLift += (to.elevation || 0) - (from.elevation || 0);
+    applyPlanMatrix();
+    rlog('storey teleport', { to: to.name, lift: +navLift.toFixed(3) });
   }
 
   // World point where a controller's pointing ray meets the floor plane, or null.
@@ -5208,7 +5236,7 @@ export function setupMR(view, project, getFootprint) {
     if (allFloorsView) {
       const floor = allFloorsReticleFloor();
       if (!floor) return null;
-      planeY = planPos.y + (floor.elevation || 0);
+      planeY = groundY() + (floor.elevation || 0);
       floorId = floor.id;
     }
     const t = (planeY - _ro.y) / _rd.y;
@@ -5857,7 +5885,7 @@ export function setupMR(view, project, getFootprint) {
           let floor = project.activeFloor;
           let z = Math.max(0, pos.y - overlayY());
           if (allFloorsView) {
-            const absoluteZ = Math.max(0, pos.y - planPos.y);
+            const absoluteZ = Math.max(0, pos.y - groundY());
             floor = project.floors.reduce((best, candidate) => {
               const lo = candidate.elevation || 0;
               const hi = lo + (candidate.height || 0);
@@ -5973,7 +6001,7 @@ export function setupMR(view, project, getFootprint) {
           let floor = project.activeFloor;
           let z = Math.max(0, pos.y - overlayY());
           if (allFloorsView) {
-            const absoluteZ = Math.max(0, pos.y - planPos.y);
+            const absoluteZ = Math.max(0, pos.y - groundY());
             floor = project.floors.reduce((best, candidate) => {
               const lo = candidate.elevation || 0, hi = lo + (candidate.height || 0);
               const distance = absoluteZ < lo ? lo - absoluteZ : absoluteZ > hi ? absoluteZ - hi : 0;
@@ -6388,6 +6416,7 @@ export function setupMR(view, project, getFootprint) {
   // hides the numpad via resetDim — re-shows the LEVEL height pad + label if that's the
   // current mode.
   function afterFloorChange() {
+    navLift = 0; // the vertical teleport belongs to ALL FLOORS only
     refreshFloorEditState();
     buildPlan();
     if (!allFloorsView) buildFurniture(); // per-floor furniture; hide in ALL FLOORS
@@ -6430,6 +6459,7 @@ export function setupMR(view, project, getFootprint) {
 
   function placeAt(x, y, z) {
     navOffset.set(0, 0, 0); // a fresh registration/recalibration exits virtual locomotion
+    navLift = 0;
     anchorYaw = 0; // the newly requested anchor has identity orientation in this space
     planPos.set(x, y, z);
     planGroup.visible = true; // may have no zones yet — the origin gizmo is the placeholder
@@ -6484,6 +6514,7 @@ export function setupMR(view, project, getFootprint) {
     anchorYaw = 0;
     floorY = 0;
     navOffset.set(0, 0, 0);
+    navLift = 0;
     refreshFloorEditState(); // seed EDGE target + undo stack from the active floor
     hoverEdge = null;
     edgeHi.visible = false;
@@ -6933,7 +6964,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
-  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false };
+  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false, leftStickY: false };
   const PLAN_YAW_STEP = THREE.MathUtils.degToRad(20); // LEFT stick-x nudges plan yaw in 20° steps
   // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
@@ -7203,6 +7234,16 @@ export function setupMR(view, project, getFootprint) {
     } else if (Math.abs(lx) < 0.3) {
       btn.leftStick = false;
     }
+    // LEFT stick-y in ALL FLOORS: vertical teleport one storey per flick (up = the
+    // storey above). The mode, pen and pending picks are untouched, so a wire can be
+    // started on one storey and finished on another. Inert on single floors.
+    const ly = lgp?.axes[3] ?? 0;
+    if (!btn.leftStickY && Math.abs(ly) > 0.7) {
+      teleportStorey(ly < 0 ? 1 : -1); // xr-standard: pushing up reads negative
+      btn.leftStickY = true;
+    } else if (Math.abs(ly) < 0.3) {
+      btn.leftStickY = false;
+    }
   }
 
   const f2 = (n) => (Number.isFinite(n) ? n.toFixed(3) : '—');
@@ -7393,7 +7434,7 @@ export function setupMR(view, project, getFootprint) {
         // draw-call-bound slowdown from a triangle-bound one.
         `draw:   ${renderer.info.render.calls} calls, ${(renderer.info.render.triangles / 1000).toFixed(1)}k tris`,
         `time:   ${timeText}`,
-        `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
+        `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - groundY())}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
         ...(modeId === 'edit' && roomAreaHud != null ? [`area:   ${roomAreaHud.toFixed(2)} m²`] : []),

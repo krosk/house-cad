@@ -54,7 +54,8 @@ Penning empty space drops a **bare junction**; segments join nodes. A segment wh
 sit on two storeys is a **riser** through the slab. To author one, select `ALL FLOORS` in
 `LEVEL`, return to `MARKER · CONDUIT`, then trigger the two nodes/devices. Aiming down favours your own
 storey and aiming up the storey above; grip cycles outward to farther storeys under the reticle.
-A basement breaker can therefore be wired to an upstairs outlet. The same stacked workspace
+A basement breaker can therefore be wired to an upstairs outlet, either by gripping, or by picking
+the breaker and flicking the LEFT stick up to teleport storeys before picking the outlet. The same stacked workspace
 supports `CONDUIT · EDIT` and `MARKER · WIRE`; other plan and marker editing remains locked.
 
 ## The dependency rules (the part people trip on)

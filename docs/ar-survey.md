@@ -363,6 +363,13 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   (a view/companion transform,
   applied via `applyPlanMatrix`), **not** model geometry — never an editor edit. LEFT grip/other
   controls never invoke editor actions.
+  **LEFT thumbstick-y (ALL FLOORS only)** is a vertical teleport, one storey per flick (up = the
+  storey above; `teleportStorey`). It shifts the whole stack by `navLift` so the target storey's floor
+  lands where "my storey's" floor was, like `navOffset` horizontally. Every world-Y ↔ absolute-Z
+  conversion goes through `groundY()` (= `planPos.y − navLift`), never `planPos.y`. The current mode,
+  pen and pending picks survive, so a wire can be started on one storey and finished on another
+  (owner request, 2026-09-26). `navLift` resets on any LEVEL change and on registration. The stick
+  is inert on single floors, whose overlays stay physically registered.
 - **No physical controller in the editor (RIGHT) role** → the headset is in hand tracking (controllers
   set down). Rather than going blank, a **"Pick up your controllers"** prompt (`handPrompt`,
   `controllers.pickUp` / `controllers.handMode`) shows and the rest of the HUD stays hidden that frame;
@@ -558,7 +565,8 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   storey rather than filtering to it (`pickRanker`). Every storey's devices, nodes, pipes and route
   legs under the reticle are candidates, ranked first by storey distance from the reticle's storey,
   then by the usual plan distance. A riser ranks by the nearer of its two storeys. Grip therefore
-  cycles outward. A first version filtered strictly to the reticle's storey, which made a basement
+  cycles outward. The LEFT stick-y storey teleport (below, controls) moves "my storey" too.
+  A first version filtered strictly to the reticle's storey, which made a basement
   breaker → upstairs outlet wire impossible (owner-reported), so do not reintroduce the filter. The
   earlier ground-datum plane put the reticle a whole storey (or more) away, or behind the ray from
   the basement, so conduit and wire picking became unusable. Flick down in LEVEL to return to
