@@ -69,6 +69,9 @@ const STRINGS = {
   'mode.move_down': { en: 'MOVE DOWN', fr: 'DESCENDRE', zh: '下移' },
   'mode.unit':     { en: 'UNIT',   fr: 'UNITÉ',     zh: '单位' },
   'mode.lang':     { en: 'LANG',   fr: 'LANGUE',   zh: '语言' },
+  'mode.perf':     { en: 'PERF',   fr: 'PERF',     zh: '性能' },
+  'perf.on':       { en: 'ON',     fr: 'ACTIF',    zh: '开' },
+  'perf.off':      { en: 'OFF',    fr: 'INACTIF',  zh: '关' },
 
   // --- plan sheet ------------------------------------------------------------
   'sheet.generated': { en: 'Generated', fr: 'Généré', zh: '生成日期' },
@@ -246,6 +249,11 @@ const STRINGS = {
     en: 'Push the thumbstick up/down to change the display and input unit. Geometry stays unchanged.',
     fr: 'Poussez le joystick haut/bas pour changer l’unité d’affichage et de saisie. La géométrie reste inchangée.',
     zh: '上下推动摇杆以切换显示和输入单位。几何尺寸保持不变。',
+  },
+  'help.perf': {
+    en: 'Trigger to start or stop the performance sweep. Hold a view about 20 s: the info panel lists what each overlay layer costs per frame, in ms. It keeps running in other modes.',
+    fr: 'Gâchette pour lancer ou arrêter la mesure de performance. Gardez une vue environ 20 s : le panneau d’infos indique le coût de chaque calque par image, en ms. Elle continue dans les autres modes.',
+    zh: '扣动扳机开始或停止性能测量。保持视角约 20 秒：信息面板列出每个叠加图层每帧的耗时（毫秒）。切换到其他模式时仍继续运行。',
   },
   'help.lang': {
     en: 'Push the thumbstick up/down to change language. Applies everywhere at once.',

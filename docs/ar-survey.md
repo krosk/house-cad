@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → PIPE
 FURNISH  · FURNISH
-PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG
+PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
 The headset label and help header show the localized `GROUP · TOOL` breadcrumb. Controller
@@ -310,6 +310,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   preference (`house-cad:unit:v1`), not project geometry; all stored coordinates remain meters.
 - **LANG** — UI language switch (see Localization). Thumbstick up/down moves through the list
   (FR/EN/ZH); trigger picks the ray-aimed row, or advances one if the ray is off the panel.
+- **PERF** (`id: perf`) — diagnostic. Trigger starts/stops a GPU layer sweep (`PERF_LAYERS`):
+  each 1.5 s window hides one overlay layer only for that render (between `scene.onBeforeRender`
+  and `onAfterRender`), and the debug HUD lists each layer's cost in ms per frame as
+  (all visible) − (without it). The time source is `EXT_disjoint_timer_query_webgl2` GPU time when
+  exposed (`gpu:`), else the frame interval (`frame:`, quantized by vsync). It keeps running in
+  other modes and is session-only. `?perf` in the URL starts it on; the APK can't pass that,
+  hence the menu toggle.
 
 ## Localization (`src/core/i18n.js`)
 
@@ -662,7 +669,9 @@ world overlays. On the RIGHT editor, stacked above the tip: mode **label**, hove
 `setMode`). The optional LEFT instead carries the enlarged live plan sheet and its own cyan
 teleport reticle; no last-active routing remains.
 
-- **Debug HUD** lines: `build:` stamp, `ptr:` (tip in plan coords + height above floor), `ret:`
+- **Debug HUD** lines: `build:` stamp, `update:`, `fps:` (average + worst frame gap), `draw:`
+  (last frame's `renderer.info` calls/triangles, both eyes: no multiview), `time:` (CPU ms in
+  `onXRFrame` vs `renderer.render`; both small while fps is low means GPU bound), `ptr:` (tip in plan coords + height above floor), `ret:`
   (reticle floor point), `edge:` (length of the highlighted edge, EDGE mode only), `batt:`
   (`navigator.getBattery()`, hidden if unsupported), plus a transient `EXIT:` hold bar. The HUD
   redraw is **throttled to ~2 Hz** (its canvases re-upload on redraw); the EXIT bar bypasses the

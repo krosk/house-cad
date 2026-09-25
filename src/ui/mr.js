@@ -5926,6 +5926,15 @@ export function setupMR(view, project, getFootprint) {
       // ray is off the panel. Applies everywhere via the i18n change bus (onLangChange).
       onTouch: () => (hoverLang ? setLang(hoverLang) : cycleLang(1)),
     },
+    {
+      id: 'perf', color: 0xf472b6, // label/help via i18n: mode.perf / help.perf
+      // Diagnostic: trigger starts/stops the GPU layer sweep (see PERF_LAYERS); its
+      // results replace the lower debug-HUD lines. Session-only, never saved.
+      onTouch: () => {
+        togglePerf();
+        applyModeVisual(modeChildLabel('perf'), modes[currentMode].color);
+      },
+    },
   ];
   // Canonical controller-menu order. Keep the implementation blocks grouped by
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
@@ -5934,7 +5943,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'marker_pipe',
     'furnish',
-    'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang',
+    'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
@@ -5943,6 +5952,7 @@ export function setupMR(view, project, getFootprint) {
     furnish: 'furnish',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
+    perf: 'project',
   };
   // These project tools stay defined and fully functional (SAVE/LOAD can still be
   // driven programmatically) but are removed from the RIGHT thumbstick cycle so the
@@ -5961,6 +5971,7 @@ export function setupMR(view, project, getFootprint) {
   const modeChildLabel = (id) =>
     id === 'level' ? `${t('mode.level')} · ${allFloorsView ? t('mode.all_floors') : project.activeFloor.name}`
     : id === 'unit' ? `${t('mode.unit')} · ${unitLabel()}`
+    : id === 'perf' ? `${t('mode.perf')} · ${t(perfEnabled ? 'perf.on' : 'perf.off')}`
     : t(`mode.${id}`);
   // Mode accents stay fixed; contextual type colors belong to the separate TYPE readout.
   const modeColor = (m) => m.color;
@@ -6202,7 +6213,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   renderer.xr.addEventListener('sessionstart', async () => {
-    perfStart();
+    if (perfEnabled) perfStart();
     const session = renderer.xr.getSession();
 
     // Stash desktop state so we can restore it on exit.
@@ -6260,7 +6271,7 @@ export function setupMR(view, project, getFootprint) {
   });
 
   renderer.xr.addEventListener('sessionend', () => {
-    perfStop();
+    if (perfEnabled) perfStop();
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
     fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; timeText = '—'; // fresh fps probe per session
@@ -6702,13 +6713,14 @@ export function setupMR(view, project, getFootprint) {
   let timeText = '—';
 
   // ---- ?perf diagnostic: what each overlay layer costs the GPU ------------------
-  // Open the app with ?perf (e.g. index.html?perf) and hold a view. The sweep cycles
+  // Toggle it with PROJECT · PERF (trigger), or open the app with ?perf to start it
+  // on, then hold a view. It survives mode switches, so any mode can be measured. The sweep cycles
   // through PERF_LAYERS, hiding one layer per PERF_WINDOW_MS, and the debug HUD lists
   // each layer's cost = (time with everything) − (time without that layer). Time is
   // GPU ms per frame from EXT_disjoint_timer_query_webgl2 when available, else the
   // frame interval. Layers are hidden only between scene.onBeforeRender and
   // onAfterRender, and restored right after, so no editing state is touched.
-  const PERF_MODE = new URLSearchParams(location.search).has('perf');
+  let perfEnabled = new URLSearchParams(location.search).has('perf');
   const PERF_WINDOW_MS = 1500, PERF_SETTLE_MS = 300;
   const PERF_LAYERS = [
     ['all', () => []],
@@ -6775,7 +6787,6 @@ export function setupMR(view, project, getFootprint) {
     }
   }
   function perfStart() {
-    if (!PERF_MODE) return;
     perf.gl = renderer.getContext();
     perf.ext = perf.gl.getExtension('EXT_disjoint_timer_query_webgl2');
     perf.source = perf.ext ? 'gpu' : 'frame';
@@ -6785,11 +6796,17 @@ export function setupMR(view, project, getFootprint) {
     scene.onAfterRender = perfAfterRender;
   }
   function perfStop() {
-    if (!PERF_MODE) return;
+    if (!perf.gl) return;
     scene.onBeforeRender = () => {};
     scene.onAfterRender = () => {};
     for (const { query } of perf.pending) perf.gl.deleteQuery(query);
     perf.pending = [];
+    perf.gl = null;
+  }
+  function togglePerf() {
+    perfEnabled = !perfEnabled;
+    if (perfEnabled) perfStart(); else perfStop();
+    lastHudAt = -Infinity; // show the change on the next frame
   }
   // HUD lines: the running measurement, then each layer's cost vs 'all', two per line.
   function perfHudLines() {
@@ -6978,7 +6995,7 @@ export function setupMR(view, project, getFootprint) {
 
   function onXRFrame(time, frame) {
     currentFrame = frame;
-    if (PERF_MODE) perfFrame(time, fpsPrevTime >= 0 ? time - fpsPrevTime : 0);
+    if (perfEnabled) perfFrame(time, fpsPrevTime >= 0 ? time - fpsPrevTime : 0);
     if (fpsPrevTime >= 0) fpsWorstMs = Math.max(fpsWorstMs, time - fpsPrevTime);
     if (fpsSince < 0) fpsSince = time;
     fpsPrevTime = time;
@@ -7146,7 +7163,7 @@ export function setupMR(view, project, getFootprint) {
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
       // ?perf: keep build/fps/draw and give the rest of the panel to the layer sweep.
-      if (PERF_MODE) {
+      if (perfEnabled) {
         lines.splice(1, 1); // drop update:
         lines.splice(3);    // keep build, fps, draw
         lines.push(...perfHudLines());
