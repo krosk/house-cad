@@ -2711,21 +2711,89 @@ export function setupMR(view, project, getFootprint) {
   // nature. The route comes from src/core/conduit.js
   // (shortest path through the graph, threading the wire's `via` overrides), so it
   // is always live — no stored geometry. An unroutable wire simply draws nothing.
+  // BATCHED like the conduit layer: PROJECT · PERF measured ~24 ms/frame of GPU for
+  // one dashed-ribbon Mesh (own material) per wire leg. Now:
+  //  - `base`: every wire's dashes in one mesh, per-vertex RGBA = type color at 0.5
+  //    (the unrelated-wire look). Static until the next rebuild.
+  //  - `overlay`: only the emphasized wires (selected/hovered yellow, rest of its
+  //    circuit green) at full opacity, drawn above base (renderOrder 17), so the
+  //    highlight wins where wires share a conduit. Rebuilt only when the emphasis
+  //    set changes (styleRoutedWires).
+  // Route legs are cached per wire here too, so floor picking tests what is drawn
+  // instead of re-running every wire's Dijkstra route each frame.
+  let wireBatch = null; // { base, overlay, quads: Map(wireId → Float32 positions), segs: Map, key }
   function buildRoutedWires() {
     for (const child of [...routedWireGroup.children]) {
       routedWireGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
     }
     routedWirePreviewLine = null; // the old preview was among the disposed children
+    const quads = new Map(), segs = new Map();
+    const positions = [], colors = [], index = [];
+    const c = new THREE.Color();
     for (const wire of project.wires || []) {
-      for (const seg of wireRouteSegments(project, wire)) {
+      const legs = wireRouteSegments(project, wire);
+      segs.set(wire.id, legs);
+      const own = [];
+      for (const seg of legs) {
         if (!touchesActiveFloor(seg)) continue; // draw the legs on this floor (incl. riser crossings)
         const ribbon = makeWireRibbon(planLocalZ(seg.a), planLocalZ(seg.b), wireTypeColor(wire));
-        ribbon.userData.routedWireId = wire.id;
-        ribbon.userData.surface = seg.surface;
-        ribbon.userData.baseColor = wireTypeColor(wire);
-        routedWireGroup.add(ribbon);
+        const pos = ribbon.geometry.attributes.position.array;
+        const idx = ribbon.geometry.index.array;
+        // makeWireRibbon emits 4 vertices + 6 indices per dash; flatten to triangles.
+        for (const i of idx) own.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+        ribbon.geometry.dispose(); ribbon.material.dispose();
       }
+      if (!own.length) continue;
+      quads.set(wire.id, own);
+      c.setHex(wireTypeColor(wire));
+      const base = positions.length / 3;
+      for (let v = 0; v < own.length / 3; v++) { colors.push(c.r, c.g, c.b, 0.5); index.push(base + v); }
+      for (const n of own) positions.push(n); // no spread: a long wire can exceed argument limits
     }
+    const wireMaterial = () => new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+    });
+    let baseMesh = null;
+    if (positions.length) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4)); // RGBA → vertexAlphas
+      geometry.setIndex(index);
+      baseMesh = new THREE.Mesh(geometry, wireMaterial());
+      baseMesh.renderOrder = 15; // above the 30 mm conduit ribbon
+      baseMesh.frustumCulled = false;
+      routedWireGroup.add(baseMesh);
+    }
+    const overlay = new THREE.Mesh(new THREE.BufferGeometry(), wireMaterial());
+    overlay.renderOrder = 17;
+    overlay.frustumCulled = false;
+    overlay.visible = false;
+    routedWireGroup.add(overlay);
+    wireBatch = { base: baseMesh, overlay, quads, segs, key: '' };
+  }
+  // Per-frame wire emphasis: [wireId, colorHex] pairs, drawn in order (later on top).
+  // Cheap when unchanged: the overlay geometry is rebuilt only when the list changes.
+  function styleRoutedWires(emphasis) {
+    if (!wireBatch) return;
+    const key = emphasis.map(([id, color]) => `${id}:${color}`).join(',');
+    if (key === wireBatch.key) return;
+    wireBatch.key = key;
+    const { overlay, quads } = wireBatch;
+    const positions = [], colors = [];
+    const c = new THREE.Color();
+    for (const [id, color] of emphasis) {
+      const own = quads.get(id);
+      if (!own) continue;
+      c.setHex(color);
+      for (const n of own) positions.push(n);
+      for (let v = 0; v < own.length / 3; v++) colors.push(c.r, c.g, c.b, 1);
+    }
+    overlay.geometry.dispose();
+    overlay.geometry = new THREE.BufferGeometry();
+    overlay.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    overlay.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+    overlay.visible = positions.length > 0;
   }
 
   // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
@@ -2812,7 +2880,8 @@ export function setupMR(view, project, getFootprint) {
     for (let order = 0; order < project.wires.length; order++) {
       const wire = project.wires[order];
       let bestD = Infinity;
-      for (const seg of wireRouteSegments(project, wire)) {
+      // Cached legs from the last buildRoutedWires (what is drawn); live route as fallback.
+      for (const seg of wireBatch?.segs.get(wire.id) ?? wireRouteSegments(project, wire)) {
         if (!touchesActiveFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
         const d = planPointToSegment(px, py, seg.a, seg.b);
         if (d < bestD) bestD = d;
@@ -7660,17 +7729,15 @@ export function setupMR(view, project, getFootprint) {
       });
       // Keep the individual wire legible inside its circuit: selected/hovered is
       // yellow, other connected wires green, unrelated wires dim in type color.
-      for (const ribbon of routedWireGroup.children) {
-        if (!ribbon.userData.routedWireId) continue; // pending-pair preview owns its own styling
-        const wireId = ribbon.userData.routedWireId;
-        const selected = wireId === selectedRoutedWire?.id;
-        const hovered = !selectedRoutedWire && wireId === hoverRoutedWire?.id;
-        const connected = !!selectedRoutedWire && selectedCircuit.wireIds.has(wireId);
-        ribbon.material.opacity = selected || hovered || connected ? 1 : 0.5;
-        ribbon.material.color.setHex(selected || hovered ? 0xffe14d
-          : connected ? CIRCUIT_CONNECTED_COLOR : ribbon.userData.baseColor);
-        ribbon.renderOrder = selected || hovered ? 17 : connected ? 16 : 15;
+      // Connected (green) first, then the selected/hovered wire (yellow) on top.
+      const emphasis = [];
+      if (selectedRoutedWire) {
+        for (const id of selectedCircuit.wireIds) if (id !== selectedRoutedWire.id) emphasis.push([id, CIRCUIT_CONNECTED_COLOR]);
+        emphasis.push([selectedRoutedWire.id, 0xffe14d]);
+      } else if (hoverRoutedWire) {
+        emphasis.push([hoverRoutedWire.id, 0xffe14d]);
       }
+      styleRoutedWires(emphasis);
       // Live preview for a pending pair: from the first endpoint to the hovered marker
       // (or the tip). No preview once a wire is selected (it draws its derived route).
       if (!routedWirePreviewLine) {
