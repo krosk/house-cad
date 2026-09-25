@@ -474,9 +474,9 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   casement); a half wall is the literal inverse of a door; a sliding door's authored box is the
   **opening**, and its panel is inferred (opening + 10 cm overhang, passed in the caller's units).
 - **Where the band shows up:** door/window `sill`/`head` drive the **desktop/shared 3D viewer**
-  (`src/core/architectural3d.js` cuts them into wall segments) and the AR Z-dim bars. They still reach
+  (`src/core/architectural3d.js` cuts them into wall segments) and the AR Z-dims. They still reach
   **no plan output**: the glyphs, sheet, DXF, and STL/OBJ/GLB export (legacy `extrude.js`) ignore them.
-  In AR itself a band edit only shows in the blue Z-dim bar or by re-selecting (the pad prefills).
+  In AR itself a band edit only shows in the blue Z-dims or by re-selecting (the pad prefills).
   Carving openings into the **exported** mesh is owner-deferred; do not build it unprompted.
 
 ## Vertical authoring (heights)
@@ -505,12 +505,15 @@ on a pad** (`nextDatum`/`datumWord`/`datumSwapLabel`, shared by the marker and n
   pins); **Z is held whenever `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`, in
   `applyMarkerGripDrag` / `applyConduitNodeGripDrag`). Applies to markers, bare nodes, and
   direct-carried conduit nodes; the GLB foot and the furniture-zone `[foot,top]` are pad-only.
-- **Z-dim visual (s28).** Any object with a defined vertical extent shows a static, non-pickable
-  **vertical height dim** — a slim bar plus value label(s) — colored to match that piece's X/Y dims:
-  markers **amber** (`0xff9f43`, floor→z, shown iff `zDatum`), bare conduit nodes **purple**
-  (`0xa78bfa`), apertures **blue** (`0x79c0ff`) spanning `[sill,head]` at the aperture center (zero
-  sill omitted; an open-top kind rises to the storey ceiling). Heights are typed, never dragged, so
-  the dims are display-only. `zDimGroup`/`buildZDims()` are rebuilt inside both `buildMarkers()` and
+- **Z-dim visual.** Any object with a defined height shows a static, non-pickable **vertical height
+  dim drawn exactly like its X/Y dims**: dashed `DIM_T` strips in the shared dim materials
+  (`makeZDimBatch`), dashed ±4.5 cm end ticks, and the standard value label centred on the line. A
+  vertical line has no floor plane, so each dash is a crossed pair of vertical strips (ticks: crossed
+  flat strips) — thin from any side. Styling follows the piece's X/Y pins: markers amber strips +
+  amber label (floor→z, shown iff `zDatum`), bare conduit junctions amber strips + **cyan** label
+  (like `CONDUIT · DIMS` pins; was purple in s28), apertures blue: floor→sill and floor→head as two
+  side-by-side dims 4 cm either side of the centre along the wall (zero sill and open top omitted).
+  Heights are typed, never dragged, so the dims are display-only. `zDimGroup`/`buildZDims()` are rebuilt inside both `buildMarkers()` and
   `buildConduits()`, active floor only (`clearZDims()` runs in `buildAllFloors`). GLB foot is not
   shown yet.
 - **The pads reuse the DIMS numpad's SWAP/DEL cells via overrides.** `numpad.draw(...)` takes optional

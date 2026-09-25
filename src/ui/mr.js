@@ -1028,7 +1028,6 @@ export function setupMR(view, project, getFootprint) {
   // amber, conduit nodes cyan, apertures (door/window/half-wall/…) blue.
   const zDimGroup = new THREE.Group();
   planGroup.add(zDimGroup);
-  const zBarGeom = new THREE.BoxGeometry(0.008, 1, 0.008); // unit-height; scaled per object
   const C_MARKER = 0xff9f43; // outlet accent (orange) when not yet fully pinned
   const markerFloorGeom = new THREE.PlaneGeometry(0.10, 0.10).rotateX(-Math.PI / 2);
 
@@ -1925,73 +1924,99 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // ---- Vertical (Z) dimension visuals (markers). Static, non-pickable: a slim bar from
-  // the floor to the glyph + a value label, for markers with a DEFINED height (zDatum).
-  // Labels reuse the shared dimLabelTexture cache (so clearZDims disposes the per-build
-  // SpriteMaterial but NOT its .map); bars share zBarGeom (never disposed, only scaled).
+  // ---- Vertical (Z) dimension visuals. Static, non-pickable height dims drawn in the
+  // SAME language as the X/Y dims (buildDimensions): dashed DIM_T strips in the shared
+  // dim materials, dashed end ticks, and the standard value label centred on the line.
+  // A vertical line has no floor plane to lie in, so each dash is a crossed pair of
+  // vertical strips (and each tick a crossed pair of flat ones) — thin from any side.
+  // Materials and label textures are shared: clearZDims disposes only per-build
+  // geometry and SpriteMaterials, never the shared dim materials or dimTexCache maps.
   function clearZDims() {
     for (const child of [...zDimGroup.children]) {
       zDimGroup.remove(child);
-      child.material?.dispose(); // per-build bar material / sprite material
-      // geometry: bars share zBarGeom; labels are sprites — neither is per-build
-      // .map: labels point at the shared dimLabelTexture cache — never dispose here
+      if (child.isSprite) child.material.dispose();
+      else child.geometry?.dispose();
     }
   }
-  // A slim vertical bar between two heights (lo→hi) at a plan point, in the piece's color.
-  function addZBar(x, y, lo, hi, colorHex) {
-    const h = hi - lo;
-    if (!(h > 1e-4)) return;
-    const bar = new THREE.Mesh(zBarGeom, new THREE.MeshBasicMaterial({
-      color: colorHex, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }));
-    bar.scale.y = h;
-    bar.position.set(x, lo + h / 2, -y);
-    bar.renderOrder = 17;
-    zDimGroup.add(bar);
-  }
-  // A value label at a given height, offset in +x so it clears the bar.
-  function addZLabel(x, y, atH, value, colorCss) {
-    const tex = dimLabelTexture(`${fmt(value)} ${unitLabel()}`, colorCss);
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-    label.scale.set(0.16, 0.04, 1);
-    label.position.set(x + 0.055, atH, -y);
-    label.renderOrder = 34;
-    zDimGroup.add(label);
-  }
-  // Single-height dim (marker / node): bar floor→z, one label at mid-height. colorHex/
-  // colorCss = the marked piece's own dim color (amber marker / cyan conduit).
-  function addZDim(x, y, z, colorHex, colorCss) {
-    if (!(z > 1e-4)) return; // nothing to show for an object sitting on the floor
-    addZBar(x, y, 0, z, colorHex);
-    addZLabel(x, y, z / 2, z, colorCss);
+  // Collects one merged geometry per material, like buildDimensions' strip batches.
+  function makeZDimBatch() {
+    const byMat = new Map();
+    const quad = (mat, p0, p1, p2, p3) => {
+      const arr = byMat.get(mat) ?? byMat.set(mat, []).get(mat);
+      for (const q of [p0, p1, p2, p0, p2, p3]) arr.push(q[0], q[2], -q[1]); // plan (x,y,z) → local (x,z,-y)
+    };
+    // Dashed pattern along a 3D segment; `across` = the unit plan directions to thicken in.
+    const dashed = (mat, a, b, across) => {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      if (len < 1e-6) return;
+      const u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len, (b[2] - a[2]) / len];
+      for (let t = 0; t < len; t += DIM_DASH + DIM_GAP) {
+        const t2 = Math.min(t + DIM_DASH, len);
+        const p = [a[0] + u[0] * t, a[1] + u[1] * t, a[2] + u[2] * t];
+        const q = [a[0] + u[0] * t2, a[1] + u[1] * t2, a[2] + u[2] * t2];
+        for (const w of across) {
+          const o = [w[0] * DIM_T, w[1] * DIM_T, w[2] * DIM_T];
+          quad(mat, [p[0] - o[0], p[1] - o[1], p[2] - o[2]], [q[0] - o[0], q[1] - o[1], q[2] - o[2]],
+            [q[0] + o[0], q[1] + o[1], q[2] + o[2]], [p[0] + o[0], p[1] + o[1], p[2] + o[2]]);
+        }
+      }
+    };
+    return {
+      // One vertical dim at plan (x, y) from height lo to hi, with ticks at both ends
+      // and the value label centred on the line.
+      add(x, y, lo, hi, value, mat, colorCss) {
+        if (!(hi - lo > 1e-4)) return;
+        const tick = 0.045; // same half-length as the X/Y pin ticks
+        dashed(mat, [x, y, lo], [x, y, hi], [[1, 0, 0], [0, 1, 0]]);
+        for (const h of [lo, hi]) {
+          dashed(mat, [x - tick, y, h], [x + tick, y, h], [[0, 1, 0], [0, 0, 1]]);
+          dashed(mat, [x, y - tick, h], [x, y + tick, h], [[1, 0, 0], [0, 0, 1]]);
+        }
+        const label = makeDimLabel(`${fmt(value)} ${unitLabel()}`, colorCss, x, y);
+        label.position.y = (lo + hi) / 2;
+        label.renderOrder = 34;
+        zDimGroup.add(label);
+      },
+      flush() {
+        for (const [mat, arr] of byMat) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.renderOrder = 17;
+          zDimGroup.add(mesh);
+        }
+      },
+    };
   }
   function buildZDims() {
     clearZDims();
-    // Markers → amber (their X/Y pin dims are amber).
+    const batch = makeZDimBatch();
+    // Markers and bare conduit junctions use their X/Y pin styling: amber pin strips,
+    // with an amber (marker) or cyan (conduit) label — see buildDimensions.
     for (const m of project.activeFloor.markers || []) {
-      if (m.zDatum) addZDim(m.x, m.y, m.z || 0, 0xff9f43, '#ff9f43');
+      if (m.zDatum && (m.z || 0) > 1e-4) batch.add(m.x, m.y, 0, m.z, m.z, markerDimMat, '#ff9f43');
     }
-    // Bare conduit junctions on the active floor → purple (distinct from amber markers).
     // Marker-bound nodes follow their device and are never dimensioned.
     for (const n of project.conduitNodes || []) {
-      if (n.markerId || !n.zDatum) continue;
+      if (n.markerId || !n.zDatum || !((n.z || 0) > 1e-4)) continue;
       if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
-      addZDim(n.x, n.y, n.z || 0, 0xa78bfa, '#a78bfa');
+      batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
     }
-    // Apertures (door/garage/window/half-wall/heater/sliding) → blue (their structural dims are
-    // blue), spanning the [sill,head] band at the aperture's center. An open-top kind
-    // (head:null, e.g. half-wall) rises to the storey ceiling; a zero sill (door/garage/sliding)
-    // omits its label. Always shown — every aperture carries a band (unlike opt-in heights).
-    const ceiling = project.activeFloor.height || 0;
+    // Apertures (door/garage/window/half-wall/heater/sliding) use the blue structural dim
+    // styling: floor→sill and floor→head as two side-by-side dims, offset along the
+    // aperture's wall axis. A zero sill and an open top (head:null) are omitted.
     for (const r of project.activeFloor.rectangles || []) {
       if (!isAperture(r.kind)) continue;
-      const lo = r.sill || 0;
-      const hi = r.head == null ? ceiling : r.head;
-      if (!(hi > lo + 1e-4)) continue;
-      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-      addZBar(cx, cy, lo, hi, 0x79c0ff);
-      if (lo > 1e-4) addZLabel(cx, cy, lo, lo, '#79c0ff');        // sill (omit a zero sill)
-      if (r.head != null) addZLabel(cx, cy, hi, r.head, '#79c0ff'); // head (omit an open top)
+      const b = r.bounds;
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+      const alongX = b.x1 - b.x0 >= b.y1 - b.y0;
+      const off = 0.04; // each dim sits 4 cm either side of the centre, along the wall
+      const [dx, dy] = alongX ? [off, 0] : [0, off];
+      const sill = r.sill || 0;
+      if (sill > 1e-4) batch.add(cx - dx, cy - dy, 0, sill, sill, dimMat, '#79c0ff');
+      if (r.head != null && r.head > 1e-4) batch.add(cx + dx, cy + dy, 0, r.head, r.head, dimMat, '#79c0ff');
     }
+    batch.flush();
   }
 
   // Rebuild the editable active floor's marker layer.

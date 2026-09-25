@@ -138,7 +138,7 @@ Read `docs/product-intent.md` before planning AR work.
 ## Findings / traps worth knowing
 
 - **`mr.js` does NOT subscribe to `project.onChange`.** Any model change in AR must call the right
-  rebuild by hand (`buildPlan()`, `buildConduits()`, …). Z-dim bars refresh inside `buildMarkers` +
+  rebuild by hand (`buildPlan()`, `buildConduits()`, …). Z-dims refresh inside `buildMarkers` +
   `buildConduits`. Aperture glyphs live in `planGroup` and need `buildPlan()`.
 - **The desktop `Sketch2D` stays live during AR.** Every `project.constraints` consumer must tolerate
   `{marker}`/`{node}` endpoints (no `.rect`) and the origin; a throw in any `onChange` listener aborts
@@ -212,7 +212,7 @@ exist; see `packaging/quest-apk.md` and don't re-init.
   **hypothesis**: the checklist wasn't updated. Newest first: plumbing (`MARKER · PIPE`); wire types +
   circuit highlight; grip-cycle/trigger-commit selection in every mode; cross-floor conduit from ALL
   FLOORS; startup placement + relocalization; RECAL composite corners/direction; left-grip sheet;
-  `link`/`qr` export (Web Share from immersive; scan → read-only 3D view); Z-dim bars; height pads
+  `link`/`qr` export (Web Share from immersive; scan → read-only 3D view); Z-dims (now drawn like X/Y dims); height pads
   (free↔floor, Z grab-lock); band pad; aperture rotate. Then older: the s23 input rework, conduit
   ribbons/dims, LEVEL, the MARKER lanes.
 - **B — Plumbing follow-ups** (only on request; list in `docs/plumbing-workflow.md`): diameters,
@@ -236,7 +236,7 @@ exist; see `packaging/quest-apk.md` and don't re-init.
   code is the only source.
 - **Shared-link decode on real phones** (needs `DecompressionStream`) and **Web Share of the QR from
   immersive** are unverified.
-- **Guessed tunings, unwalked:** Z-dim bar scale; conduit ribbon width and node discs;
+- **Guessed tunings, unwalked:** Z-dim crossed-strip look; conduit ribbon width and node discs;
   `WAYPOINT_GRAB_M` (0.14 m); left-stick 20° per flick; heater default band (`0`/`0.6`); furniture zone
   band (`0`/`0.9`); aperture glyph sizes; startup floor estimate (1.50 m below the camera).
 - **The 3D wall fix (`f457bd5`) is Node-verified only** — confirm doors/windows from both faces in
