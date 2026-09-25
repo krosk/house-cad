@@ -187,9 +187,9 @@ const STRINGS = {
   'furnish.selected': { en: 'Rotate · move · delete', fr: 'Pivoter · déplacer · supprimer', zh: '旋转 · 移动 · 删除' },
   'furnish.none':     { en: 'No furniture in catalog', fr: 'Aucun meuble au catalogue', zh: '目录中无家具' },
   'help.recal': {
-    en: 'Fix drift. Aim the pointer reticle so wall 1 highlights and trigger to pick its corner, then touch 2 points on wall 1 and 1 on wall 2.',
-    fr: 'Corrige la dérive. Visez avec le réticule jusqu’à surligner le mur 1, gâchette pour choisir son coin, puis 2 points sur le mur 1 et 1 sur le mur 2.',
-    zh: '修正漂移。用指针准星瞄准至墙1高亮，扣动扳机选择墙角，然后在墙1上触碰2个点、在墙2上触碰1个点。',
+    en: 'Fix drift. Pick the corner and wall 1, then touch 1 farther away and 2 toward the corner on wall 1; touch 3 on wall 2.',
+    fr: 'Corrige la dérive. Choisissez le coin et le mur 1, puis touchez 1 au plus loin et 2 vers le coin sur le mur 1 ; touchez 3 sur le mur 2.',
+    zh: '修正漂移。选择墙角和墙1，然后在墙1上先触碰远处的点1，再向墙角触碰点2；最后在墙2上触碰点3。',
   },
   'help.plan_dims': {
     en: 'Plan dimensions only. Pick two compatible edges, or an edge and the origin, then type the distance. Marker icons are inert.',
@@ -250,8 +250,9 @@ const STRINGS = {
   // --- transient mode labels --------------------------------------------------
   'lbl.wall2':   { en: 'WALL 2', fr: 'MUR 2', zh: '墙2' },
   'lbl.perp':    { en: 'PERP',   fr: 'PERP',  zh: '垂直墙' },
-  'lbl.wall1p1': { en: 'WALL 1 · P1', fr: 'MUR 1 · P1', zh: '墙1 · P1' },
-  'lbl.wall1p2': { en: 'WALL 1 · P2', fr: 'MUR 1 · P2', zh: '墙1 · P2' },
+  'lbl.recalP1': { en: '1 · FARTHER ON WALL 1', fr: '1 · PLUS LOIN SUR MUR 1', zh: '1 · 墙1远处' },
+  'lbl.recalP2': { en: '2 · TOWARD CORNER', fr: '2 · VERS LE COIN', zh: '2 · 朝墙角' },
+  'lbl.recalP3': { en: '3 · ON WALL 2', fr: '3 · SUR MUR 2', zh: '3 · 墙2上' },
   'lbl.snap':    { en: 'SNAP TO WALL', fr: 'ALIGNER AU MUR', zh: '贴到墙面' },
 
   // --- numpad keys ------------------------------------------------------------

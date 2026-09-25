@@ -848,7 +848,7 @@ export function setupMR(view, project, getFootprint) {
       ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2); ctx.fill();
       ctx.lineWidth = 9; ctx.strokeStyle = color; ctx.stroke();
       ctx.fillStyle = color;
-      ctx.font = 'bold 82px sans-serif';
+      ctx.font = `bold ${String(txt).length > 1 ? 58 : 82}px sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(txt, 64, 72);
       tex.needsUpdate = true;
@@ -857,8 +857,8 @@ export function setupMR(view, project, getFootprint) {
     return { sprite, setText };
   }
   const C_WALL1 = '#22d3ee', C_WALL2 = '#a78bfa'; // RECAL wall-1 (cyan) / wall-2 (purple)
-  const recalBadge1 = makeBadge(); recalBadge1.setText('1', C_WALL1); // rides wall 1
-  const recalBadge2 = makeBadge(); recalBadge2.setText('2', C_WALL2); // rides wall 2
+  const recalBadge1 = makeBadge(); recalBadge1.setText('W1', C_WALL1); // rides wall 1
+  const recalBadge2 = makeBadge(); recalBadge2.setText('W2', C_WALL2); // rides wall 2
   const recalStep = makeBadge();                                      // rides the reticle (current step)
 
   // Whole-zone outline highlight for PLAN mode (the room/wall under your ray). All
@@ -3166,18 +3166,12 @@ export function setupMR(view, project, getFootprint) {
   function recalibrate(corner, Wc, wdx, wdz) {
     const wlen = Math.hypot(wdx, wdz);
     const wx = wdx / wlen, wz = wdz / wlen;
-    // Pick the plan axis whose CURRENT world direction best matches the touch, so
-    // recal makes the small intended rotation (not a 90° flip to another edge).
-    const currentWorldYaw = anchorYaw + planYaw;
-    const c0 = Math.cos(currentWorldYaw), s0 = Math.sin(currentWorldYaw);
-    let Pdx = 1, Pdy = 0, best = -Infinity;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const ex = dx * c0 - dy * s0;   // Ry(yaw)·(dx,0,-dy), horizontal x
-      const ez = -dx * s0 - dy * c0;  // ... horizontal z
-      const dot = ex * wx + ez * wz;
-      if (dot > best) { best = dot; Pdx = dx; Pdy = dy; }
-    }
-    // yaw so plan dir (Pdx,Pdy) maps to world (wx,wz).
+    // P1 -> P2 is explicitly INWARD toward the corner. Map the selected plan
+    // wall's matching endpoint -> corner ray onto that directed physical vector.
+    // Unlike the old +/-X/+/-Y guess, this has one solution and deliberately makes
+    // reversed samples produce the reversed orientation.
+    const Pdx = corner.cx - corner.a.x;
+    const Pdy = corner.cy - corner.a.y;
     const yaw1 = Math.atan2(-wz, wx) - Math.atan2(Pdy, Pdx);
     planYaw = yaw1;
     // planPos so the plan corner maps to the touched world corner.
@@ -5341,14 +5335,14 @@ export function setupMR(view, project, getFootprint) {
           recalCorner = orderWallsByReticle(near, px, py); // a = wall 1 (hugged wall), b = wall 2
           recalLocked = true;
           recalPts = [];
-          applyModeVisual(t('lbl.wall1p1'), C_RECAL);
+          applyModeVisual(t('lbl.recalP1'), C_RECAL);
           rlog('recal corner', { cx: +recalCorner.cx.toFixed(3), cy: +recalCorner.cy.toFixed(3) });
           return;
         }
         const n = recalPts.length;
         if (n === 0) {
           recalPts.push({ x: pos.x, z: pos.z }); // P1 along wall 1
-          applyModeVisual(t('lbl.wall1p2'), C_RECAL);
+          applyModeVisual(t('lbl.recalP2'), C_RECAL);
           rlog('recal p1', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
           return;
         }
@@ -5356,7 +5350,7 @@ export function setupMR(view, project, getFootprint) {
           const p1 = recalPts[0];
           if (Math.hypot(pos.x - p1.x, pos.z - p1.z) < 0.05) return; // too close to define wall 1
           recalPts.push({ x: pos.x, z: pos.z }); // P2 along wall 1
-          applyModeVisual(t('lbl.wall2'), C_RECAL_DIR);
+          applyModeVisual(t('lbl.recalP3'), C_RECAL_DIR);
           rlog('recal p2', { x: +pos.x.toFixed(3), z: +pos.z.toFixed(3) });
           return;
         }
@@ -6125,7 +6119,7 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'recal' && (recalPts.length || recalLocked)) { // back out RECAL step by step
       if (recalPts.length) {
         recalPts.pop(); // undo a wall touch; corner stays selected
-        applyModeVisual(recalPts.length === 0 ? t('lbl.wall1p1') : t('lbl.wall1p2'), C_RECAL);
+        applyModeVisual(recalPts.length === 0 ? t('lbl.recalP1') : t('lbl.recalP2'), C_RECAL);
       } else {
         recalLocked = false; recalCorner = null; // deselect the corner
         applyModeVisual(t('mode.recal'), C_RECAL);
@@ -6612,11 +6606,11 @@ export function setupMR(view, project, getFootprint) {
           const activeWall = recalLocked && recalPts.length === 2 ? c.b : c.a;
           showPlanEdge(c.cx, c.cy, activeWall.x, activeWall.y, C_RECAL);
         }
-        // Reticle step badge only after the corner is selected: "1" while on wall 1
-        // (0-1 touches), "2" once on wall 2. During SELECT the wall badges already lead.
+        // Reticle badge names each physical sample: 1 farther on wall 1, 2 inward
+        // toward the corner, then 3 on wall 2. Wall identity uses W1/W2 badges.
         if (recalLocked && reticle.visible && c) {
-          const step = recalPts.length === 2 ? 2 : 1;
-          if (step !== prevRecalStep) { recalStep.setText(String(step), step === 2 ? C_WALL2 : C_WALL1); prevRecalStep = step; }
+          const step = recalPts.length + 1;
+          if (step !== prevRecalStep) { recalStep.setText(String(step), step === 3 ? C_WALL2 : C_WALL1); prevRecalStep = step; }
           recalStep.sprite.position.set(reticle.position.x, reticle.position.y + 0.05, reticle.position.z);
           recalStep.sprite.visible = true;
         }

@@ -38,9 +38,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## SETUP · RECAL (`recal`)  ✅ session 14 — the reticle you asked about
 - [x] SELECT phase: reticle rides the **pointer/ray floor point** (not the tip)
 - [x] Nearest corner previews under the pointer; aim biases which wall is "1"
-- [x] Nearer wall = **1 (cyan)**, other = **2 (purple)**; active wall gets the edge highlight
+- [ ] Nearer wall = **W1 (cyan)**, other = **W2 (purple)**; active wall gets the edge highlight
 - [x] Trigger locks the corner + wall order
-- [x] Then P1,P2 along real wall 1, P3 on real wall 2
+- [ ] Then P1 farther along real wall 1, P2 inward toward the corner, P3 on real wall 2
+- [ ] Reticle samples are labelled 1, 2, 3; reversing P1/P2 deliberately reverses orientation
 - [x] Geometry lands on the touches — both rotational AND positional drift corrected
 - [x] Grip backs out a point / deselects the corner
 - [x] Reticle step badge shows "1" on wall 1, "2" on wall 2 after lock

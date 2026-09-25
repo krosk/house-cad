@@ -213,9 +213,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `emit:false`, committed once via `touch()`; the foot elevation `y` is preserved). **B/Y deletes** the
   selected item. Detail: `docs/furniture-handoff.md`.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
-  pointer reticle (aim so it hugs the wall you want as "1"; nearer wall = 1 cyan, other = 2 purple;
+  pointer reticle (aim so it hugs the wall you want as wall 1; W1 is cyan, W2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
-  → P1,P2 along real wall 1 → P3 on real wall 2. Corrects both rotational + positional drift.
+  → P1 farther along real wall 1 → P2 inward toward the corner → P3 on real wall 2. The directed
+  P1→P2 vector maps the selected wall's endpoint→corner ray, giving one unique orientation.
+  Corrects both rotational + positional drift.
 - **SAVE / LOAD** — ray-aimed 6-slot menu; the unit is the whole multi-floor project. Empty SAVE
   slots write immediately. Selecting an occupied slot replaces the slot grid with a confirmation
   screen containing separate **CONFIRM OVERWRITE** and **CANCEL** buttons; the original slot is no
