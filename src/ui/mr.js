@@ -36,6 +36,7 @@ import {
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
+import { deriveCircuits } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
@@ -1885,9 +1886,9 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // Add one floor's marker glyphs in planGroup-local coordinates. The editable
-  // active floor gets selection outlines; stacked overview markers are deliberately
-  // inert and therefore omit them.
+  // Add one floor's marker glyphs in planGroup-local coordinates. Outlines are
+  // visual-only: stacked overview markers remain inert even when WIRE uses their
+  // outlines to reveal a whole-house circuit.
   function addFloorMarkers(floor, elevation = 0, withOutlines = true) {
     for (const m of floor.markers) {
       const spr = makeMarkerSprite(m);
@@ -1992,6 +1993,7 @@ export function setupMR(view, project, getFootprint) {
   // inferred routing metadata, but does not recolor either layer in AR.
   const CONDUIT_COLOR = 0xa78bfa;
   const CONDUIT_NODE_COLOR = 0xffffff;
+  const CIRCUIT_CONNECTED_COLOR = 0x4ade80;
   const WIRE_TYPE_COLOR = { electrical: 0xf59e0b, ethernet: 0x38bdf8 };
   const wireTypeColor = (wire) => WIRE_TYPE_COLOR[wire?.type] || WIRE_TYPE_COLOR.electrical;
 
@@ -2389,6 +2391,21 @@ export function setupMR(view, project, getFootprint) {
     return candidates[(current + 1) % candidates.length].wire;
   }
 
+  // Every device in the connected wire component containing `wire`, whether the
+  // component is a valid breaker-owned circuit, an unfinished unassigned run, or
+  // an illegal multi-breaker conflict. Circuit inspection must remain useful while
+  // a survey is incomplete, so it intentionally covers all three classifications.
+  function wireComponent(wire) {
+    if (!wire) return { markerIds: new Set(), wireIds: new Set() };
+    const derived = deriveCircuits(project);
+    const components = [...derived.circuits, ...derived.conflicts, ...derived.unassigned];
+    const component = components.find((candidate) => candidate.wireIds.includes(wire.id));
+    return {
+      markerIds: new Set(component?.deviceIds || [wire.fromMarkerId, wire.toMarkerId]),
+      wireIds: new Set(component?.wireIds || [wire.id]),
+    };
+  }
+
   // ---- Cross-floor authoring targets (risers + cross-floor wires) --------------
   // The floors immediately above and below the active one (its stack neighbors).
   function adjacentFloors() {
@@ -2451,17 +2468,20 @@ export function setupMR(view, project, getFootprint) {
 
   // Recolor adjacent-floor target dots each frame: the hovered one reads yellow + enlarged
   // (it will close a riser / cross-floor wire), the rest stay dim slate.
-  function highlightAdjacentTargets() {
+  function highlightAdjacentTargets(selectedCircuit = null) {
     const selectedEndpointIds = selectedRoutedWire
       ? new Set([selectedRoutedWire.fromMarkerId, selectedRoutedWire.toMarkerId]) : null;
     for (const child of adjacentGroup.children) {
       const a = child.userData.adjacent;
       if (!a) continue;
       const hot = hoverAdjacent && hoverAdjacent.kind === a.kind && hoverAdjacent.id === a.id;
-      const endpoint = a.kind === 'marker'
-        && (selectedEndpointIds?.has(a.id) || wireFromMarker?.id === a.id);
-      child.material.color.setHex(hot || endpoint ? 0xffe14d : 0x64748b);
-      child.scale.setScalar(hot || endpoint ? 1.6 : 1);
+      const directEndpoint = a.kind === 'marker' && selectedEndpointIds?.has(a.id);
+      const circuitMember = a.kind === 'marker' && selectedCircuit?.markerIds.has(a.id);
+      const pendingEndpoint = a.kind === 'marker' && wireFromMarker?.id === a.id;
+      const emphasized = hot || directEndpoint || circuitMember || pendingEndpoint;
+      child.material.color.setHex(hot || directEndpoint || pendingEndpoint ? 0xffe14d
+        : circuitMember ? CIRCUIT_CONNECTED_COLOR : 0x64748b);
+      child.scale.setScalar(emphasized ? 1.6 : 1);
     }
   }
 
@@ -2486,7 +2506,7 @@ export function setupMR(view, project, getFootprint) {
       addApertureGlyphs(floor, elevation);
       addFloorStrips(floor, elevation);
       if (withDims) buildDimensions(floor, elevation, false);
-      if (withDims) addFloorMarkers(floor, elevation, false);
+      if (withDims) addFloorMarkers(floor, elevation, true);
     }
     // Whole-house topology is rendered by conduitGroup/routedWireGroup in the
     // corresponding interactive ALL FLOORS tools, avoiding a duplicate inert copy.
@@ -6862,7 +6882,8 @@ export function setupMR(view, project, getFootprint) {
       } else {
         reticle.visible = false;
       }
-      highlightAdjacentTargets();
+      const selectedCircuit = wireComponent(selectedRoutedWire);
+      highlightAdjacentTargets(selectedCircuit);
       // Show conduit nodes as white context; hovered target yellow, existing vias cyan.
       for (const child of conduitGroup.children) {
         const id = child.userData.conduitNodeId;
@@ -6872,13 +6893,18 @@ export function setupMR(view, project, getFootprint) {
         child.material.color.setHex(color);
         child.scale.setScalar(id === hoverConduitNode?.id ? 1.5 : 1);
       }
-      // Brighten the selected (or hovered-for-select) wire above the rest.
+      // Keep the individual wire legible inside its circuit: selected/hovered is
+      // yellow, other connected wires green, unrelated wires dim in type color.
       for (const ribbon of routedWireGroup.children) {
         if (!ribbon.userData.routedWireId) continue; // pending-pair preview owns its own styling
-        const active = ribbon.userData.routedWireId === (selectedRoutedWire?.id || hoverRoutedWire?.id);
-        ribbon.material.opacity = active ? 1 : 0.5;
-        ribbon.material.color.setHex(active ? 0xffe14d : ribbon.userData.baseColor);
-        ribbon.renderOrder = active ? 17 : 15;
+        const wireId = ribbon.userData.routedWireId;
+        const selected = wireId === selectedRoutedWire?.id;
+        const hovered = !selectedRoutedWire && wireId === hoverRoutedWire?.id;
+        const connected = !!selectedRoutedWire && selectedCircuit.wireIds.has(wireId);
+        ribbon.material.opacity = selected || hovered || connected ? 1 : 0.5;
+        ribbon.material.color.setHex(selected || hovered ? 0xffe14d
+          : connected ? CIRCUIT_CONNECTED_COLOR : ribbon.userData.baseColor);
+        ribbon.renderOrder = selected || hovered ? 17 : connected ? 16 : 15;
       }
       // Live preview for a pending pair: from the first endpoint to the hovered marker
       // (or the tip). No preview once a wire is selected (it draws its derived route).
@@ -6924,6 +6950,11 @@ export function setupMR(view, project, getFootprint) {
       outlineMarker(wireFromMarker, 'floor', wireTypeColor({ type: currentWireType }));
       outlineMarker(wireFromMarker, 'wall', wireTypeColor({ type: currentWireType }));
       if (selectedRoutedWire) {
+        for (const markerId of selectedCircuit.markerIds) {
+          const endpoint = project.findMarker(markerId)?.marker;
+          outlineMarker(endpoint, 'floor', CIRCUIT_CONNECTED_COLOR);
+          outlineMarker(endpoint, 'wall', CIRCUIT_CONNECTED_COLOR);
+        }
         for (const markerId of [selectedRoutedWire.fromMarkerId, selectedRoutedWire.toMarkerId]) {
           const endpoint = project.findMarker(markerId)?.marker;
           outlineMarker(endpoint, 'floor', 0xffe14d);

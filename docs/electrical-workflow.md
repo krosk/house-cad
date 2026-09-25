@@ -109,6 +109,12 @@ breaker marker; membership is **derived, never stored**. Control links are delib
 `deriveCircuits(project)` returns `{ circuits, conflicts, unassigned, deviceCircuit,
 wireCircuit, circuitColor }`. It is pure and recomputed like wire routes.
 
+In AR `MARKER · WIRE`, selecting any existing wire keeps that wire and its direct endpoints
+yellow, while every other wire and marker in its connected component turns green. Unrelated
+wires remain dim in their normal type color. This inspection works for a normal breaker-owned
+circuit, an unfinished unassigned component, and a multi-breaker conflict; it does not modify
+or store membership. In `ALL FLOORS`, every member glyph is outlined at its true elevation.
+
 ## Status (as of this writing)
 
 - Conduit network, wires, routing, risers, wall-pinned junctions: **implemented**
@@ -116,6 +122,7 @@ wireCircuit, circuitColor }`. It is pure and recomputed like wire routes.
   `docs/ar-survey.md` and `.claude/handoff.md`).
 - `breaker` marker type + `number`/`rating`/`poles` persistence, and `circuits.js`
   derivation: **implemented** as model helpers.
+- Selected-wire circuit membership highlighting in AR: **implemented**.
 - **Not yet done** (deliberately deferred): surfacing circuits in any output (the print
   sheet stays as-is), per-circuit coloring/numbering/schedule, conflict warnings in the UI,
   AR editing of breaker `number`/`rating`, and tying a breaker to a `panel` enclosure
