@@ -2368,6 +2368,12 @@ export function setupMR(view, project, getFootprint) {
   // A segment/wire-leg belongs to the active-floor view if either end is on it.
   const touchesActiveFloor = (s) => allFloorsView
     || s.aFloorId === project.activeFloorId || s.bFloorId === project.activeFloorId;
+  // Picking scope. ALL FLOORS draws the whole house but picks only on the storey whose
+  // floor the reticle lies on (see allFloorsReticleFloor); a riser touches both.
+  let reticleFloorId = null;
+  const pickFloorId = () => (allFloorsView ? reticleFloorId : project.activeFloorId);
+  const pickFloor = () => project.floors.find((f) => f.id === pickFloorId()) || null;
+  const touchesPickFloor = (s) => s.aFloorId === pickFloorId() || s.bFloorId === pickFloorId();
 
   const conduitNodeGeom = new THREE.SphereGeometry(0.022, 12, 12);
   // Flat disc laid on the floor at a node's plan projection — the real aim target for
@@ -2520,12 +2526,12 @@ export function setupMR(view, project, getFootprint) {
     return target.copy(conduitBatch.nodePos[i].sphere).applyMatrix4(conduitGroup.matrixWorld);
   }
 
-  // Nearest eligible conduit node under the reticle, by plan projection. ALL FLOORS
-  // exposes the whole vertical stack; normal views remain scoped to the active floor.
+  // Nearest eligible conduit node under the reticle, by plan projection, scoped to
+  // the pick storey (the active floor, or in ALL FLOORS the reticle's storey).
   function conduitNodeAtFloorPoint(px, py) {
     let best = null, bestD = RETICLE_OUTER;
     for (const node of project.conduitNodes) {
-      if (!allFloorsView && project.conduitNodeFloorId(node) !== project.activeFloorId) continue;
+      if (project.conduitNodeFloorId(node) !== pickFloorId()) continue;
       const p = conduitNodePos(project, node);
       const d = Math.hypot(px - p.x, py - p.y);
       if (d < bestD) { bestD = d; best = node; }
@@ -2539,7 +2545,7 @@ export function setupMR(view, project, getFootprint) {
   // commits only the currently highlighted target.
   function conduitTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
-    const targetFloors = allFloorsView ? project.floors : [project.activeFloor];
+    const targetFloors = [pickFloor()].filter(Boolean);
     targetFloors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
         const distance = Math.hypot(px - marker.x, py - marker.y);
         if (distance <= RETICLE_OUTER) candidates.push({
@@ -2549,7 +2555,7 @@ export function setupMR(view, project, getFootprint) {
       }));
     project.conduitNodes.forEach((node, order) => {
       const floorId = project.conduitNodeFloorId(node);
-      if (!allFloorsView && floorId !== project.activeFloorId) return;
+      if (floorId !== pickFloorId()) return;
       // A marker-bound node is the same physical endpoint as its marker; presenting
       // both would waste a cycle step without changing the pen target.
       if (node.markerId && project.findMarker(node.markerId)?.floor?.id === floorId) return;
@@ -2564,7 +2570,7 @@ export function setupMR(view, project, getFootprint) {
     // splits it into a T-junction. Skipped near a run's ends (target that node
     // instead) and for runs already attached to the pen node.
     conduitNetworkSegments(project).forEach((seg, order) => {
-      if (!touchesActiveFloor(seg)) return;
+      if (!touchesPickFloor(seg)) return;
       const source = project.conduitSegments.find((s) => s.id === seg.id);
       if (penNodeId && source && (source.a === penNodeId || source.b === penNodeId)) return;
       const distance = planPointToSegment(px, py, seg.a, seg.b);
@@ -2596,7 +2602,7 @@ export function setupMR(view, project, getFootprint) {
     const zLo = Math.min(seg.a.z || 0, seg.b.z || 0), zHi = Math.max(seg.a.z || 0, seg.b.z || 0);
     let x, y, worldZ;
     if (len2 < 1e-6) {
-      const tip = tipPosition(editCtl);
+      const tip = tipPosition(frameEditCtl);
       if (!tip) return null;
       worldZ = Math.max(zLo, Math.min(zHi, tip.y - planPos.y));
       if (worldZ - zLo < RETICLE_OUTER || zHi - worldZ < RETICLE_OUTER) return null;
@@ -2664,7 +2670,7 @@ export function setupMR(view, project, getFootprint) {
   function conduitEditTargetAtFloorPoint(px, py, currentKey = null, cycleAfterKey = null) {
     const candidates = [];
     project.conduitNodes.forEach((node, order) => {
-      if (!allFloorsView && project.conduitNodeFloorId(node) !== project.activeFloorId) return;
+      if (project.conduitNodeFloorId(node) !== pickFloorId()) return;
       const p = conduitNodePos(project, node);
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({
@@ -2672,7 +2678,7 @@ export function setupMR(view, project, getFootprint) {
       });
     });
     conduitNetworkSegments(project).forEach((seg, order) => {
-      if (!touchesActiveFloor(seg)) return;
+      if (!touchesPickFloor(seg)) return;
       const distance = planPointToSegment(px, py, seg.a, seg.b);
       if (distance <= WIRE_PICK_M) candidates.push({
         kind: 'segment', id: seg.id, key: `segment:${seg.id}`,
@@ -2856,7 +2862,7 @@ export function setupMR(view, project, getFootprint) {
     for (const pipe of project.pipes || []) {
       const an = project.pipeNodes.find((n) => n.id === pipe.a), bn = project.pipeNodes.find((n) => n.id === pipe.b);
       const a = an && pipeNodePos(an), b = bn && pipeNodePos(bn);
-      if (!a || !b || (!allFloorsView && a.floorId !== project.activeFloorId && b.floorId !== project.activeFloorId)) continue;
+      if (!a || !b || (a.floorId !== pickFloorId() && b.floorId !== pickFloorId())) continue;
       const d = planPointToSegment(px, py, a, b);
       if (d < bestD) { bestD = d; best = pipe; }
     }
@@ -2864,7 +2870,7 @@ export function setupMR(view, project, getFootprint) {
   }
   function pipeTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
-    const floors = allFloorsView ? project.floors : [project.activeFloor];
+    const floors = [pickFloor()].filter(Boolean);
     floors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
       const distance = Math.hypot(px - marker.x, py - marker.y);
       if (distance <= RETICLE_OUTER) candidates.push({ kind: 'marker', item: marker,
@@ -2873,7 +2879,7 @@ export function setupMR(view, project, getFootprint) {
     (project.pipeNodes || []).forEach((node, order) => {
       if (node.markerId) return; // its marker is the same logical target
       const p = pipeNodePos(node);
-      if (!allFloorsView && p.floorId !== project.activeFloorId) return;
+      if (p.floorId !== pickFloorId()) return;
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({ kind: 'node', item: node,
         key: `node:${node.id}`, distance, z: p.z || 0, order });
@@ -2895,7 +2901,7 @@ export function setupMR(view, project, getFootprint) {
       let bestD = Infinity;
       // Cached legs from the last buildRoutedWires (what is drawn); live route as fallback.
       for (const seg of wireBatch?.segs.get(wire.id) ?? wireRouteSegments(project, wire)) {
-        if (!touchesActiveFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
+        if (!touchesPickFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
         const d = planPointToSegment(px, py, seg.a, seg.b);
         if (d < bestD) bestD = d;
       }
@@ -5139,12 +5145,41 @@ export function setupMR(view, project, getFootprint) {
     return true;
   }
 
+  // ALL FLOORS reticle plane: the storey holding the headset ("my storey"). A ray
+  // aimed down lands on my storey's floor, a ray aimed up on the floor of the storey
+  // directly above — never further, so the reticle stays near and readable. Returns
+  // that floor or null (aimed up from the top storey).
+  function allFloorsReticleFloor() {
+    const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
+    if (!floors.length) return null;
+    const viewer = currentFrame?.getViewerPose(localSpace);
+    const headZ = viewer ? viewer.transform.position.y - planPos.y : 0;
+    let mine = 0;
+    for (let i = 0; i < floors.length; i++) if ((floors[i].elevation || 0) <= headZ) mine = i;
+    return _rd.y < 0 ? floors[mine] : floors[mine + 1] || null;
+  }
+
   // World point where a controller's pointing ray meets the floor plane, or null.
+  // `rayHitFloorId` records which storey's floor that plane is (always the active
+  // floor outside ALL FLOORS), so ALL FLOORS picking can follow the reticle.
+  let rayHitFloorId = null;
+  let frameEditCtl = null; // this frame's editor input source (the frame loop's editCtl)
   function rayFloorHit(inputSource) {
+    rayHitFloorId = null;
+    if (inputSource === frameEditCtl) reticleFloorId = null;
     if (!setControllerRay(inputSource)) return null;
     if (Math.abs(_rd.y) < 1e-4) return null; // parallel to the floor
-    const t = (overlayY() - _ro.y) / _rd.y;
+    let planeY = overlayY(), floorId = project.activeFloorId;
+    if (allFloorsView) {
+      const floor = allFloorsReticleFloor();
+      if (!floor) return null;
+      planeY = planPos.y + (floor.elevation || 0);
+      floorId = floor.id;
+    }
+    const t = (planeY - _ro.y) / _rd.y;
     if (t <= 0) return null; // floor is behind the controller
+    rayHitFloorId = floorId;
+    if (inputSource === frameEditCtl) reticleFloorId = floorId; // the editor reticle scopes picking
     return _rhit.copy(_ro).addScaledVector(_rd, t);
   }
 
@@ -5172,9 +5207,9 @@ export function setupMR(view, project, getFootprint) {
   // MARKER · EDIT, LINK, and DIMS pick markers only through their flat floor projection,
   // using the same reticle-radius gating as plan edges — a stable plan-space target,
   // and it disambiguates markers stacked at the same X/Y far better than the billboard.
-  function markerAtFloorPoint(px, py) {
+  function markerAtFloorPoint(px, py, markers = project.markers) {
     let best = null, bestD = RETICLE_OUTER;
-    for (const marker of project.markers) {
+    for (const marker of markers) {
       const d = Math.hypot(px - marker.x, py - marker.y);
       if (d < bestD) { bestD = d; best = marker; }
     }
@@ -5186,7 +5221,7 @@ export function setupMR(view, project, getFootprint) {
   // share one distance-then-height ordered cycle.
   function wireMarkerAtFloorPoint(px, py, afterKey = null) {
     const floors = allFloorsView
-      ? project.floors
+      ? [pickFloor()].filter(Boolean)
       : [project.activeFloor, ...adjacentFloors()].filter(Boolean);
     const candidates = floors.flatMap((floor, floorOrder) => (floor.markers || []).map((marker, order) => ({
         marker, floorId: floor.id, floorOrder, order, key: `marker:${marker.id}`,
@@ -7194,6 +7229,7 @@ export function setupMR(view, project, getFootprint) {
     }
     pollModeCycle(frame, time);
     const editCtl = editorSource(frame);
+    frameEditCtl = editCtl;
     // No physical controller in the editor role → the headset is in hand tracking
     // (controllers set down). Prompt to pick one up rather than going blank; the
     // rest of the HUD (keyed on editCtl) stays hidden this frame.
@@ -7355,7 +7391,7 @@ export function setupMR(view, project, getFootprint) {
       const hit = placed ? rayFloorHit(editCtl) : null;
       if (hit) {
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
       } else {
         reticle.visible = false;
       }
@@ -7381,7 +7417,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(editCtl);
         if (hit) {
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           const candidate = edgeAtPoint(px, py);
           if (candidate && !translateTargets[isXEdge(candidate.edge) ? 'x' : 'y']) hoverEdge = candidate;
@@ -7407,7 +7443,7 @@ export function setupMR(view, project, getFootprint) {
         hoverEdge = selectedEdge ? null : retainedEdgeAtPoint(px, py, edgePickKey);
         if (!hoverEdge && !selectedEdge) edgePickKey = null;
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         if (gripDrag?.kind === 'edge') applyGripDrag(px, py);
       } else {
         hoverEdge = null;
@@ -7442,7 +7478,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           recalAim = worldToPlan(hit);
         } else {
           reticle.visible = false;
@@ -7516,7 +7552,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true; // reticle always tracks the floor point
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           hoverFloorPt = { px, py }; // remember where the tip stands (for a new dim's default placement)
           if (gripDrag) applyGripDrag(px, py); // grip-drag the grabbed dim panel to the reticle
@@ -7639,7 +7675,7 @@ export function setupMR(view, project, getFootprint) {
             else planEditPickAfterId = null;
           }
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         } else {
           reticle.visible = false;
           hoverStack = [];
@@ -7666,7 +7702,7 @@ export function setupMR(view, project, getFootprint) {
       hoverMarker = null;
       if (hit) {
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
         hoverMarker = linkMarkerAtFloorPoint(px, py, markerLinkPickAfterId);
         if (!hoverMarker) markerLinkPickAfterId = null;
@@ -7709,11 +7745,11 @@ export function setupMR(view, project, getFootprint) {
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
         if (selectedRoutedWire) { // override mode: conduit nodes are the primary target
           hoverConduitNode = conduitNodeAtFloorPoint(px, py);
-          if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py);
+          if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py, pickFloor()?.markers || []);
         } else {
           const endpoint = wireMarkerAtFloorPoint(px, py, wireEndpointPickAfterKey);
           if (endpoint && (allFloorsView || endpoint.floorId === project.activeFloorId)) hoverMarker = endpoint.marker;
@@ -7815,7 +7851,7 @@ export function setupMR(view, project, getFootprint) {
       const hit = rayFloorHit(editCtl);
       if (hit) {
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
         const target = pipeTargetAtFloorPoint(px, py, pipePickAfterKey);
         if (target?.kind === 'marker') hoverMarker = target.item;
@@ -7885,7 +7921,7 @@ export function setupMR(view, project, getFootprint) {
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
-        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
         const target = conduitTargetAtFloorPoint(px, py, conduitPickAfterKey);
         if (target?.kind === 'node') hoverConduitNode = target.item;
@@ -7957,7 +7993,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           if (!selectedConduitNodeId && !selectedConduitSegmentId) {
             const target = conduitEditTargetAtFloorPoint(
@@ -8016,7 +8052,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           if (selectedMarker) {
             const picked = markerAtFloorPoint(px, py);
@@ -8066,7 +8102,7 @@ export function setupMR(view, project, getFootprint) {
         const hit = rayFloorHit(source);
         if (hit) {
           reticle.visible = true;
-          reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           hoverFurnitureId = furnitureAtFloorPoint(px, py)?.id || null;
         } else {

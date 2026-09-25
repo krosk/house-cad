@@ -141,8 +141,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   step *created* (pre-existing items are never removed; `addConduitSegment`/
   `ensureConduitNodeAtMarker` may return existing ones), re-joins a split run, and moves the pen back.
   Repeated presses walk back; the history clears on mode change. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** enter
-  **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Every storey's nodes/devices are
-  directly pickable in one vertical stack; grip cycles overlaps and a trigger joins the chosen pair.
+  **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Aim down to pick on your own storey,
+  aim up to pick on the storey directly above (the reticle rule under **ALL FLOORS** below); grip
+  cycles overlaps and a trigger joins the chosen pair.
   Empty-space junctions are assigned to the storey whose vertical band contains the controller tip.
   In a normal single-floor view, the floor directly above/below is also drawn dimmed (`adjacentGroup`)
   at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
@@ -548,8 +549,16 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged and hides
   the height pad. Architecture, marker placement, dimensions, and furniture remain read-only, but
   the whole-house topology tools **MARKER · CONDUIT**, **CONDUIT · EDIT**, and **MARKER · WIRE**
-  remain available. They render and pick nodes/devices/routes across every storey, so a segment
-  between floors becomes a riser without changing active floor. Flick down in LEVEL to return to
+  remain available. They render nodes/devices/routes across every storey, so a segment between
+  floors becomes a riser without changing active floor.
+  **Reticle rule (owner decision, 2026-09-26):** the reticle never lands further than one slab away.
+  "My storey" is the one whose elevation band holds the headset (`allFloorsReticleFloor`). Aiming
+  down puts the reticle on my storey's floor; aiming up puts it on the floor of the storey directly
+  above. From the top storey, aiming up shows no reticle. Picking follows the reticle: only that
+  storey's devices, nodes, pipes and route legs are candidates (`pickFloorId`), and a riser counts
+  for both storeys it joins. To reach a storey further away, stand on it or leave ALL FLOORS. The
+  earlier ground-datum plane put the reticle a whole storey (or more) away, or behind the ray from
+  the basement, so conduit and wire picking became unusable. Flick down in LEVEL to return to
   the top real floor and restore every editing group.
 - `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the selected
   single-floor or stacked overlay. It re-shows the LEVEL pad only for real floors (the
@@ -679,9 +688,30 @@ teleport reticle; no last-active routing remains.
 
 ## Performance notes (per-frame cost)
 
-- **Dim-label textures are cached** by text+color (`dimTexCache`, evicted in `buildDimensions`,
-  bounded at 64). `buildPlan` no longer disposes the shared sprite `.map`. This makes the DIMS
-  dim-offset grip-drag a per-frame cache hit.
+- **Draw calls are drawn twice.** three.js 0.170's `WebXRManager` has no multiview, so every visible
+  object renders once per eye; `renderer.info` (the HUD `draw:` line) counts both. On the Quest,
+  many small per-item objects, each with its own material/texture, were the real frame cost. PROJECT ·
+  PERF measured the per-marker Sprite + floor Mesh (168 CanvasTextures for 84 markers) at ~47 ms of GPU
+  per frame on the owner's ground floor; after batching, the owner reports ~90 fps with the whole floor
+  in view, and >80 fps in `MARKER · WIRE`. The floor fills/strips were never the problem.
+- **Never add an AR overlay layer as one Mesh/Sprite per item.** Use the existing batch patterns:
+  - dim + Z-dim labels: `addDimLabelBatch`, an atlas of 256x64 slots plus `makeBillboardMaterial`;
+  - markers: `makeMarkerBatch`, a type+ring glyph atlas, one billboard mesh + one flat mesh;
+  - conduit: one vertex-coloured run mesh plus InstancedMesh spheres/dots, styled via
+    `styleConduitNode`/`styleConduitSegment`;
+  - routed wires: a static base mesh plus an emphasis overlay (`styleRoutedWires`).
+
+  Labels and markers keep **invisible proxy `Object3D`s** carrying position + userData for picking,
+  grab and drag. They are not Sprites, so code must not assume `.material`. After moving proxies,
+  refresh the batch (`refreshMarkerBatches`).
+- **Canvas-texture uploads are expensive on Quest.** Every canvas `setText`/redraw must skip unchanged
+  content. `makeLabel` guards it; the pads and menus redraw only on hover change; the debug HUD
+  refreshes at ~2 Hz.
+- **Still per-object:**
+  - adjacent-floor targets in conduit/wire/pipe modes: a 12x12 sphere each, 119 on the owner's house;
+  - pipes, furniture, and switch→light links.
+
+  Hypothesis: these are the next costs if a mode drops frames. Measure first with PERF.
 - **PLAN EDGE picking is deliberate**: every edge inside the reticle is ordered by fixed plan
   geometry (vertical/increasing X, then horizontal/increasing Y). Grip cycles, the first trigger
   locks the highlighted edge, grip can then drag only that locked edge, and the second trigger
