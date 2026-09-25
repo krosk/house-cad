@@ -2187,62 +2187,149 @@ export function setupMR(view, project, getFootprint) {
   // the ceiling or mid-wall). Mirrors the marker floor icon.
   const conduitNodeFloorGeom = new THREE.CircleGeometry(0.03, 20).rotateX(-Math.PI / 2);
   // Draw every conduit segment touching the active floor in uniform purple and a small sphere per active-floor node
-  // (floor projections remain slightly dimmer). Rebuilt on any topology change;
-  // node spheres carry userData for picking/handles.
-  function buildConduits() {
+  // (floor projections remain slightly dimmer). Rebuilt on any topology change.
+  // BATCHED: the whole layer is ~5 draw calls, not one per run/sphere/dot/leader. On the
+  // owner's house the per-object layer added ~300 draw calls and took the Quest from ~70
+  // to under 30 fps. Runs are one vertex-coloured mesh; spheres and floor dots are
+  // InstancedMeshes; leaders are one LineSegments. Per-item hover/selection styling goes
+  // through styleConduitNode / styleConduitSegment, never through child objects.
+  // Picking is plan-space math (conduitTargetAtFloorPoint etc.), not raycasts.
+  let conduitBatch = null; // { runs, runIndex, spheres, nodeIndex, dotFor, nodePos, styleKey }
+  const _cm = new THREE.Matrix4(), _cq = new THREE.Quaternion(), _cs = new THREE.Vector3();
+  const _cc = new THREE.Color();
+  function clearConduits() {
     for (const child of [...conduitGroup.children]) {
-      conduitGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+      conduitGroup.remove(child);
+      if (child.isInstancedMesh) child.dispose(); // instance buffers; the node geometries are shared
+      else child.geometry?.dispose();
+      child.material?.dispose();
     }
+    conduitBatch = null;
     conduitPreviewLine = null; // recreated on demand in the render branch
-    for (const seg of conduitNetworkSegments(project)) {
-      if (!touchesActiveFloor(seg)) continue;
-      const baseColor = CONDUIT_COLOR;
-      const line = makeConduitRibbon(planLocalZ(seg.a), planLocalZ(seg.b), baseColor);
-      line.userData.conduitSegmentId = seg.id;
-      line.userData.baseColor = baseColor; // restored when un-hovered (CONDUIT EDIT recolors the hover target)
-      conduitGroup.add(line);
+  }
+  function buildConduits() {
+    clearConduits();
+    const segs = conduitNetworkSegments(project).filter(touchesActiveFloor);
+    // Runs: the makeConduitRibbon quad per segment, merged, with per-vertex colour.
+    const positions = [], colors = [], indices = [];
+    const runIndex = new Map(); // segment id → first vertex
+    _cc.setHex(CONDUIT_COLOR);
+    for (const seg of segs) {
+      const quad = makeConduitRibbon(planLocalZ(seg.a), planLocalZ(seg.b), CONDUIT_COLOR);
+      const base = positions.length / 3;
+      runIndex.set(seg.id, base);
+      positions.push(...quad.geometry.attributes.position.array);
+      for (let k = 0; k < 4; k++) colors.push(_cc.r, _cc.g, _cc.b);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      quad.geometry.dispose(); quad.material.dispose();
     }
-    for (const node of project.conduitNodes || []) {
+    let runs = null;
+    if (segs.length) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setIndex(indices);
+      runs = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.92,
+        depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      }));
+      runs.renderOrder = 14;
+      runs.frustumCulled = false;
+      conduitGroup.add(runs);
+    }
+    // Nodes: a height sphere + a floor dot (the reticle's aim target) + a faint leader.
+    const nodes = (project.conduitNodes || []).filter((node) =>
+      allFloorsView || project.conduitNodeFloorId(node) === project.activeFloorId);
+    const nodeIndex = new Map(); // node id → sphere instance
+    const nodePos = [];          // per instance: { sphere: Vector3, dot: Vector3 } (group-local)
+    const dotFor = new Map();    // node id → { mesh, index }
+    const leaderPts = [];
+    const spheres = new THREE.InstancedMesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
+      color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
+    }), Math.max(1, nodes.length));
+    const dotMat = (opacity) => new THREE.MeshBasicMaterial({
+      color: 0xffffff, opacity, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+    });
+    // Device-bound nodes' dots are dimmer; opacity is per material, hence two batches.
+    const boundCount = nodes.filter((n) => n.markerId).length;
+    const dotsBare = new THREE.InstancedMesh(conduitNodeFloorGeom, dotMat(0.7), Math.max(1, nodes.length - boundCount));
+    const dotsBound = new THREE.InstancedMesh(conduitNodeFloorGeom, dotMat(0.5), Math.max(1, boundCount));
+    let nBare = 0, nBound = 0;
+    nodes.forEach((node, i) => {
       const floorId = project.conduitNodeFloorId(node);
-      if (!allFloorsView && floorId !== project.activeFloorId) continue;
       const p = planLocalZ(conduitNodePos(project, node));
-      const baseNodeColor = CONDUIT_NODE_COLOR;
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), new THREE.MeshBasicMaterial({
-        color: baseNodeColor,
-        depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
-      }));
-      mesh.position.set(p.x, p.z, -p.y);
-      mesh.renderOrder = 16;
-      mesh.userData.conduitNodeId = node.id;
-      mesh.userData.conduitNodeRole = 'node'; // the height sphere (vs. its floor dot)
-      conduitGroup.add(mesh);
-      // Floor projection: the aim target for picking. Shares the node id so the hover/
-      // select recolor loops light it up too; a faint leader ties it to the sphere.
-      const dot = new THREE.Mesh(conduitNodeFloorGeom, new THREE.MeshBasicMaterial({
-        color: baseNodeColor, opacity: node.markerId ? 0.5 : 0.7,
-        transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
-      }));
       const nodeFloor = project.floors.find((floor) => floor.id === floorId);
       const floorZ = allFloorsView ? (nodeFloor?.elevation || 0) + 0.016 : 0.016;
-      dot.position.set(p.x, floorZ, -p.y);
-      dot.renderOrder = 15;
-      dot.userData.conduitNodeId = node.id;
-      dot.userData.conduitNodeRole = 'floor';
-      conduitGroup.add(dot);
+      nodeIndex.set(node.id, i);
+      nodePos.push({ sphere: new THREE.Vector3(p.x, p.z, -p.y), dot: new THREE.Vector3(p.x, floorZ, -p.y) });
+      dotFor.set(node.id, node.markerId ? { mesh: dotsBound, index: nBound++ } : { mesh: dotsBare, index: nBare++ });
       if (Math.abs(p.z - floorZ) > 0.03) { // draw a leader only when the sphere is clear of the floor
-        const leader = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(p.x, floorZ, -p.y), new THREE.Vector3(p.x, p.z, -p.y)]),
-          new THREE.LineBasicMaterial({
-            color: CONDUIT_NODE_COLOR, transparent: true, opacity: 0.5,
-            depthTest: false, depthWrite: false,
-          }));
-        leader.renderOrder = 14;
-        leader.userData.conduitLeader = node.id; // inert to recolor/scale loops (no conduitNodeId)
-        conduitGroup.add(leader);
+        leaderPts.push(p.x, floorZ, -p.y, p.x, p.z, -p.y);
       }
+    });
+    spheres.count = nodes.length; dotsBare.count = nBare; dotsBound.count = nBound;
+    spheres.renderOrder = 16; dotsBare.renderOrder = 15; dotsBound.renderOrder = 15;
+    for (const m of [spheres, dotsBare, dotsBound]) { m.frustumCulled = false; conduitGroup.add(m); }
+    if (leaderPts.length) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(leaderPts, 3));
+      const leaders = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+        color: CONDUIT_NODE_COLOR, transparent: true, opacity: 0.5, depthTest: false, depthWrite: false,
+      }));
+      leaders.renderOrder = 14;
+      leaders.frustumCulled = false;
+      conduitGroup.add(leaders);
     }
+    conduitBatch = { runs, runIndex, spheres, nodeIndex, dotFor, nodePos, styleKey: new Map() };
+    for (const node of nodes) styleConduitNode(node.id, CONDUIT_NODE_COLOR, 1);
+    for (const seg of segs) conduitBatch.styleKey.set(`s:${seg.id}`, CONDUIT_COLOR);
     if (!allFloorsView) buildZDims(); // stacked topology view omits active-floor-only Z dims
+  }
+
+  // Per-item styling of the batched conduit layer. Unchanged styles are skipped, so
+  // the per-frame recolor loops upload nothing while the hover target is steady.
+  function styleConduitNode(id, color, scale = 1) {
+    const b = conduitBatch;
+    const i = b?.nodeIndex.get(id);
+    if (i == null) return;
+    const key = color * 4 + scale;
+    if (b.styleKey.get(`n:${id}`) === key) return;
+    b.styleKey.set(`n:${id}`, key);
+    _cc.setHex(color);
+    _cs.setScalar(scale);
+    b.spheres.setMatrixAt(i, _cm.compose(b.nodePos[i].sphere, _cq, _cs));
+    b.spheres.setColorAt(i, _cc);
+    b.spheres.instanceMatrix.needsUpdate = true;
+    b.spheres.instanceColor.needsUpdate = true;
+    const dot = b.dotFor.get(id);
+    dot.mesh.setMatrixAt(dot.index, _cm.compose(b.nodePos[i].dot, _cq, _cs));
+    dot.mesh.setColorAt(dot.index, _cc);
+    dot.mesh.instanceMatrix.needsUpdate = true;
+    dot.mesh.instanceColor.needsUpdate = true;
+  }
+  function styleConduitSegment(id, color) {
+    const b = conduitBatch;
+    const base = b?.runIndex.get(id);
+    if (base == null || b.styleKey.get(`s:${id}`) === color) return;
+    b.styleKey.set(`s:${id}`, color);
+    _cc.setHex(color);
+    const attr = b.runs.geometry.attributes.color;
+    for (let k = 0; k < 4; k++) attr.setXYZ(base + k, _cc.r, _cc.g, _cc.b);
+    attr.needsUpdate = true;
+  }
+  // Recolor every drawn node / run: fn(id) → [color, scale] for nodes, → color for runs.
+  function restyleConduitNodes(fn) {
+    for (const id of conduitBatch?.nodeIndex.keys() ?? []) styleConduitNode(id, ...fn(id));
+  }
+  function restyleConduitSegments(fn) {
+    for (const id of conduitBatch?.runIndex.keys() ?? []) styleConduitSegment(id, fn(id));
+  }
+  // World position of a drawn node's height sphere (grip-drag near/far test), or null.
+  function conduitNodeWorldPos(id, target) {
+    const i = conduitBatch?.nodeIndex.get(id);
+    if (i == null) return null;
+    conduitGroup.updateWorldMatrix(true, false);
+    return target.copy(conduitBatch.nodePos[i].sphere).applyMatrix4(conduitGroup.matrixWorld);
   }
 
   // Nearest eligible conduit node under the reticle, by plan projection. ALL FLOORS
@@ -6181,13 +6268,10 @@ export function setupMR(view, project, getFootprint) {
     }
     if (id === 'conduit_edit' && selectedConduitNodeId
         && hoverConduitNode?.id === selectedConduitNodeId && !hoverConduitNode.markerId) {
-      const handle = conduitGroup.children.find((c) =>
-        c.userData.conduitNodeId === hoverConduitNode.id && c.userData.conduitNodeRole === 'node');
-      if (!handle) return;
+      if (!conduitNodeWorldPos(hoverConduitNode.id, _dp)) return;
       // Same dual-move choice as WIRE EDIT: tip near the node → carry it in 3D;
       // far → the floor reticle drives X/Y and the pad drives z.
       const tip = tipPosition(event.data);
-      handle.getWorldPosition(_dp);
       const near = tip && tip.distanceTo(_dp) < WAYPOINT_GRAB_M;
       selectConduitNode(hoverConduitNode.id); // grabbing also selects (opens the height pad)
       gripDrag = { kind: 'conduitNode', nodeId: hoverConduitNode.id, mode: near ? 'direct' : 'remote' };
@@ -7082,15 +7166,12 @@ export function setupMR(view, project, getFootprint) {
         const panelNodeIds = new Set((hoverDim
           ? [hoverDim.userData.refA, hoverDim.userData.refB] : [])
           .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
-        for (const child of conduitGroup.children) {
-          const id = child.userData.conduitNodeId;
-          if (id == null) continue;
-          const color = panelNodeIds.has(id) ? 0x22d3ee
+        restyleConduitNodes((id) => [
+          panelNodeIds.has(id) ? 0x22d3ee
             : selectedNodeIds.has(id) ? 0xfbbf24
-            : hoverNodeIds.has(id) ? 0xffe14d : CONDUIT_NODE_COLOR;
-          child.material.color.setHex(color);
-          child.scale.setScalar(panelNodeIds.has(id) || selectedNodeIds.has(id) || hoverNodeIds.has(id) ? 1.5 : 1);
-        }
+            : hoverNodeIds.has(id) ? 0xffe14d : CONDUIT_NODE_COLOR,
+          panelNodeIds.has(id) || selectedNodeIds.has(id) || hoverNodeIds.has(id) ? 1.5 : 1,
+        ]);
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
       // When hovering a dim panel, preview BOTH its references (cyan) so you see how it's defined.
@@ -7259,14 +7340,11 @@ export function setupMR(view, project, getFootprint) {
       const selectedCircuit = wireComponent(selectedRoutedWire);
       highlightAdjacentTargets(selectedCircuit);
       // Show conduit nodes as white context; hovered target yellow, existing vias cyan.
-      for (const child of conduitGroup.children) {
-        const id = child.userData.conduitNodeId;
-        if (!id) continue;
+      restyleConduitNodes((id) => {
         const viaOn = selectedRoutedWire && (selectedRoutedWire.via || []).includes(id);
-        const color = id === hoverConduitNode?.id ? 0xffe14d : viaOn ? 0x22d3ee : CONDUIT_NODE_COLOR;
-        child.material.color.setHex(color);
-        child.scale.setScalar(id === hoverConduitNode?.id ? 1.5 : 1);
-      }
+        return [id === hoverConduitNode?.id ? 0xffe14d : viaOn ? 0x22d3ee : CONDUIT_NODE_COLOR,
+          id === hoverConduitNode?.id ? 1.5 : 1];
+      });
       // Keep the individual wire legible inside its circuit: selected/hovered is
       // yellow, other connected wires green, unrelated wires dim in type color.
       for (const ribbon of routedWireGroup.children) {
@@ -7428,22 +7506,12 @@ export function setupMR(view, project, getFootprint) {
       }
       highlightAdjacentTargets();
       // Recolor node spheres: pen amber, hovered yellow, otherwise white.
-      for (const child of conduitGroup.children) {
-        const id = child.userData.conduitNodeId;
-        if (!id || child === conduitPreviewLine) continue;
-        const color = id === penNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
-          : CONDUIT_NODE_COLOR;
-        child.material.color.setHex(color);
-        child.scale.setScalar(id === penNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
-      }
+      restyleConduitNodes((id) => [
+        id === penNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d : CONDUIT_NODE_COLOR,
+        id === penNodeId || id === hoverConduitNode?.id ? 1.5 : 1,
+      ]);
       // The run a trigger would split into a T-junction previews yellow.
-      for (const child of conduitGroup.children) {
-        const segId = child.userData.conduitSegmentId;
-        if (!segId) continue;
-        const hovered = segId === hoverPenSplit?.segmentId;
-        child.material.color.setHex(hovered ? 0xffe14d : child.userData.baseColor);
-        child.material.opacity = hovered ? 1 : 0.92;
-      }
+      restyleConduitSegments((segId) => segId === hoverPenSplit?.segmentId ? 0xffe14d : CONDUIT_COLOR);
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
       // Pen preview: pen node → current tip (or → the T-junction point on a hovered run).
@@ -7522,23 +7590,13 @@ export function setupMR(view, project, getFootprint) {
       }
       if (selectedConduitNodeObj() && hoverKey !== prevHoverKey) { redrawNodePad(); prevHoverKey = hoverKey; }
       // Recolor node sphere + floor dot: selected amber, candidate yellow, else white.
-      for (const child of conduitGroup.children) {
-        const id = child.userData.conduitNodeId;
-        if (!id) continue;
-        const color = id === selectedConduitNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d
-          : CONDUIT_NODE_COLOR;
-        child.material.color.setHex(color);
-        child.scale.setScalar(id === selectedConduitNodeId || id === hoverConduitNode?.id ? 1.5 : 1);
-      }
+      restyleConduitNodes((id) => [
+        id === selectedConduitNodeId ? 0xfbbf24 : id === hoverConduitNode?.id ? 0xffe14d : CONDUIT_NODE_COLOR,
+        id === selectedConduitNodeId || id === hoverConduitNode?.id ? 1.5 : 1,
+      ]);
       // Selected segment amber; current pre-selection candidate yellow.
-      for (const child of conduitGroup.children) {
-        const segId = child.userData.conduitSegmentId;
-        if (!segId) continue;
-        const selected = segId === selectedConduitSegmentId;
-        const hovered = !selected && segId === hoverConduitSegmentId;
-        child.material.color.setHex(selected ? 0xfbbf24 : hovered ? 0xffe14d : child.userData.baseColor);
-        child.material.opacity = selected || hovered ? 1 : 0.92;
-      }
+      restyleConduitSegments((segId) => segId === selectedConduitSegmentId ? 0xfbbf24
+        : segId === hoverConduitSegmentId ? 0xffe14d : CONDUIT_COLOR);
     } else if (modeId === 'marker') {
       // MARKER: aim a FLOOR reticle; the marker under it — picked via its flat floor icon
       // (markerAtFloorPoint), a stable plan-space target vs. the floating wall billboard —
