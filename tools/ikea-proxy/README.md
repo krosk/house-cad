@@ -4,7 +4,7 @@ A ~40-line Cloudflare Worker that lets the app load IKEA 3D models **on the fly*
 bundling them into the APK. IKEA's model host origin-allowlists (a browser fetch from our
 app gets `403`; only `*.ikea.com` or server-side no-Origin requests get `200`). This Worker
 fetches server-side and re-serves the GLB with permissive CORS. See `worker.js` for the
-full rationale and the memory `ikea-3d-model-pipeline`.
+full rationale and `docs/furniture.md`.
 
 It is intentionally narrow: only a bare article id (`/595112780` → 6+ digits) is accepted,
 it only ever hits the fixed rotera model URL, and CORS is echoed only to an allowlisted

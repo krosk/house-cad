@@ -22,6 +22,23 @@ npm run preview  # serve the production build
 - **`npm run build` is how you verify changes** — there is no test suite, linter, or type checker. A clean build (`✓ built in …`) means imports/syntax are sound. It does **not** catch runtime/visual bugs.
 - When running `vite build` through PowerShell you will see a spurious `node.exe : … NativeCommandError` line — that is PowerShell wrapping Vite's stderr (the chunk-size note), **not** a build failure. Trust the `✓ built in …` line.
 - Changes can only be verified by build + browser; Claude cannot click through the UI. Say so when reporting, and flag the most likely visual regression.
+- The owner QAs from other devices on the LAN (Quest, phone). Keep the dev server running rather than stopping it after a task, and report its **Network** URL (Vite's `➜ Network:` line), not just localhost.
+
+## Where project knowledge lives (rule)
+
+All project knowledge is **repo-backed**, so every agent and tool sees the same thing:
+
+- **Design documents, owner decisions and their rationale, and durable traps go in `docs/`.** Add to
+  the relevant existing doc, or create a new `docs/<topic>.md` when no doc fits.
+- Core architecture and working rules go in this file; live session state goes in `.claude/handoff.md`.
+- **Do not store project knowledge in Claude's per-user auto-memory** (or any agent-private memory).
+  It is invisible to other agents and to git, and it goes stale silently. If something is worth
+  remembering about this project, write it into the repo instead.
+
+Design docs: `docs/product-intent.md` (Phase-5 goal, survey method, drift, multi-floor, Guardian) ·
+`docs/ar-survey.md` (AR mechanics + traps) · `docs/electrical-workflow.md` ·
+`docs/plumbing-workflow.md` · `docs/furniture.md` · `docs/share-view.md` · `docs/markers-plan.md` ·
+`docs/ar-qa-checklist.md` (on-device QA record) · `packaging/quest-apk.md`.
 
 ## Core architecture
 

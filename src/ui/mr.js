@@ -2621,7 +2621,7 @@ export function setupMR(view, project, getFootprint) {
   //
   // Models are NOT bundled: they load ON THE FLY from a CORS proxy (Cloudflare Worker
   // in tools/ikea-proxy/) at `${VITE_IKEA_PROXY}/<article>`, because IKEA's host
-  // origin-allowlists direct browser fetches. See memory `ikea-3d-model-pipeline`.
+  // origin-allowlists direct browser fetches. See docs/furniture.md.
   const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
   const furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
   const furnitureSrc = new Map();     // article -> decoded source scene (cloned per instance)

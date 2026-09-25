@@ -2,13 +2,13 @@
 
 Stable operational detail for the Quest MR survey surface. This is the settled "how the
 AR tool is put together" reference; the live "where are we / what next" doc is
-`.claude/handoff.md`. Deep rationale lives in Claude memory (`phase5-xr-intent`,
-`multi-floor-design`, `ar-2d-parity`, `quest-guardian-limitation`). Packaging is
+`.claude/handoff.md`. Deep rationale (survey method, drift, multi-floor, AR-only surface, Guardian)
+lives in `docs/product-intent.md`. Packaging is
 `packaging/quest-apk.md`. Core (non-AR) architecture is `CLAUDE.md`.
 
 AR (`src/ui/mr.js`) is the **only** authoring surface on the Quest — the immersive APK exits
 AR by quitting, there is no 2D editor on-device — so it must reach parity with the desktop 2D
-editor (`ar-2d-parity` memory).
+editor (`docs/product-intent.md`).
 
 ## Mode hierarchy (tools with stable `id`s)
 
@@ -105,14 +105,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   icon and wall glyph are outlined, and the height pad refreshes for each cycled marker.
   Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
   hovered marker opens its **height pad** (a single-value datum pad — see "Vertical authoring"): the
-  typed value is an offset, **SWAP toggles the FLOOR/CEILING datum** (`↑ floor` / `↓ ceiling`), and
-  **DEL frees Z** (`⊘ FREE Z`) — clearing the height dim so the grab moves Z again. ENTER commits the
+  typed value is the height above the floor, **SWAP toggles free↔floor** (`⊘ free` / `↑ floor`), and
+  **DEL frees Z** (standard DEL caption) — clearing the height dim so the grab moves Z again. ENTER commits the
   height, closes the pad, and clears the selection. **Only the selected marker can be grip-dragged**
   in 3D, but **every axis carrying a defined dim stays locked**: X/Y from
   `marker._locked` (its distance pins) and **Z whenever a `zDatum` is set** (`nz = marker.zDatum ?
   marker.z : tipZ`). So a fully-pinned marker with a defined height doesn't move at all under grab; a
-  free (never-height-set) marker grabs in full 3D; a ceiling-pinned marker's z follows a LEVEL height
-  change. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
+  free (never-height-set) marker grabs in full 3D. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Grip cycles eligible
@@ -150,7 +149,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   changes whenever it is still eligible, so hand jitter cannot silently reorder the hover selection;
   only grip advances it. Selecting a free (bare) junction opens
   a height pad (`activateNodePad` / `commitNodeHeight`, mirroring the marker height pad: single-value
-  datum pad, **SWAP toggles FLOOR/FREE**, **DEL frees Z** (`⊘ FREE Z`, clears the height dim — it
+  datum pad, **SWAP toggles FLOOR/FREE**, **DEL frees Z** (standard DEL caption, clears the height dim — it
   no longer deletes the node), ENTER commits z and keeps it selected). Trigger again deselects.
   **Only a selected node can be grip-dragged**, direct vs remote chosen at grip-press by the real 3D
   distance from the tip to the node sphere (`WAYPOINT_GRAB_M`): **direct** (in reach) carries it 1:1
@@ -217,18 +216,18 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,
-  IKEA models loaded on the fly through the Cloudflare Worker proxy; memory `ikea-3d-model-pipeline`),
+  IKEA models loaded on the fly through the Cloudflare Worker proxy; see `docs/furniture.md`),
   drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`. These are **NOT massing** — they never
   enter the footprint/boolean/extrude pipeline (distinct from the `furniture` *zone* kind, a
   `[foot,top]` placeholder rect authored in PLAN). Trigger empty space to **drop** the current article
   at the tip; trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a
   single value = how high the model's base sits off the floor (for wall-hung units/shelves). That pad
-  is a **two-state datum pad** (SWAP toggles FLOOR/CEILING only; there is **no** free-Z and **DEL
+  is **floor-only** (its SWAP cell is inert; there is **no** free-Z and **DEL
   deletes the item**, because furniture grip-drag is floor-planar so the foot is pad-only). **Thumbstick
   up/down** (`cycleFurnish`) rotates the selected item, or cycles the drop article when none selected.
   **Grip-drag** moves the hovered item over the floor reticle (`applyFurnitureGripDrag`, x/y only,
   `emit:false`, committed once via `touch()`; the foot elevation `y` is preserved). **B/Y deletes** the
-  selected item. Detail: `docs/furniture-handoff.md`.
+  selected item. Detail: `docs/furniture.md`.
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as wall 1; W1 is cyan, W2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
@@ -309,7 +308,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 All user-facing AR text is localized (EN default, FR, ZH) — mode labels, per-mode help boxes,
 transient labels (SNAP TO WALL, WALL 1/2, PERP…), numpad keys, DIMS titles + edge/origin ref
 names, band-pad field labels (`aperture.sill`/`head`, `furniture.foot`/`top`), datum words
-(`z.floor`/`ceiling`/`free`/`freeKey`), the pick-up-controllers prompt (`controllers.*`), SAVE/LOAD
+(`z.floor`/`free`), the pick-up-controllers prompt (`controllers.*`), SAVE/LOAD
 slot menu, LEVEL pad title, and UNIT/LANG menus. The EXPORT sheet language is chosen separately from
 the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic).
 
@@ -462,50 +461,63 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   field it switches to, namespaced `aperture.*` vs `furniture.*`); ENTER writes `rect[field]` with a
   band-ordering guard (lower < upper); **DEL deletes the whole zone** (unlike the height pads' DEL).
   The pad stays open after a commit so the other bound can be typed next.
-- **Sill/head/foot/top reach NO output yet** — `extrude.js` is deliberately not aperture-aware, and
-  the glyph/sheet/DXF ignore the band bounds; only `serialize.js` (v3, additive) persists them. So
-  **band edits are geometrically invisible** — verify a change by re-selecting (the pad prefills the
-  stored value). Height-aware extrude that carves `[sill,head]` is owner-deferred; do not build it
-  unprompted.
+- **Owner decisions:** every aperture stays a **subtract** (the `op` invariant is untouched); `hinge`
+  is measured **along the wall's own axis** (`left` = min-coord jamb, `right` = max, `both` = double
+  casement); a half wall is the literal inverse of a door; a sliding door's authored box is the
+  **opening**, and its panel is inferred (opening + 10 cm overhang, passed in the caller's units).
+- **Where the band shows up:** door/window `sill`/`head` drive the **desktop/shared 3D viewer**
+  (`src/core/architectural3d.js` cuts them into wall segments) and the AR Z-dim bars. They still reach
+  **no plan output**: the glyphs, sheet, DXF, and STL/OBJ/GLB export (legacy `extrude.js`) ignore them.
+  In AR itself a band edit only shows in the blue Z-dim bar or by re-selecting (the pad prefills).
+  Carving openings into the **exported** mesh is owner-deferred; do not build it unprompted.
 
-## Vertical authoring (heights & datums)
+## Vertical authoring (heights)
 
-Marker z, bare conduit-node z, and GLB foot elevation are all authored as a **single-value height on a
-datum pad** (`nextDatum`/`datumWord`/`datumSwapLabel`/`convertDatumValue`, shared by all three).
+Marker z, bare conduit-node z, and GLB foot elevation are each authored as a **single-value height
+on a pad** (`nextDatum`/`datumWord`/`datumSwapLabel`, shared by the marker and node pads).
 
-- **INVARIANT: stored `z` is always the height above the (active) floor.** A datum is **input-only**:
-  ceiling-relative entry resolves to a floor-referenced z and is never stored ceiling-relative.
-- A z may carry a **`zDatum`**: `'floor'` (absolute above the floor), `'ceiling'` (below the ceiling,
-  stored as `zOff` and resolved by `solveVerticalDatums` in `constraints.js` — run in `_emit` after
-  the marker/node pins — as `z = max(0, floorHeight − zOff)`, so it **tracks LEVEL height edits
-  one-way**), or **no `zDatum` = FREE** (height never defined; the 3D grab moves Z). A node's ceiling
-  is its **own** floor's height (nodes are whole-house).
-- **Marker + conduit-node pads are tri-state**: **SWAP** cycles `free → floor → ceiling → floor`
-  (`free` is only re-entered via DEL), keeping the physical height across a floor↔ceiling toggle
-  (`convertDatumValue`); typing any digit while free defines it as `floor`. **DEL frees Z** (`⊘ FREE
-  Z`, `t('z.freeKey')`) — clears the height dim, it does NOT delete the object (object-delete is B/Y).
-  Setters: `setMarkerVertical` / `setConduitNodeVertical(id, datum, value)` via shared `setVertical`
-  (datum `'free'` drops the dim). A z-datum edit that moves geometry needs a hand `buildPlan()` /
+- **Z is deliberately NOT in the solver** (it stays 2× 1-D X/Y: "plan + single extrusion height").
+  Every vertical value (marker/node z, GLB foot, aperture sill/head, furniture-zone foot/top) is a
+  typed scalar, not a relational constraint.
+- **Heights are floor-referenced only (owner, s28: "Ref to Floor is the only requirement").**
+  INVARIANT: stored `z` is always the height above the (active) floor. The earlier ceiling-relative
+  datum was **removed** (no `zOff`, no `solveVerticalDatums`); `verticalFields()` in `serialize.js`
+  coerces legacy `zDatum:'ceiling'` + `zOff` to `'floor'` losslessly (the stored `z` was already the
+  resolved height).
+- **`zDatum` is just free vs defined.** No `zDatum` = **free** (height never defined; the 3D grab
+  moves Z). `zDatum:'floor'` = **defined** (a real vertical dim; the value holds in a grab). Setters
+  `setMarkerVertical` / `setConduitNodeVertical` / `setFurnitureVertical(id, datum, value)` via the
+  shared `setVertical`: datum `'free'` drops the flag and keeps z; anything else stamps `'floor'`.
+- **Marker + conduit-node pads:** **SWAP toggles free↔floor** (title `⊘ free` / `↑ floor`); typing a
+  value defines it; **DEL frees Z** (standard DEL caption) — it clears the height dim and does NOT
+  delete the object (object-delete is B/Y). A z edit that moves geometry needs a hand `buildPlan()` /
   `buildConduits()` (`mr.js` doesn't subscribe to `onChange`).
-- **GLB foot pad is two-state** (SWAP toggles floor/ceiling only; no free; DEL deletes the item) — see
-  FURNISH. `setFurnitureVertical(id, datum, value)`.
+- **GLB foot pad is floor-only**: SWAP inert, DEL deletes the item (see FURNISH).
 - **The 3D grip-drag holds any axis with a defined dim.** X/Y come from `marker._locked` (distance
   pins); **Z is held whenever `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`, in
-  `applyMarkerGripDrag` / `applyConduitNodeGripDrag`). A ceiling-pinned object also follows a LEVEL
-  height change. Applies to markers, bare nodes, and (in reach) direct-carried conduit nodes; the GLB
-  foot and the furniture-zone `[foot,top]` are pad-only (no Z-grab). Z is **not** in the solver (that
-  stays 2× 1-D X/Y); the blocker to full Z-dimensioning is display (no section view yet).
+  `applyMarkerGripDrag` / `applyConduitNodeGripDrag`). Applies to markers, bare nodes, and
+  direct-carried conduit nodes; the GLB foot and the furniture-zone `[foot,top]` are pad-only.
+- **Z-dim visual (s28).** Any object with a defined vertical extent shows a static, non-pickable
+  **vertical height dim** — a slim bar plus value label(s) — colored to match that piece's X/Y dims:
+  markers **amber** (`0xff9f43`, floor→z, shown iff `zDatum`), bare conduit nodes **purple**
+  (`0xa78bfa`), apertures **blue** (`0x79c0ff`) spanning `[sill,head]` at the aperture center (zero
+  sill omitted; an open-top kind rises to the storey ceiling). Heights are typed, never dragged, so
+  the dims are display-only. `zDimGroup`/`buildZDims()` are rebuilt inside both `buildMarkers()` and
+  `buildConduits()`, active floor only (`clearZDims()` runs in `buildAllFloors`). GLB foot is not
+  shown yet.
 - **The pads reuse the DIMS numpad's SWAP/DEL cells via overrides.** `numpad.draw(...)` takes optional
-  `swapLabel` and `delLabel`. So **SWAP now has three context meanings** — FLIP (DIMS), field-cycle
-  (band pad), datum-toggle (height pads) — and **DEL means "delete the DIM you're editing"** on the
-  height pads (Z-dim) and in DIMS (constraint), but **"delete the whole zone/item"** on the band pad
-  and GLB foot pad. Don't assume SWAP == FLIP or DEL == delete-object.
+  `swapLabel` and `delLabel`. So **SWAP has three context meanings** — FLIP (DIMS), field-cycle
+  (band pad), free↔floor toggle (height pads) — and **DEL means "delete the DIM you're editing"** on
+  the height pads (Z-dim) and in DIMS (constraint), but **"delete the whole zone/item"** on the band
+  pad and GLB foot pad. Don't assume SWAP == FLIP or DEL == delete-object.
+- Not done: an align/offset link between two vertical entities, or a true third solver axis with a
+  section view.
 
 ## Multi-floor (LEVEL)
 
 Floors are independent plans sharing the same plan origin (0,0); elevation is DERIVED by
 stacking per-floor heights (`Project._recomputeElevations`: ground = 0, up accumulates,
-basement negative). See `multi-floor-design` memory for the settled design.
+basement negative). The settled design decisions are in `docs/product-intent.md`.
 
 - Entering AR seeds **Basement · Ground · Upper** around Ground (`ensureFloors`; no-op if
   already multi-floor; default 2.8 m, persists via autosave).
@@ -681,16 +693,16 @@ teleport reticle; no last-active routing remains.
   every picker/highlight reads normalized min/max; the solver write-back normalizes
   (`src/core/constraints.js`). Don't reintroduce a raw negative-size path.
 - **The numpad's SWAP/DEL cells are context-overloaded** (via optional `swapLabel`/`delLabel` args to
-  `numpad.draw`). **SWAP** = FLIP (DIMS), field-cycle (band pad), or datum-toggle (marker/node/GLB
-  height pads). **DEL** = "delete the DIM you're editing" (constraint in DIMS; free-Z in the marker/
+  `numpad.draw`). **SWAP** = FLIP (DIMS), field-cycle (band pad), or free↔floor toggle (marker/node
+  height pads; inert on the GLB foot pad). **DEL** = "delete the DIM you're editing" (constraint in DIMS; free-Z in the marker/
   node height pads) OR "delete the whole zone/item" (band pad, GLB foot pad). It is **never** the
   object-delete for a marker/node — that's B/Y. Don't assume SWAP == FLIP or DEL == delete-object.
-- **`zDatum: 'ceiling'` is INPUT-ONLY.** Stored `z` is always height above the active floor; the
-  ceiling datum stores `zOff` and `solveVerticalDatums` (`constraints.js`, run in `_emit` after the
-  pins) resolves it to a floor-referenced z each solve. Never store anything ceiling-referenced in `z`.
-- **Aperture band bounds (`sill`/`head`/`foot`/`top`) reach NO output** — `extrude.js`, the glyphs,
-  the sheet, and DXF all ignore them; only `serialize.js` persists them. So a band-pad edit is
-  **geometrically invisible** — verify by re-selecting (the pad prefills). Aperture glyphs live in
+- **Heights are floor-referenced only.** Stored `z` is always the height above the active floor;
+  `zDatum` only distinguishes free (unset) from defined (`'floor'`). The ceiling datum was removed
+  (s28); `serialize.js` coerces legacy `'ceiling'` + `zOff` to `'floor'`. Don't reintroduce it.
+- **Aperture band bounds (`sill`/`head`/`foot`/`top`) reach no PLAN output** — the glyphs, sheet,
+  DXF, and legacy mesh export ignore them (only the desktop 3D viewer and AR Z-dims use them).
+  Aperture glyphs live in
   `planGroup` (`addApertureGlyphs`), so a door/window/heater/sliding change needs a hand `buildPlan()`
   (mr.js doesn't subscribe to `onChange`); edit glyph shapes ONLY in `apertureGlyph.js` (the print
   page's Y is flipped, so orientation resolves from mapped corners — never baked into the glyph fns).
@@ -706,6 +718,12 @@ teleport reticle; no last-active routing remains.
   plan origin is placed vertically below the headset, its floor is estimated 1.50 m below the
   camera, and plan +Y follows the viewer's horizontal heading. This makes the plan immediately
   visible on entry; FLOOR/ORIGIN/RECAL remain authoritative and replace/refine that estimate.
+- **Don't drive `Object3D.matrix` directly.** With `matrixAutoUpdate=false`, setting `.matrix` does not
+  update `matrixWorld` unless `matrixWorldNeedsUpdate=true` is also set, so the object renders stuck
+  at the origin while the math is correct. Set `position`/`quaternion` and leave `matrixAutoUpdate` on.
+- **`depth-sensing` is deliberately omitted** from the session's optional features. Its automatic
+  occlusion is noisy at the floor plane and made the flat plan flicker; placement is touch-based, so
+  depth isn't needed. Re-add selectively only if 3D walls ever need occlusion.
 - **Remote logging** (`rlog` → dev-only `POST /__log` → `quest-debug.log`, gitignored — never
   stage it) works only on the dev server, NOT on Pages/the APK. The release TWA has **no web
   console** — debug the `?ar=1` page in the plain Quest Browser or Oculus Remote Web Inspector.
@@ -714,13 +732,13 @@ teleport reticle; no last-active routing remains.
 
 | Path | Role |
 |---|---|
-| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad (DIMS + band pad + tri-state datum height pads + 2-state GLB foot pad), slot menu, grip-drag (X/Y/Z dim-lock), multi-floor/LEVEL, RECAL, FURNISH, conduit ribbons/nodes, `planYaw`, `?ar=1` auto-AR, thumbstick-hold exit |
+| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad (DIMS + band pad + free/floor height pads + floor-only GLB foot pad), Z-dim visual (`zDimGroup`/`buildZDims`), slot menu, grip-drag (X/Y/Z dim-lock), multi-floor/LEVEL, RECAL, FURNISH, conduit ribbons/nodes, `planYaw`, `?ar=1` auto-AR, thumbstick-hold exit |
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
-| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict`; `solveMarkers`/`solveConduitNodes` (one-way pins) + **`solveVerticalDatums`** (ceiling-pin resolve) |
+| `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict`; `solveMarkers`/`solveConduitNodes` (one-way pins) (Z is not solved) |
 | `src/core/apertureGlyph.js` | **Sole** source of door/window/half-wall/heater/sliding plan glyphs (`doorSwingSegments` etc.) + `resolveApertureOrient`; consumed by planSheet, dxf, AND mr (`addApertureGlyphs`) so they can't diverge |
 | `src/core/zoneColors.js` | `ZONE_KINDS`, per-kind colors, `APERTURE_DEFAULTS`, `FURNITURE_BAND`, `isAperture`, `apertureBounds`, `verticalBandFields` (the authoritative band-pad field list) |
 | `src/core/translate.js` | atomic rigid floor translation; preserves relative constraints and moves origin locks + authored dimension-label placements coherently |
-| `src/io/serialize.js` | `serializeProject`/`deserializeInto` v3 (rectangles [+ `sill`/`head`/`hinge`/`swing`/`foot`/`top`] + constraints + markers [+ `z`/`zDatum`/`zOff`] + electrical links + furniture + height per floor; whole-house conduit/wires + `revision` at top level) — desktop JSON, localStorage autosave, AND the AR slots |
+| `src/io/serialize.js` | `serializeProject`/`deserializeInto` v3 (rectangles [+ `sill`/`head`/`hinge`/`swing`/`foot`/`top`] + constraints + markers [+ `z`/`zDatum`] + electrical links + furniture + height per floor; whole-house conduit/wires + `revision` at top level) — desktop JSON, localStorage autosave, AND the AR slots |
 | `src/core/electrical.js` | Shared validation + derived switch→ceiling→light control-route points + `segmentSurface` classifier, consumed by AR, sheets, DXF, and conduit routing |
 | `src/core/conduit.js` | Conduit-network graph + Dijkstra `shortestConduitPath` (threads `via`); `wireRouteSegments`/`wireRoutePoints`/`conduitNetworkSegments` — wires route over conduits, path derived not stored |
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |

@@ -4,8 +4,8 @@
 // our app sends an Origin header and gets 403; only *.ikea.com origins (or no Origin,
 // i.e. server-side) get 200. This Worker fetches server-side (no browser Origin → 200)
 // and re-serves the GLB with permissive CORS so the app can load it on the fly. Nothing
-// is bundled into the app/APK; models are never stored in our repo. See memory
-// `ikea-3d-model-pipeline`.
+// is bundled into the app/APK; models are never stored in our repo. See
+// docs/furniture.md.
 //
 // It is deliberately NOT a general proxy: it only accepts a bare article id, only ever
 // hits the fixed rotera model URL, and only echoes CORS back to an allowlisted origin.

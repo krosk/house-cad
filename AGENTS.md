@@ -25,10 +25,10 @@ bridge into that environment as follows:
 - Claude Code workflows in `.claude/skills/` may not appear in Codex's native
   skill registry. When a task matches one, read its `SKILL.md` in full and
   follow the underlying procedure.
-- Claude Code memory referenced by project documentation may be unavailable to
-  Codex. Treat that as a compatibility gap: use repository-backed context,
-  state the missing context when material, and do not invent or silently
-  replace it.
+- All project knowledge is repo-backed (see "Where project knowledge lives" in
+  `CLAUDE.md`); there is no agent-private memory to consult. If a doc refers
+  to context you cannot find in the repo, state the gap rather than inventing
+  or silently replacing it.
 - Do not introduce Codex-specific memory or persistence files. Follow the
   repository's existing `CLAUDE.md`, `.claude/handoff.md`, design-doc, and
   implementation-doc persistence model.

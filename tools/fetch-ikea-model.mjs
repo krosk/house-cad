@@ -18,7 +18,7 @@
 // Only the PUBLIC static GLB is used (no auth). The richer rotera *data* endpoint
 // (official measurements, planeClassification, product name) needs a browser bearer
 // token, so it is NOT used here — dimensions are derived from the GLB's bounding box
-// instead (matches IKEA's published spec to ~1%). See memory `ikea-3d-model-pipeline`.
+// instead (matches IKEA's published spec to ~1%). See docs/furniture.md.
 
 import { mkdirSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';

@@ -163,6 +163,6 @@ feature.**
   OPEN: whether to ever let the user override an inferred surface (currently geometry alone decides);
   the direct/remote grab threshold `WAYPOINT_GRAB_M`=0.14 m needs on-device tuning.
 - **Desktop parity** — markers are AR-first, but the desktop 2D editor exists. Whether/how markers
-  render/edit in 2D is open (memory `ar-2d-parity`). Not required for the AR slice.
+  render/edit in 2D is open (see `docs/product-intent.md`). Not required for the AR slice.
 - **Do markers belong to a floor or span floors?** Assumed per-floor (like rectangles). A wire
   running between storeys would break that — out of scope for the first slice.

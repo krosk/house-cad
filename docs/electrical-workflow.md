@@ -115,6 +115,31 @@ wires remain dim in their normal type color. This inspection works for a normal 
 circuit, an unfinished unassigned component, and a multi-breaker conflict; it does not modify
 or store membership. In `ALL FLOORS`, every member glyph is outlined at its true elevation.
 
+## Owner decisions and their rationale
+
+These are settled; don't reopen them without the owner.
+
+- **Routing is automatic shortest path plus manual override.** A wire with an empty `via` list
+  takes the Dijkstra shortest route through the conduit graph; ordered `via` nodes force it
+  through specific junctions.
+- **Bare junction nodes are allowed** (nodes not bound to a device).
+- **Conduit node `z` is floor-relative, never absolute.** A floor-height edit re-stacks
+  elevations, so every higher node's world Z follows while its stored `z` stays put, and a riser
+  through the moved slab stretches to match. Storing absolute Z would desync on a height edit.
+- **Markers stay on one floor** (a device is mounted on one storey's wall). Only the conduit
+  network and wires are whole-house.
+- **Control links stay per-floor, intentionally not cross-floor.** A ground-floor switch driving an
+  upstairs light is authored as **two lights and two links**, so the light and its link print on
+  **both** floor sheets; the contractor needs to see it on each. A single cross-floor link would
+  print only once. Don't promote `electricalLinks` to `Project`.
+- **Junctions are pinned to walls by a dimension, not snapped on drop.** A `{node}` dimension
+  (`CONDUIT · DIMS`) makes the junction follow the wall on every later edit; a snap would not
+  re-track. It is solved one-way in `solveConduitNodes`, like a marker pin; z stays out of the
+  solver.
+- **Output:** the conduit network and routed wires are authoring scaffolding. They are always
+  excluded from plan sheets and change maps; in DXF they are an opt-in `wiring` layer (default
+  off). Markers and control links are unaffected.
+
 ## Status (as of this writing)
 
 - Conduit network, wires, routing, risers, wall-pinned junctions: **implemented**
