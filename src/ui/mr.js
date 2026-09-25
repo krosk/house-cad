@@ -116,7 +116,13 @@ export function setupMR(view, project, getFootprint) {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
     sprite.scale.set(0.12, 0.03, 1);
     sprite.position.set(0, 0.06, 0); // just above the tip
+    // The controller readout calls this EVERY frame; skip the canvas redraw + texture
+    // upload when nothing changed (a per-frame canvas upload can stall the Quest GPU).
+    let shown = null;
     const setText = (text, colorHex) => {
+      const key = `${colorHex}|${text}`;
+      if (key === shown) return;
+      shown = key;
       ctx.clearRect(0, 0, 256, 64);
       // Dark backing pill so the label stays legible over passthrough.
       ctx.fillStyle = 'rgba(15, 18, 24, 0.78)';
