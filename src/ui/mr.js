@@ -16,7 +16,7 @@ import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { Rectangle, WIRE_TYPES } from '../core/model.js';
-import { connectedRoomComponent } from '../core/geometry2d.js';
+import { connectedRoomComponent, recalibrationCorners } from '../core/geometry2d.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
@@ -2744,6 +2744,8 @@ export function setupMR(view, project, getFootprint) {
   let recalCorner = null;              // {cx, cy, a, b} selected corner; after lock a=wall 1 end, b=wall 2 end
   let recalLocked = false;             // RECAL: corner + wall order explicitly selected (else still previewing)
   let prevRecalStep = null;            // last reticle step number drawn (redraw the badge only on change)
+  let recalCornerCacheKey = null;       // composite edge intersections, rebuilt only when geometry changes
+  let recalCornerCache = [];
   // MARKER · EDIT drop type. Cycled by B/Y (or thumbstick-y) while in the mode, like
   // LEVEL cycles floors. Session-level (persists across mode switches). Extend the list
   // for new fixture types; each also needs a markerFace() branch, a
@@ -3118,25 +3120,26 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // Nearest plan-space corner of ANY surveyed rectangle to a plan point — RECAL's
-  // reference-point pick (so you can re-zero off any known corner, not just origin).
-  // Returns {cx, cy, a, b} where a/b are the far endpoints of the two walls meeting
-  // at the corner (a = along the rectangle's X edge, b = along its Y edge), so RECAL
-  // can badge them "wall 1" / "wall 2".
+  // Nearest structural edge intersection to a plan point. Unlike rectangle-owned
+  // corners, this includes composite corners/T-junctions whose horizontal and
+  // vertical edges belong to different zones (for example ROOM + INSULATION).
   function nearestPlanCorner(px, py) {
+    const signature = project.rectangles
+      .filter((r) => zoneKind(r) !== 'furniture')
+      .map((r) => {
+        const b = r.bounds;
+        return `${r.id}:${b.x0}:${b.y0}:${b.x1}:${b.y1}`;
+      })
+      .join('|');
+    const key = `${project.activeFloorId}:${signature}`;
+    if (key !== recalCornerCacheKey) {
+      recalCornerCacheKey = key;
+      recalCornerCache = recalibrationCorners(project.rectangles);
+    }
     let best = null, bestD = Infinity;
-    for (const r of project.rectangles) {
-      const b = r.bounds;
-      const corners = [
-        { cx: b.x0, cy: b.y0, a: { x: b.x1, y: b.y0 }, b: { x: b.x0, y: b.y1 } },
-        { cx: b.x1, cy: b.y0, a: { x: b.x0, y: b.y0 }, b: { x: b.x1, y: b.y1 } },
-        { cx: b.x1, cy: b.y1, a: { x: b.x0, y: b.y1 }, b: { x: b.x1, y: b.y0 } },
-        { cx: b.x0, cy: b.y1, a: { x: b.x1, y: b.y1 }, b: { x: b.x0, y: b.y0 } },
-      ];
-      for (const c of corners) {
-        const d = Math.hypot(px - c.cx, py - c.cy);
-        if (d < bestD) { bestD = d; best = c; }
-      }
+    for (const corner of recalCornerCache) {
+      const d = Math.hypot(px - corner.cx, py - corner.cy);
+      if (d < bestD) { bestD = d; best = corner; }
     }
     return best;
   }

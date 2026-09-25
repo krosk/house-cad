@@ -58,6 +58,56 @@ export function computeFootprint(rectangles) {
   return result;
 }
 
+/**
+ * Axis-aligned reference corners usable by AR recalibration.
+ *
+ * A useful surveyed corner is not necessarily owned by one rectangle: a room
+ * edge can terminate against the side of an insulation/wall rectangle. Build
+ * candidates from every horizontal/vertical structural-edge intersection so
+ * those composite corners and T-junctions are selectable too. Duplicate
+ * intersections (common where several zones share a boundary) collapse to one.
+ * Furniture is deliberately excluded because it is movable, not a building
+ * registration reference.
+ *
+ * Returns {cx,cy,a,b}; `a` is an endpoint along the horizontal edge and `b`
+ * along the vertical edge, matching RECAL's existing wall-ordering contract.
+ */
+export function recalibrationCorners(rectangles, epsilon = 1e-6) {
+  const horizontal = [];
+  const vertical = [];
+  for (const rect of rectangles || []) {
+    if (zoneKind(rect) === 'furniture') continue;
+    const bounds = rect?.bounds;
+    if (!bounds) continue;
+    const x0 = Math.min(bounds.x0, bounds.x1), x1 = Math.max(bounds.x0, bounds.x1);
+    const y0 = Math.min(bounds.y0, bounds.y1), y1 = Math.max(bounds.y0, bounds.y1);
+    if (x1 - x0 <= epsilon || y1 - y0 <= epsilon) continue;
+    horizontal.push({ y: y0, lo: x0, hi: x1 }, { y: y1, lo: x0, hi: x1 });
+    vertical.push({ x: x0, lo: y0, hi: y1 }, { x: x1, lo: y0, hi: y1 });
+  }
+
+  const candidates = new Map();
+  for (const h of horizontal) {
+    for (const v of vertical) {
+      if (v.x < h.lo - epsilon || v.x > h.hi + epsilon
+          || h.y < v.lo - epsilon || h.y > v.hi + epsilon) continue;
+      const cx = v.x, cy = h.y;
+      const ax = cx - h.lo > h.hi - cx ? h.lo : h.hi;
+      const by = cy - v.lo > v.hi - cy ? v.lo : v.hi;
+      const candidate = {
+        cx, cy,
+        a: { x: ax, y: cy },
+        b: { x: cx, y: by },
+        span: (h.hi - h.lo) + (v.hi - v.lo),
+      };
+      const key = `${Math.round(cx / epsilon)}:${Math.round(cy / epsilon)}`;
+      const previous = candidates.get(key);
+      if (!previous || candidate.span > previous.span) candidates.set(key, candidate);
+    }
+  }
+  return [...candidates.values()].map(({ span, ...corner }) => corner);
+}
+
 // Signed shoelace area of a closed or open ring. Polygon-clipping normally closes
 // its rings, but the modulo keeps this useful for either representation.
 function ringArea(ring) {
