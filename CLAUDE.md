@@ -182,3 +182,10 @@ Static Vite app → GitHub Pages. `vite.config.js` uses a relative `base` for pr
 ## Git workflow
 
 Commit and push **directly on `main`** — do **not** create feature branches. (Still only commit/push when the user asks.) Because pushing `main` triggers the Pages deploy above, **every push publishes** — call that out when relevant.
+
+For every non-trivial commit, include a descriptive commit body. Use it to record information and
+intent that cannot be readily derived from the diff: the user-facing reason for the change,
+important behavioral decisions or invariants, compatibility and migration implications,
+intentional limitations or deferred work, and the verification performed. Do not merely enumerate
+changed files or restate the implementation. A subject-only commit is acceptable only for a
+genuinely trivial change.
