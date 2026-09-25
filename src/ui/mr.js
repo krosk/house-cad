@@ -1176,8 +1176,17 @@ export function setupMR(view, project, getFootprint) {
     const canvas = document.createElement('canvas');
     canvas.width = ATLAS_W; canvas.height = ATLAS_H;
     const texture = new THREE.CanvasTexture(canvas);
-    // Same output path as the SpriteMaterial it replaces (tone mapping + color space).
-    const material = new THREE.ShaderMaterial({
+    const material = makeBillboardMaterial(texture);
+    const page = { canvas, ctx: canvas.getContext('2d'), texture, material, used: 0, dirty: false };
+    labelAtlas.pages.push(page);
+    return page;
+  }
+  // Camera-facing quads batched in one mesh, sampling `texture`: the vertex shader
+  // offsets each corner in VIEW space like THREE.Sprite, so every quad faces the
+  // viewer. Same output path as the SpriteMaterial it replaces (tone mapping + color
+  // space). Geometry: position = quad centre (x4), corner = metres offset, uv.
+  function makeBillboardMaterial(texture) {
+    return new THREE.ShaderMaterial({
       uniforms: { map: { value: texture } },
       vertexShader: `
         attribute vec2 corner; // label-local offset in metres (already scaled)
@@ -1200,9 +1209,6 @@ export function setupMR(view, project, getFootprint) {
         }`,
       transparent: true, depthTest: false, depthWrite: false,
     });
-    const page = { canvas, ctx: canvas.getContext('2d'), texture, material, used: 0, dirty: false };
-    labelAtlas.pages.push(page);
-    return page;
   }
   function dimLabelSlot(text, color) {
     const key = `${text}|${color}`;
@@ -1679,10 +1685,7 @@ export function setupMR(view, project, getFootprint) {
   // status ring are shared across types; the faceplate interior is drawn per type (outlet
   // = French Type E socket, switch = rocker). The ring changes orange->white when fully
   // pinned. Extend markerFace() for new types (light, ethernet, …).
-  function markerTexture(marker) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128; canvas.height = 128;
-    const ctx = canvas.getContext('2d');
+  function drawMarkerGlyph(ctx, marker) {
     const ringColor = marker._full ? '#ffffff' : '#ff9f43';
     // Dark badge + constraint-status ring keep the white faceplate readable over
     // passthrough and on the projected floor copy.
@@ -1696,7 +1699,6 @@ export function setupMR(view, project, getFootprint) {
     ctx.lineWidth = 3; ctx.strokeStyle = '#cbd5e1'; ctx.stroke();
 
     markerFace(ctx, marker.type);
-    return new THREE.CanvasTexture(canvas);
   }
 
   // Per-type faceplate interior, drawn inside the shared white faceplate above.
@@ -1938,38 +1940,112 @@ export function setupMR(view, project, getFootprint) {
 
   // Highlight overlay for an outlet. It occupies the exact same footprint as the
   // icon and draws inward from its edge, so hover/selection never changes its size.
+  let markerOutlineTex = null; // shared by every outline; never disposed by clearMarkers
   function markerOutlineTexture() {
+    if (markerOutlineTex) return markerOutlineTex;
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
     ctx.beginPath(); ctx.arc(64, 64, 53, 0, Math.PI * 2);
     ctx.lineWidth = 12; ctx.strokeStyle = '#ffffff'; ctx.stroke();
-    return new THREE.CanvasTexture(canvas);
+    markerOutlineTex = new THREE.CanvasTexture(canvas);
+    return markerOutlineTex;
   }
 
-  function makeMarkerSprite(marker) {
-    const tex = markerTexture(marker);
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
-    spr.scale.set(0.09, 0.09, 1);
-    spr.renderOrder = 32; // above floor overlays/highlights (badges are 30)
-    spr.userData.markerId = marker.id;
-    spr.userData.markerRole = 'wall';
-    return spr;
+  // ---- Batched marker glyphs ----------------------------------------------------
+  // PROJECT · PERF on the owner's Quest measured the marker layer alone at ~47 ms of
+  // GPU per frame (the whole plan cost the same), when it was one Sprite + one floor
+  // Mesh per marker, each with its OWN 128x128 CanvasTexture (168 textures for 84
+  // markers). Now a glyph depends only on type + pinned ring, so each variant is
+  // painted once into a shared atlas, and a floor's markers draw as TWO meshes:
+  // camera-facing wall glyphs (makeBillboardMaterial) and flat floor icons.
+  // Invisible proxies keep userData.markerId / markerRole ('wall' | 'floor') and the
+  // position, so picking, grab distance and the live drag work unchanged; after
+  // moving proxies call refreshMarkerBatches(). Outlines stay individual (hidden
+  // unless highlighted, so they cost nothing at rest).
+  const MARKER_TEX = 128, MARKER_ATLAS = 1024, MARKER_COLS = MARKER_ATLAS / MARKER_TEX;
+  const MARKER_SLOTS = MARKER_COLS * MARKER_COLS; // 64 ≥ every type × pinned/unpinned
+  const MARKER_WALL_HALF = 0.045, MARKER_FLOOR_HALF = 0.05; // the old 0.09 sprite / 0.10 plane
+  const markerAtlas = { ctx: null, texture: null, wallMat: null, floorMat: null, slots: new Map(), dirty: false };
+  function markerGlyphSlot(marker) {
+    if (!markerAtlas.texture) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = MARKER_ATLAS;
+      markerAtlas.ctx = canvas.getContext('2d');
+      markerAtlas.texture = new THREE.CanvasTexture(canvas);
+      markerAtlas.wallMat = makeBillboardMaterial(markerAtlas.texture);
+      markerAtlas.floorMat = new THREE.MeshBasicMaterial({
+        map: markerAtlas.texture, transparent: true, opacity: 0.78,
+        side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+      });
+    }
+    const key = `${marker.type}|${marker._full ? 1 : 0}`;
+    let slot = markerAtlas.slots.get(key);
+    if (slot) return slot;
+    const i = Math.min(markerAtlas.slots.size, MARKER_SLOTS - 1); // full: reuse the last cell
+    const x = (i % MARKER_COLS) * MARKER_TEX, y = Math.floor(i / MARKER_COLS) * MARKER_TEX;
+    const ctx = markerAtlas.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.clearRect(0, 0, MARKER_TEX, MARKER_TEX);
+    drawMarkerGlyph(ctx, marker);
+    ctx.restore();
+    markerAtlas.dirty = true;
+    const inset = 0.5 / MARKER_ATLAS; // half a texel, so neighbours never bleed in
+    slot = { u0: x / MARKER_ATLAS + inset, u1: (x + MARKER_TEX) / MARKER_ATLAS - inset,
+      v0: 1 - (y + MARKER_TEX) / MARKER_ATLAS + inset, v1: 1 - y / MARKER_ATLAS - inset };
+    markerAtlas.slots.set(key, slot);
+    return slot;
   }
-
-  // A second copy of the outlet glyph projected flat onto the plan overlay. DIMS
-  // uses this as the marker's dimension reference; OUTLET continues to target the
-  // wall-height sprite, keeping the two editing domains spatially unambiguous.
-  function makeMarkerFloorIcon(marker) {
-    const tex = markerTexture(marker);
-    const mesh = new THREE.Mesh(markerFloorGeom, new THREE.MeshBasicMaterial({
-      map: tex, transparent: true, opacity: 0.78,
-      side: THREE.DoubleSide, depthTest: false, depthWrite: false,
-    }));
-    mesh.renderOrder = 31;
-    mesh.userData.markerId = marker.id;
-    mesh.userData.markerRole = 'floor';
+  function makeMarkerProxy(marker, role) {
+    const proxy = new THREE.Object3D();
+    proxy.userData.markerId = marker.id;
+    proxy.userData.markerRole = role;
+    proxy.userData.glyphSlot = markerGlyphSlot(marker);
+    return proxy;
+  }
+  // Write every quad of a marker batch from its proxies' current positions.
+  function writeMarkerBatch(mesh) {
+    const { proxies, flat } = mesh.userData.markerBatch;
+    const pos = mesh.geometry.attributes.position;
+    proxies.forEach((proxy, q) => {
+      const p = proxy.position;
+      for (let k = 0; k < 4; k++) {
+        if (!flat) { pos.setXYZ(q * 4 + k, p.x, p.y, p.z); continue; }
+        // Flat on the floor, texture top toward plan +y (local -z), like the old
+        // PlaneGeometry(0.10).rotateX(-PI/2).
+        const sx = k === 0 || k === 3 ? -1 : 1, sz = k < 2 ? 1 : -1;
+        pos.setXYZ(q * 4 + k, p.x + sx * MARKER_FLOOR_HALF, p.y, p.z + sz * MARKER_FLOOR_HALF);
+      }
+    });
+    pos.needsUpdate = true;
+  }
+  function makeMarkerBatch(proxies, flat) {
+    const n = proxies.length;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 12), 3));
+    const uv = [], corner = [], index = [];
+    proxies.forEach((proxy, q) => {
+      const { u0, u1, v0, v1 } = proxy.userData.glyphSlot;
+      uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+      const h = MARKER_WALL_HALF;
+      corner.push(-h, -h, h, -h, h, h, -h, h);
+      index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
+    });
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    if (!flat) geometry.setAttribute('corner', new THREE.Float32BufferAttribute(corner, 2));
+    geometry.setIndex(index);
+    const mesh = new THREE.Mesh(geometry, flat ? markerAtlas.floorMat : markerAtlas.wallMat);
+    mesh.renderOrder = flat ? 31 : 32; // above floor overlays/highlights (badges are 30)
+    mesh.frustumCulled = false;
+    mesh.userData.markerBatch = { proxies, flat };
+    writeMarkerBatch(mesh);
+    if (markerAtlas.dirty) { markerAtlas.texture.needsUpdate = true; markerAtlas.dirty = false; }
     return mesh;
+  }
+  // Re-sync every marker batch after proxies moved (the live marker grip-drag).
+  function refreshMarkerBatches() {
+    for (const child of markerGroup.children) if (child.userData.markerBatch) writeMarkerBatch(child);
   }
 
   function makeMarkerOutline(marker, role) {
@@ -1994,8 +2070,10 @@ export function setupMR(view, project, getFootprint) {
   function clearMarkers() {
     for (const child of [...markerGroup.children]) {
       markerGroup.remove(child);
-      child.material?.map?.dispose();
-      child.material?.dispose();
+      // Batches own their geometry but share the atlas materials; outlines own their
+      // material but share markerFloorGeom / the sprite quad and the outline texture.
+      if (child.userData.markerBatch) child.geometry.dispose();
+      else child.material?.dispose();
     }
   }
 
@@ -2003,12 +2081,14 @@ export function setupMR(view, project, getFootprint) {
   // visual-only: stacked overview markers remain inert even when WIRE uses their
   // outlines to reveal a whole-house circuit.
   function addFloorMarkers(floor, elevation = 0, withOutlines = true) {
+    const wallProxies = [], floorProxies = [];
     for (const m of floor.markers) {
-      const spr = makeMarkerSprite(m);
+      const spr = makeMarkerProxy(m, 'wall');
       spr.position.set(m.x, elevation + m.z, -m.y);
-      const floorIcon = makeMarkerFloorIcon(m);
+      const floorIcon = makeMarkerProxy(m, 'floor');
       floorIcon.position.set(m.x, elevation + 0.016, -m.y);
       markerGroup.add(spr, floorIcon);
+      wallProxies.push(spr); floorProxies.push(floorIcon);
       if (!withOutlines) continue;
       const wallOutline = makeMarkerOutline(m, 'wall');
       wallOutline.position.copy(spr.position);
@@ -2016,6 +2096,7 @@ export function setupMR(view, project, getFootprint) {
       floorOutline.position.set(m.x, elevation + 0.018, -m.y);
       markerGroup.add(wallOutline, floorOutline);
     }
+    if (floor.markers.length) markerGroup.add(makeMarkerBatch(floorProxies, true), makeMarkerBatch(wallProxies, false));
   }
 
   // ---- Vertical (Z) dimension visuals. Static, non-pickable height dims drawn in the
@@ -3906,6 +3987,7 @@ export function setupMR(view, project, getFootprint) {
       if (visual.userData.markerRole.startsWith('wall')) visual.position.set(marker.x, marker.z, -marker.y);
       else visual.position.set(marker.x, visual.userData.markerRole === 'floor-outline' ? 0.018 : 0.016, -marker.y);
     }
+    refreshMarkerBatches(); // the glyph batches draw from the proxies just moved
   }
 
   function pressKey(k) {
@@ -7179,7 +7261,7 @@ export function setupMR(view, project, getFootprint) {
     hoverStack = [];
     hoverMarker = null;
     for (const visual of markerGroup.children) {
-      if (visual.userData.markerRole.endsWith('-outline')) visual.visible = false;
+      if (visual.userData.markerRole?.endsWith('-outline')) visual.visible = false; // batches have no role
     }
     const modeId = modes[currentMode].id;
     // electricalGroup carries the LINK switch→light control routes only; the routed
