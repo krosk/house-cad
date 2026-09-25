@@ -4029,13 +4029,13 @@ export function setupMR(view, project, getFootprint) {
   // Building the compressed view URL is asynchronous, so keep the current variant
   // warm instead of awaiting compression after the trigger. Project change events
   // invalidate ONLY this cache; AR visuals still rebuild explicitly elsewhere.
-  let shareUrlCache = null; // { url, markers }
+  let shareUrlCache = null; // { url, markers, furniture }
   let shareUrlGeneration = 0;
   let shareUrlTimer = null;
-  async function refreshShareUrl(generation, markers) {
+  async function refreshShareUrl(generation, markers, furniture) {
     try {
-      const url = await buildShareUrl(project, { markers });
-      if (generation === shareUrlGeneration) shareUrlCache = { url, markers };
+      const url = await buildShareUrl(project, { markers, furniture });
+      if (generation === shareUrlGeneration) shareUrlCache = { url, markers, furniture };
     } catch (error) {
       if (generation === shareUrlGeneration) shareUrlCache = null;
       rlog('share URL precompute failed', String(error?.message || error));
@@ -4044,9 +4044,11 @@ export function setupMR(view, project, getFootprint) {
   function scheduleShareUrlRefresh() {
     shareUrlCache = null;
     const generation = ++shareUrlGeneration;
-    const markers = getOutputSettings().markerIcons;
+    const settings = getOutputSettings();
+    const markers = settings.markerIcons;
+    const furniture = settings.furniture;
     clearTimeout(shareUrlTimer);
-    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers), 0);
+    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers, furniture), 0);
   }
   project.onChange(scheduleShareUrlRefresh);
   scheduleShareUrlRefresh();
@@ -4174,7 +4176,8 @@ export function setupMR(view, project, getFootprint) {
     // cache so writeText starts inside the trigger activation; it never silently
     // substitutes a file. QR independently creates and delivers its PNG.
     if (format === 'link') {
-      const cached = shareUrlCache?.markers === settings.markerIcons ? shareUrlCache.url : null;
+      const cached = shareUrlCache?.markers === settings.markerIcons
+        && shareUrlCache?.furniture === settings.furniture ? shareUrlCache.url : null;
       if (cached && navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(cached);
@@ -4193,8 +4196,12 @@ export function setupMR(view, project, getFootprint) {
       let url;
       let blob;
       try {
-        const cached = shareUrlCache?.markers === settings.markerIcons ? shareUrlCache.url : null;
-        url = cached || await buildShareUrl(project, { markers: settings.markerIcons });
+        const cached = shareUrlCache?.markers === settings.markerIcons
+          && shareUrlCache?.furniture === settings.furniture ? shareUrlCache.url : null;
+        url = cached || await buildShareUrl(project, {
+          markers: settings.markerIcons,
+          furniture: settings.furniture,
+        });
         blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
       } catch (error) {
         rlog('qr generation failed', String(error?.message || error));
@@ -5607,7 +5614,7 @@ export function setupMR(view, project, getFootprint) {
   // and the left-controller sheet immediately; the authored project is untouched.
   onOutputSettingsChange(() => {
     sheetDirty = true;
-    scheduleShareUrlRefresh(); // marker-icons toggle changes the shared-view payload
+    scheduleShareUrlRefresh(); // marker-icons/furniture toggles change the view payload
     if (exportMenu.group.visible) redrawExportMenu();
     if (sheetPanel.group.visible) redrawSheet();
   });
@@ -5720,12 +5727,14 @@ export function setupMR(view, project, getFootprint) {
     saved.controls = view.controls.enabled;
     saved.meshVisible = view.house?.visible;
     saved.markerLightsVisible = view.markerLights?.visible;
+    saved.furnitureModelsVisible = view.furnitureModels?.visible;
 
     scene.background = null; // reveal passthrough
     if (view.grid) view.grid.visible = false;
     if (view.floor) view.floor.visible = false;
     if (view.house) view.house.visible = false; // hide the extruded walls
     if (view.markerLights) view.markerLights.visible = false;
+    if (view.furnitureModels) view.furnitureModels.visible = false;
     view.hideMesh = true; // keep them hidden even as survey edits rebuild the mesh
     view.controls.enabled = false;
 
@@ -5794,6 +5803,7 @@ export function setupMR(view, project, getFootprint) {
     if (view.floor) view.floor.visible = saved.floorVisible ?? true;
     if (view.house) view.house.visible = saved.meshVisible ?? true;
     if (view.markerLights) view.markerLights.visible = saved.markerLightsVisible ?? true;
+    if (view.furnitureModels) view.furnitureModels.visible = saved.furnitureModelsVisible ?? true;
     view.controls.enabled = saved.controls ?? true;
     view._resize(); // XR left the framebuffer at headset size
   });

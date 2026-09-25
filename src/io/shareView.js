@@ -16,7 +16,7 @@
 
 import { deserializeInto, FILE_VERSION } from './serialize.js';
 
-export const VIEW_SCHEMA = 1;
+export const VIEW_SCHEMA = 2;
 const VIEW_APP = 'house-cad-view';
 const HASH_KEY = 'view';
 
@@ -28,12 +28,15 @@ const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3)
 // plain zone carries none, so they are emitted only when present.
 const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top'];
 
-// Project → compact view object. `markers` opts them in (they roughly double the size
-// and cost the QR-code comfort margin), so the default is massing only.
-export function serializeView(project, { markers = false } = {}) {
+// Project → compact view object. Furniture placements are compact enough to include by
+// default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
+export function serializeView(project, { markers = false, furniture = true } = {}) {
   const kinds = [...new Set(project.floors.flatMap((f) => f.rectangles.map((r) => r.kind || 'room')))];
   const markerTypes = markers
     ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.type || 'outlet')))]
+    : [];
+  const furnitureArticles = furniture
+    ? [...new Set(project.floors.flatMap((f) => (f.furniture || []).map((item) => String(item.article))))]
     : [];
   return {
     app: VIEW_APP,
@@ -44,6 +47,7 @@ export function serializeView(project, { markers = false } = {}) {
     i: Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId)),
     k: kinds,
     t: markerTypes,
+    a: furnitureArticles,
     // Positional arrays keep a large marker set within QR version 40 after deflate.
     // version 40 even after deflate. Trailing defaults are removed before encoding.
     f: project.floors.map((f) => {
@@ -53,15 +57,25 @@ export function serializeView(project, { markers = false } = {}) {
         while (rc.length > 6 && rc.at(-1) == null) rc.pop();
         return rc;
       });
-      const floor = [f.name, mm(f.height), rects];
-      if (markers) {
-        floor.push(f.markers.map((m) => {
+      const floorMarkers = markers
+        ? f.markers.map((m) => {
           const mk = [markerTypes.indexOf(m.type || 'outlet'), mm(m.x), mm(m.y), mm(m.z)];
           if (m.zDatum) mk.push(1); // a defined (grab-locking / dimensioned) height
           return mk;
-        }));
-      }
-      return floor;
+        })
+        : [];
+      const floorFurniture = furniture
+        ? (f.furniture || []).map((item) => {
+          const placed = [
+            furnitureArticles.indexOf(String(item.article)),
+            mm(item.x), mm(item.y), mm(item.z || 0), mm(item.rotationY || 0),
+          ];
+          if (item.name) placed.push(item.name);
+          return placed;
+        })
+        : [];
+      // v2 fixes both optional lanes at stable indices: markers=3, furniture=4.
+      return [f.name, mm(f.height), rects, floorMarkers, floorFurniture];
     }),
   };
 }
@@ -73,7 +87,7 @@ export function loadView(project, view) {
       || view.v !== VIEW_SCHEMA || !Array.isArray(view.f)) {
     throw new Error('Not a house-cad view link.');
   }
-  let rid = 0, mid = 0; // ids only need to be present + unique (nothing references them)
+  let rid = 0, mid = 0, fnid = 0; // fresh local ids; compact payload carries no ids
   const sourceFloors = view.f.map((f) => ({
     name: f[0], height: f[1],
     rects: (f[2] || []).map((r) => ({
@@ -83,6 +97,11 @@ export function loadView(project, view) {
     })),
     markers: (f[3] || []).map((m) => ({
       t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
+    })),
+    furniture: (f[4] || []).map((item) => ({
+      article: view.a?.[item[0]] || String(item[0]),
+      x: item[1], y: item[2], z: item[3] || 0, rotationY: item[4] || 0,
+      ...(item[5] ? { name: item[5] } : {}),
     })),
   }));
   const floors = sourceFloors.map((f, i) => ({
@@ -100,7 +119,11 @@ export function loadView(project, view) {
       ...(m.d ? { zDatum: 'floor' } : {}),
     })),
     electricalLinks: [],
-    furniture: [],
+    furniture: (f.furniture || []).map((item) => ({
+      id: `fn${++fnid}`, article: String(item.article),
+      x: item.x, y: item.y, z: item.z || 0, rotationY: item.rotationY || 0,
+      name: item.name || null,
+    })),
   }));
   if (!floors.length) throw new Error('View link has no floors.');
   const groundIndex = view.g;

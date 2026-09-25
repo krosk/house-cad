@@ -184,6 +184,7 @@ function rebuild() {
     name: f.name,
     height: f.height,
     markers: f.markers,
+    furniture: f.furniture,
     constraints: f.constraints,
     rectangles: f.rectangles,
   }));
@@ -648,7 +649,7 @@ document.getElementById('save').addEventListener('click', () => {
 });
 
 // Copy a view-only 3D link: solved geometry in the URL fragment, no server, not editable.
-// Massing only by default so the link stays short (QR-able); markers are opt-in.
+// Architecture + furniture by default; markers remain opt-in to keep the link QR-able.
 document.getElementById('share-view').addEventListener('click', async () => {
   try {
     const url = await buildShareUrl(project, { markers: false });

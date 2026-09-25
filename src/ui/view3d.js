@@ -3,6 +3,8 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
   const canvas = document.createElement('canvas');
@@ -242,6 +244,19 @@ export class View3D {
     this.scene.add(this.house);
     this.markerLights = new THREE.Group();
     this.scene.add(this.markerLights);
+    this.furnitureModels = new THREE.Group();
+    this.scene.add(this.furnitureModels);
+    this.furnitureBuildToken = 0;
+    this.furnitureSources = new Map();
+    this.furniturePending = new Map();
+    this.furnitureCatalog = {};
+    this.ikeaProxy = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
+    const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
+    this.furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
+    fetch(import.meta.env.BASE_URL + 'furniture/index.json')
+      .then((response) => (response.ok ? response.json() : {}))
+      .then((catalog) => { this.furnitureCatalog = catalog || {}; })
+      .catch(() => { this.furnitureCatalog = {}; });
     // While MR is active the extruded walls must stay hidden (the flat plan is
     // shown instead). setGeometry rebuilds on every model change, so it honors
     // this flag rather than a one-time visibility toggle.
@@ -297,6 +312,8 @@ export class View3D {
     for (const m of this.house.children) m.geometry.dispose();
     this.house.clear();
     this.markerLights.clear();
+    this._clearFurniture();
+    const furnitureToken = ++this.furnitureBuildToken;
 
     const list = Array.isArray(floors)
       ? floors
@@ -306,7 +323,7 @@ export class View3D {
       const {
         geometry, floorGeometry, wallGeometry, ceilingGeometry,
         doorGeometry, windowGeometry, outlineGeometry, stairGeometry, elevation, floorId, name,
-        constraints, rectangles,
+        constraints, rectangles, furniture,
       } = entry;
       const parts = geometry
         ? [[geometry, this.material, 'massing']]
@@ -357,10 +374,104 @@ export class View3D {
         fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
         this.markerLights.add(fixture);
       }
+      for (const item of furniture || []) {
+        this._addFurniture(item, entry, furnitureToken);
+      }
     }
     this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
     this.markerLights.visible = !this.hideMesh;
+    this.furnitureModels.visible = !this.hideMesh;
     this._updateLightShadows();
+  }
+
+  _clearFurniture() {
+    for (const child of [...this.furnitureModels.children]) {
+      this.furnitureModels.remove(child);
+      child.traverse?.((object) => {
+        if (!object.isMesh || !object.material) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) material?.dispose?.();
+        if (object.userData.furniturePlaceholder) object.geometry?.dispose?.();
+      });
+    }
+  }
+
+  async _loadFurnitureSource(article) {
+    if (this.furnitureSources.has(article)) return this.furnitureSources.get(article);
+    if (this.furniturePending.has(article)) return this.furniturePending.get(article);
+    if (!this.ikeaProxy) throw new Error('no VITE_IKEA_PROXY');
+    const url = `${this.ikeaProxy}/${article}`;
+    const pending = (async () => {
+      const cache = globalThis.caches ? await caches.open('house-cad:furniture:v1') : null;
+      const hit = cache && await cache.match(url);
+      let buffer;
+      if (hit) buffer = await hit.arrayBuffer();
+      else {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`proxy ${response.status}`);
+        if (cache) await cache.put(url, response.clone());
+        buffer = await response.arrayBuffer();
+      }
+      const scene = await new Promise((resolve, reject) =>
+        this.furnitureLoader.parse(buffer, '', (gltf) => resolve(gltf.scene), reject));
+      this.furnitureSources.set(article, scene);
+      return scene;
+    })();
+    this.furniturePending.set(article, pending);
+    try { return await pending; } finally { this.furniturePending.delete(article); }
+  }
+
+  _furnitureInstance(source) {
+    const instance = source.clone();
+    instance.traverse((object) => {
+      if (!object.isMesh || !object.material) return;
+      object.material = Array.isArray(object.material)
+        ? object.material.map((material) => material.clone())
+        : object.material.clone();
+      object.castShadow = true;
+      object.receiveShadow = true;
+    });
+    return instance;
+  }
+
+  _furnitureFallback(article) {
+    const mmSize = this.furnitureCatalog[article]?.sizeMm || [600, 600, 600];
+    const [width, height, depth] = mmSize.map((value) => value / 1000);
+    const object = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      new THREE.MeshStandardMaterial({ color: 0x8a9aa5, transparent: true, opacity: 0.55 }),
+    );
+    object.position.y = height / 2;
+    object.userData.furniturePlaceholder = article;
+    return object;
+  }
+
+  _addFurniture(item, entry, token) {
+    const place = (object) => {
+      if (token !== this.furnitureBuildToken) {
+        object.traverse?.((child) => {
+          if (!child.isMesh || !child.material) return;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          for (const material of materials) material?.dispose?.();
+          if (child.userData.furniturePlaceholder) child.geometry?.dispose?.();
+        });
+        return;
+      }
+      object.position.set(
+        Number(item.x) || 0,
+        (Number(entry.elevation) || 0) + (Number(item.z) || 0),
+        -(Number(item.y) || 0),
+      );
+      object.rotation.y = THREE.MathUtils.degToRad(Number(item.rotationY) || 0);
+      object.userData.floorId = entry.floorId || null;
+      object.userData.furnitureId = item.id || null;
+      object.visible = this.floorFilter == null || object.userData.floorId === this.floorFilter;
+      this.furnitureModels.add(object);
+    };
+    const article = String(item.article);
+    this._loadFurnitureSource(article)
+      .then((source) => place(this._furnitureInstance(source)))
+      .catch(() => place(this._furnitureFallback(article)));
   }
 
   _markerAccent(type) {
@@ -478,6 +589,9 @@ export class View3D {
     }
     for (const fixture of this.markerLights.children) {
       fixture.visible = floorId == null || fixture.userData.floorId === floorId;
+    }
+    for (const object of this.furnitureModels.children) {
+      object.visible = floorId == null || object.userData.floorId === floorId;
     }
     this._updateLightShadows();
     this.frameModel();
