@@ -6202,6 +6202,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   renderer.xr.addEventListener('sessionstart', async () => {
+    perfStart();
     const session = renderer.xr.getSession();
 
     // Stash desktop state so we can restore it on exit.
@@ -6259,6 +6260,7 @@ export function setupMR(view, project, getFootprint) {
   });
 
   renderer.xr.addEventListener('sessionend', () => {
+    perfStop();
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
     fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; timeText = '—'; // fresh fps probe per session
@@ -6698,6 +6700,108 @@ export function setupMR(view, project, getFootprint) {
   // Average CPU ms per frame in onXRFrame ("js") and in renderer.render ("render"),
   // from View3D.xrTiming. Both small while fps is low ⇒ the GPU is the bottleneck.
   let timeText = '—';
+
+  // ---- ?perf diagnostic: what each overlay layer costs the GPU ------------------
+  // Open the app with ?perf (e.g. index.html?perf) and hold a view. The sweep cycles
+  // through PERF_LAYERS, hiding one layer per PERF_WINDOW_MS, and the debug HUD lists
+  // each layer's cost = (time with everything) − (time without that layer). Time is
+  // GPU ms per frame from EXT_disjoint_timer_query_webgl2 when available, else the
+  // frame interval. Layers are hidden only between scene.onBeforeRender and
+  // onAfterRender, and restored right after, so no editing state is touched.
+  const PERF_MODE = new URLSearchParams(location.search).has('perf');
+  const PERF_WINDOW_MS = 1500, PERF_SETTLE_MS = 300;
+  const PERF_LAYERS = [
+    ['all', () => []],
+    ['fill', () => planGroup.children.filter((o) => o.material === fillMat)],
+    ['zones', () => planGroup.children.filter((o) => [...zoneFillMatCache.values()].includes(o.material))],
+    ['edges', () => planGroup.children.filter((o) => o.material === lockedMat || [...edgeMatCache.values()].includes(o.material))],
+    ['dimln', () => planGroup.children.filter((o) => o.material === dimMat || o.material === markerDimMat || o.material === dimConflictMat)],
+    ['labels', () => planGroup.children.filter((o) => o.userData.dimLabelBatch)],
+    ['marker', () => [markerGroup]],
+    ['zdims', () => [zDimGroup]],
+    ['links', () => [electricalGroup, routedWireGroup]],
+    ['condt', () => [conduitGroup, adjacentGroup, pipeGroup]],
+    ['furn', () => [furnitureGroup]],
+    ['plan', () => [planGroup]], // the whole plan; what remains is HUD + controllers
+  ];
+  const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
+    ext: null, gl: null, active: false, pending: [], source: 'frame' };
+  function perfRecord(name, ms) {
+    const s = perf.samples.get(name) ?? perf.samples.set(name, { sum: 0, n: 0 }).get(name);
+    s.sum += ms; s.n++;
+  }
+  // Per XR frame: advance the sweep, file this frame's interval, collect timer results.
+  function perfFrame(time, dt) {
+    if (perf.phaseStart < 0) perf.phaseStart = time;
+    if (time - perf.phaseStart >= PERF_WINDOW_MS) {
+      const name = PERF_LAYERS[perf.phase][0];
+      const s = perf.samples.get(name);
+      if (s?.n) perf.result.set(name, s.sum / s.n);
+      perf.samples.delete(name);
+      perf.phase = (perf.phase + 1) % PERF_LAYERS.length;
+      perf.phaseStart = time;
+    }
+    const settled = time - perf.phaseStart >= PERF_SETTLE_MS;
+    perf.current = settled ? PERF_LAYERS[perf.phase][0] : null;
+    if (!perf.ext && perf.current && dt > 0) perfRecord(perf.current, dt);
+    const gl = perf.gl;
+    while (perf.ext && perf.pending.length) {
+      const { query, name } = perf.pending[0];
+      if (!gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) break;
+      const ns = gl.getQueryParameter(query, gl.QUERY_RESULT);
+      if (!gl.getParameter(perf.ext.GPU_DISJOINT_EXT) && name) perfRecord(name, ns / 1e6);
+      gl.deleteQuery(query);
+      perf.pending.shift();
+    }
+  }
+  function perfBeforeRender() {
+    if (!renderer.xr.isPresenting) return;
+    // Hide for the whole window (settling included); only recording waits to settle.
+    perf.hidden = PERF_LAYERS[perf.phase][1]().filter((o) => o.visible);
+    for (const o of perf.hidden) o.visible = false;
+    if (perf.ext && perf.pending.length < 8) {
+      const query = perf.gl.createQuery();
+      perf.gl.beginQuery(perf.ext.TIME_ELAPSED_EXT, query);
+      perf.active = { query, name: perf.current }; // null while settling → not recorded
+    }
+  }
+  function perfAfterRender() {
+    for (const o of perf.hidden) o.visible = true;
+    perf.hidden = [];
+    if (perf.active) {
+      perf.gl.endQuery(perf.ext.TIME_ELAPSED_EXT);
+      perf.pending.push(perf.active);
+      perf.active = false;
+    }
+  }
+  function perfStart() {
+    if (!PERF_MODE) return;
+    perf.gl = renderer.getContext();
+    perf.ext = perf.gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    perf.source = perf.ext ? 'gpu' : 'frame';
+    Object.assign(perf, { phase: 0, phaseStart: -1, pending: [], active: false });
+    perf.samples.clear(); perf.result.clear();
+    scene.onBeforeRender = perfBeforeRender;
+    scene.onAfterRender = perfAfterRender;
+  }
+  function perfStop() {
+    if (!PERF_MODE) return;
+    scene.onBeforeRender = () => {};
+    scene.onAfterRender = () => {};
+    for (const { query } of perf.pending) perf.gl.deleteQuery(query);
+    perf.pending = [];
+  }
+  // HUD lines: the running measurement, then each layer's cost vs 'all', two per line.
+  function perfHudLines() {
+    const all = perf.result.get('all');
+    const cells = PERF_LAYERS.slice(1).map(([name]) => {
+      const t = perf.result.get(name);
+      return `${name.padEnd(6)} ${all != null && t != null ? (all - t).toFixed(1).padStart(5) : '    ?'}`;
+    });
+    const out = [`${perf.source}:  all ${all != null ? all.toFixed(1) : '?'} ms [${PERF_LAYERS[perf.phase][0]}]`];
+    for (let i = 0; i < cells.length; i += 2) out.push(cells.slice(i, i + 2).join('  '));
+    return out;
+  }
   let exitWasActive = false; // EXIT bar shown last frame -> force one redraw when it clears
   let exiting = false;   // guard so session.end() fires once
 
@@ -6874,6 +6978,7 @@ export function setupMR(view, project, getFootprint) {
 
   function onXRFrame(time, frame) {
     currentFrame = frame;
+    if (PERF_MODE) perfFrame(time, fpsPrevTime >= 0 ? time - fpsPrevTime : 0);
     if (fpsPrevTime >= 0) fpsWorstMs = Math.max(fpsWorstMs, time - fpsPrevTime);
     if (fpsSince < 0) fpsSince = time;
     fpsPrevTime = time;
@@ -7040,6 +7145,12 @@ export function setupMR(view, project, getFootprint) {
         ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
+      // ?perf: keep build/fps/draw and give the rest of the panel to the layer sweep.
+      if (PERF_MODE) {
+        lines.splice(1, 1); // drop update:
+        lines.splice(3);    // keep build, fps, draw
+        lines.push(...perfHudLines());
+      }
       for (const d of debugs) d.setLines(lines);
     }
     // Floor preview + edge highlight, depending on the current mode.
