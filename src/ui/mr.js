@@ -6079,6 +6079,7 @@ export function setupMR(view, project, getFootprint) {
   renderer.xr.addEventListener('sessionend', () => {
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
+    fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; // fresh fps probe per session
     anchor = null;
     anchorPoseMissing = false;
     startupPlacementPending = false;
@@ -6511,6 +6512,9 @@ export function setupMR(view, project, getFootprint) {
   let exitHoldStart = 0; // performance-time when the hold began (0 = not held)
   let exitProgress = 0;  // 0..1, for the HUD countdown
   let lastHudAt = -Infinity; // ms of the last debug-HUD redraw (throttled; see onXRFrame)
+  // Frame-rate probe for the debug HUD: frames counted and the longest frame gap seen
+  // since the last HUD refresh, so a steady rate and a periodic hitch both show up.
+  let fpsFrames = 0, fpsSince = -1, fpsPrevTime = -1, fpsWorstMs = 0, fpsText = '—';
   let exitWasActive = false; // EXIT bar shown last frame -> force one redraw when it clears
   let exiting = false;   // guard so session.end() fires once
 
@@ -6687,6 +6691,10 @@ export function setupMR(view, project, getFootprint) {
 
   function onXRFrame(time, frame) {
     currentFrame = frame;
+    if (fpsPrevTime >= 0) fpsWorstMs = Math.max(fpsWorstMs, time - fpsPrevTime);
+    if (fpsSince < 0) fpsSince = time;
+    fpsPrevTime = time;
+    fpsFrames++;
     // Give tracking a few frames to settle, then expose the plan immediately with a
     // provisional placement: active-floor origin directly below the initial headset,
     // 1.50 m down, with plan +Y aligned to the viewer's horizontal forward direction.
@@ -6813,6 +6821,10 @@ export function setupMR(view, project, getFootprint) {
     if (exitProgress > 0 || exitWasActive || time - lastHudAt >= 500) {
       lastHudAt = time;
       exitWasActive = exitProgress > 0;
+      if (time - fpsSince >= 500) {
+        fpsText = `${Math.round((fpsFrames * 1000) / (time - fpsSince))}  (worst ${Math.round(fpsWorstMs)} ms)`;
+        fpsFrames = 0; fpsSince = time; fpsWorstMs = 0;
+      }
       const ptrW = tipPosition(editCtl);
       const ptr = ptrW ? worldToPlan(ptrW) : null;
       const ret = reticle.visible ? worldToPlan(reticle.position) : null;
@@ -6829,7 +6841,8 @@ export function setupMR(view, project, getFootprint) {
         `update: ${getVersionStatus().state === 'available' ? `NEW ${getVersionStatus().latest?.build || ''}`
           : getVersionStatus().state === 'current' ? 'current'
           : getVersionStatus().state}`,
-        ...(exitProgress > 0 ? [`EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}`] : []),
+        // The EXIT bar takes the fps line's slot while held, so the HUD never outgrows its canvas.
+        exitProgress > 0 ? `EXIT:   hold ${'█'.repeat(Math.round(exitProgress * 10)).padEnd(10, '·')}` : `fps:    ${fpsText}`,
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
