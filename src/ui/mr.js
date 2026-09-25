@@ -2368,12 +2368,26 @@ export function setupMR(view, project, getFootprint) {
   // A segment/wire-leg belongs to the active-floor view if either end is on it.
   const touchesActiveFloor = (s) => allFloorsView
     || s.aFloorId === project.activeFloorId || s.bFloorId === project.activeFloorId;
-  // Picking scope. ALL FLOORS draws the whole house but picks only on the storey whose
-  // floor the reticle lies on (see allFloorsReticleFloor); a riser touches both.
+  // Picking priority. Outside ALL FLOORS only the active floor is pickable (rank 0).
+  // ALL FLOORS picks the whole house, but ranks each storey by its distance in storeys
+  // from the one the reticle lies on (see allFloorsReticleFloor): the reticle's storey
+  // wins by default and grip cycles outward, so a basement breaker can still reach an
+  // upstairs outlet. `pickRanker()` returns floorId → rank (Infinity = not pickable).
   let reticleFloorId = null;
   const pickFloorId = () => (allFloorsView ? reticleFloorId : project.activeFloorId);
   const pickFloor = () => project.floors.find((f) => f.id === pickFloorId()) || null;
-  const touchesPickFloor = (s) => s.aFloorId === pickFloorId() || s.bFloorId === pickFloorId();
+  function pickRanker() {
+    if (!allFloorsView) return (floorId) => (floorId === project.activeFloorId ? 0 : Infinity);
+    const order = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0))
+      .map((f) => f.id);
+    const at = order.indexOf(reticleFloorId);
+    return (floorId) => {
+      const i = order.indexOf(floorId);
+      return at < 0 || i < 0 ? Infinity : Math.abs(i - at);
+    };
+  }
+  // A riser/cross-floor leg ranks by the nearer of its two storeys.
+  const segRank = (rank, s) => Math.min(rank(s.aFloorId), rank(s.bFloorId));
 
   const conduitNodeGeom = new THREE.SphereGeometry(0.022, 12, 12);
   // Flat disc laid on the floor at a node's plan projection — the real aim target for
@@ -2526,15 +2540,17 @@ export function setupMR(view, project, getFootprint) {
     return target.copy(conduitBatch.nodePos[i].sphere).applyMatrix4(conduitGroup.matrixWorld);
   }
 
-  // Nearest eligible conduit node under the reticle, by plan projection, scoped to
-  // the pick storey (the active floor, or in ALL FLOORS the reticle's storey).
+  // Nearest eligible conduit node under the reticle, by plan projection: the active
+  // floor, or in ALL FLOORS the nearest storey to the reticle's that has one.
   function conduitNodeAtFloorPoint(px, py) {
-    let best = null, bestD = RETICLE_OUTER;
+    const rank = pickRanker();
+    let best = null, bestD = RETICLE_OUTER, bestR = Infinity;
     for (const node of project.conduitNodes) {
-      if (project.conduitNodeFloorId(node) !== pickFloorId()) continue;
+      const r = rank(project.conduitNodeFloorId(node));
+      if (r === Infinity) continue;
       const p = conduitNodePos(project, node);
       const d = Math.hypot(px - p.x, py - p.y);
-      if (d < bestD) { bestD = d; best = node; }
+      if (d <= RETICLE_OUTER && (r < bestR || (r === bestR && d < bestD))) { bestR = r; bestD = d; best = node; }
     }
     return best;
   }
@@ -2545,24 +2561,29 @@ export function setupMR(view, project, getFootprint) {
   // commits only the currently highlighted target.
   function conduitTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
-    const targetFloors = [pickFloor()].filter(Boolean);
-    targetFloors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
+    const rank = pickRanker();
+    project.floors.forEach((floor, floorOrder) => {
+      const r = rank(floor.id);
+      if (r === Infinity) return;
+      (floor.markers || []).forEach((marker, order) => {
         const distance = Math.hypot(px - marker.x, py - marker.y);
         if (distance <= RETICLE_OUTER) candidates.push({
-          kind: 'marker', item: marker, key: `marker:${marker.id}`,
+          kind: 'marker', item: marker, key: `marker:${marker.id}`, rank: r,
           distance, z: (floor.elevation || 0) + (marker.z || 0), order: floorOrder * 100000 + order,
         });
-      }));
+      });
+    });
     project.conduitNodes.forEach((node, order) => {
       const floorId = project.conduitNodeFloorId(node);
-      if (floorId !== pickFloorId()) return;
+      const r = rank(floorId);
+      if (r === Infinity) return;
       // A marker-bound node is the same physical endpoint as its marker; presenting
       // both would waste a cycle step without changing the pen target.
       if (node.markerId && project.findMarker(node.markerId)?.floor?.id === floorId) return;
       const p = conduitNodePos(project, node);
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({
-        kind: 'node', item: node, key: `node:${node.id}`,
+        kind: 'node', item: node, key: `node:${node.id}`, rank: r,
         distance, z: p.z || 0, order,
       });
     });
@@ -2570,7 +2591,8 @@ export function setupMR(view, project, getFootprint) {
     // splits it into a T-junction. Skipped near a run's ends (target that node
     // instead) and for runs already attached to the pen node.
     conduitNetworkSegments(project).forEach((seg, order) => {
-      if (!touchesPickFloor(seg)) return;
+      const r = segRank(rank, seg);
+      if (r === Infinity) return;
       const source = project.conduitSegments.find((s) => s.id === seg.id);
       if (penNodeId && source && (source.a === penNodeId || source.b === penNodeId)) return;
       const distance = planPointToSegment(px, py, seg.a, seg.b);
@@ -2578,12 +2600,12 @@ export function setupMR(view, project, getFootprint) {
       const split = conduitSplitPoint(seg, px, py);
       if (!split) return;
       candidates.push({
-        kind: 'segment', item: split, key: `segment:${seg.id}`,
+        kind: 'segment', item: split, key: `segment:${seg.id}`, rank: r,
         distance, z: split.worldZ, order,
       });
     });
     const KIND_RANK = { marker: 0, node: 1, segment: 2 };
-    candidates.sort((a, b) => a.distance - b.distance
+    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
       || KIND_RANK[a.kind] - KIND_RANK[b.kind]
       || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
@@ -2669,23 +2691,26 @@ export function setupMR(view, project, getFootprint) {
   // A vertical segment collapses to a plan point but remains selectable here.
   function conduitEditTargetAtFloorPoint(px, py, currentKey = null, cycleAfterKey = null) {
     const candidates = [];
+    const rank = pickRanker();
     project.conduitNodes.forEach((node, order) => {
-      if (project.conduitNodeFloorId(node) !== pickFloorId()) return;
+      const r = rank(project.conduitNodeFloorId(node));
+      if (r === Infinity) return;
       const p = conduitNodePos(project, node);
       const distance = Math.hypot(px - p.x, py - p.y);
       if (distance <= RETICLE_OUTER) candidates.push({
-        kind: 'node', id: node.id, key: `node:${node.id}`, distance, z: p.z || 0, order,
+        kind: 'node', id: node.id, key: `node:${node.id}`, rank: r, distance, z: p.z || 0, order,
       });
     });
     conduitNetworkSegments(project).forEach((seg, order) => {
-      if (!touchesPickFloor(seg)) return;
+      const r = segRank(rank, seg);
+      if (r === Infinity) return;
       const distance = planPointToSegment(px, py, seg.a, seg.b);
       if (distance <= WIRE_PICK_M) candidates.push({
-        kind: 'segment', id: seg.id, key: `segment:${seg.id}`,
+        kind: 'segment', id: seg.id, key: `segment:${seg.id}`, rank: r,
         distance, z: Math.max(seg.a.z || 0, seg.b.z || 0), order,
       });
     });
-    candidates.sort((a, b) => a.distance - b.distance
+    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
       || (a.kind === b.kind ? 0 : a.kind === 'node' ? -1 : 1)
       || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
@@ -2858,33 +2883,40 @@ export function setupMR(view, project, getFootprint) {
     }
   }
   function pipeAtFloorPoint(px, py) {
-    let best = null, bestD = WIRE_PICK_M;
+    const rank = pickRanker();
+    let best = null, bestD = WIRE_PICK_M, bestR = Infinity;
     for (const pipe of project.pipes || []) {
       const an = project.pipeNodes.find((n) => n.id === pipe.a), bn = project.pipeNodes.find((n) => n.id === pipe.b);
       const a = an && pipeNodePos(an), b = bn && pipeNodePos(bn);
-      if (!a || !b || (a.floorId !== pickFloorId() && b.floorId !== pickFloorId())) continue;
+      const r = a && b ? Math.min(rank(a.floorId), rank(b.floorId)) : Infinity;
+      if (r === Infinity) continue;
       const d = planPointToSegment(px, py, a, b);
-      if (d < bestD) { bestD = d; best = pipe; }
+      if (d <= WIRE_PICK_M && (r < bestR || (r === bestR && d < bestD))) { bestR = r; bestD = d; best = pipe; }
     }
     return best;
   }
   function pipeTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
-    const floors = [pickFloor()].filter(Boolean);
-    floors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
-      const distance = Math.hypot(px - marker.x, py - marker.y);
-      if (distance <= RETICLE_OUTER) candidates.push({ kind: 'marker', item: marker,
-        key: `marker:${marker.id}`, distance, z: (floor.elevation || 0) + (marker.z || 0), order: floorOrder * 100000 + order });
-    }));
+    const rank = pickRanker();
+    project.floors.forEach((floor, floorOrder) => {
+      const r = rank(floor.id);
+      if (r === Infinity) return;
+      (floor.markers || []).forEach((marker, order) => {
+        const distance = Math.hypot(px - marker.x, py - marker.y);
+        if (distance <= RETICLE_OUTER) candidates.push({ kind: 'marker', item: marker, rank: r,
+          key: `marker:${marker.id}`, distance, z: (floor.elevation || 0) + (marker.z || 0), order: floorOrder * 100000 + order });
+      });
+    });
     (project.pipeNodes || []).forEach((node, order) => {
       if (node.markerId) return; // its marker is the same logical target
       const p = pipeNodePos(node);
-      if (p.floorId !== pickFloorId()) return;
+      const r = rank(p.floorId);
+      if (r === Infinity) return;
       const distance = Math.hypot(px - p.x, py - p.y);
-      if (distance <= RETICLE_OUTER) candidates.push({ kind: 'node', item: node,
+      if (distance <= RETICLE_OUTER) candidates.push({ kind: 'node', item: node, rank: r,
         key: `node:${node.id}`, distance, z: p.z || 0, order });
     });
-    candidates.sort((a, b) => a.distance - b.distance
+    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
       || (a.kind === b.kind ? 0 : a.kind === 'marker' ? -1 : 1) || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex((candidate) => candidate.key === afterKey);
@@ -2896,18 +2928,21 @@ export function setupMR(view, project, getFootprint) {
   // that overlap stack instead of making the first-created wire permanently win.
   function routedWireAtFloorPoint(px, py, afterId = null) {
     const candidates = [];
+    const rank = pickRanker();
     for (let order = 0; order < project.wires.length; order++) {
       const wire = project.wires[order];
-      let bestD = Infinity;
+      let bestD = Infinity, bestR = Infinity;
       // Cached legs from the last buildRoutedWires (what is drawn); live route as fallback.
+      // A wire ranks by its nearest-storey leg under the reticle.
       for (const seg of wireBatch?.segs.get(wire.id) ?? wireRouteSegments(project, wire)) {
-        if (!touchesPickFloor(seg) || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
+        const r = segRank(rank, seg);
+        if (r === Infinity || (seg.a.x === seg.b.x && seg.a.y === seg.b.y)) continue;
         const d = planPointToSegment(px, py, seg.a, seg.b);
-        if (d < bestD) bestD = d;
+        if (d <= WIRE_PICK_M && (r < bestR || (r === bestR && d < bestD))) { bestR = r; bestD = d; }
       }
-      if (bestD <= WIRE_PICK_M) candidates.push({ wire, distance: bestD, order });
+      if (bestR < Infinity) candidates.push({ wire, rank: bestR, distance: bestD, order });
     }
-    candidates.sort((a, b) => a.distance - b.distance || a.order - b.order);
+    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex((item) => item.wire.id === afterId);
     return candidates[(current + 1) % candidates.length].wire;
@@ -5221,15 +5256,18 @@ export function setupMR(view, project, getFootprint) {
   // share one distance-then-height ordered cycle.
   function wireMarkerAtFloorPoint(px, py, afterKey = null) {
     const floors = allFloorsView
-      ? [pickFloor()].filter(Boolean)
+      ? project.floors
       : [project.activeFloor, ...adjacentFloors()].filter(Boolean);
+    // ALL FLOORS: the reticle's storey first, then outward (see pickRanker); a normal
+    // view keeps its active + adjacent floors on equal footing.
+    const rank = allFloorsView ? pickRanker() : () => 0;
     const candidates = floors.flatMap((floor, floorOrder) => (floor.markers || []).map((marker, order) => ({
-        marker, floorId: floor.id, floorOrder, order, key: `marker:${marker.id}`,
+        marker, floorId: floor.id, floorOrder, order, key: `marker:${marker.id}`, rank: rank(floor.id),
         distance: Math.hypot(px - marker.x, py - marker.y),
         z: (floor.elevation || 0) + (marker.z || 0),
       })))
-      .filter((candidate) => candidate.distance <= RETICLE_OUTER)
-      .sort((a, b) => a.distance - b.distance || b.z - a.z
+      .filter((candidate) => candidate.distance <= RETICLE_OUTER && candidate.rank < Infinity)
+      .sort((a, b) => a.rank - b.rank || a.distance - b.distance || b.z - a.z
         || a.floorOrder - b.floorOrder || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex((candidate) => candidate.key === afterKey);

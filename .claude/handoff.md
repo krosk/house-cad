@@ -17,7 +17,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 29, continued)
-**Status:** Proven (git): `main` was pushed with `2f7d7df` plus the commit that adds this handoff.
+**Status:** Proven (git): `main` is pushed; see `git log` for the latest commit (the ALL FLOORS pick-ranking follow-up).
 The tree is clean apart from the owner's untracked `Document from Alexis He.json`. Check the deploy with
 `version.json` (see traps).
 The AR performance work is **owner-confirmed on the Quest**; the rest of this session is build/Node-verified only.
@@ -82,8 +82,9 @@ Read `docs/product-intent.md` before planning AR work.
    on the Quest.
 6. **ALL FLOORS reticle** (`2f7d7df`, owner-reported: "no floor reticle" in ALL FLOORS, so there was
    no way to pick conduits or wires). The reticle now lands on your storey's floor when you aim down,
-   and on the floor of the storey above when you aim up. Picking is scoped to that storey. The rule
-   is in `docs/ar-survey.md`. The same commit fixes a latent ReferenceError when the pen hovers a riser.
+   and on the floor of the storey above when you aim up. Picking favours that storey, and grip cycles
+   outward to farther storeys. A strict per-storey filter blocked a basement breaker → upstairs outlet
+   wire, so it was replaced by ranking. The rule is in `docs/ar-survey.md`. The same commit fixes a latent ReferenceError when the pen hovers a riser.
    Build-verified only.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)

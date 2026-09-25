@@ -52,9 +52,9 @@ The pivotal mechanic in **step 2**: penning **onto a device marker** binds a con
 to that device (`ensureConduitNodeAtMarker`) — that is how a device gets *onto the graph*.
 Penning empty space drops a **bare junction**; segments join nodes. A segment whose ends
 sit on two storeys is a **riser** through the slab. To author one, select `ALL FLOORS` in
-`LEVEL`, return to `MARKER · CONDUIT`, then aim down to trigger a node/device on your own storey
-and aim up to trigger one on the storey above. The reticle never reaches further than that.
-Grip cycles overlapping candidates. The same stacked workspace
+`LEVEL`, return to `MARKER · CONDUIT`, then trigger the two nodes/devices. Aiming down favours your own
+storey and aiming up the storey above; grip cycles outward to farther storeys under the reticle.
+A basement breaker can therefore be wired to an upstairs outlet. The same stacked workspace
 supports `CONDUIT · EDIT` and `MARKER · WIRE`; other plan and marker editing remains locked.
 
 ## The dependency rules (the part people trip on)

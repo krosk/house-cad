@@ -141,9 +141,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   step *created* (pre-existing items are never removed; `addConduitSegment`/
   `ensureConduitNodeAtMarker` may return existing ones), re-joins a split run, and moves the pen back.
   Repeated presses walk back; the history clears on mode change. Grip on empty space lifts the pen (no deletion). **Cross-floor risers:** enter
-  **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Aim down to pick on your own storey,
-  aim up to pick on the storey directly above (the reticle rule under **ALL FLOORS** below); grip
-  cycles overlaps and a trigger joins the chosen pair.
+  **LEVEL · ALL FLOORS**, then return to **MARKER · CONDUIT**. Aiming down favours your own storey,
+  aiming up the storey directly above (the reticle rule under **ALL FLOORS** below); grip cycles
+  overlaps outward to farther storeys, and a trigger joins the chosen pair.
   Empty-space junctions are assigned to the storey whose vertical band contains the controller tip.
   In a normal single-floor view, the floor directly above/below is also drawn dimmed (`adjacentGroup`)
   at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
@@ -554,9 +554,12 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   **Reticle rule (owner decision, 2026-09-26):** the reticle never lands further than one slab away.
   "My storey" is the one whose elevation band holds the headset (`allFloorsReticleFloor`). Aiming
   down puts the reticle on my storey's floor; aiming up puts it on the floor of the storey directly
-  above. From the top storey, aiming up shows no reticle. Picking follows the reticle: only that
-  storey's devices, nodes, pipes and route legs are candidates (`pickFloorId`), and a riser counts
-  for both storeys it joins. To reach a storey further away, stand on it or leave ALL FLOORS. The
+  above. From the top storey, aiming up shows no reticle. Picking **prioritises** the reticle's
+  storey rather than filtering to it (`pickRanker`). Every storey's devices, nodes, pipes and route
+  legs under the reticle are candidates, ranked first by storey distance from the reticle's storey,
+  then by the usual plan distance. A riser ranks by the nearer of its two storeys. Grip therefore
+  cycles outward. A first version filtered strictly to the reticle's storey, which made a basement
+  breaker → upstairs outlet wire impossible (owner-reported), so do not reintroduce the filter. The
   earlier ground-datum plane put the reticle a whole storey (or more) away, or behind the ray from
   the basement, so conduit and wire picking became unusable. Flick down in LEVEL to return to
   the top real floor and restore every editing group.

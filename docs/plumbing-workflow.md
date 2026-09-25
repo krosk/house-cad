@@ -24,8 +24,9 @@ free junction; each later trigger creates a segment and advances the pen, enabli
 branches, and loops. Grip cycles overlapping markers/nodes, or lifts the pen over empty
 space. Trigger an existing pipe with no active pen to select it; thumbstick changes its
 service and B/Y deletes it. B/Y on the current free pen node removes that junction and its
-incident segments. In ALL FLOORS, aim down for your own storey and up for the one
-above (the `docs/ar-survey.md` reticle rule), and join them to create risers.
+incident segments. In ALL FLOORS, aiming down favours your own storey and aiming up
+the one above, and grip reaches farther storeys (the `docs/ar-survey.md` reticle rule). Join them
+to create risers.
 
 Colors are blue (cold), red (hot), orange (heating supply), and purple (heating return).
 
