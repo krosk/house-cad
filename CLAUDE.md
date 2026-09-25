@@ -1,5 +1,17 @@
 # CLAUDE.md
 
+## Rule: label every claim Proven or Hypothesis
+
+Any statement about this project's state or behavior must be prefixed with one of:
+
+- **Proven:** backed by evidence gathered in this session. Name the evidence: a command's output,
+  a build, a test/script run, a file you read, or something the owner observed.
+- **Hypothesis:** a plausible inference not yet backed by that evidence. Say what would prove it.
+
+This applies to user-facing reports, commit bodies, and repo docs, including `.claude/handoff.md`.
+Never let a hypothesis read as settled. Unverified on device, in a browser, or at runtime is a
+Hypothesis, even when the code "should" work.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
