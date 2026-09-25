@@ -11,10 +11,10 @@
 // deserializeInto.
 
 import {
-  Floor, Rectangle, WIRE_TYPES, nextMarkerId, nextElectricalLinkId,
-  nextConduitNodeId, nextConduitSegmentId, nextWireId, nextFurnitureId,
+  Floor, Rectangle, WIRE_TYPES, PIPE_SERVICES, nextMarkerId, nextElectricalLinkId,
+  nextConduitNodeId, nextConduitSegmentId, nextWireId, nextPipeNodeId, nextPipeId, nextFurnitureId,
   syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter, syncElectricalLinkIdCounter,
-  syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter, syncFurnitureIdCounter,
+  syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter, syncPipeNodeIdCounter, syncPipeIdCounter, syncFurnitureIdCounter,
 } from '../core/model.js';
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
@@ -95,6 +95,13 @@ function serializeWire(w) {
     type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via: [...(w.via || [])],
   };
 }
+function serializePipe(pipe) {
+  return { id: pipe.id, service: pipe.service, diameter: pipe.diameter, a: pipe.a, b: pipe.b };
+}
+function serializePipeNode(node) {
+  return { id: node.id, x: node.x, y: node.y, z: node.z || 0, floorId: node.floorId || null,
+    markerId: node.markerId || null, role: node.role || null };
+}
 function serializeFurniture(f) {
   return { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, ...verticalFields(f), rotationY: f.rotationY || 0, name: f.name || null };
 }
@@ -108,7 +115,7 @@ export function serializeFloor(f) {
     constraints: f.constraints.filter((c) => !c.measurement).map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
     electricalLinks: (f.electricalLinks || []).map(serializeElectricalLink),
-    // conduitNodes/conduitSegments/wires are whole-house (top level), not per-floor.
+    // conduitNodes/conduitSegments/wires/pipes are whole-house (top level), not per-floor.
     // `_demo`-flagged items (if any transient ones exist) never persist.
     furniture: (f.furniture || []).filter((x) => !x._demo).map(serializeFurniture),
   };
@@ -126,6 +133,8 @@ export function serializeProject(project) {
     conduitNodes: (project.conduitNodes || []).map(serializeConduitNode),
     conduitSegments: (project.conduitSegments || []).map(serializeConduitSegment),
     wires: (project.wires || []).map(serializeWire),
+    pipeNodes: (project.pipeNodes || []).map(serializePipeNode),
+    pipes: (project.pipes || []).map(serializePipe),
   };
 }
 
@@ -134,10 +143,10 @@ export function serializeProject(project) {
 // collide. It replaces only the selected floor's authored plan; that destination
 // floor keeps its id/name/height/elevation and ground-floor role.
 //
-// The conduit network + wires are whole-house, so a floor clipboard carries only the
+// The conduit network, wires, and pipes are whole-house, so a floor clipboard carries only the
 // INTRA-FLOOR subset: nodes on this floor (bound to its markers, or bare with its
-// floorId), segments whose both ends are in that subset, and wires whose both markers
-// live on this floor. Cross-floor risers/wires (referencing another storey) are not
+// floorId), segments whose both ends are in that subset, and wires/pipes whose both markers
+// live on this floor. Cross-floor risers/wires/pipes (referencing another storey) are not
 // carried, since the other floor is not part of the copy.
 export function createFloorClipboard(project, floor) {
   const markerIds = new Set((floor.markers || []).map((m) => m.id));
@@ -146,6 +155,9 @@ export function createFloorClipboard(project, floor) {
   const nodeIds = new Set(nodes.map((n) => n.id));
   const segments = (project.conduitSegments || []).filter((s) => nodeIds.has(s.a) && nodeIds.has(s.b));
   const wires = (project.wires || []).filter((w) => markerIds.has(w.fromMarkerId) && markerIds.has(w.toMarkerId));
+  const pipeNodes = (project.pipeNodes || []).filter((n) => n.markerId ? markerIds.has(n.markerId) : n.floorId === floor.id);
+  const pipeNodeIds = new Set(pipeNodes.map((n) => n.id));
+  const pipes = (project.pipes || []).filter((p) => pipeNodeIds.has(p.a) && pipeNodeIds.has(p.b));
   return {
     app: 'house-cad-floor',
     version: FLOOR_CLIPBOARD_VERSION,
@@ -153,6 +165,8 @@ export function createFloorClipboard(project, floor) {
     conduitNodes: nodes.map(serializeConduitNode),
     conduitSegments: segments.map(serializeConduitSegment),
     wires: wires.map((w) => ({ ...serializeWire(w), via: (w.via || []).filter((v) => nodeIds.has(v)) })),
+    pipeNodes: pipeNodes.map(serializePipeNode),
+    pipes: pipes.map(serializePipe),
   };
 }
 
@@ -208,6 +222,8 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   const srcNodes = clipboard.conduitNodes ?? source.conduitNodes ?? [];
   const srcSegments = clipboard.conduitSegments ?? source.conduitSegments ?? [];
   const srcWires = clipboard.wires ?? source.wires ?? [];
+  const srcPipes = clipboard.pipes ?? source.pipes ?? [];
+  const srcPipeNodes = clipboard.pipeNodes ?? source.pipeNodes ?? [];
   const nodeIds = new Map();
   const conduitNodes = srcNodes.flatMap((n) => {
     const markerId = n.markerId ? markerIds.get(n.markerId) : null;
@@ -270,6 +286,25 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via,
     }];
   });
+  const pipeNodeIds = new Map();
+  const pipeNodes = srcPipeNodes.flatMap((node) => {
+    const markerId = node.markerId ? markerIds.get(node.markerId) : null;
+    if (node.markerId && !markerId) return [];
+    const copy = { id: nextPipeNodeId(), x: node.x, y: node.y, z: node.z || 0,
+      floorId: target.id, markerId: markerId || null, role: node.role || null };
+    pipeNodeIds.set(node.id, copy.id);
+    return [copy];
+  });
+  const pipes = srcPipes.flatMap((pipe) => {
+    const a = pipeNodeIds.get(pipe.a), b = pipeNodeIds.get(pipe.b);
+    if (!a || !b || a === b) return [];
+    const service = PIPE_SERVICES.includes(pipe.service) ? pipe.service : 'cold';
+    return [{
+      id: nextPipeId(), service,
+      diameter: Number.isFinite(pipe.diameter) && pipe.diameter > 0 ? pipe.diameter : 0.016,
+      a, b,
+    }];
+  });
   // Furniture has no cross-references — just mint fresh ids.
   const furniture = (source.furniture || []).map((x) => ({
     id: nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
@@ -287,6 +322,9 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   project.conduitNodes = (project.conduitNodes || []).filter((n) => !goneNodeIds.has(n.id));
   project.conduitSegments = (project.conduitSegments || []).filter((s) => !goneNodeIds.has(s.a) && !goneNodeIds.has(s.b));
   project.wires = (project.wires || []).filter((w) => !oldMarkerIds.has(w.fromMarkerId) && !oldMarkerIds.has(w.toMarkerId));
+  const gonePipeNodeIds = new Set((project.pipeNodes || []).filter((n) => n.markerId ? oldMarkerIds.has(n.markerId) : n.floorId === target.id).map((n) => n.id));
+  project.pipeNodes = (project.pipeNodes || []).filter((n) => !gonePipeNodeIds.has(n.id));
+  project.pipes = (project.pipes || []).filter((p) => !gonePipeNodeIds.has(p.a) && !gonePipeNodeIds.has(p.b));
   for (const w of project.wires) w.via = (w.via || []).filter((v) => !goneNodeIds.has(v));
 
   target.rectangles = rectangles;
@@ -298,6 +336,8 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   project.conduitNodes.push(...conduitNodes);
   project.conduitSegments.push(...conduitSegments);
   project.wires.push(...wires);
+  project.pipeNodes.push(...pipeNodes);
+  project.pipes.push(...pipes);
   project.activeFloorId = target.id;
   project._emit();
   return target;
@@ -327,7 +367,7 @@ export function validateProjectData(data) {
   if (!floors) return 'Missing "floors" (or legacy "rectangles") array.';
   if (!floors.length) return 'File has no floors.';
   // Whole-house network arrays (v3) are optional but must be arrays when present.
-  for (const key of ['conduitNodes', 'conduitSegments', 'wires']) {
+  for (const key of ['conduitNodes', 'conduitSegments', 'wires', 'pipeNodes', 'pipes']) {
     if (data[key] != null && !Array.isArray(data[key])) return `"${key}" must be an array.`;
   }
   for (const f of floors) {
@@ -439,6 +479,22 @@ export function deserializeInto(project, data) {
     });
   }
 
+  project.pipeNodes = (data.pipeNodes || []).flatMap((node) => {
+    if (node.markerId && !project.findMarker(node.markerId)) return [];
+    return [{ id: node.id || nextPipeNodeId(), x: node.x || 0, y: node.y || 0, z: node.z || 0,
+      floorId: node.floorId || fallbackFloorId, markerId: node.markerId || null, role: node.role || null }];
+  });
+  const validPipeNodeIds = new Set(project.pipeNodes.map((node) => node.id));
+  project.pipes = (data.pipes || []).flatMap((pipe) => {
+    const service = PIPE_SERVICES.includes(pipe.service) ? pipe.service : 'cold';
+    if (!validPipeNodeIds.has(pipe.a) || !validPipeNodeIds.has(pipe.b) || pipe.a === pipe.b) return [];
+    return [{
+      id: pipe.id || nextPipeId(), service,
+      diameter: Number.isFinite(pipe.diameter) && pipe.diameter > 0 ? pipe.diameter : 0.016,
+      a: pipe.a, b: pipe.b,
+    }];
+  });
+
   // Ensure future auto-generated ids don't collide with loaded ones.
   syncFloorIdCounter(floors.map((f) => f.id));
   syncRectIdCounter(floors.flatMap((f) => f.rectangles.map((r) => r.id)));
@@ -448,6 +504,8 @@ export function deserializeInto(project, data) {
   syncConduitNodeIdCounter(project.conduitNodes.map((n) => n.id));
   syncConduitSegmentIdCounter(project.conduitSegments.map((s) => s.id));
   syncWireIdCounter(project.wires.map((w) => w.id));
+  syncPipeNodeIdCounter(project.pipeNodes.map((node) => node.id));
+  syncPipeIdCounter(project.pipes.map((pipe) => pipe.id));
   syncFurnitureIdCounter(floors.flatMap((f) => f.furniture.map((x) => x.id)));
 
   project._emit();

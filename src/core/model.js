@@ -79,6 +79,20 @@ export const nextWireId = () => `w${++_wid}`;
 export function syncWireIdCounter(ids) {
   for (const id of ids) { const m = /^w(\d+)$/.exec(id); if (m) _wid = Math.max(_wid, Number(m[1])); }
 }
+let _pid = 0;
+let _pnid = 0;
+export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return'];
+export const PIPE_SERVICE_ROLE = {
+  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return',
+};
+export const nextPipeId = () => `p${++_pid}`;
+export const nextPipeNodeId = () => `pn${++_pnid}`;
+export function syncPipeIdCounter(ids) {
+  for (const id of ids) { const m = /^p(\d+)$/.exec(id); if (m) _pid = Math.max(_pid, Number(m[1])); }
+}
+export function syncPipeNodeIdCounter(ids) {
+  for (const id of ids) { const m = /^pn(\d+)$/.exec(id); if (m) _pnid = Math.max(_pnid, Number(m[1])); }
+}
 // Furniture instances (real-scale product models, e.g. IKEA "rotera" GLBs). A parallel
 // lane like markers — never part of the footprint/extrude/solver pipeline. The GLB is
 // loaded on the fly (not stored); only the placement is persisted.
@@ -242,6 +256,10 @@ export class Project {
     this.conduitNodes = [];
     this.conduitSegments = [];
     this.wires = [];
+    // Whole-house plumbing graph. Nodes are free junctions or fixture-bound logical
+    // ports; pipe segments connect nodes and carry service + diameter.
+    this.pipeNodes = [];
+    this.pipes = [];
     // Saved-revision counter: advanced by every explicit SAVE (desktop house.json,
     // AR slot) — NOT by autosave — so it tracks deliberate saves. Persisted with the
     // project and stamped on export filenames and printed sheets. 0 = never saved.
@@ -450,6 +468,9 @@ export class Project {
     this.conduitNodes = this.conduitNodes.filter((n) => !goneNodeIds.has(n.id));
     this.conduitSegments = this.conduitSegments.filter((s) => !goneNodeIds.has(s.a) && !goneNodeIds.has(s.b));
     this.wires = this.wires.filter((w) => !markerIds.has(w.fromMarkerId) && !markerIds.has(w.toMarkerId));
+    const gonePipeNodeIds = new Set(this.pipeNodes.filter((n) => n.markerId && markerIds.has(n.markerId)).map((n) => n.id));
+    this.pipeNodes = this.pipeNodes.filter((n) => !gonePipeNodeIds.has(n.id) && !(n.floorId === this.activeFloorId && !n.markerId));
+    this.pipes = this.pipes.filter((pipe) => !gonePipeNodeIds.has(pipe.a) && !gonePipeNodeIds.has(pipe.b));
     for (const w of this.wires) w.via = (w.via || []).filter((v) => !goneNodeIds.has(v));
     this.rectangles = [];
     this.constraints = [];
@@ -493,6 +514,9 @@ export class Project {
         this.conduitSegments = this.conduitSegments.filter((s) => !goneNodeIds.has(s.a) && !goneNodeIds.has(s.b));
       }
       this.wires = this.wires.filter((w) => w.fromMarkerId !== id && w.toMarkerId !== id);
+      const gonePipeNodeIds = new Set(this.pipeNodes.filter((n) => n.markerId === id).map((n) => n.id));
+      this.pipeNodes = this.pipeNodes.filter((n) => !gonePipeNodeIds.has(n.id));
+      this.pipes = this.pipes.filter((pipe) => !gonePipeNodeIds.has(pipe.a) && !gonePipeNodeIds.has(pipe.b));
       for (const w of this.wires) w.via = (w.via || []).filter((v) => !goneNodeIds.has(v));
       this._emit();
     }
@@ -716,6 +740,107 @@ export class Project {
     if (!wire || !(wire.via || []).length) return;
     wire.via.pop();
     this._emit();
+  }
+
+  // ---- Plumbing graph (separate from electrical conduit/wires) -------------
+  addPipeNode({ x = 0, y = 0, z = 0, floorId = this.activeFloorId, markerId = null, role = null, emit = true } = {}) {
+    const node = { id: nextPipeNodeId(), x, y, z: z || 0, floorId, markerId, role };
+    this.pipeNodes.push(node);
+    if (emit) this._emit();
+    return node;
+  }
+
+  ensurePipeNodeAtMarker(markerId, service = 'cold') {
+    const normalizedService = PIPE_SERVICES.includes(service) ? service : 'cold';
+    const role = PIPE_SERVICE_ROLE[normalizedService];
+    let node = this.pipeNodes.find((n) => n.markerId === markerId && n.role === role);
+    if (node) return node;
+    const found = this.findMarker(markerId);
+    if (!found) return null;
+    const m = found.marker;
+    node = { id: nextPipeNodeId(), x: m.x, y: m.y, z: m.z || 0, floorId: found.floor.id, markerId, role };
+    this.pipeNodes.push(node);
+    return node;
+  }
+
+  pipeNodeFloorId(node) {
+    if (node?.markerId) return this.floorOfMarker(node.markerId)?.id ?? node.floorId ?? this.activeFloorId;
+    return node?.floorId ?? this.activeFloorId;
+  }
+
+  addPipe(aNodeId, bNodeId, service = 'cold', diameter = 0.016, { emit = true } = {}) {
+    if (!aNodeId || !bNodeId || aNodeId === bNodeId) return { ok: false, reason: 'incompatible' };
+    if (!this.pipeNodes.some((n) => n.id === aNodeId) || !this.pipeNodes.some((n) => n.id === bNodeId)) return { ok: false, reason: 'missing-node' };
+    const normalizedService = PIPE_SERVICES.includes(service) ? service : 'cold';
+    const existing = this.pipes.find((p) => p.service === normalizedService
+      && ((p.a === aNodeId && p.b === bNodeId) || (p.a === bNodeId && p.b === aNodeId)));
+    if (existing) return { ok: true, pipe: existing };
+    const pipe = { id: nextPipeId(), service: normalizedService,
+      diameter: Number.isFinite(diameter) && diameter > 0 ? diameter : 0.016, a: aNodeId, b: bNodeId };
+    this.pipes.push(pipe);
+    if (emit) this._emit();
+    return { ok: true, pipe };
+  }
+
+  removePipeNode(id) {
+    if (!this.pipeNodes.some((n) => n.id === id)) return false;
+    this.pipeNodes = this.pipeNodes.filter((n) => n.id !== id);
+    this.pipes = this.pipes.filter((p) => p.a !== id && p.b !== id);
+    this._emit();
+    return true;
+  }
+
+  // Return the complete plumbing component reachable from one node. Service behaves
+  // as a network property in the UI, while remaining stamped on segments for compact
+  // persistence and future reducers/manifolds.
+  pipeComponent(nodeId) {
+    if (!this.pipeNodes.some((n) => n.id === nodeId)) return { nodeIds: new Set(), pipes: [] };
+    const nodeIds = new Set([nodeId]);
+    const pipes = [];
+    const seenPipes = new Set();
+    const queue = [nodeId];
+    while (queue.length) {
+      const current = queue.shift();
+      for (const pipe of this.pipes) {
+        if (seenPipes.has(pipe.id) || (pipe.a !== current && pipe.b !== current)) continue;
+        seenPipes.add(pipe.id); pipes.push(pipe);
+        const other = pipe.a === current ? pipe.b : pipe.a;
+        if (!nodeIds.has(other)) { nodeIds.add(other); queue.push(other); }
+      }
+    }
+    return { nodeIds, pipes };
+  }
+
+  pipeServiceAtNode(nodeId, fallback = 'cold') {
+    return this.pipeComponent(nodeId).pipes[0]?.service
+      || (PIPE_SERVICES.includes(fallback) ? fallback : 'cold');
+  }
+
+  setPipeComponentService(nodeId, service, { emit = true } = {}) {
+    if (!PIPE_SERVICES.includes(service)) return false;
+    const component = this.pipeComponent(nodeId);
+    if (!component.nodeIds.size) return false;
+    for (const pipe of component.pipes) pipe.service = service;
+    for (const id of component.nodeIds) {
+      const node = this.pipeNodes.find((candidate) => candidate.id === id);
+      if (node?.markerId) node.role = PIPE_SERVICE_ROLE[service];
+    }
+    if (emit) this._emit();
+    return true;
+  }
+
+  removePipe(id) {
+    const i = this.pipes.findIndex((pipe) => pipe.id === id);
+    if (i < 0) return { ok: false };
+    const [pipe] = this.pipes.splice(i, 1);
+    this._emit();
+    return { ok: true, pipe };
+  }
+
+  setPipeService(id, service) {
+    const pipe = this.pipes.find((candidate) => candidate.id === id);
+    if (!pipe || !PIPE_SERVICES.includes(service)) return false;
+    return this.setPipeComponentService(pipe.a, service);
   }
 
   // --- furniture (real-scale product-model placements) --------------------

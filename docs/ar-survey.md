@@ -15,7 +15,7 @@ editor (`ar-2d-parity` memory).
 ```text
 SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
-MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE
+MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → PIPE
 FURNISH  · FURNISH
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG
 ```
@@ -26,7 +26,7 @@ presentation adds hierarchy without remapping any contextual buttons or thumbsti
 The single source of truth for order is `MODE_ORDER` (which sorts the `modes` array) and `MODE_GROUP`;
 IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport`, `drop`, `edge`,
 `plan_dims`, `edit`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
-`conduit_edit`, `marker_wire`, `furnish`, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
+`conduit_edit`, `marker_wire`, `marker_pipe`, `furnish`, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
 `translate`, `save`, `load`, `export`, `unit`, `lang`. **`MODE_HIDDEN`** = `{copy_floor, paste_floor,
 move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
 are removed from the thumbstick-x cycle to keep the list short, so they do **not** appear in the
@@ -196,6 +196,23 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `PICK START`, `PICK END`, then `VIA · <n>`. The wall/ceiling/floor surface of each segment is
   **inferred** from geometry (`segmentSurface`), never stored. This REPLACES the removed
   per-wire-waypoint model (`MARKER · WIRE`-trace + `WIRE EDIT`); routing lives in `src/core/conduit.js`.
+- **MARKER · PIPE** (`id: marker_pipe`) — author a separate whole-house plumbing graph. Trigger a
+  fixture, existing pipe node, or empty space to start a pen; empty space creates a free junction,
+  and subsequent triggers create segments and advance the pen for bends, branches, loops, and
+  cross-floor risers. Grip cycles overlapping marker/node targets, or lifts the pen on empty space.
+  Thumbstick up/down chooses or retypes
+  the service: cold water (blue), hot water (red), heating supply (orange), or heating return
+  (purple). The selected pipe and both fixtures highlight yellow; B/Y deletes the selected pipe.
+  Fixture-bound nodes store `{markerId, role}` and their role is inferred from the service (`cold`,
+  `hot`, `supply`, or `return`), so one boiler/radiator/appliance marker can carry multiple logical
+  ports without spatial connector geometry. Free nodes store floor-relative `{x,y,z,floorId}`;
+  pipe segments reference two node ids. The graph persists in saves and floor-copy intra-floor
+  subsets, and renders as ribbons at the stored 16 mm diameter. Retyping one segment propagates
+  through its connected component. Joining unlike services uses source-wins semantics but is guarded:
+  the first trigger highlights the destination component warning-red without mutation; trigger the
+  same target again to convert/connect, or grip to cancel. Editable diameters, valves/manifolds, fixture
+  role validation, derived networks, and output layers are intentionally deferred; see
+  `docs/plumbing-workflow.md`.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.

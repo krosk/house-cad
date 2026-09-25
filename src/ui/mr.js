@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { Rectangle, WIRE_TYPES } from '../core/model.js';
+import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
 import { connectedRoomComponent, recalibrationCorners } from '../core/geometry2d.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
@@ -1004,6 +1004,9 @@ export function setupMR(view, project, getFootprint) {
   const routedWireGroup = new THREE.Group();
   routedWireGroup.visible = false;
   planGroup.add(routedWireGroup);
+  const pipeGroup = new THREE.Group();
+  pipeGroup.visible = false;
+  planGroup.add(pipeGroup);
   // Cross-floor authoring targets: in a single-floor view the floor directly above/below
   // is dimmed at its true height. ALL FLOORS already renders every marker/node directly,
   // so it does not need this duplicate target layer.
@@ -1441,7 +1444,7 @@ export function setupMR(view, project, getFootprint) {
     // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
     // rebuilds) and are evicted there, not here.
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup || child === furnitureGroup) continue; // rebuilt separately below
+      if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup || child === pipeGroup || child === furnitureGroup) continue; // rebuilt separately below
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -1605,6 +1608,23 @@ export function setupMR(view, project, getFootprint) {
 
   // Per-type faceplate interior, drawn inside the shared white faceplate above.
   function markerFace(ctx, type) {
+    if (['radiator', 'boiler', 'sink', 'washing_machine'].includes(type)) {
+      ctx.strokeStyle = '#334155'; ctx.fillStyle = '#dbeafe'; ctx.lineWidth = 4;
+      if (type === 'radiator') {
+        ctx.strokeRect(40, 43, 48, 40);
+        for (let x = 48; x <= 80; x += 8) { ctx.beginPath(); ctx.moveTo(x, 47); ctx.lineTo(x, 79); ctx.stroke(); }
+      } else if (type === 'boiler') {
+        ctx.beginPath(); ctx.roundRect(43, 35, 42, 56, 7); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(64, 61, 11, 0, Math.PI * 2); ctx.stroke();
+      } else if (type === 'sink') {
+        ctx.beginPath(); ctx.ellipse(64, 67, 27, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(64, 50); ctx.lineTo(64, 40); ctx.lineTo(76, 40); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.roundRect(42, 36, 44, 56, 5); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(64, 66, 15, 0, Math.PI * 2); ctx.stroke();
+      }
+      return;
+    }
     if (type === 'switch') {
       // French rocker switch: a centered rounded rocker with a horizontal split and a
       // shaded lower (pressed) half.
@@ -2019,7 +2039,7 @@ export function setupMR(view, project, getFootprint) {
   // stays visible from a standing viewpoint rather than lying edge-on. A near-vertical
   // run (riser) falls back to a fixed horizontal axis so its band doesn't degenerate.
   const CONDUIT_RIBBON_W = 0.03; // m; band width (~realistic conduit gauge, clearly hoverable)
-  function makeConduitRibbon(a, b, color) {
+  function makeConduitRibbon(a, b, color, width = CONDUIT_RIBBON_W) {
     const A = new THREE.Vector3(a.x, a.z, -a.y);
     const B = new THREE.Vector3(b.x, b.z, -b.y);
     const dir = new THREE.Vector3().subVectors(B, A);
@@ -2029,7 +2049,7 @@ export function setupMR(view, project, getFootprint) {
     // direction ⟂ the run, so the band is a vertical plane for any horizontal run.
     const perp = new THREE.Vector3(0, 1, 0).addScaledVector(dir, -dir.y);
     if (perp.lengthSq() < 1e-6) perp.set(1, 0, 0); // run is vertical (riser) → horizontal axis
-    perp.normalize().multiplyScalar(CONDUIT_RIBBON_W / 2);
+    perp.normalize().multiplyScalar(width / 2);
     const c0 = new THREE.Vector3().subVectors(A, perp);
     const c1 = new THREE.Vector3().addVectors(A, perp);
     const c2 = new THREE.Vector3().addVectors(B, perp);
@@ -2162,7 +2182,7 @@ export function setupMR(view, project, getFootprint) {
       if (!allFloorsView && floorId !== project.activeFloorId) continue;
       const p = planLocalZ(conduitNodePos(project, node));
       const baseNodeColor = CONDUIT_NODE_COLOR;
-      const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), new THREE.MeshBasicMaterial({
         color: baseNodeColor,
         depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
       }));
@@ -2370,6 +2390,82 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
+  // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
+  const PIPE_SERVICE_COLOR = {
+    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6,
+  };
+  const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
+  function pipeNodePos(node) {
+    if (node?.markerId) {
+      const found = project.findMarker(node.markerId);
+      if (found) return { x: found.marker.x, y: found.marker.y,
+        z: (found.floor.elevation || 0) + (found.marker.z || 0), floorId: found.floor.id };
+    }
+    const floor = project.floorById(node?.floorId);
+    return { x: node?.x || 0, y: node?.y || 0,
+      z: (floor?.elevation || 0) + (node?.z || 0), floorId: floor?.id || project.activeFloorId };
+  }
+  function buildPipes() {
+    for (const child of [...pipeGroup.children]) {
+      pipeGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+    }
+    pipePreviewLine = null;
+    for (const pipe of project.pipes || []) {
+      const aNode = project.pipeNodes.find((n) => n.id === pipe.a);
+      const bNode = project.pipeNodes.find((n) => n.id === pipe.b);
+      const aWorld = aNode && pipeNodePos(aNode), bWorld = bNode && pipeNodePos(bNode);
+      const a = aWorld && planLocalZ(aWorld), b = bWorld && planLocalZ(bWorld);
+      if (!a || !b || (!allFloorsView && aWorld.floorId !== project.activeFloorId && bWorld.floorId !== project.activeFloorId)) continue;
+      const ribbon = makeConduitRibbon(a, b, pipeColor(pipe), pipe.diameter || 0.016);
+      ribbon.userData.pipeId = pipe.id;
+      ribbon.userData.baseColor = pipeColor(pipe);
+      pipeGroup.add(ribbon);
+    }
+    for (const node of project.pipeNodes || []) {
+      const pWorld = pipeNodePos(node);
+      if (!allFloorsView && pWorld.floorId !== project.activeFloorId) continue;
+      const p = planLocalZ(pWorld);
+      const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
+        color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
+      }));
+      mesh.position.set(p.x, p.z, -p.y); mesh.renderOrder = 17;
+      mesh.userData.pipeNodeId = node.id; pipeGroup.add(mesh);
+    }
+  }
+  function pipeAtFloorPoint(px, py) {
+    let best = null, bestD = WIRE_PICK_M;
+    for (const pipe of project.pipes || []) {
+      const an = project.pipeNodes.find((n) => n.id === pipe.a), bn = project.pipeNodes.find((n) => n.id === pipe.b);
+      const a = an && pipeNodePos(an), b = bn && pipeNodePos(bn);
+      if (!a || !b || (!allFloorsView && a.floorId !== project.activeFloorId && b.floorId !== project.activeFloorId)) continue;
+      const d = planPointToSegment(px, py, a, b);
+      if (d < bestD) { bestD = d; best = pipe; }
+    }
+    return best;
+  }
+  function pipeTargetAtFloorPoint(px, py, afterKey = null) {
+    const candidates = [];
+    const floors = allFloorsView ? project.floors : [project.activeFloor];
+    floors.forEach((floor, floorOrder) => (floor.markers || []).forEach((marker, order) => {
+      const distance = Math.hypot(px - marker.x, py - marker.y);
+      if (distance <= RETICLE_OUTER) candidates.push({ kind: 'marker', item: marker,
+        key: `marker:${marker.id}`, distance, z: (floor.elevation || 0) + (marker.z || 0), order: floorOrder * 100000 + order });
+    }));
+    (project.pipeNodes || []).forEach((node, order) => {
+      if (node.markerId) return; // its marker is the same logical target
+      const p = pipeNodePos(node);
+      if (!allFloorsView && p.floorId !== project.activeFloorId) return;
+      const distance = Math.hypot(px - p.x, py - p.y);
+      if (distance <= RETICLE_OUTER) candidates.push({ kind: 'node', item: node,
+        key: `node:${node.id}`, distance, z: p.z || 0, order });
+    });
+    candidates.sort((a, b) => a.distance - b.distance
+      || (a.kind === b.kind ? 0 : a.kind === 'marker' ? -1 : 1) || b.z - a.z || a.order - b.order);
+    if (!candidates.length) return null;
+    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
+    return candidates[(current + 1) % candidates.length];
+  }
+
   // All routed wires whose plan projection passes within WIRE_PICK_M, nearest first.
   // Multiple wires commonly share exactly one conduit, so `afterId` advances through
   // that overlap stack instead of making the first-created wire permanently win.
@@ -2426,7 +2522,7 @@ export function setupMR(view, project, getFootprint) {
     for (const child of [...adjacentGroup.children]) {
       adjacentGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
     }
-    if (allFloorsView || (modeId !== 'marker_conduit' && modeId !== 'marker_wire')) return;
+    if (allFloorsView || !['marker_conduit', 'marker_wire', 'marker_pipe'].includes(modeId)) return;
     const wantNodes = modeId === 'marker_conduit';
     const addDot = (wp, adjacent, opacity) => {
       const p = planLocalZ(wp);
@@ -2470,14 +2566,18 @@ export function setupMR(view, project, getFootprint) {
   // (it will close a riser / cross-floor wire), the rest stay dim slate.
   function highlightAdjacentTargets(selectedCircuit = null) {
     const selectedEndpointIds = selectedRoutedWire
-      ? new Set([selectedRoutedWire.fromMarkerId, selectedRoutedWire.toMarkerId]) : null;
+      ? new Set([selectedRoutedWire.fromMarkerId, selectedRoutedWire.toMarkerId])
+      : selectedPipe ? new Set([selectedPipe.a, selectedPipe.b]
+        .map((id) => project.pipeNodes.find((n) => n.id === id)?.markerId).filter(Boolean)) : null;
     for (const child of adjacentGroup.children) {
       const a = child.userData.adjacent;
       if (!a) continue;
       const hot = hoverAdjacent && hoverAdjacent.kind === a.kind && hoverAdjacent.id === a.id;
       const directEndpoint = a.kind === 'marker' && selectedEndpointIds?.has(a.id);
       const circuitMember = a.kind === 'marker' && selectedCircuit?.markerIds.has(a.id);
-      const pendingEndpoint = a.kind === 'marker' && wireFromMarker?.id === a.id;
+      const pendingEndpoint = a.kind === 'marker'
+        && (wireFromMarker?.id === a.id || (pipePenNodeId
+          && project.pipeNodes.find((n) => n.id === pipePenNodeId)?.markerId === a.id));
       const emphasized = hot || directEndpoint || circuitMember || pendingEndpoint;
       child.material.color.setHex(hot || directEndpoint || pendingEndpoint ? 0xffe14d
         : circuitMember ? CIRCUIT_CONNECTED_COLOR : 0x64748b);
@@ -2739,7 +2839,9 @@ export function setupMR(view, project, getFootprint) {
   // expensive 2048px raster refresh during continuous grip drags.
   function buildPlan(withDims = true) {
     sheetDirty = true;
-    return allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
+    const built = allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
+    if (pipeGroup.visible) buildPipes();
+    return built;
   }
 
   let localSpace = null;
@@ -2774,7 +2876,7 @@ export function setupMR(view, project, getFootprint) {
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
     'switch', 'light', 'ethernet', 'ethernet_dual', 'tv_antenna', 'camera_ethernet', 'patch_panel', 'intercom',
-    'panel', 'breaker',
+    'panel', 'breaker', 'radiator', 'boiler', 'sink', 'washing_machine',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
@@ -2830,6 +2932,14 @@ export function setupMR(view, project, getFootprint) {
   let hoverRoutedWire = null;
   let routedWirePickAfterId = null;
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
+  let pipePenNodeId = null;
+  let pipePickAfterKey = null;
+  let hoverPipeNode = null;
+  let pipePreviewLine = null;
+  let pendingPipeMerge = null; // {sourceNodeId,targetNodeId,service}; second trigger confirms
+  let selectedPipe = null;
+  let hoverPipe = null;
+  let currentPipeService = PIPE_SERVICES[0];
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
   // Datum for the marker / node height pads: 'floor' = a defined height above the floor
@@ -3749,6 +3859,24 @@ export function setupMR(view, project, getFootprint) {
       rlog('wire retype', { id: selectedRoutedWire.id, type: next });
     } else {
       rlog('wire type', { type: next });
+    }
+  }
+
+  function cyclePipeService(dir = 1) {
+    const active = selectedPipe?.service
+      || (pipePenNodeId ? project.pipeServiceAtNode(pipePenNodeId, currentPipeService) : currentPipeService);
+    const i = PIPE_SERVICES.indexOf(active);
+    const next = PIPE_SERVICES[((i < 0 ? 0 : i) + dir + PIPE_SERVICES.length) % PIPE_SERVICES.length];
+    currentPipeService = next;
+    if (selectedPipe) {
+      project.setPipeService(selectedPipe.id, next);
+      buildPipes();
+      rlog('pipe retype', { id: selectedPipe.id, service: next });
+    } else if (pipePenNodeId && project.pipeComponent(pipePenNodeId).pipes.length) {
+      project.setPipeComponentService(pipePenNodeId, next);
+      pendingPipeMerge = null;
+      buildPipes();
+      rlog('pipe network retype', { node: pipePenNodeId, service: next });
     }
   }
 
@@ -5309,6 +5437,59 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'marker_pipe', color: 0x38bdf8,
+      onTouch: (pos) => {
+        if (!placed) return;
+        if (selectedPipe) { selectedPipe = null; pendingPipeMerge = null; return; }
+        const sourceService = pipePenNodeId
+          ? project.pipeServiceAtNode(pipePenNodeId, currentPipeService) : currentPipeService;
+        let targetNodeId = hoverPipeNode?.id || null;
+        if (!targetNodeId && hoverMarker) {
+          targetNodeId = project.ensurePipeNodeAtMarker(hoverMarker.id, sourceService)?.id || null;
+        }
+        if (!targetNodeId && !pipePenNodeId && hoverPipe) { selectedPipe = hoverPipe; return; }
+        if (!targetNodeId) {
+          const { px, py } = worldToPlan(pos);
+          let floor = project.activeFloor;
+          let z = Math.max(0, pos.y - overlayY());
+          if (allFloorsView) {
+            const absoluteZ = Math.max(0, pos.y - planPos.y);
+            floor = project.floors.reduce((best, candidate) => {
+              const lo = candidate.elevation || 0, hi = lo + (candidate.height || 0);
+              const distance = absoluteZ < lo ? lo - absoluteZ : absoluteZ > hi ? absoluteZ - hi : 0;
+              return !best || distance < best.distance ? { floor: candidate, distance } : best;
+            }, null)?.floor || project.activeFloor;
+            z = Math.max(0, Math.min(floor.height || Infinity, absoluteZ - (floor.elevation || 0)));
+          }
+          targetNodeId = project.addPipeNode({ x: px, y: py, z, floorId: floor.id, emit: false }).id;
+        }
+        if (pipePenNodeId && pipePenNodeId !== targetNodeId) {
+          const sourceComponent = project.pipeComponent(pipePenNodeId);
+          const targetComponent = project.pipeComponent(targetNodeId);
+          const networksDiffer = !sourceComponent.nodeIds.has(targetNodeId)
+            && targetComponent.pipes.some((pipe) => pipe.service !== sourceService);
+          const samePending = pendingPipeMerge?.sourceNodeId === pipePenNodeId
+            && pendingPipeMerge?.targetNodeId === targetNodeId
+            && pendingPipeMerge?.service === sourceService;
+          if (networksDiffer && !samePending) {
+            pendingPipeMerge = { sourceNodeId: pipePenNodeId, targetNodeId, service: sourceService };
+            setModeInfo();
+            rlog('pipe merge warning', { from: pipePenNodeId, to: targetNodeId, service: sourceService });
+            return;
+          }
+          if (networksDiffer) project.setPipeComponentService(targetNodeId, sourceService, { emit: false });
+          project.addPipe(pipePenNodeId, targetNodeId, sourceService, 0.016, { emit: false });
+        }
+        pipePenNodeId = targetNodeId;
+        currentPipeService = sourceService;
+        pendingPipeMerge = null;
+        pipePickAfterKey = null;
+        project.touch(); buildPipes();
+        setModeInfo();
+        rlog('pipe pen', { node: pipePenNodeId, service: currentPipeService });
+      },
+    },
+    {
       id: 'furnish', color: 0xa78bfa, // place real furniture GLB models (loaded on the fly)
       // Thumbstick-y cycles the article to drop (or rotates the selected item 15°/tick).
       // Trigger an item to select it; trigger empty floor to drop the current article;
@@ -5468,14 +5649,14 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'level', 'recal', 'teleport',
     'drop', 'edge', 'plan_dims', 'edit',
-    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire',
+    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'marker_pipe',
     'furnish',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
-    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
@@ -5536,6 +5717,7 @@ export function setupMR(view, project, getFootprint) {
     selectedLinkSwitch = null; markerLinkPickAfterId = null; // ...and link picker/source
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
     selectedRoutedWire = null; routedWirePickAfterId = null; // ...and routed-wire selection picker
+    pipePenNodeId = null; pipePickAfterKey = null; hoverPipeNode = null; selectedPipe = null; pendingPipeMerge = null;
     penNodeId = null; conduitPickAfterKey = null; // ...and lift/reset the conduit pen picker
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
@@ -5568,16 +5750,18 @@ export function setupMR(view, project, getFootprint) {
     conduitGroup.visible = showConduits;
     if (m.id === 'marker_wire') buildRoutedWires();
     routedWireGroup.visible = m.id === 'marker_wire';
+    if (m.id === 'marker_pipe') buildPipes();
+    pipeGroup.visible = m.id === 'marker_pipe';
     // Cross-floor authoring targets: CONDUIT (risers) + WIRE (cross-floor wires) only.
     hoverAdjacent = null;
     buildAdjacentTargets(m.id);
-    adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire';
+    adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire' || m.id === 'marker_pipe';
   }
 
   // The stacked overview remains read-only for architecture and marker placement,
   // but the whole-house topology tools are deliberately available there: every
   // storey's existing devices/nodes can be joined without changing active floor.
-  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire']);
+  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire', 'marker_pipe']);
   const modeAvailable = (index) => {
     const id = modes[index].id;
     if (MODE_HIDDEN.has(id)) return false; // parked tools: never a cycle stop
@@ -5982,6 +6166,21 @@ export function setupMR(view, project, getFootprint) {
       buildRoutedWires();
       return true;
     }
+    if (mode.id === 'marker_pipe') {
+      if (selectedPipe) {
+        project.removePipe(selectedPipe.id);
+        selectedPipe = null;
+        buildPipes();
+        return true;
+      }
+      const node = project.pipeNodes.find((n) => n.id === pipePenNodeId);
+      if (node && !node.markerId) {
+        project.removePipeNode(node.id);
+        pipePenNodeId = null;
+        buildPipes();
+        return true;
+      }
+    }
     return false;
   }
 
@@ -6116,6 +6315,24 @@ export function setupMR(view, project, getFootprint) {
         wireEndpointPickAfterKey = null;
       }
       return;
+    }
+    if (mode.id === 'marker_pipe') {
+      if (pendingPipeMerge) {
+        rlog('pipe merge cancelled', pendingPipeMerge);
+        pendingPipeMerge = null;
+        setModeInfo();
+        return;
+      }
+      if (selectedPipe) { selectedPipe = null; return; }
+      if (hoverMarker) {
+        pipePickAfterKey = `marker:${hoverMarker.id}`;
+        return;
+      }
+      if (hoverPipeNode) {
+        pipePickAfterKey = `node:${hoverPipeNode.id}`;
+        return;
+      }
+      if (pipePenNodeId) { pipePenNodeId = null; pipePickAfterKey = null; return; }
     }
     if (mode.id === 'edge') {
       if (selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -6254,6 +6471,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'marker_wire') cycleWireType(stickY < 0 ? 1 : -1); // retype selected / new-wire type
+      else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
@@ -6418,6 +6636,11 @@ export function setupMR(view, project, getFootprint) {
       ? (selectedConduitSegmentId ? t('conduit.editSeg')
         : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickTarget'))
       : null;
+    const pipeStatus = modes[currentMode].id === 'marker_pipe'
+      ? pendingPipeMerge
+        ? `${t(`pipe.service.${project.pipeServiceAtNode(pendingPipeMerge.targetNodeId)}`)} → ${t(`pipe.service.${pendingPipeMerge.service}`)} · ${t('pipe.confirmMerge')}`
+        : `${t(`pipe.service.${selectedPipe?.service || currentPipeService}`)} · ${pipePenNodeId ? t('conduit.run') : t('pipe.pickStart')}`
+      : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
       : null;
@@ -6430,9 +6653,10 @@ export function setupMR(view, project, getFootprint) {
         : currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
       : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || pipeStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : furnishStatus ? 0xa78bfa
+      : pipeStatus ? pipeColor(selectedPipe || { service: currentPipeService })
       : wireStatus ? (modes[currentMode].id === 'marker_conduit' || modes[currentMode].id === 'conduit_edit'
         ? CONDUIT_COLOR : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
       : exportStatus ? C_EXPORT : 0x38bdf8;
@@ -6960,6 +7184,73 @@ export function setupMR(view, project, getFootprint) {
           outlineMarker(endpoint, 'floor', 0xffe14d);
           outlineMarker(endpoint, 'wall', 0xffe14d);
         }
+      }
+    } else if (modeId === 'marker_pipe') {
+      hoverKey = null;
+      numpadCursor.visible = false;
+      hoverMarker = null; hoverAdjacent = null; hoverPipe = null; hoverPipeNode = null;
+      if (selectedPipe && !project.pipes.includes(selectedPipe)) selectedPipe = null;
+      if (pipePenNodeId && !project.pipeNodes.some((n) => n.id === pipePenNodeId)) pipePenNodeId = null;
+      const hit = rayFloorHit(editCtl);
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, overlayY() + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        const target = pipeTargetAtFloorPoint(px, py, pipePickAfterKey);
+        if (target?.kind === 'marker') hoverMarker = target.item;
+        else if (target?.kind === 'node') hoverPipeNode = target.item;
+        else pipePickAfterKey = null;
+        if (!target && !pipePenNodeId && !selectedPipe) hoverPipe = pipeAtFloorPoint(px, py);
+      } else reticle.visible = false;
+      highlightAdjacentTargets();
+      const warningComponent = pendingPipeMerge
+        ? project.pipeComponent(pendingPipeMerge.targetNodeId) : null;
+      for (const ribbon of pipeGroup.children) {
+        if (ribbon === pipePreviewLine) continue;
+        if (ribbon.userData.pipeNodeId) {
+          const hot = ribbon.userData.pipeNodeId === (hoverPipeNode?.id || pipePenNodeId);
+          const warning = warningComponent?.nodeIds.has(ribbon.userData.pipeNodeId);
+          ribbon.material.color.setHex(warning ? 0xff1744 : hot ? 0xffe14d : 0xffffff);
+          ribbon.scale.setScalar(warning || hot ? 1.5 : 1);
+          continue;
+        }
+        const warning = warningComponent?.pipes.some((pipe) => pipe.id === ribbon.userData.pipeId);
+        const active = ribbon.userData.pipeId === (selectedPipe?.id || hoverPipe?.id);
+        ribbon.material.color.setHex(warning ? 0xff1744 : active ? 0xffe14d : ribbon.userData.baseColor);
+        ribbon.material.opacity = warning || active ? 1 : 0.62;
+        ribbon.renderOrder = warning || active ? 17 : 14;
+      }
+      outlineMarker(hoverMarker, 'floor', 0xffe14d);
+      outlineMarker(hoverMarker, 'wall', 0xffe14d);
+      const penNode = project.pipeNodes.find((n) => n.id === pipePenNodeId);
+      const penMarker = penNode?.markerId ? project.findMarker(penNode.markerId)?.marker : null;
+      outlineMarker(penMarker, 'floor', pipeColor({ service: currentPipeService }));
+      outlineMarker(penMarker, 'wall', pipeColor({ service: currentPipeService }));
+      if (selectedPipe) {
+        for (const markerId of [selectedPipe.a, selectedPipe.b]
+          .map((id) => project.pipeNodes.find((n) => n.id === id)?.markerId).filter(Boolean)) {
+          const marker = project.findMarker(markerId)?.marker;
+          outlineMarker(marker, 'floor', 0xffe14d);
+          outlineMarker(marker, 'wall', 0xffe14d);
+        }
+      }
+      if (!pipePreviewLine) {
+        pipePreviewLine = makeRouteLine([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], pipeColor({ service: currentPipeService }));
+        pipePreviewLine.frustumCulled = false;
+        pipePreviewLine.renderOrder = 16;
+        pipeGroup.add(pipePreviewLine);
+      }
+      const tipW = tipPosition(editCtl);
+      if (penNode && tipW) {
+        const from = planLocalZ(pipeNodePos(penNode));
+        const { px, py } = worldToPlan(tipW);
+        const to = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
+        pipePreviewLine.material.color.setHex(pipeColor({ service: currentPipeService }));
+        pipePreviewLine.visible = true;
+        pipePreviewLine.geometry.setFromPoints([from, to].map((p) => new THREE.Vector3(p.x, p.z, -p.y)));
+        pipePreviewLine.computeLineDistances();
+      } else {
+        pipePreviewLine.visible = false;
       }
     } else if (modeId === 'marker_conduit') {
       // CONDUIT authoring: aim the floor reticle. Nodes and markers share one nearest-
