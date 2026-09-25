@@ -810,6 +810,11 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
     be.rect(cx - r * 0.82, cy - r * 0.7, r * 1.64, r * 1.4, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     for (const dx of [-0.42, 0, 0.42])
       be.rect(cx + r * dx - r * 0.08, cy - r * 0.28, r * 0.16, r * 0.56, { fill: '#fff', stroke: C_MARK, width: 0.1 });
+  } else if (type === 'breaker') {
+    // One modular circuit breaker: narrow module on a DIN rail, with its toggle.
+    be.line(cx - r, cy, cx + r, cy, { stroke: C_MARK, width: 0.14 });
+    be.rect(cx - r * 0.42, cy - r * 0.92, r * 0.84, r * 1.84, { fill: '#fff', stroke: C_MARK, width: 0.18 });
+    be.rect(cx - r * 0.2, cy - r * 0.58, r * 0.4, r * 0.56, { fill: C_MARK, stroke: C_MARK, width: 0.1 });
   } else if (type === 'intercom') {
     be.rect(cx - r * 0.68, cy - r, r * 1.36, r * 2, { fill: '#fff', stroke: C_MARK, width: 0.18 });
     be.rect(cx - r * 0.48, cy - r * 0.72, r * 0.96, r * 0.68, { fill: '#fff', stroke: C_MARK, width: 0.14 });

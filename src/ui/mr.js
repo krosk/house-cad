@@ -1912,6 +1912,19 @@ export function setupMR(view, project, getFootprint) {
       ctx.beginPath(); ctx.moveTo(44, 74); ctx.lineTo(84, 74); ctx.stroke();
       return;
     }
+    if (type === 'breaker') {
+      // One modular circuit breaker (matches the desktop 3D fixture): a narrow DIN
+      // module on its rail with a raised toggle — vs. the panel's multi-module box.
+      ctx.lineWidth = 3; ctx.strokeStyle = '#334155';
+      ctx.beginPath(); ctx.moveTo(36, 64); ctx.lineTo(92, 64); ctx.stroke(); // DIN rail
+      ctx.beginPath(); ctx.roundRect(50, 34, 28, 60, 4);
+      ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.lineWidth = 4; ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(57, 46, 14, 20, 3); // toggle lever, up = on
+      ctx.fillStyle = '#334155'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(56, 82); ctx.lineTo(72, 82); ctx.lineWidth = 3; ctx.stroke();
+      return;
+    }
     if (type === 'intercom') {
       // Wall intercom: display, call key, and speaker grille.
       ctx.beginPath(); ctx.roundRect(43, 35, 42, 58, 6);
