@@ -17,6 +17,13 @@ const WALL_ZONE_KINDS = new Set(['wall', 'door', 'garage', 'window', 'halfwall',
 
 const validBounds = (b) => b && b.x1 - b.x0 > EPS && b.y1 - b.y0 > EPS;
 const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Solved coordinates carry float noise (a room edge at -1.88 beside a door edge at
+// -1.8799999999999999). Snap grid lines to 1 µm so near-equal edges share one line;
+// otherwise the 1e-14 m band between them became a zero-thickness, full-height wall
+// "sheet" that no opening could cut, drawn straight across door faces.
+const snap = (v) => Math.round(v * 1e6) / 1e6;
+// Furthest an opening may be extended through wall layers beyond its own footprint.
+const PIERCE_MAX = 0.6;
 
 function openingBand(rect, storeyHeight) {
   const kind = zoneKind(rect);
@@ -93,8 +100,8 @@ function pointInFootprint(x, y, footprint) {
 function unionRectSources(sources, { cuts = [], excludeFootprint = null } = {}) {
   if (!sources.length) return [];
   const xs = new Set(), ys = new Set();
-  for (const b of sources) { xs.add(b.x0); xs.add(b.x1); ys.add(b.y0); ys.add(b.y1); }
-  for (const [x, y] of cuts) { xs.add(x); ys.add(y); }
+  for (const b of sources) { xs.add(snap(b.x0)); xs.add(snap(b.x1)); ys.add(snap(b.y0)); ys.add(snap(b.y1)); }
+  for (const [x, y] of cuts) { xs.add(snap(x)); ys.add(snap(y)); }
   const X = [...xs].sort((a, b) => a - b);
   const Y = [...ys].sort((a, b) => a - b);
   const complete = [];
@@ -131,11 +138,49 @@ function unionRectSources(sources, { cuts = [], excludeFootprint = null } = {}) 
   return complete;
 }
 
+// An aperture zone is often authored thinner than the wall it sits in: a 10 cm
+// window rect against a 12 cm inferred exterior wall, or a gap strip beside a half
+// wall. Cutting only the rect's own footprint left a skin of wall across the opening
+// on one face. So extend the cut along the wall normal through every contiguous
+// layer of wall that spans the aperture's FULL width. Requiring full-width coverage
+// (and PIERCE_MAX) keeps it from tunnelling into a perpendicular wall, or past a
+// door rect drawn wider than the real opening behind it.
+function piercedBounds(b, sources) {
+  const alongX = b.x1 - b.x0 >= b.y1 - b.y0;
+  const [A0, A1, N0, N1] = alongX ? ['x0', 'x1', 'y0', 'y1'] : ['y0', 'y1', 'x0', 'x1'];
+  const a0 = b[A0], a1 = b[A1];
+  const inSpan = sources.filter((s) => Math.min(s[A1], a1) - Math.max(s[A0], a0) > EPS);
+  // Does wall material at normal coordinate m cover the aperture's whole width?
+  const covers = (m) => {
+    const spans = inSpan.filter((s) => m > s[N0] + EPS && m < s[N1] - EPS)
+      .map((s) => [s[A0], s[A1]]).sort((p, q) => p[0] - q[0]);
+    let reach = a0;
+    for (const [lo, hi] of spans) {
+      if (lo > reach + EPS) return false;
+      reach = Math.max(reach, hi);
+    }
+    return reach >= a1 - EPS;
+  };
+  const stops = [...new Set(inSpan.flatMap((s) => [snap(s[N0]), snap(s[N1])]))].sort((p, q) => p - q);
+  let n0 = b[N0], n1 = b[N1];
+  for (const s of stops) {
+    if (s <= n1 + EPS) continue;
+    if (s - b[N1] > PIERCE_MAX || !covers((n1 + s) / 2)) break;
+    n1 = s;
+  }
+  for (const s of [...stops].reverse()) {
+    if (s >= n0 - EPS) continue;
+    if (b[N0] - s > PIERCE_MAX || !covers((n0 + s) / 2)) break;
+    n0 = s;
+  }
+  return { ...b, [N0]: n0, [N1]: n1 };
+}
+
 function splitWallByOpenings(source, storeyHeight, openings) {
   const overlaps = openings.flatMap((opening) => {
-    const b = opening.rect.bounds;
-    const x0 = Math.max(source.x0, b.x0), x1 = Math.min(source.x1, b.x1);
-    const y0 = Math.max(source.y0, b.y0), y1 = Math.min(source.y1, b.y1);
+    const b = opening.bounds;
+    const x0 = snap(Math.max(source.x0, b.x0)), x1 = snap(Math.min(source.x1, b.x1));
+    const y0 = snap(Math.max(source.y0, b.y0)), y1 = snap(Math.min(source.y1, b.y1));
     if (x1 - x0 <= EPS || y1 - y0 <= EPS || opening.z1 - opening.z0 <= EPS) return [];
     return [{ x0, x1, y0, y1, z0: opening.z0, z1: opening.z1 }];
   });
@@ -207,7 +252,9 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
   const sources = unionRectSources([...clippedInferred, ...explicit]);
   const openings = rectangles.flatMap((rect) => {
     const band = openingBand(rect, height);
-    return band && validBounds(rect.bounds) ? [{ rect, z0: band[0], z1: band[1] }] : [];
+    return band && validBounds(rect.bounds)
+      ? [{ rect, bounds: piercedBounds(rect.bounds, sources), z0: band[0], z1: band[1] }]
+      : [];
   });
   return sources.flatMap((source) => splitWallByOpenings(source, height, openings));
 }
