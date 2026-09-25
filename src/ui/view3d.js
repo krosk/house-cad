@@ -105,6 +105,7 @@ export class View3D {
 
     // Optional per-frame hook, set by the MR module; receives (time, XRFrame).
     this.onXRFrame = null;
+    this.xrTiming = { js: 0, gl: 0, frames: 0 }; // summed ms per XR frame; see _animate
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     // Kept for the MR lifecycle, which temporarily saves/disables this field.
@@ -774,7 +775,17 @@ export class View3D {
       this.camera.quaternion.slerpQuaternions(this.cameraTransition.fromQuaternion, this.cameraTransition.toQuaternion, eased);
       if (a >= 1) this._finishTransition(this.cameraTransition.destination);
     }
-    if (frame && this.onXRFrame) this.onXRFrame(time, frame);
+    if (frame && this.onXRFrame) {
+      // CPU cost split for the AR debug HUD: frame logic vs. three's render submission.
+      // mr.js reads and resets xrTiming at each HUD refresh.
+      const t0 = performance.now();
+      this.onXRFrame(time, frame);
+      const t1 = performance.now();
+      this.renderer.render(this.scene, this.camera);
+      const t = this.xrTiming;
+      t.js += t1 - t0; t.gl += performance.now() - t1; t.frames++;
+      return;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }

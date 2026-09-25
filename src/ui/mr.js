@@ -141,23 +141,23 @@ export function setupMR(view, project, getFootprint) {
   function makeDebug() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
-    canvas.height = 320; // taller so the extra build-stamp line fits without clipping
+    canvas.height = 352; // 10 lines at a 32 px pitch (build … batt, incl. fps/draw/time)
     const ctx = canvas.getContext('2d');
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-    sprite.scale.set(0.24, 0.15, 1); // match the 512x320 aspect
+    sprite.scale.set(0.24, 0.165, 1); // match the 512x352 aspect
     sprite.position.set(0, 0.14, -0.04);
     const setLines = (lines) => {
-      ctx.clearRect(0, 0, 512, 320);
+      ctx.clearRect(0, 0, 512, 352);
       ctx.fillStyle = 'rgba(15, 18, 24, 0.82)';
       ctx.beginPath();
-      ctx.roundRect(6, 6, 500, 308, 14);
+      ctx.roundRect(6, 6, 500, 340, 14);
       ctx.fill();
       ctx.fillStyle = '#e6edf3';
       ctx.font = '28px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      lines.forEach((line, i) => ctx.fillText(line, 20, 18 + i * 32)); // 9 lines fit the 320 px canvas
+      lines.forEach((line, i) => ctx.fillText(line, 20, 18 + i * 32)); // 10 lines fit the 352 px canvas
       tex.needsUpdate = true;
     };
     return { sprite, setLines };
@@ -6255,7 +6255,8 @@ export function setupMR(view, project, getFootprint) {
   renderer.xr.addEventListener('sessionend', () => {
     view.onXRFrame = null;
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
-    fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; // fresh fps probe per session
+    fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; timeText = '—'; // fresh fps probe per session
+    Object.assign(view.xrTiming, { js: 0, gl: 0, frames: 0 });
     anchor = null;
     anchorPoseMissing = false;
     startupPlacementPending = false;
@@ -6688,6 +6689,9 @@ export function setupMR(view, project, getFootprint) {
   // Frame-rate probe for the debug HUD: frames counted and the longest frame gap seen
   // since the last HUD refresh, so a steady rate and a periodic hitch both show up.
   let fpsFrames = 0, fpsSince = -1, fpsPrevTime = -1, fpsWorstMs = 0, fpsText = '—';
+  // Average CPU ms per frame in onXRFrame ("js") and in renderer.render ("render"),
+  // from View3D.xrTiming. Both small while fps is low ⇒ the GPU is the bottleneck.
+  let timeText = '—';
   let exitWasActive = false; // EXIT bar shown last frame -> force one redraw when it clears
   let exiting = false;   // guard so session.end() fires once
 
@@ -6987,7 +6991,7 @@ export function setupMR(view, project, getFootprint) {
     // ptr's 3rd value is height above the registered floor. reticle.position is this
     // frame's value from the previous mode pass — one frame of lag is imperceptible.
     // Throttle the debug HUD to ~2 Hz: its coordinate readouts change every frame, so
-    // redrawing the two 512x320 canvases + re-uploading their textures each frame is
+    // redrawing the two 512x352 canvases + re-uploading their textures each frame is
     // pure waste for numbers no one reads that fast. The EXIT hold bar bypasses the
     // throttle so its countdown stays smooth. The worldToPlan calls that only feed the
     // HUD are inside the gate too, so they're skipped between refreshes.
@@ -6997,6 +7001,9 @@ export function setupMR(view, project, getFootprint) {
       if (time - fpsSince >= 500) {
         fpsText = `${Math.round((fpsFrames * 1000) / (time - fpsSince))}  (worst ${Math.round(fpsWorstMs)} ms)`;
         fpsFrames = 0; fpsSince = time; fpsWorstMs = 0;
+        const t = view.xrTiming;
+        if (t.frames) timeText = `js ${(t.js / t.frames).toFixed(1)}  render ${(t.gl / t.frames).toFixed(1)} ms`;
+        t.js = 0; t.gl = 0; t.frames = 0;
       }
       const ptrW = tipPosition(editCtl);
       const ptr = ptrW ? worldToPlan(ptrW) : null;
@@ -7019,6 +7026,7 @@ export function setupMR(view, project, getFootprint) {
         // Last frame's renderer totals (autoReset: one render per XR frame), to tell a
         // draw-call-bound slowdown from a triangle-bound one.
         `draw:   ${renderer.info.render.calls} calls, ${(renderer.info.render.triangles / 1000).toFixed(1)}k tris`,
+        `time:   ${timeText}`,
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - planPos.y)}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
