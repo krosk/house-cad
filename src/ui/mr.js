@@ -1151,38 +1151,134 @@ export function setupMR(view, project, getFootprint) {
   // marker textures, and electrical routes never need to be recomputed per frame.
   let dimObjects = [];
 
-  // Cache dim-label textures by their content (text+color). buildPlan rebuilds every
-  // label sprite on each change, but a label's canvas only depends on text+color, so
-  // reusing the CanvasTexture avoids a fresh canvas draw + GPU upload per rebuild. This
-  // is what makes dragging a dim offset cheap: the value text is constant through the
-  // drag, so every frame is a cache hit. Bounded by evicting (disposing) in buildDimensions.
-  const dimTexCache = new Map(); // `${text}|${color}` -> CanvasTexture
-  function dimLabelTexture(text, color) {
-    const key = `${text}|${color}`;
-    let tex = dimTexCache.get(key);
-    if (tex) return tex;
+  // Dimension value labels are drawn in BATCHES, not one Sprite each. WebXR in this
+  // three.js build renders every object once per eye (no multiview), so the owner's
+  // ~400-label ground floor cost ~800 draw calls and halved the Quest frame rate.
+  //  - Each distinct text+color is painted once into a slot of a shared atlas page
+  //    (a 2048x1024 CanvasTexture, 8x16 slots of the old 256x64 label canvas).
+  //  - makeDimLabel returns an invisible PROXY Object3D carrying the position, scale
+  //    and userData (dimText, cId, refA, refB) that picking, hover echo and grip-drag
+  //    read; addDimLabelBatch draws a set of proxies as one billboard mesh per page.
+  //  - Editing a value paints its new text once (one page upload); a grip-drag keeps
+  //    its text, so it only rebuilds the batch quads. Stale slots are dropped by
+  //    resetDimLabelAtlas() at the start of a full buildPlan once pages pile up,
+  //    because that rebuild recreates every batch (plan dims AND Z-dims).
+  const DIM_LABEL_W = 256, DIM_LABEL_H = 64, ATLAS_W = 2048, ATLAS_H = 1024;
+  const ATLAS_COLS = ATLAS_W / DIM_LABEL_W, ATLAS_SLOTS = ATLAS_COLS * (ATLAS_H / DIM_LABEL_H);
+  const labelAtlas = { pages: [], slots: new Map() }; // slots: `${text}|${color}` -> { page, u0, v0 }
+  function labelAtlasPage() {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 64;
-    const ctx = canvas.getContext('2d');
+    canvas.width = ATLAS_W; canvas.height = ATLAS_H;
+    const texture = new THREE.CanvasTexture(canvas);
+    // Same output path as the SpriteMaterial it replaces (tone mapping + color space).
+    const material = new THREE.ShaderMaterial({
+      uniforms: { map: { value: texture } },
+      vertexShader: `
+        attribute vec2 corner; // label-local offset in metres (already scaled)
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          mv.xy += corner; // view-aligned billboard, like THREE.Sprite
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform sampler2D map;
+        varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(map, vUv);
+          if (c.a < 0.004) discard;
+          gl_FragColor = c;
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+      transparent: true, depthTest: false, depthWrite: false,
+    });
+    const page = { canvas, ctx: canvas.getContext('2d'), texture, material, used: 0, dirty: false };
+    labelAtlas.pages.push(page);
+    return page;
+  }
+  function dimLabelSlot(text, color) {
+    const key = `${text}|${color}`;
+    let slot = labelAtlas.slots.get(key);
+    if (slot) return slot;
+    let page = labelAtlas.pages.at(-1);
+    if (!page || page.used >= ATLAS_SLOTS) page = labelAtlasPage();
+    const i = page.used++;
+    const x = (i % ATLAS_COLS) * DIM_LABEL_W, y = Math.floor(i / ATLAS_COLS) * DIM_LABEL_H;
+    const ctx = page.ctx;
+    ctx.save();
+    ctx.translate(x, y);
     ctx.fillStyle = 'rgba(15, 18, 24, 0.82)';
     ctx.beginPath(); ctx.roundRect(6, 14, 244, 36, 10); ctx.fill();
     ctx.fillStyle = color;
     ctx.font = 'bold 30px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, 128, 33);
-    tex = new THREE.CanvasTexture(canvas);
-    dimTexCache.set(key, tex);
-    return tex;
+    ctx.restore();
+    page.dirty = true;
+    // Canvas y runs down; texture v runs up (flipY), so a slot's top row is v = 1 - y/H.
+    slot = { page, u0: x / ATLAS_W, u1: (x + DIM_LABEL_W) / ATLAS_W,
+      v0: 1 - (y + DIM_LABEL_H) / ATLAS_H, v1: 1 - y / ATLAS_H };
+    labelAtlas.slots.set(key, slot);
+    return slot;
+  }
+  // Drop every slot once more than two pages exist. Only call where every label batch
+  // is about to be rebuilt (buildPlan with dims), or live batches would show garbage.
+  function resetDimLabelAtlas() {
+    if (labelAtlas.pages.length <= 2) return;
+    for (const page of labelAtlas.pages) { page.texture.dispose(); page.material.dispose(); }
+    labelAtlas.pages = [];
+    labelAtlas.slots.clear();
+  }
+  // One billboard mesh per atlas page for `proxies` (makeDimLabel results, positioned
+  // in `parent`'s space), added to `parent`. Returns the meshes (for disposal tracking).
+  function addDimLabelBatch(proxies, parent, renderOrder = 0) {
+    const byPage = new Map();
+    for (const proxy of proxies) {
+      const slot = dimLabelSlot(proxy.userData.dimText, proxy.userData.dimColor);
+      const list = byPage.get(slot.page) ?? byPage.set(slot.page, []).get(slot.page);
+      list.push([proxy, slot]);
+    }
+    const meshes = [];
+    for (const [page, list] of byPage) {
+      const pos = [], corner = [], uv = [], index = [];
+      for (const [proxy, slot] of list) {
+        const base = pos.length / 3;
+        const hx = proxy.scale.x / 2, hy = proxy.scale.y / 2;
+        for (const [cx, cy, u, v] of [[-hx, -hy, slot.u0, slot.v0], [hx, -hy, slot.u1, slot.v0],
+          [hx, hy, slot.u1, slot.v1], [-hx, hy, slot.u0, slot.v1]]) {
+          pos.push(proxy.position.x, proxy.position.y, proxy.position.z);
+          corner.push(cx, cy);
+          uv.push(u, v);
+        }
+        index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geometry.setAttribute('corner', new THREE.Float32BufferAttribute(corner, 2));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geometry.setIndex(index);
+      const mesh = new THREE.Mesh(geometry, page.material); // page material: shared, never disposed here
+      mesh.frustumCulled = false; // quads extend past their centre points
+      mesh.renderOrder = renderOrder;
+      mesh.userData.dimLabelBatch = true;
+      parent.add(mesh);
+      meshes.push(mesh);
+      if (page.dirty) { page.texture.needsUpdate = true; page.dirty = false; }
+    }
+    return meshes;
   }
 
-  // A billboarded value label (canvas pill, always faces the user) at a plan point.
+  // A billboarded value label at a plan point: an invisible proxy (see above) that the
+  // caller hands to addDimLabelBatch once its final position is set.
   function makeDimLabel(text, color, px, py) {
-    const tex = dimLabelTexture(text, color);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-    sprite.scale.set(0.16, 0.04, 1);
-    sprite.position.set(px, 0.04, -py); // plan (x,y) -> local (x,0,-y), lifted 4 cm
-    sprite.userData.dimText = text;     // the value, echoed on the controller on hover
-    return sprite;
+    const proxy = new THREE.Object3D();
+    proxy.scale.set(0.16, 0.04, 1);
+    proxy.position.set(px, 0.04, -py); // plan (x,y) -> local (x,0,-y), lifted 4 cm
+    proxy.userData.dimText = text;     // the value, echoed on the controller on hover
+    proxy.userData.dimColor = color;
+    return proxy;
   }
 
   // Draw every distance constraint of one floor into planGroup: a dim line between
@@ -1380,21 +1476,21 @@ export function setupMR(view, project, getFootprint) {
     }
     for (const s of floorDimSprites) {
       s.position.y += elevation;
-      planGroup.add(s);
+      planGroup.add(s); // invisible proxy: pick position + userData
       if (selectable) dimObjects.push(s);
     }
+    for (const mesh of addDimLabelBatch(floorDimSprites, planGroup)) if (selectable) dimObjects.push(mesh);
   }
 
   // Rebuild ONLY the active floor's dimensions in place — the cheap path for a live
-  // dim grip-drag. Removes the tracked dim meshes/sprites (line geometry is per-build,
-  // so dispose it; sprite .map is the shared dimTexCache, so never dispose it here)
+  // dim grip-drag. Removes the tracked dim meshes, label proxies and label batches
+  // (geometry is per-build, so dispose it; batch materials are the shared atlas pages)
   // and re-runs buildDimensions, leaving the footprint/strips/markers/electrical
   // untouched. sheetDirty is set so the optional left-hand sheet still refreshes.
   function rebuildDimsOnly() {
     for (const o of dimObjects) {
       planGroup.remove(o);
-      if (o.isSprite) o.material.dispose(); // per-build SpriteMaterial; its .map is the shared cache — leave it
-      else o.geometry?.dispose();
+      o.geometry?.dispose(); // label batches share their atlas page material — never dispose it here
     }
     dimObjects = [];
     buildDimensions(project.activeFloor);
@@ -1436,12 +1532,11 @@ export function setupMR(view, project, getFootprint) {
   // per-frame marker/electrical rebuild creates a CanvasTexture per glyph, the dominant
   // cost. The live edge drag passes false to freeze those (their groups aren't cleared
   // here, so they stay visible at their pre-drag spots) but then re-runs buildDimensions
-  // itself, so dimensions stay live and cheap (constant values => cached label textures).
+  // itself, so dimensions stay live and cheap (constant values => existing atlas slots).
   // onSqueezeEnd's full rebuild brings markers/electrical back to their solved positions.
   function clearPlanGeometry() {
-    // Clear any previous geometry. Dispose per-rebuild materials; do NOT dispose the
-    // sprite .map — dim-label textures are shared/cached in dimTexCache (reused across
-    // rebuilds) and are evicted there, not here.
+    // Clear any previous geometry. Dispose per-rebuild geometry/sprite materials; dim
+    // label batches use the shared atlas page materials (see addDimLabelBatch).
     for (const child of [...planGroup.children]) {
       if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup || child === pipeGroup || child === furnitureGroup) continue; // rebuilt separately below
       planGroup.remove(child);
@@ -1449,13 +1544,6 @@ export function setupMR(view, project, getFootprint) {
       if (child.isSprite) child.material.dispose();
     }
     dimSprites = [];
-    // Safe only after every old label has been removed. In ALL FLOORS,
-    // buildDimensions runs once per storey, so evicting inside that function could
-    // dispose a texture already attached to an earlier floor in the same rebuild.
-    if (dimTexCache.size > 64) {
-      for (const texture of dimTexCache.values()) texture.dispose();
-      dimTexCache.clear();
-    }
   }
 
   // Two-triangle fill quad for the full extent of each rectangle, in planGroup-local
@@ -1929,18 +2017,18 @@ export function setupMR(view, project, getFootprint) {
   // dim materials, dashed end ticks, and the standard value label centred on the line.
   // A vertical line has no floor plane to lie in, so each dash is a crossed pair of
   // vertical strips (and each tick a crossed pair of flat ones) — thin from any side.
-  // Materials and label textures are shared: clearZDims disposes only per-build
-  // geometry and SpriteMaterials, never the shared dim materials or dimTexCache maps.
+  // Materials and the label atlas are shared: clearZDims disposes only per-build
+  // geometry, never the shared dim materials or atlas pages.
   function clearZDims() {
     for (const child of [...zDimGroup.children]) {
       zDimGroup.remove(child);
-      if (child.isSprite) child.material.dispose();
-      else child.geometry?.dispose();
+      child.geometry?.dispose(); // label batches share their atlas page material
     }
   }
   // Collects one merged geometry per material, like buildDimensions' strip batches.
   function makeZDimBatch() {
     const byMat = new Map();
+    const labels = []; // proxies, drawn as one billboard batch in flush()
     const quad = (mat, p0, p1, p2, p3) => {
       const arr = byMat.get(mat) ?? byMat.set(mat, []).get(mat);
       for (const q of [p0, p1, p2, p0, p2, p3]) arr.push(q[0], q[2], -q[1]); // plan (x,y,z) → local (x,z,-y)
@@ -1974,10 +2062,10 @@ export function setupMR(view, project, getFootprint) {
         }
         const label = makeDimLabel(`${fmt(value)} ${unitLabel()}`, colorCss, x, y);
         label.position.y = (lo + hi) / 2;
-        label.renderOrder = 34;
-        zDimGroup.add(label);
+        labels.push(label);
       },
       flush() {
+        addDimLabelBatch(labels, zDimGroup, 34);
         for (const [mat, arr] of byMat) {
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
@@ -3002,6 +3090,7 @@ export function setupMR(view, project, getFootprint) {
   // expensive 2048px raster refresh during continuous grip drags.
   function buildPlan(withDims = true) {
     sheetDirty = true;
+    if (withDims) resetDimLabelAtlas(); // every label batch is rebuilt below (plan dims + Z-dims)
     const built = allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
     if (pipeGroup.visible) buildPipes();
     return built;
