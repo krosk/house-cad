@@ -169,6 +169,43 @@ cut plan.
 - Texture cost: the design canvas is 2048 × 949 px (about 10 MB of GPU memory with mipmaps), four times
   the generic planks. Hypothesis: fine on Quest for one or two such materials; watch PERF in the AR 3D view.
 
+## Wall tile products (a design on a brick-bond material)
+
+Same idea as flooring: a `surface: 'wall'`, `pattern: 'brick'` entry with the published tile size and
+pack (the takeoff counts it), plus a `design` drawn over a 4 tiles × 8 rows unit. A brick design also
+has a **bump texture** (`finishBumpTexture`, same unit and seed) that View 3D applies; `bumpScale`
+sets its strength and `edgeWobble` (m) the handmade edge wander.
+
+- `tile_vernisse_white`: GoodHome Vernisse wall tile, white gloss, "carreaux anciens" relief (Castorama,
+  EAN 5036581063269, 2026-09-26). From the page: 301 × 75.4 mm, 8.5 mm, glazed ceramic, not rectified;
+  40 tiles = 0.92 m² per box (the page's embedded data: `"0.92","m²",…,"count",40`). White tile, white
+  grout (owner). Joint 3 mm and the half-offset layout are estimates from photo **05** (straight-on);
+  the relief from **03** (edge) and **09** (kitchen, raking light). The colour layer is nearly flat
+  white; the look comes from the bump (rounded edges, long glaze undulations) and gloss
+  (`roughness` 0.12, `bumpScale` 3). Owner: "looks really good".
+  Proven: build; scratch renders beside photos 05 and 09; takeoff of a 2 × 0.6 m splashback = 60 tiles
+  (Node). Not yet seen on a real wall in View 3D or in AR.
+- **Its look depends on reflections.** Photo 09's character is the room mirrored in a wavy glaze. That
+  needs an environment map: View 3D's **✦ Reflections** toggle (below). Without it the tiles show
+  their relief but little shine.
+- **AR shows only the colour layer**: the AR 3D view's Lambert materials ignore bump and reflections, so
+  the tile reads as flat white with faint joints there.
+
+### View 3D reflections (owner decision, 2026-09-26: on demand)
+
+A **✦ Reflections** button under the View 3D lighting toggle sets `scene.environment` to three's
+`RoomEnvironment` (PMREM, built once on first use; hemisphere fill 0.9 → 0.35 while on, environment
+intensity 0.6). Off by default and remembered **per device** (`localStorage`
+`house-cad:view3d-reflections:v1`), because some devices struggle; it never enters project or share
+data. MR saves and clears `scene.environment` at session start and restores it at the end, so AR never
+pays for it. Proven: toggles, persists across reload, no console errors, in a plain-HTTP dev app. Not
+measured on a phone.
+
+Could AR have it? Possible, not built. It would need Standard (PBR) finish materials in the AR 3D view
+instead of Lambert, plus the environment map: both cost GPU on Quest, where performance was hard to
+get. Hypothesis: WebXR light estimation could supply a real-room reflection map on some headsets
+(unverified on the Quest browser). If wanted, make it a separate opt-in inside AR and watch PERF.
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a FURNISH item),

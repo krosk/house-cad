@@ -16,11 +16,16 @@ const GROUT = 0xcbd5e1;
 // material swaps the generic stagger for a drawn product look over a larger unit
 // (DESIGN_PER_ROW planks per row, DESIGN_ROWS rows, so the repeat is hard to spot).
 const DESIGN_ROWS = 10, DESIGN_PER_ROW = 3;
+// Brick-bond tile designs: BRICK_COLS tiles per row, BRICK_ROWS rows, rows offset by half.
+const BRICK_COLS = 4, BRICK_ROWS = 8;
+const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
+  || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design]);
 
 // Repeat unit (metres) of a pattern.
 export function patternUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
+  if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
   if (m.pattern === 'stagger') return [m.w, 3 * py];
   if (m.pattern === 'brick') return [px, 2 * py];
   return [px, py];
@@ -153,8 +158,94 @@ function paintDesign(ctx, m, W, H, ppm) {
   }
 }
 
+// Glossy handmade-look wall tile ("carreaux anciens"): slightly wavy edges, tiny tone
+// differences, a soft glaze ripple, and a thin grey shadow where the rounded edge meets
+// the joint. `bump` draws the matching height map instead (grout low, tile high, edges
+// rounding down, glaze ripples), which gives the rippled gloss highlights in View 3D.
+function glossTile(ctx, m, x, y, w, h, ppm, r, bump) {
+  const wob = (m.edgeWobble ?? 0.0006) * ppm;
+  // Outline: each edge wanders a little, through a few random control points.
+  const edge = (x0, y0, x1, y1, nx, ny) => {
+    const pts = [];
+    const k = 5, amp = [0, ...Array.from({ length: k - 1 }, () => (r() - 0.5) * 2 * wob), 0];
+    for (let i = 0; i <= k; i++) pts.push([x0 + ((x1 - x0) * i) / k + nx * amp[i], y0 + ((y1 - y0) * i) / k + ny * amp[i]]);
+    return pts;
+  };
+  const outline = [
+    ...edge(x, y, x + w, y, 0, 1), ...edge(x + w, y, x + w, y + h, -1, 0).slice(1),
+    ...edge(x + w, y + h, x, y + h, 0, -1).slice(1), ...edge(x, y + h, x, y, 1, 0).slice(1, -1),
+  ];
+  const path = () => {
+    ctx.beginPath();
+    outline.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+    ctx.closePath();
+  };
+  // Glaze ripples: long, gentle waves along the tile (the glaze pools unevenly), drawn
+  // as elongated blobs and heavily blurred so they read as smooth undulation.
+  const ripples = (lightCss, darkCss, alpha) => {
+    ctx.filter = `blur(${Math.max(2, 0.006 * ppm)}px)`;
+    for (let i = 0; i < 7; i++) {
+      ctx.globalAlpha = alpha * (0.5 + r());
+      ctx.fillStyle = r() < 0.5 ? lightCss : darkCss;
+      ctx.beginPath();
+      ctx.ellipse(x + r() * w, y + r() * h, (0.08 + r() * 0.25) * w, (0.12 + r() * 0.25) * h, (r() - 0.5) * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+  };
+  ctx.save();
+  path(); ctx.clip();
+  if (bump) {
+    ctx.fillStyle = '#b4b4b4';
+    ctx.fillRect(x, y, w, h);
+    ripples('#ffffff', '#6a6a6a', 0.35);
+    // Rounded edge: a blurred dark rim just inside the outline.
+    ctx.filter = `blur(${Math.max(1, 0.0015 * ppm)}px)`;
+    ctx.strokeStyle = '#5a5a5a';
+    ctx.lineWidth = 0.004 * ppm;
+    path(); ctx.stroke();
+    ctx.filter = 'none';
+  } else {
+    // White on white: the colour layer stays nearly flat; the look comes from the bump
+    // map + gloss. Only a faint edge shade, for the AR view (no bump there).
+    const base = new THREE.Color(m.color).multiplyScalar(0.99 + r() * 0.015);
+    ctx.fillStyle = `#${base.getHexString()}`;
+    ctx.fillRect(x, y, w, h);
+    ctx.filter = `blur(${Math.max(1, 0.001 * ppm)}px)`;
+    ctx.strokeStyle = `#${base.clone().multiplyScalar(0.8).getHexString()}`;
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 0.0022 * ppm;
+    path(); ctx.stroke();
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+const BRICK_DESIGNS = { 'handmade-gloss': glossTile };
+
+// Brick bond: each row offset by half a tile; tiles crossing the right edge are drawn
+// again at the left so the unit tiles. Grout is `m.accent` (colour) / low (bump).
+function paintBrickDesign(ctx, m, W, H, ppm, bump) {
+  const r = rng(m.seed ?? 41);
+  const pw = W / BRICK_COLS, ph = H / BRICK_ROWS, jp = (m.joint || 0) * ppm;
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.accent); // grout: a shallow recess
+  ctx.fillRect(0, 0, W, H);
+  for (let row = 0; row < BRICK_ROWS; row++) {
+    const off = row % 2 ? pw / 2 : 0;
+    for (let k = 0; k < BRICK_COLS; k++) {
+      const x = off + k * pw, s = Math.floor(r() * 1e9);
+      for (const dx of x + pw > W ? [0, -W] : [0]) {
+        BRICK_DESIGNS[m.design](ctx, m, x + dx + jp / 2, row * ph + jp / 2, pw - jp, ph - jp, ppm, rng(s), bump);
+      }
+    }
+  }
+}
+
 function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return paintDesign(ctx, m, W, H, ppm);
+  if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return paintBrickDesign(ctx, m, W, H, ppm, false);
   const jp = Math.max(1.5, (m.joint || 0) * ppm); // joint in px, never invisible
   if (m.pattern === 'stagger') {
     const rowH = H / 3;
@@ -208,19 +299,36 @@ function paintUnit(ctx, m, W, H, ppm) {
   }
 }
 
-// → { map, repeat: [ru, rv] } or null for untextured (paint) materials.
-export function finishTexture(m, anisotropy = 1) {
-  if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
+function unitCanvas(m, paint) {
   const [uw, uh] = patternUnit(m);
-  const ppm = (DESIGNS[m.design] ? 2048 : 512) / Math.max(uw, uh);
+  const ppm = (hasDesign(m) ? 2048 : 512) / Math.max(uw, uh);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(8, Math.round(uw * ppm));
   canvas.height = Math.max(8, Math.round(uh * ppm));
-  paintUnit(canvas.getContext('2d'), m, canvas.width, canvas.height, ppm);
-  const map = new THREE.CanvasTexture(canvas);
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(1 / uw, 1 / uh);
-  map.anisotropy = anisotropy;
+  paint(canvas.getContext('2d'), canvas.width, canvas.height, ppm);
+  return { canvas, uw, uh };
+}
+
+function repeatTexture({ canvas, uw, uh }, anisotropy) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / uw, 1 / uh);
+  t.anisotropy = anisotropy;
+  return t;
+}
+
+// → a CanvasTexture (repeat = 1 / unit size, UVs in plan metres) or null for untextured
+// (paint) materials.
+export function finishTexture(m, anisotropy = 1) {
+  if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
+  const map = repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm)), anisotropy);
   map.colorSpace = THREE.SRGBColorSpace;
   return map;
+}
+
+// Height map for designs that have one (same unit and seed as finishTexture, so the two
+// line up), else null. View 3D only: the AR 3D view's Lambert materials ignore it.
+export function finishBumpTexture(m, anisotropy = 1) {
+  if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
+  return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);
 }

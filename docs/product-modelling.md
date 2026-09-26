@@ -11,7 +11,8 @@ Where the result goes:
 - **flooring (or other finish)** → a `surface: 'floor'` material in `src/core/materials.js` with the
   published piece size and pack, plus an optional `design` drawn in `src/ui/finishTextures.js`
   (`docs/materials.md` "Flooring products"); tune colour and figure against a room photo from the top
-  and at a low perspective angle;
+  and at a low perspective angle. Glossy surfaces need a bump texture and View 3D's Reflections
+  toggle to look right (`docs/materials.md` "Wall tile products");
 - **door (or other product that fills a zone)** → a `surface: 'door'` material in
   `src/core/materials.js` and a `design` drawing in `doorProducts.js` (`docs/materials.md` "Doors").
 
@@ -59,6 +60,7 @@ node tools/product-images.mjs --download --out <dir> <image-url>...   # then dow
 | IKEA | `ikea.com/<cc>/<lang>/images/products/<slug>__<id>_<code>_s5.jpg`, only this product's slug; 1400 px | curl |
 | Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (pictos excluded); 1240 × 900 | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
 | Leroy Merlin | `media.adeo.com/media/<id>/media.jpg` ids in the page HTML = the gallery, in order; downloaded as `media.jpeg?width=1200` | **Chrome only** (DataDome, below); images download fine by curl |
+| Castorama | Scene7 `media.castorama.fr/is/image/Castorama/<slug>~<EAN>_<code>`, only this EAN (from `…/<EAN>_CAFR.prd`); `?wid=1400`. Specs and pack are in the page (tile count sits in its embedded data) | curl |
 | leboncoin | `<script id="__NEXT_DATA__">`: objects with `subject` + `images.urls_large`, filtered by title (`--filter`, default the URL's words) | curl (Node's own fetch gets 403) |
 | other | every absolute image URL minus logos/icons: review by eye | curl |
 

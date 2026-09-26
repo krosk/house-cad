@@ -6999,6 +6999,7 @@ export function setupMR(view, project, getFootprint) {
 
     // Stash desktop state so we can restore it on exit.
     saved.background = scene.background;
+    saved.environment = scene.environment;
     saved.gridVisible = view.grid?.visible;
     saved.floorVisible = view.floor?.visible;
     saved.controls = view.controls.enabled;
@@ -7007,6 +7008,7 @@ export function setupMR(view, project, getFootprint) {
     saved.furnitureModelsVisible = view.furnitureModels?.visible;
 
     scene.background = null; // reveal passthrough
+    scene.environment = null; // View 3D reflections are desktop-only (Quest cost)
     if (view.grid) view.grid.visible = false;
     if (view.floor) view.floor.visible = false;
     if (view.house) view.house.visible = false; // hide the extruded walls
@@ -7080,6 +7082,7 @@ export function setupMR(view, project, getFootprint) {
 
     view.hideMesh = false; // desktop shows the extruded walls again
     scene.background = saved.background ?? null;
+    scene.environment = saved.environment ?? null;
     if (view.grid) view.grid.visible = saved.gridVisible ?? true;
     if (view.floor) view.floor.visible = saved.floorVisible ?? true;
     if (view.house) view.house.visible = saved.meshVisible ?? true;

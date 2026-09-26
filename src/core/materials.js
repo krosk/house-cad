@@ -11,7 +11,8 @@
 //   surface  floor | wall | both
 //   pack     { pieces } per box, or { area } m² per pack (paint)
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
-//            with `bevel` = long-edge V-bevel width, m); `roughness` optional (3D)
+//            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
+//            bump map in View 3D, `edgeWobble` m, `bumpScale`); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
@@ -63,6 +64,15 @@ export const BUILTIN_MATERIALS = [
     w: 1.18, h: 0.164, joint: 0, bevel: 0.002, thickness: 0.014,
     color: 0xc0a585, accent: 0x6a5038, roughness: 0.55, pack: { pieces: 8 },
     name: { en: 'Beaulieu oak charme 118×16.4', fr: 'Parquet chêne charme Beaulieu 118×16,4', zh: 'Beaulieu 橡木地板 118×16.4' },
+  },
+  {
+    // GoodHome Vernisse wall tile, white gloss, "carreaux anciens" relief (Castorama EAN
+    // 5036581063269): 301 × 75.4 mm, 8.5 mm, glazed ceramic, not rectified; 40 tiles =
+    // 0.92 m² per box. White tile, white grout (owner); the joint width is an estimate.
+    id: 'tile_vernisse_white', surface: 'wall', pattern: 'brick', design: 'handmade-gloss',
+    w: 0.301, h: 0.0754, joint: 0.003, thickness: 0.0085,
+    color: 0xf4f4f0, accent: 0xf8f8f5, roughness: 0.12, bumpScale: 3, pack: { pieces: 40 },
+    name: { en: 'Vernisse white tile 30×7.5', fr: 'Faïence Vernisse blanc 30×7,5', zh: 'Vernisse 白色墙砖 30×7.5' },
   },
   {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like

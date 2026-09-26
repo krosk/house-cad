@@ -5,7 +5,7 @@
 // sites that refuse scripted fetches.
 //
 //   node tools/product-images.mjs <product-url> [--out <dir>] [--filter <text>] [--list]
-//       fetch the page (sites that allow it), list the product images, download them
+//       fetch the page (IKEA, Lapeyre, Castorama, leboncoin), list the product images, download them
 //   node tools/product-images.mjs --snippet
 //       print a JS snippet; run it in Chrome on the product page (javascript_tool):
 //       it returns the image URLs, which you then download with --download
@@ -65,6 +65,14 @@ function extractImages(pageUrl, html, filter = '') {
     for (const m of all(/https:\/\/www\.ikea\.com\/[a-z]{2}\/[a-z]{2}\/images\/products\/([^"?,\s]+?)__(\d+)_([a-z]{2}\d+)(?:_[a-z0-9]+)?\.(?:jpe?g|webp|avif)/g)) {
       if (slug && m[1] !== slug) continue;
       add(m[0], `ikea ${m[3]}`, m[2]); // one per image id; no query = 1400 px
+    }
+  } else if (host.endsWith('castorama.fr')) {
+    // Scene7: media.castorama.fr/is/image/Castorama/<slug>~<EAN>_<code>; keep this
+    // product's EAN (from …/<EAN>_CAFR.prd), one per code; `?wid=1400` is full size.
+    const ean = (new URL(pageUrl).pathname.match(/\/(\d{8,14})_CAFR\.prd/) || [])[1];
+    for (const m of all(/https?:\/\/media\.castorama\.fr\/is\/image\/Castorama\/[^"'\s?\\~]+~(\d{8,14})_([0-9A-Za-z_]+)/g)) {
+      if (ean && m[1] !== ean) continue;
+      add(`${m[0]}?wid=1400`, `casto ${m[2]}`, m[2]);
     }
   } else if (host.endsWith('leboncoin.fr')) {
     // __NEXT_DATA__ JSON: every object with `subject` + `images` is a listing (a search

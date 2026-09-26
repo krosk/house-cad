@@ -3,12 +3,13 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
-import { finishTexture } from './finishTextures.js';
+import { finishTexture, finishBumpTexture } from './finishTextures.js';
 
 function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
   const canvas = document.createElement('canvas');
@@ -134,6 +135,8 @@ export class View3D {
     // Lighting.
     const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
     this.scene.add(hemi);
+    this.hemi = hemi;
+    this.reflectionsEnabled = false;
     this.sun = new THREE.DirectionalLight(0xffffff, 1.6);
     this.sun.position.set(12, 20, 8);
     this.sun.castShadow = false;
@@ -647,6 +650,22 @@ export class View3D {
     this._updateLightShadows();
   }
 
+  // Reflections (opt-in per device: some devices struggle): an environment map from
+  // three's RoomEnvironment, built once on first use, so glossy finishes (glazed tile,
+  // vitrified floor) reflect a soft room. It adds light, so the hemisphere fill drops
+  // while it is on. MR clears scene.environment for its session (mr.js).
+  setReflectionsEnabled(enabled) {
+    this.reflectionsEnabled = !!enabled;
+    if (this.reflectionsEnabled && !this._envTexture) {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      this._envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    this.scene.environment = this.reflectionsEnabled ? this._envTexture : null;
+    this.scene.environmentIntensity = 0.6;
+    this.hemi.intensity = this.reflectionsEnabled ? 0.35 : 0.9;
+  }
+
   // One cached material per catalog entry (keyed by its content, so an edited custom
   // product gets a fresh texture). Never disposed with the per-build geometry.
   _finishMaterial(def) {
@@ -656,9 +675,11 @@ export class View3D {
     if (material) return material;
     const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     const map = finishTexture(def, anisotropy);
+    const bumpMap = finishBumpTexture(def, anisotropy);
     material = new THREE.MeshStandardMaterial({
       color: map ? 0xffffff : (def?.color ?? 0xffffff),
       map,
+      ...(bumpMap ? { bumpMap, bumpScale: def.bumpScale ?? 1 } : {}),
       roughness: def?.roughness ?? (def?.pattern === 'stagger' ? 0.72 : def?.pattern === 'paint' ? 0.92 : 0.45),
       metalness: 0,
       side: THREE.DoubleSide,

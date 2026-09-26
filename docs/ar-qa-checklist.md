@@ -61,6 +61,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; strips sit inside the walls; door/window area deducted in the m² line
 - [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (zone tints anthracite); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
 - [ ] MATERIAL · FLOOR: cycle to Beaulieu oak charme 118×16.4 on a room; LEFT X shows light oak planks along the room's long axis with soft grain and a few knots, no visible repeat; PERF stays usable; takeoff lists packs of 8
+- [ ] MATERIAL · WALL: set Vernisse white tile 30×7.5 on a wall; LEFT X shows white brick-bond tiles with faint joints (no gloss/relief in AR by design); PERF usable; takeoff in packs of 40
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
 - [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL tints
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors

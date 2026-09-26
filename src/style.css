@@ -245,7 +245,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-#view3d-lighting {
+#view3d-lighting,
+#view3d-reflections {
   width: 100%;
   margin-top: 5px;
   padding: 7px 8px;
@@ -258,7 +259,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-#view3d-lighting[aria-pressed="true"] {
+#view3d-lighting[aria-pressed="true"],
+#view3d-reflections[aria-pressed="true"] {
   color: #0b1220;
   background: #ffd166;
   border-color: #ffd166;

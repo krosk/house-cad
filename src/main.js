@@ -111,6 +111,23 @@ function setDesktopLighting(enabled) {
 view3dLighting.addEventListener('click', () => setDesktopLighting(!desktopLightingEnabled));
 setDesktopLighting(false);
 
+// Reflections: opt-in and remembered per device (localStorage), since some devices
+// struggle with the environment map. Never part of project or share data.
+const REFLECTIONS_KEY = 'house-cad:view3d-reflections:v1';
+const view3dReflections = document.getElementById('view3d-reflections');
+function setDesktopReflections(enabled, remember = true) {
+  view.setReflectionsEnabled(enabled);
+  view3dReflections.setAttribute('aria-pressed', String(!!enabled));
+  view3dReflections.textContent = enabled ? '✦ Reflections' : '✧ No reflections';
+  if (remember) { try { localStorage.setItem(REFLECTIONS_KEY, enabled ? '1' : '0'); } catch { /* private mode */ } }
+}
+view3dReflections.addEventListener('click', () => setDesktopReflections(!view.reflectionsEnabled));
+{
+  let saved = false;
+  try { saved = localStorage.getItem(REFLECTIONS_KEY) === '1'; } catch { /* private mode */ }
+  setDesktopReflections(saved, false);
+}
+
 function render3DFloorList() {
   if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
     selected3DFloorId = null;
