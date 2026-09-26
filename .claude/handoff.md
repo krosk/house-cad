@@ -17,7 +17,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 29, continued)
-**Status:** Proven (git + live `version.json`): `origin/main` served `47c08de` (stair rotation) before
+**Status:** Proven (git + live `version.json`): `origin/main` served `9bce6e7` (stacked-marker readout) before
 this handoff's own commit, which changes only this file. The tree is clean apart from the owner's
 untracked `Document from Alexis He.json`.
 The AR performance work is **owner-confirmed on the Quest**; the rest of this session is build/Node-verified only.
@@ -106,6 +106,16 @@ Read `docs/product-intent.md` before planning AR work.
     Details: `docs/ar-survey.md` (A/X rotate). Proven by build + Node harness (cycle, save round-trip,
     legacy arrow identical to the old sheet, 3D treads rise along `climb`). **Parked:** the owner could
     not verify on device yet.
+12. **MARKER · CHECK** (`0ad552d`, owner request): a read-only AR circuit-diagnostics mode between WIRE
+    and PIPE. Rings: red = cross-tie (2+ breakers), orange = wired but no breaker, white = unwired
+    outlet/switch/light; thumbstick-y filters. Also fixed: Ethernet wires were counted as power edges
+    (7 false "no breaker" components); circuits are now per nature. Definitions + owner choices
+    (spare breakers not flagged, narrow `needsPower`): `docs/electrical-workflow.md`. Proven by build +
+    Node on rev 9 (0 cross-tie / 5 no-breaker / 93 unwired). **Parked**, not seen on device.
+13. **Stacked-marker readout** (`9bce6e7`): a double switch stays two switch markers at one point
+    (owner decision; LINK needs one marker per rocker). Hovering a marker that shares its point adds
+    `<type> i/n → k× light` and outlines its lights cyan. Drawing stacked markers apart was rejected:
+    see `docs/ar-survey.md` "Stacked devices". Proven by build + Node on rev 9. **Parked**, not seen on device.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -166,7 +176,7 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `47c08de` before the handoff commit). Session 29, all with descriptive bodies:
+All pushed (`origin/main` = `9bce6e7` before the handoff commit). Session 29, all with descriptive bodies:
 - **3D / docs:** `f457bd5` 3D walls/doors · `c391395` memory→docs · `7308e44` claim rule ·
   `309d807` 3D faceplates.
 - **Conduit pen and Z-dims:** `dce02f1` pen undo + T · `fb56fbc` Z-dims.
@@ -178,6 +188,7 @@ All pushed (`origin/main` = `47c08de` before the handoff commit). Session 29, al
   `245cb3f` LEFT stick-y storey teleport · `5698fb7` WIRE device+wire cycle, sticky highlight ·
   `8603501` CIRCUIT/SHARED lengths.
 - **Stairs:** `47c08de` rotatable stair direction (`climb`).
+- **Circuits:** `0ad552d` MARKER · CHECK diagnostics + power-only circuits · `9bce6e7` stacked-marker readout.
 
 Doc-only commits are omitted. **Never stage** `Document from Alexis He.json` (untracked): it is the
 owner's real 3-storey house and a useful read-only Node fixture.
@@ -217,6 +228,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - conduit pen undo + T-junction;
   - stair rotation (parked 2026-09-26, owner could not verify yet): A/X arrow turns, STAIRS DOWN above
     points the opposite way, sheet/DXF/View 3D follow (checklist item in `docs/ar-qa-checklist.md`);
+  - MARKER · CHECK rings/filter/counts and frame rate with ~100 rings (parked 2026-09-26);
+  - stacked-marker readout `switch i/n → k× light` on the double switches (parked 2026-09-26);
   - Z-dim look;
   - 3D-viewer wall/door and faceplate fixes (desktop);
   - then the older backlog (plumbing, cross-floor conduit, RECAL, left-grip sheet, `link`/`qr`).
@@ -246,7 +259,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the conduit pen undo/T;
   - whether the Z-dim restyle reads well;
   - the 3D viewer fixes (never viewed in a browser);
-  - stair rotation (`47c08de`): whether the new AR stair arrow reads over the stairs' fill tint.
+  - stair rotation (`47c08de`): whether the new AR stair arrow reads over the stairs' fill tint;
+  - MARKER · CHECK (`0ad552d`): whether 1-px pins read, whether white rings are distinct from the yellow
+    hover outline, and whether ~100 rings hold frame rate. The readout pill grew to 4 lines and sits
+    1.25 cm higher in every mode.
 
   The owner has used AR with markers, labels, conduits and wires since the batching, and reported
   them working.
