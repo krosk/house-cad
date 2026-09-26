@@ -190,9 +190,3 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 - FURNISH authoring (drop/select/move/rotate/delete, foot pad) is AR-unwalked.
 - Offline Cache API reuse across a real no-wifi session is unverified.
 - Deferred: env-map lighting, snap-to-wall/grid on drop, multi-select.
-  **The models show only with the AR 3D view on (LEFT X)** (owner decision, 2026-09-26: at full
-  size they occluded the plan while furnishing). Otherwise each item draws as a flat **plan piece**
-  on the floor (`furniturePlanGroup`): its catalog footprint (width × depth) as a violet fill and
-  outline, a V notch on the front edge, and a dashed outline when the item is raised (wall-hung,
-  like an overhead line on a plan); hover turns it yellow, selection amber. `buildArch3d` swaps the
-  two groups' visibility.
