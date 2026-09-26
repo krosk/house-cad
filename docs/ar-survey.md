@@ -285,7 +285,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`. These are **NOT massing** — they never
   enter the footprint/boolean/extrude pipeline (distinct from the `furniture` *zone* kind, a
   `[foot,top]` placeholder rect authored in PLAN). Trigger empty space to **drop** the current article
-  at the tip; trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a
+  at the tip (at the catalog's `mountZMm` foot height for a wall-hung product, else on the floor); trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a
   single value = how high the model's base sits off the floor (for wall-hung units/shelves). That pad
   is **floor-only** (its SWAP cell is inert; there is **no** free-Z and **DEL
   deletes the item**, because furniture grip-drag is floor-planar so the foot is pad-only). **Thumbstick

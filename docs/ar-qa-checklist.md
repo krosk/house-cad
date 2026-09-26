@@ -349,6 +349,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Choice persists across an APK relaunch
 - [x] ZH help text wraps (CJK-aware) without overflowing the box
 
+## FURNISH (`furnish`)  ⬜ procedural items build-verified only
+
+- [ ] Cycle to `daikin-ctxm15a` and drop it on a wall: it starts with its bottom at 2.0 m (foot pad shows 2.00), back flat to the wall once rotated, flap and sensors facing the room at the bottom right; its size looks right against the real wall
+
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)
 - [ ] Mode label + help show the localized `GROUP · TOOL` breadcrumb

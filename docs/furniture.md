@@ -94,6 +94,18 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   (`params.mattress`), 25 cm thick (`params.mattressHeightMm`, owner choice). The rail height, lean and cushion size are estimates from photos, not
   measurements. Proven in a scratch browser preview (bounding box 1.72 × 0.93 × 2.23 m); not yet
   seen in FURNISH or on device.
+- `daikin-ctxm15a`: Daikin Perfera CTXM15A wall-mounted AC indoor unit (multi-split, 1.5 kW),
+  804 × 298 × 252 mm, 11.5 kg (Daikin's CTXM-A spec table). Builder `daikin-wall-unit`: a flat glossy
+  front panel, a slanted lower face with the outlet flap and two sensor windows at the right end, and
+  an underside curving up to the wall (side profile from Daikin's CTXM-A installer reference guide
+  4P518023-17P, pages 23–24; front layout from the clim-split and climamania retailer photos, scaled
+  by the 804 mm width). Panel lower edge 73 mm up, flap 65–674 mm from the left, logo 206 mm below the top
+  (`params`): photo estimates, not measurements. The catalog's **`mountZMm: 2000`** makes a FURNISH drop
+  start with the unit's bottom 2.0 m off the floor (any entry may carry it; default 0). Installation
+  rules from the same guide: bottom **≥ 1.8 m** above the floor, **≥ 30 mm** to the ceiling, **≥ 50 mm**
+  to a side wall on each side. The builder doesn't check them. Proven in a scratch browser preview (bounding box 0.804 × 0.298 ×
+  0.253 m, the extra 1 mm is the logo) and in the real View 3D overview on a wall of the demo house;
+  not yet seen in FURNISH or on device.
 
 ## Rendering
 

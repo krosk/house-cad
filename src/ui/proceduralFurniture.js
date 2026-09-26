@@ -216,7 +216,78 @@ function stockholmBed(entry) {
   return g;
 }
 
-const BUILDERS = { 'stockholm-bed': stockholmBed };
+// Daikin Perfera CTXM-A wall-mounted AC indoor unit (sources in docs/furniture.md).
+// W × H × D from the catalog `sizeMm` (Daikin: 804 × 298 × 252 mm). Back against the
+// wall at −Z; the catalog `mountZMm` lifts it on drop (the foot is the unit's bottom).
+//
+// Shape, from Daikin's installer guide drawings and retailer front photos:
+//   - a flat glossy front panel over the upper ~3/4 of the face (logo centred low);
+//   - a slanted lower-front face carrying the horizontal outlet flap and, at the
+//     right end, the two round sensor/receiver windows;
+//   - an underside that curves up to the wall at the back.
+function daikinWallUnit(entry) {
+  const [W, H, D] = (entry.sizeMm || [804, 298, 252]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const panelBottom = (p.panelBottomMm ?? 73) / 1000;   // front panel lower edge (photo)
+  const panelT = 0.014;
+  const flapX = (p.flapMm || [65, 674]).map((v) => v / 1000 - W / 2); // from the left (photo)
+  const white = new THREE.MeshStandardMaterial({ color: p.color ?? 0xf3f3f1, roughness: 0.3 });
+  const body = new THREE.MeshStandardMaterial({ color: p.bodyColor ?? 0xf0f0ee, roughness: 0.55 });
+  const flap = new THREE.MeshStandardMaterial({ color: 0xe2e2df, roughness: 0.4 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2e3034, roughness: 0.3 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'daikin-wall-unit';
+
+  // Casing: the side profile in (z, y), extruded across the width (a −90° turn about Y
+  // maps the shape's x onto world +Z and the extrusion onto −X).
+  const zf = D / 2 - panelT;                   // casing front, behind the panel
+  const slopeFoot = [D / 2 - 0.05, 0.012];     // bottom of the slanted outlet face
+  const s = new THREE.Shape();
+  s.moveTo(-D / 2, 0.11);                      // back, where the underside meets the wall
+  s.quadraticCurveTo(-D / 2 + 0.01, 0.005, -D / 2 + 0.09, 0);
+  s.lineTo(...slopeFoot);
+  s.lineTo(zf, panelBottom);
+  s.lineTo(zf, H);
+  s.lineTo(-D / 2, H);
+  s.lineTo(-D / 2, 0.11);
+  const cg = new THREE.ExtrudeGeometry(s, { depth: W, bevelEnabled: false, curveSegments: 8 });
+  cg.rotateY(-Math.PI / 2);
+  cg.translate(W / 2, 0, 0);
+  g.add(new THREE.Mesh(cg, body));
+
+  // Front panel with softened edges, and the logo mark.
+  const ph = H - panelBottom;
+  const panel = new THREE.Mesh(new RoundedBoxGeometry(W, ph, panelT, 2, 0.004), white);
+  panel.position.set(0, panelBottom + ph / 2, D / 2 - panelT / 2);
+  g.add(panel);
+  const logoY = H - (p.logoFromTopMm ?? 206) / 1000;
+  g.add(box([-0.022, logoY - 0.0035, D / 2], [0.022, logoY + 0.0035, D / 2 + 0.001], dark));
+
+  // Slanted lower face: flap and sensor windows sit on it, 1–2 mm proud.
+  // Vectors are (z, y). Local Y of a part = the face's outward normal, local Z = down the slope.
+  const a = new THREE.Vector2(zf, panelBottom), b = new THREE.Vector2(...slopeFoot);
+  const len = a.distanceTo(b);
+  const dir = b.clone().sub(a).normalize();
+  const n = new THREE.Vector2(-dir.y, dir.x);         // forward and down
+  const tilt = Math.atan2(n.x, n.y);
+  const onSlope = (mesh, x, t, out) => {              // t = 0 at the top edge … 1 at the foot
+    mesh.position.set(x, a.y + (b.y - a.y) * t + n.y * out, a.x + (b.x - a.x) * t + n.x * out);
+    mesh.rotation.x = tilt;
+    g.add(mesh);
+  };
+  onSlope(new THREE.Mesh(new THREE.BoxGeometry(flapX[1] - flapX[0], 0.004, len * 0.72), flap),
+    (flapX[0] + flapX[1]) / 2, 0.5, 0.002);
+  // Sensor windows: light grey discs with a dark centre (cylinder axis = local Y = normal).
+  const lens = new THREE.MeshStandardMaterial({ color: 0xcfd0d0, roughness: 0.35 });
+  for (const [xmm, r] of [[700, 0.009], [745, 0.012]]) {
+    const x = xmm / 1000 - W / 2;
+    onSlope(new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.003, 20), lens), x, 0.45, 0.0015);
+    onSlope(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.4, r * 0.4, 0.003, 16), dark), x, 0.45, 0.0025);
+  }
+  return g;
+}
+
+const BUILDERS = { 'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit };
 
 export function isProcedural(entry) {
   return !!(entry && BUILDERS[entry.procedural]);

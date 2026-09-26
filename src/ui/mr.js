@@ -6582,7 +6582,9 @@ export function setupMR(view, project, getFootprint) {
         if (selectedFurnitureId) { selectedFurnitureId = null; deactivateNumpad(); setModeInfo(); return; } // first empty trigger deselects
         if (!currentFurnitureArticle) { rlog('furniture drop skipped: empty catalog'); return; }
         const { px, py } = worldToPlan(pos);
-        const item = project.addFurniture({ article: currentFurnitureArticle, x: px, y: py, rotationY: 0 });
+        // A wall-hung product's catalog `mountZMm` sets its starting foot elevation.
+        const z = (furnitureCatalog[currentFurnitureArticle]?.mountZMm ?? 0) / 1000;
+        const item = project.addFurniture({ article: currentFurnitureArticle, x: px, y: py, z, rotationY: 0 });
         buildFurniture();
         rlog('furniture drop', { id: item.id, article: item.article, px: +px.toFixed(3), py: +py.toFixed(3) });
       },
