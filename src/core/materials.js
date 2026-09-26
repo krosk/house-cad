@@ -13,7 +13,8 @@
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
 //            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
 //            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
-//            sheet of `mosaic` = [cols, rows] sticks, with a bump map); `roughness` optional (3D)
+//            sheet of `mosaic` = [cols, rows] sticks, with a bump map; octagon: 'porcelain-matte',
+//            accent = the tozzetto colour, `grout` = the joint colour); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
@@ -35,11 +36,6 @@ export const BUILTIN_MATERIALS = [
     id: 'tile_300', surface: 'floor', pattern: 'grid', w: 0.3, h: 0.3, joint: 0.003,
     color: 0xe5e7eb, accent: 0x9ca3af, pack: { pieces: 11 },
     name: { en: 'Tile 30×30', fr: 'Carrelage 30×30', zh: '地砖 30×30' },
-  },
-  {
-    id: 'octagon_200', surface: 'floor', pattern: 'octagon', w: 0.2, h: 0.2, joint: 0.002,
-    color: 0xf1f5f9, accent: 0x111827, pack: { pieces: 25 },
-    name: { en: 'Octagon + cabochon 20', fr: 'Octogone + cabochon 20', zh: '八角砖 + 小方砖 20' },
   },
   {
     id: 'wall_tile_200', surface: 'wall', pattern: 'grid', w: 0.2, h: 0.2, joint: 0.002,
@@ -74,6 +70,16 @@ export const BUILTIN_MATERIALS = [
     w: 0.301, h: 0.0754, joint: 0.003, thickness: 0.0085,
     color: 0xf4f4f0, accent: 0xf8f8f5, roughness: 0.12, bumpScale: 3, pack: { pieces: 40 },
     name: { en: 'Vernisse white tile 30×7.5', fr: 'Faïence Vernisse blanc 30×7,5', zh: 'Vernisse 白色墙砖 30×7.5' },
+  },
+  {
+    // Etruria Design HEX (through-body porcelain, matte, 10 mm): Ottagono regolare 15×15
+    // in MATTONE (terracotta) with the 6.2×6.2 Tozzetto in BIANCO at each corner (owner's
+    // choice of product and colours). Colours from Etruria's swatch photos; the joint,
+    // grout colour and pack size are estimates (the retailer sells per m² / per piece).
+    id: 'etruria_hex_octagon_mattone', surface: 'floor', pattern: 'octagon', design: 'porcelain-matte',
+    w: 0.15, h: 0.15, joint: 0.002, thickness: 0.01,
+    color: 0x7a4534, accent: 0xd4cfc4, grout: 0xcfc8bc, roughness: 0.85, bumpScale: 1.5, pack: { pieces: 1 },
+    name: { en: 'Etruria HEX octagon Mattone + white tozzetto 15', fr: 'Etruria HEX octogone Mattone + cabochon blanc 15', zh: 'Etruria HEX 八角砖 砖红 + 白色小方砖 15' },
   },
   {
     // GoodHome Blue stone mosaic, light grey (Castorama EAN 5036581066864): natural stone,

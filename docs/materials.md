@@ -218,6 +218,42 @@ between sheets, as on a laid wall) over a 3 × 3 sheet unit, with a bump map lik
     - takeoff (Node): a 2 × 1.5 m floor = 35 sheets (24 whole, 11 cut).
   - Not yet seen in View 3D on a real room or in AR.
 
+## Octagon + tozzetto products
+
+An `octagon` entry with a `design` draws OCT_CELLS × OCT_CELLS (4 × 4) octagons in `color` with a tozzetto
+diamond in `accent` at every lattice corner, on `grout`, plus a bump map. The tozzetto's half-diagonal
+is the chamfer leg minus the joint's share, so the chamfer-to-tozzetto gap equals the joint. The
+geometry already fits a real regular octagon: a 150 mm octagon's side is 150 / (1 + √2) = 62.1 mm,
+the published 6.2 cm tozzetto.
+
+The generic placeholder `octagon_200` (200 mm, white + black cabochon) was removed on 2026-09-26: the owner
+chose Etruria as the real product. A saved finish that still names it shows as having no material
+(every `materialById` caller handles null: no texture, no count). The 200 mm figures quoted above
+were measured with that placeholder.
+
+- `etruria_hex_octagon_mattone`: Etruria Design HEX, *Ottagono regolare* 15 × 15 in **MATTONE** with the
+  *Tozzetto* 6.2 × 6.2 in **BIANCO** (owner's product; "terracotta" octagon, white tozzetto,
+  2026-09-26).
+  - From Etruria's HEX catalogue PDF (`wp-content/uploads/2016/04/ETRURIAdesign_HEXcollection_Catalogue.pdf`,
+    pages 58–59): through-body coloured porcelain, 10 mm, not rectified, 17 colours.
+  - Colours: Etruria's swatch photos `Etruria_Hex_col_Mattone.jpg` (mean #703f2f) and `…_Bianco.jpg`
+    (#d4cfc4). The catalogue's printed swatches are lighter (#8f5844, #e6dfcd). The entry uses
+    `0x7a4534` between the two, and BIANCO as is.
+  - Look: the close-up `Etruria_Hex_amb_01.jpg` shows a matte, fine sandy surface with a softly rounded
+    edge. The cellar `Etruria_Hex_amb_08.jpg` is this exact combination laid, with a thin light grout
+    and a slight shade shift between tiles. A retailer sample (cristiani.it `Ottagono-Avorio.jpeg`)
+    confirms the proportions.
+  - **Estimates:** the joint (2 mm), the grout colour (`0xcfc8bc`) and the pack. Retailers sell the
+    octagon per m² and the tozzetto per piece, so `pack: { pieces: 1 }` until the owner has the real
+    box size.
+  - Other options: BISCOTTO is the lighter terracotta; SUPER BIANCO is a whiter white.
+  - Proven:
+    - the build passes;
+    - scratch renders beside the sample and the cellar photo;
+    - takeoff (Node) of the upstairs bathroom 1.88 × 2.39 m = 208 octagons (180 whole, 28 cut) and
+      221 tozzetti.
+  - Not yet seen in View 3D on a real room or in AR.
+
 ### View 3D reflections (owner decision, 2026-09-26: on demand)
 
 A **✦ Reflections** button under the View 3D lighting toggle sets `scene.environment` to three's

@@ -20,9 +20,12 @@ const DESIGN_ROWS = 10, DESIGN_PER_ROW = 3;
 const BRICK_COLS = 4, BRICK_ROWS = 8;
 // Mosaic-sheet designs (grid pattern, piece = one sheet): GRID_SHEETS × GRID_SHEETS sheets.
 const GRID_SHEETS = 3;
+// Octagon + tozzetto designs: OCT_CELLS × OCT_CELLS octagons (tone varies per tile).
+const OCT_CELLS = 4;
 const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
   || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design])
-  || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design]);
+  || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design])
+  || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design]);
 
 // Repeat unit (metres) of a pattern.
 export function patternUnit(m) {
@@ -30,6 +33,7 @@ export function patternUnit(m) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [GRID_SHEETS * px, GRID_SHEETS * py];
+  if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return [OCT_CELLS * px, OCT_CELLS * py];
   if (m.pattern === 'stagger') return [m.w, 3 * py];
   if (m.pattern === 'brick') return [px, 2 * py];
   return [px, py];
@@ -355,10 +359,92 @@ function paintGridDesign(ctx, m, W, H, ppm, bump) {
   }
 }
 
+// Matte through-body porcelain piece (Etruria HEX): one flat colour per piece with a
+// slight tone shift, faint clouding, and a soft rounded edge. `pts` = the outline (px).
+// The fine sandy grain is added over the whole unit afterwards (grainPass).
+function porcelainPiece(ctx, hex, pts, ppm, r, bump) {
+  const path = () => {
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+  };
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  ctx.save();
+  path(); ctx.clip();
+  const base = new THREE.Color(hex).multiplyScalar(bump ? 1 : 0.95 + r() * 0.1);
+  const fill = bump ? '#b4b4b4' : `#${base.getHexString()}`;
+  ctx.fillStyle = fill;
+  ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  if (!bump) {
+    // Clouding: a couple of very faint soft blobs.
+    ctx.filter = `blur(${Math.max(2, 0.01 * ppm)}px)`;
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.05 + r() * 0.06;
+      ctx.fillStyle = `#${base.clone().multiplyScalar(r() < 0.5 ? 1.12 : 0.88).getHexString()}`;
+      ctx.beginPath();
+      ctx.arc(x0 + r() * (x1 - x0), y0 + r() * (y1 - y0), (0.2 + r() * 0.3) * (x1 - x0), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // Rounded edge: a soft rim darker than the face (colour) / falling away (bump).
+  ctx.filter = `blur(${Math.max(1, 0.0008 * ppm)}px)`;
+  ctx.globalAlpha = bump ? 1 : 0.55;
+  ctx.strokeStyle = bump ? '#6a6a6a' : `#${base.clone().multiplyScalar(0.72).getHexString()}`;
+  ctx.lineWidth = 0.0016 * ppm;
+  path(); ctx.stroke();
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+const OCT_DESIGNS = { 'porcelain-matte': porcelainPiece };
+
+// Fine sandy grain over the whole unit: per-pixel brightness noise plus rare specks.
+function grainPass(ctx, W, H, r, amount) {
+  const img = ctx.getImageData(0, 0, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let f = 1 + (r() - 0.5) * amount;
+    if (r() < 0.0004) f *= r() < 0.5 ? 0.6 : 1.25;
+    d[i] *= f; d[i + 1] *= f; d[i + 2] *= f;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// Octagons (`m.color`) with a tozzetto diamond (`m.accent`) at every lattice corner, in
+// `m.grout`. Corner diamonds on the unit edge are drawn on both sides with one seed so
+// the unit tiles. Gap between a chamfer and its diamond = the joint.
+function paintOctDesign(ctx, m, W, H, ppm, bump) {
+  const r = rng(m.seed ?? 67);
+  const n = OCT_CELLS, px = W / n, py = H / n, jp = (m.joint || 0) * ppm;
+  const hw = (m.w * ppm) / 2, c = (m.w / (2 + Math.SQRT2)) * ppm;
+  const k = c - jp * (Math.SQRT2 - 1); // tozzetto half-diagonal
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.grout ?? GROUT);
+  ctx.fillRect(0, 0, W, H);
+  const seeds = Array.from({ length: n * n * 2 }, () => Math.floor(r() * 1e9));
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const cx = (i + 0.5) * px, cy = (j + 0.5) * py;
+      const oct = [[-hw + c, -hw], [hw - c, -hw], [hw, -hw + c], [hw, hw - c], [hw - c, hw], [-hw + c, hw], [-hw, hw - c], [-hw, -hw + c]]
+        .map(([x, y]) => [cx + x, cy + y]);
+      OCT_DESIGNS[m.design](ctx, m.color, oct, ppm, rng(seeds[j * n + i]), bump);
+    }
+  }
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) {
+      const X = i * px, Y = j * py;
+      const dia = [[X, Y - k], [X + k, Y], [X, Y + k], [X - k, Y]];
+      OCT_DESIGNS[m.design](ctx, m.accent, dia, ppm, rng(seeds[n * n + (j % n) * n + (i % n)]), bump);
+    }
+  }
+  grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 67) + 1), bump ? 0.12 : 0.05);
+}
+
 function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return paintDesign(ctx, m, W, H, ppm);
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return paintBrickDesign(ctx, m, W, H, ppm, false);
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return paintGridDesign(ctx, m, W, H, ppm, false);
+  if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return paintOctDesign(ctx, m, W, H, ppm, false);
   const jp = Math.max(1.5, (m.joint || 0) * ppm); // joint in px, never invisible
   if (m.pattern === 'stagger') {
     const rowH = H / 3;
@@ -442,6 +528,9 @@ export function finishTexture(m, anisotropy = 1) {
 // Height map for designs that have one (same unit and seed as finishTexture, so the two
 // line up), else null. View 3D only: the AR 3D view's Lambert materials ignore it.
 export function finishBumpTexture(m, anisotropy = 1) {
+  if (m?.pattern === 'octagon' && OCT_DESIGNS[m.design]) {
+    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintOctDesign(ctx, m, W, H, ppm, true)), anisotropy);
+  }
   if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
     return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true)), anisotropy);
   }
