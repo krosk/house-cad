@@ -42,21 +42,41 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
   Read the pages with the Read tool (`pages: "1-6"`); page 1 is usually a clean isometric.
 - Record every source (URL) and every number's origin in the doc entry.
 
-## 3. Getting photos that automated access can reach
+## 3. Getting photos: `tools/product-images.mjs`
 
-- **Blocked** (402/403 to curl and WebFetch): IKEAPEDIA (ikeaddict.com), AptDeco, ikea-club.org,
-  manuall, Leroy Merlin (read it in the Chrome tools instead: the page renders there).
-- **Worked:** Design Plus Gallery, lot-art, and manufacturer image hosts
-  (`statics-lapeyre.fr`), all by plain `curl` + a regex for `https?://…\.(jpe?g|png|webp)`.
-- **Leboncoin:** curl a search-landing page such as `https://www.leboncoin.fr/ck/ameublement/lit-stockholm`,
-  parse `<script id="__NEXT_DATA__">` JSON, walk objects that have `subject` + `images`, and filter
-  on the product name. `images.urls_large` gives full photos. Listings sometimes repost the
-  manufacturer's own studio shots, which are the best side views.
-- Open the product page's **gallery** (and sibling variants: other widths/colours of the same range);
-  the HTML often carries only the main image. For a surface, a straight top-down photo is the best
-  reference: render at the same scale beside it and compare pixel statistics, not just by eye.
-- Save photos to the session scratchpad (never the repo), view them with Read, and pick one straight
-  front view, one straight side view, and one in-context photo.
+The script knows each retailer's image pattern and downloads full-size photos; send them to the
+scratchpad with `--out`, never the repo. Proven 2026-09-26 on every site below.
+
+```bash
+node tools/product-images.mjs --out <scratchpad>/imgs <product-url>   # IKEA, Lapeyre, leboncoin
+node tools/product-images.mjs --list <url>                            # list only
+node tools/product-images.mjs --snippet    # Leroy Merlin: JS to run in Chrome on the product page
+node tools/product-images.mjs --download --out <dir> <image-url>...   # then download what it returned
+```
+
+| Site | Pattern the script uses | Access |
+|---|---|---|
+| IKEA | `ikea.com/<cc>/<lang>/images/products/<slug>__<id>_<code>_s5.jpg`, only this product's slug; 1400 px | curl |
+| Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (pictos excluded); 1240 × 900 | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
+| Leroy Merlin | `media.adeo.com/media/<id>/media.jpg` ids in the page HTML = the gallery, in order; downloaded as `media.jpeg?width=1200` | **Chrome only** (DataDome, below); images download fine by curl |
+| leboncoin | `<script id="__NEXT_DATA__">`: objects with `subject` + `images.urls_large`, filtered by title (`--filter`, default the URL's words) | curl (Node's own fetch gets 403) |
+| other | every absolute image URL minus logos/icons: review by eye | curl |
+
+- **Why a site blocks:** Leroy Merlin runs DataDome (403 with `x-datadome: protected` and a JS challenge
+  from `geo.captcha-delivery.com`). A real Chrome passes it silently and gets a `datadome` cookie, so
+  the snippet re-fetches the page from inside the tab. A proxy would not help. The script fetches with
+  curl because leboncoin rejects Node's fetch with identical headers (TLS fingerprint: Hypothesis).
+- **Blocked everywhere we tried** (402/403 to curl and WebFetch; Chrome route untested): IKEAPEDIA
+  (ikeaddict.com), AptDeco, ikea-club.org, manuall. Design Plus Gallery and lot-art worked with curl
+  (generic pattern).
+- Look at **every** gallery image, and at sibling variants (other widths/colours of the same range).
+  The first pass on the Beaulieu floor stopped at the main photo and missed the top-down shot. On
+  Leroy Merlin, later `.jpg` ids can belong to other products: check before using.
+- Listings on leboncoin sometimes repost the manufacturer's own studio shots, the best side views.
+- For a surface, a straight top-down photo is the best reference: render at the same scale beside it
+  and compare pixel statistics, not just by eye.
+- View photos with Read, and pick one straight front view, one straight side view, and one in-context
+  photo.
 
 ## 4. Build from shapes in code
 

@@ -161,12 +161,11 @@ cut plan.
   close-up: knot, grain), room shots **1587720** and **964334** (these two disagree in warmth: studio
   lighting), and the same wood in the M (13 cm) and XL (18.7 cm) widths. Figure: mild per-plank tone,
   fine broken grain, small flames on about half the planks, clusters of pin knots, some larger knots.
-  The bevel width (2 mm) is an estimate. The gallery images load only when the gallery is opened; the
-  page HTML carries just the main image.
+  The bevel width (2 mm) is an estimate.
   Proven: build; scratch browser renders beside photos 799228 and 964334; takeoff of a 5 × 4 m room = 107 planks
   (Node). Not yet seen in View 3D on a real room or in AR.
-- Leroy Merlin blocks curl and WebFetch (403); the page reads fine in the Chrome tools, where the
-  characteristics are in the DOM as label/value rows. Images come from `media.adeo.com/media/<id>/media.jpeg`.
+- Photos come from `tools/product-images.mjs` (Leroy Merlin via its Chrome snippet: the site runs
+  DataDome); see `docs/product-modelling.md` step 3.
 - Texture cost: the design canvas is 2048 × 949 px (about 10 MB of GPU memory with mipmaps), four times
   the generic planks. Hypothesis: fine on Quest for one or two such materials; watch PERF in the AR 3D view.
 
