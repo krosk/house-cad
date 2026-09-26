@@ -114,6 +114,16 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   free (never-height-set) marker grabs in full 3D. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
+- **Stacked devices** (owner decision, 2026-09-26). A double switch is authored as **two switch markers
+  at the same point**, one per rocker. Circuits alone would not need that: one marker is correct when both
+  rockers share a feed. But a LINK goes from a switch marker to a light, so two rockers driving two lights
+  need two markers. **Do not draw stacked markers apart in AR.** That was considered and rejected: the floor
+  icon, reticle pick, marker dims and sheet all use the shared point, so a display-only offset would put
+  glyphs where the data is not. Instead, when the hovered marker shares its plan point with others
+  (`markerStackInfo`), the controller readout adds `<type> i/n → k× light`. `i/n` is its place in the
+  grip-cycle order: top to bottom, then authoring order, counting every marker at that point, e.g.
+  shutter 214 cm, 2 switches 109 cm, outlet 24 cm = 4. The lights it controls are outlined cyan in every
+  mode except LINK, which already shows them. MARKER · CHECK folds `i/n` into its hover line.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Grip cycles eligible
   overlapping switches (then lights), and trigger confirms the yellow candidate. Triggering one or
   more selected light icons toggles each control link. Pairwise links allow one switch to

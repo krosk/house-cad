@@ -3485,6 +3485,7 @@ export function setupMR(view, project, getFootprint) {
   let selectedMarker = null; // OUTLET mode: marker being height-edited
   let markerEditPickAfterId = null;
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
+  let hoverStackInfo = null; // markerStackInfo() of the hovered marker when it shares its point
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
   let markerLinkPickAfterId = null;
   // MARKER · WIRE (routed): the pending first endpoint of a new wire pair.
@@ -5396,6 +5397,30 @@ export function setupMR(view, project, getFootprint) {
     }
     return best;
   }
+
+  // Devices authored at the SAME plan point on one floor (owner case: a double switch
+  // is two switch markers, one per rocker, so each can drive its own light). The data
+  // stays truthful: nothing is drawn apart. Instead the hovered one reports its place
+  // in the stack (top to bottom, then authoring order, as the EDIT grip cycle) and
+  // the lights it controls, so the grip cycle is legible. Null unless 2+ share it.
+  function markerStackInfo(marker) {
+    const found = project.findMarker(marker.id);
+    if (!found) return null;
+    const stack = found.floor.markers
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => candidate.x === marker.x && candidate.y === marker.y)
+      .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
+      .map(({ candidate }) => candidate);
+    if (stack.length < 2) return null;
+    const lightIds = (found.floor.electricalLinks || [])
+      .filter((link) => link.fromMarkerId === marker.id).map((link) => link.toMarkerId);
+    return {
+      marker, index: stack.indexOf(marker) + 1, size: stack.length,
+      lights: found.floor.markers.filter((m) => lightIds.includes(m.id)),
+    };
+  }
+  const stackLabel = (info) => `${t(`marker.${info.marker.type || 'outlet'}`)} ${info.index}/${info.size}`
+    + (info.lights.length ? ` → ${info.lights.length}× ${t('marker.light')}` : '');
 
   // MARKER · WIRE endpoint candidates. Nearby and vertically stacked devices share one
   // distance-then-height order.
@@ -7525,7 +7550,8 @@ export function setupMR(view, project, getFootprint) {
     if (modes[currentMode].id === 'circuit_check' && checkDiag) {
       const lines = [], colors = [];
       if (checkHover) {
-        lines.push(`${t(`marker.${checkHover.marker.type || 'outlet'}`)} · ${t(`check.${checkHover.issue}`)}`);
+        const stack = hoverStackInfo?.marker === checkHover.marker ? hoverStackInfo : null;
+        lines.push(`${t(`marker.${checkHover.marker.type || 'outlet'}`)}${stack ? ` ${stack.index}/${stack.size}` : ''} · ${t(`check.${checkHover.issue}`)}`);
         colors.push(0xffe14d);
       } else {
         lines.push(t(`check.${checkFilter}`)); colors.push(0xf97316);
@@ -7563,10 +7589,18 @@ export function setupMR(view, project, getFootprint) {
           wireTypeColor({ type: wireLengths.otherType })]
         : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
       : exportStatus ? C_EXPORT : 0x38bdf8;
+    // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
+    let pillText = readoutText, pillColor = readoutColor;
+    if (hoverStackInfo && !checkStatus) {
+      const lines = pillText ? String(pillText).split('\n') : [];
+      const colors = lines.map((_, i) => (Array.isArray(pillColor) ? (pillColor[i] ?? pillColor[0]) : pillColor));
+      lines.push(stackLabel(hoverStackInfo)); colors.push(0xffe14d);
+      pillText = lines.join('\n'); pillColor = colors;
+    }
     controllers.forEach((c, i) => {
-      const on = c.userData.inputSource === editCtl && !!readoutText;
+      const on = c.userData.inputSource === editCtl && !!pillText;
       readouts[i].sprite.visible = on;
-      if (on) readouts[i].setText(readoutText, readoutColor);
+      if (on) readouts[i].setText(pillText, pillColor);
     });
     // Minimal HUD: build stamp + the controller pointer and the reticle's floor
     // point, BOTH in plan coordinates (relative to the registered origin, yaw-
@@ -8462,6 +8496,16 @@ export function setupMR(view, project, getFootprint) {
       // DROP modes: no floor target (zones drop at the standing position).
       reticle.visible = false;
       edgeHi.visible = false;
+    }
+    // A hovered device that shares its point (markerStackInfo): outline the lights it
+    // controls in the LINK cyan. LINK itself already shows the selected switch's lights.
+    const stackTarget = modeId === 'circuit_check' ? checkHover?.marker : hoverMarker;
+    hoverStackInfo = stackTarget ? markerStackInfo(stackTarget) : null;
+    if (hoverStackInfo && modeId !== 'marker_link') {
+      for (const light of hoverStackInfo.lights) {
+        outlineMarker(light, 'floor', 0x22d3ee);
+        outlineMarker(light, 'wall', 0x22d3ee);
+      }
     }
     // Keep the placed plan locked to the COMPLETE anchor pose. In particular, Quest
     // may rotate local-floor while relocalizing after headset sleep; ignoring the
