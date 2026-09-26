@@ -1,8 +1,9 @@
 # Materials (surface finishes): design
 
-Status (2026-09-26): **phases 1–2 implemented**: catalog, finishes, takeoff, AR MATERIAL · FLOOR /
-WALL, and View 3D textures. Build- and Node-verified on the owner's house; **not yet seen in a browser
-or on device**. Phases 3–4 are not started. This file records the owner's decisions so later sessions build the same thing.
+Status (2026-09-26): **phases 1–3 implemented**: catalog, finishes, takeoff, AR MATERIAL · FLOOR /
+WALL, View 3D textures, and the AR 3D view on LEFT X. Build- and Node-verified on the owner's house;
+**not yet seen in a browser or on device**. Phase 4 is not started. The MATERIAL tints were invisible
+in AR until the `PLAN_OVERLAY_GROUPS` fix (see `docs/ar-survey.md` "Performance notes"). This file records the owner's decisions so later sessions build the same thing.
 
 ## Goal
 
@@ -133,16 +134,15 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - Checked in Node: with every room on Ground and Upper finished, 133 of 134 wall overlay quads sit
      on a solid 3D wall, just in front of it. The 1 exception is the half-wall gap above.
    The same geometry and textures are meant to feed the **AR 3D view** below.
-3. **AR 3D view** (owner intent): a LEFT-controller button toggles an architectural 3D layer in AR.
-   It uses the same `src/core/architectural3d.js` interpretation, which was built to be reused by an
-   opt-in AR layer. Proven free on LEFT today: **X** (`buttons[4]`), **Y** (`buttons[5]`) and the
-   stick click (`buttons[3]`). LEFT trigger = teleport, LEFT grip = hold-to-view sheet, LEFT stick-x =
-   rotate plan, LEFT stick-y = storey teleport in ALL FLOORS. It must be measured with PROJECT · PERF:
-   the AR budget is tight, and batching was what fixed it.
+3. **AR 3D view** (implemented): **LEFT X** toggles it (owner choice). It shows the same
+   `architectural3d.js` walls/openings/stairs/outlines plus the finish overlays and textures, for the
+   floors on show; the real floor stays visible. Details are in `docs/ar-survey.md` (controls).
+   - Unmeasured: check PROJECT · PERF with it on, because the AR budget is tight and batching was what
+     fixed it.
+   - Other free LEFT buttons: **Y** (`buttons[5]`) and the stick click (`buttons[3]`).
 4. **Custom products in AR:** the numpad enters w/h/joint/pack; the list is kept per project.
 
 ## Open questions
 
 - Until the AR 3D view exists, AR shows a wall face's material as a coloured strip along its edge on
   the floor plan.
-- Which LEFT button toggles the 3D view (X, Y or the stick click).

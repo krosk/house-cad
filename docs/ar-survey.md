@@ -402,6 +402,13 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   the shared panel ray-pointer at order 110. The pointer itself is explicitly transparent-pass;
   making it opaque would force it before the canvas panels regardless of `renderOrder`.
 - RIGHT **trigger** = mode action (place / pick / press a numpad or slot key). LEFT trigger = teleport.
+  **LEFT X** toggles the **AR 3D view** (owner choice, 2026-09-26; `toggleArch3d`/`buildArch3d`). This is
+  the desktop `architectural3d.js` interpretation for the floors on show (active floor, or all in
+  ALL FLOORS): walls, door/window inserts, stairs, crease outlines, and the textured finish overlays
+  from `docs/materials.md`. The real floor stays visible (no wood slab, no ceiling). It uses Lambert
+  materials under the shared scene lights, with no shadows. It rebuilds with every `buildPlan` and
+  after a MATERIAL edit, only while on. Off by default; it is not a mode, so it works in any mode.
+  Its frame cost is unmeasured: check PROJECT · PERF with it on.
   **LEFT thumbstick-x** rotates the placed plan **about the headset position** in **±20° steps**
   by updating `planYaw` plus `navOffset` (never `planPos`, which the spatial anchor restores each frame),
   one per flick (`PLAN_YAW_STEP`), so the point under you stays put and the room swings around you —
@@ -751,6 +758,13 @@ teleport reticle; no last-active routing remains.
   throttle.
 
 ## Performance notes (per-frame cost)
+
+- **Every planGroup overlay group must be in `PLAN_OVERLAY_GROUPS`** (Proven bug, fixed 2026-09-26).
+  `clearPlanGeometry` removes every planGroup child it doesn't keep. Its old hand-written skip list
+  missed `zDimGroup`, `adjacentGroup`, `checkGroup` and `materialGroup`, so the first plan build
+  detached them. Z-dims, adjacent-floor target dots, CHECK rings and MATERIAL tints then never rendered,
+  while picking kept working because it reads the groups' children directly. A verbatim Node run of
+  `clearPlanGeometry` proved both the bug and the fix.
 
 - **Draw calls are drawn twice.** three.js 0.170's `WebXRManager` has no multiview, so every visible
   object renders once per eye; `renderer.info` (the HUD `draw:` line) counts both. On the Quest,

@@ -18,7 +18,9 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName } from '../core/materials.js';
-import { materialTakeoff, edgeFace, regionBoxes, EDGES } from '../core/flooring.js';
+import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces } from '../core/flooring.js';
+import { buildArchitecturalFloor, finishGeometries } from '../core/architectural3d.js';
+import { finishTexture } from './finishTextures.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
@@ -1033,6 +1035,12 @@ export function setupMR(view, project, getFootprint) {
   const materialGroup = new THREE.Group();
   materialGroup.visible = false;
   planGroup.add(materialGroup);
+  // AR 3D view (LEFT X toggles; docs/materials.md phase 3): the desktop architectural
+  // interpretation (walls, openings, stairs, outlines) plus the textured finishes,
+  // built by buildArch3d for the floors on show. Off by default.
+  const arch3dGroup = new THREE.Group();
+  arch3dGroup.visible = false;
+  planGroup.add(arch3dGroup);
   // MARKER · CHECK diagnostic rings + pins (one batched mesh + one line batch).
   const checkGroup = new THREE.Group();
   checkGroup.visible = false;
@@ -1570,11 +1578,20 @@ export function setupMR(view, project, getFootprint) {
   // here, so they stay visible at their pre-drag spots) but then re-runs buildDimensions
   // itself, so dimensions stay live and cheap (constant values => existing atlas slots).
   // onSqueezeEnd's full rebuild brings markers/electrical back to their solved positions.
+  // Overlay groups that live under planGroup for its transform but are rebuilt by
+  // their own builders. clearPlanGeometry must KEEP every one of them attached: a
+  // hand-maintained skip list once missed zDim/adjacent/check/material groups, which
+  // were then silently detached on the first plan build and never rendered in AR.
+  // Any new planGroup overlay group belongs in this set.
+  const PLAN_OVERLAY_GROUPS = new Set([
+    markerGroup, electricalGroup, conduitGroup, routedWireGroup, pipeGroup, furnitureGroup,
+    zDimGroup, adjacentGroup, checkGroup, materialGroup, arch3dGroup,
+  ]);
   function clearPlanGeometry() {
     // Clear any previous geometry. Dispose per-rebuild geometry/sprite materials; dim
     // label batches use the shared atlas page materials (see addDimLabelBatch).
     for (const child of [...planGroup.children]) {
-      if (child === markerGroup || child === electricalGroup || child === conduitGroup || child === routedWireGroup || child === pipeGroup || child === furnitureGroup) continue; // rebuilt separately below
+      if (PLAN_OVERLAY_GROUPS.has(child)) continue; // rebuilt separately
       planGroup.remove(child);
       child.geometry?.dispose();
       if (child.isSprite) child.material.dispose();
@@ -3221,6 +3238,7 @@ export function setupMR(view, project, getFootprint) {
     else project.setWallFinish([{ rect: target.rect.id, edge: target.edge }], next);
     rlog('material set', { mode: modeId, material: next });
     buildMaterials();
+    buildArch3d();
   }
   // Readout lines [text, color]: the target's material, its own quantity, then the
   // whole-house total for that product (packs rounded once for the house).
@@ -3587,7 +3605,80 @@ export function setupMR(view, project, getFootprint) {
     if (withDims) resetDimLabelAtlas(); // every label batch is rebuilt below (plan dims + Z-dims)
     const built = allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
     if (pipeGroup.visible) buildPipes();
+    buildArch3d(); // no-op while the AR 3D view is off
     return built;
+  }
+
+  // ---- AR 3D view (LEFT X) --------------------------------------------------------
+  // Reuses src/core/architectural3d.js exactly as View 3D does, so AR and desktop show
+  // one interpretation. The real floor stays visible (no wood slab, no ceiling): only
+  // walls, door/window inserts, stairs, crease outlines and the finish overlays draw.
+  // Lambert materials under the scene's existing hemisphere/sun lights, no shadows:
+  // the AR frame budget is tight (docs/ar-survey.md "Performance notes"). Rebuilt with
+  // every buildPlan and after a MATERIAL edit, only while on.
+  let arch3dOn = false;
+  const arch3dMats = {
+    walls: new THREE.MeshLambertMaterial({ color: 0xf1f0ec, side: THREE.DoubleSide }),
+    doors: new THREE.MeshLambertMaterial({ color: 0xa9794f, side: THREE.DoubleSide }),
+    windows: new THREE.MeshLambertMaterial({
+      color: 0x9ed8ea, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide,
+    }),
+    stairs: new THREE.MeshLambertMaterial({ color: 0xd6c3a5, side: THREE.DoubleSide }),
+    outlines: new THREE.LineBasicMaterial({ color: 0x475569 }),
+  };
+  const arch3dFinishMats = new Map(); // catalog entry (JSON) → material; never disposed
+  function arch3dFinishMaterial(def) {
+    const key = JSON.stringify(def || {});
+    let material = arch3dFinishMats.get(key);
+    if (!material) {
+      const map = finishTexture(def, 4);
+      material = new THREE.MeshLambertMaterial({
+        color: map ? 0xffffff : (def?.color ?? 0xffffff), map, side: THREE.DoubleSide,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      });
+      arch3dFinishMats.set(key, material);
+    }
+    return material;
+  }
+  function buildArch3d() {
+    for (const child of [...arch3dGroup.children]) {
+      arch3dGroup.remove(child); child.geometry?.dispose(); // materials are shared
+    }
+    arch3dGroup.visible = arch3dOn;
+    if (!arch3dOn) return;
+    const floors = allFloorsView ? project.floors : [project.activeFloor];
+    for (const floor of floors) {
+      const index = project.floors.indexOf(floor);
+      const a = buildArchitecturalFloor(floor, {
+        downRise: index > 0
+          ? Math.max(0.2, (floor.elevation || 0) - (project.floors[index - 1].elevation || 0))
+          : (floor.height || 2.8),
+      });
+      a.floorGeometry?.dispose(); a.ceilingGeometry?.dispose(); // real floor stays visible
+      const y = (floor.elevation || 0) - displayElevation();
+      const parts = [
+        [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
+        [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
+        ...finishGeometries(finishSurfaces(project, floor))
+          .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
+      ];
+      for (const [geometry, material] of parts) {
+        if (!geometry) continue;
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.y = y;
+        arch3dGroup.add(mesh);
+      }
+      if (a.outlineGeometry) {
+        const lines = new THREE.LineSegments(a.outlineGeometry, arch3dMats.outlines);
+        lines.position.y = y;
+        arch3dGroup.add(lines);
+      }
+    }
+  }
+  function toggleArch3d() {
+    arch3dOn = !arch3dOn;
+    buildArch3d();
+    rlog('ar 3d view', { on: arch3dOn, meshes: arch3dGroup.children.length });
   }
 
   let localSpace = null;
@@ -7076,6 +7167,7 @@ export function setupMR(view, project, getFootprint) {
       else project.setWallFinish([{ rect: target.rect.id, edge: target.edge }], null);
       rlog('material clear', { mode: mode.id });
       buildMaterials();
+      buildArch3d();
       return true;
     }
     if (mode.id === 'edit') {
@@ -7328,7 +7420,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
-  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false, leftStickY: false };
+  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false, leftStickY: false, leftX: false };
   const PLAN_YAW_STEP = THREE.MathUtils.degToRad(20); // LEFT stick-x nudges plan yaw in 20° steps
   // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
@@ -7701,6 +7793,10 @@ export function setupMR(view, project, getFootprint) {
     // xr-standard button 1 is squeeze/grip. The sheet is a hold-to-view companion:
     // hidden at rest, visible only for as long as the LEFT grip remains pressed.
     const companionGripPressed = !!companionCtl?.gamepad?.buttons[1]?.pressed;
+    // LEFT X (xr-standard button 4 on the left controller) toggles the AR 3D view.
+    const companionX = !!companionCtl?.gamepad?.buttons[4]?.pressed;
+    if (companionX && !btn.leftX && placed) toggleArch3d();
+    btn.leftX = companionX;
     updateLeftSheet(time, companionController, companionGripPressed);
     const companionHit = placed && companionCtl ? rayFloorHit(companionCtl) : null;
     if (companionHit) {

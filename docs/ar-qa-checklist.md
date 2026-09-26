@@ -59,6 +59,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Stacked devices (double switch = two switch markers at one point): hovering one in EDIT/WIRE/CHECK shows `switch i/n → k× light` and outlines its lights cyan; grip advances i/n
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (tint appears), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; strips sit inside the walls; door/window area deducted in the m² line
+- [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
+- [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL tints
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors
 - [ ] Returning to a real floor restores PLAN/MARKER traversal and editing
 - [ ] Thumbstick-y changes floor **only in LEVEL** (no-op in modes without a cycle action)
