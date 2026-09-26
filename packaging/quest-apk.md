@@ -16,8 +16,19 @@ Complete, reproducible steps for turning the web app into a sideloaded, offline,
     splash until the page calls `requestSession('immersive-ar')`.
 - Consequence: the immersive APK is **AR-only** (no 2D editor UI). Author
   floors/plans in the desktop web app.
-  OPEN: whether the installed app shares localStorage with the Quest Browser at
-  the same origin, or needs JSON Save/Load transfer — unverified.
+  **Storage is shared with the Quest Browser (Proven 2026-09-26).** The APK's page runs
+  inside `com.oculus.browser` (DevTools `/json/version`). A Quest Browser tab on
+  `https://krosk.github.io/house-cad/` read the same `localStorage` as the APK: all six
+  `house-cad:slot:*` entries had identical `savedAt` timestamps, and the autosave was the
+  same (rev 9, 49 wires). Only AR writes slots.
+  - **On-device JSON import/export uses the Quest Browser 2D page.** 📂 Load a `.json` from
+    Downloads writes the shared autosave; the APK opens on it at its next launch, and
+    PROJECT · SAVE stores it in a slot. 💾 Save in the 2D page downloads the AR work.
+  - **Last writer wins.** Each app autosaves its in-memory project on every change and
+    never re-reads storage while open. Quit the APK before editing in the browser, and
+    reload the browser tab after an AR session before touching it.
+  - The APK itself has no 2D view: exiting AR quits it. Switch between the two apps with
+    the Meta menu.
 
 ## This machine (Steam Deck / SteamOS)
 

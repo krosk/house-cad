@@ -17,9 +17,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 29, continued)
-**Status:** Proven (git): `main` is pushed; see `git log` for the latest commit (the ALL FLOORS pick-ranking follow-up).
-The tree is clean apart from the owner's untracked `Document from Alexis He.json`. Check the deploy with
-`version.json` (see traps).
+**Status:** Proven (git + live `version.json`): `origin/main` served `8603501` before this handoff's
+own commit, which adds only this file and `packaging/quest-apk.md`. The tree is clean apart from
+the owner's untracked `Document from Alexis He.json`.
 The AR performance work is **owner-confirmed on the Quest**; the rest of this session is build/Node-verified only.
 
 ## What the app is today (the gist, no code needed)
@@ -94,6 +94,12 @@ Read `docs/product-intent.md` before planning AR work.
 8. **Circuit lengths** (owner request): a selected wire's readout shows `CIRCUIT <len>` and
    `SHARED <len>` (conduit shared with the other wire nature). The definitions are in
    `docs/electrical-workflow.md`. Proven on a synthetic 5 m shared run (Node harness); not yet on device.
+9. **The APK shares storage with the Quest Browser.** Proven over adb DevTools: a Quest Browser tab
+   read the APK's six slots (identical `savedAt`) and its autosave. So on-device JSON import/export is
+   the 2D page's 📂 Load / 💾 Save, and whichever app saves last wins. Runbook: `packaging/quest-apk.md`.
+10. **Owner fixture replaced** with their rev 9 export: 229 conduit nodes, 47 wires (40 electrical,
+    7 Ethernet), 14 circuits. It is near-identical to AR slot 5. The previous rev 4 file (0 wires) was
+    not kept in the repo.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -129,7 +135,12 @@ Read `docs/product-intent.md` before planning AR work.
   of `mr.js` into a harness with stubs (the scratchpad pattern used all session), or replaying model
   bookkeeping against `Project`. Say which you did.
 - **The APK always opens `/house-cad/?ar=1`**, so URL switches (`?perf`, `#view=`) can't reach it.
-  AR diagnostics need an in-menu toggle.
+  AR diagnostics need an in-menu toggle. It has no 2D view (exit = quit), but it shares
+  `localStorage` with the Quest Browser, so the 2D page is the on-device import/export path.
+- **Reading the headset's live state without touching it:** `adb forward tcp:9333
+  localabstract:chrome_devtools_remote`, list pages at `http://127.0.0.1:9333/json/list`, then run a
+  CDP `Runtime.evaluate` over the page's WebSocket (Node 20 needs `--experimental-websocket`). Use it
+  **read-only** unless the owner explicitly asks for a write; their slots/autosave are the real survey.
 - **Never run `adb shell pm clear com.krosk.housecad`** casually: it wipes the owner's autosave and
   save slots too. To pick up a new build, relaunch the APK and check the HUD `update:` line.
   adb is at `~/Android/Sdk/platform-tools/adb`; the headset has been connected over wireless adb.
@@ -139,7 +150,8 @@ Read `docs/product-intent.md` before planning AR work.
   `architectural3d.js`).
 - **`addConduitSegment` / `ensureConduitNodeAtMarker` return EXISTING items**; `addWire` returns
   `{ ok, wire }`; `wireSegmentPath` returns segment IDS (compare routes physically).
-- **The owner's house file has 0 wires**; build a synthetic network for wire tests.
+- **The owner's house file is a real wired network** (rev 9, 47 wires). It suits wire/length tests
+  directly; a synthetic network is still handy to control an exact expectation.
 - **Thick walls between rooms are hollow in 3D** (12 cm skin per room face; wider gaps leave a void).
 - **The desktop `Sketch2D` stays live during AR**; a throw in any `onChange` listener aborts the AR caller.
 - **`rlog` works only on the dev server**; never stage `quest-debug.log`.
@@ -148,7 +160,7 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed; `origin/main` = `dee978f`. Session 29, all with descriptive bodies:
+All pushed (`origin/main` = `8603501` before the handoff commit). Session 29, all with descriptive bodies:
 - **3D / docs:** `f457bd5` 3D walls/doors · `c391395` memory→docs · `7308e44` claim rule ·
   `309d807` 3D faceplates.
 - **Conduit pen and Z-dims:** `dce02f1` pen undo + T · `fb56fbc` Z-dims.
@@ -156,6 +168,9 @@ All pushed; `origin/main` = `dee978f`. Session 29, all with descriptive bodies:
   `4369ac2` label atlas · `7f329c3` label redraw guard · `36fa3d1`/`425c2e5` PERF sweep ·
   `4af1d20` marker atlas · `4d3610b` wire batch.
 - **Glyph:** `dee978f` breaker glyph.
+- **ALL FLOORS + wiring UX:** `2f7d7df` reticle within one slab · `47c5b66` storey-ranked picks ·
+  `245cb3f` LEFT stick-y storey teleport · `5698fb7` WIRE device+wire cycle, sticky highlight ·
+  `8603501` CIRCUIT/SHARED lengths.
 
 Doc-only commits are omitted. **Never stage** `Document from Alexis He.json` (untracked): it is the
 owner's real 3-storey house and a useful read-only Node fixture.
@@ -232,5 +247,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - `docs/ar-qa-checklist.md` is stale for most work since s16.
 - **Data oddities in the owner's house:** cameras m174/m183 have `z = 0`; doors r77/r120 are drawn
   wider than their opening.
+- **IKEA furniture on the published app:** the Pages build embeds the proxy and the Worker returns a
+  valid GLB with CORS for `https://krosk.github.io` (Proven by curl). Nobody has yet seen a real model
+  replace the placeholder box on Pages/APK (Hypothesis).
 - **Unverified:** shared-link decode on real phones, Web Share of the QR from immersive mode, and
   mobile 3D performance with lights.
