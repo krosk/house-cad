@@ -18,14 +18,18 @@ const GROUT = 0xcbd5e1;
 const DESIGN_ROWS = 10, DESIGN_PER_ROW = 3;
 // Brick-bond tile designs: BRICK_COLS tiles per row, BRICK_ROWS rows, rows offset by half.
 const BRICK_COLS = 4, BRICK_ROWS = 8;
+// Mosaic-sheet designs (grid pattern, piece = one sheet): GRID_SHEETS × GRID_SHEETS sheets.
+const GRID_SHEETS = 3;
 const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
-  || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design]);
+  || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design])
+  || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design]);
 
 // Repeat unit (metres) of a pattern.
 export function patternUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
+  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [GRID_SHEETS * px, GRID_SHEETS * py];
   if (m.pattern === 'stagger') return [m.w, 3 * py];
   if (m.pattern === 'brick') return [px, 2 * py];
   return [px, py];
@@ -243,9 +247,118 @@ function paintBrickDesign(ctx, m, W, H, ppm, bump) {
   }
 }
 
+// Honed stone stick (mosaic): a mid grey with per-stick tone, soft mottling, patches of
+// fine diagonal saw/polish scuffs, faint hairline veins, the odd white calcite vein across
+// the stick, and slightly tumbled edges. `bump` draws the height map (grout low, stone
+// high, edges rounding down), which is what makes the joints read as recessed.
+function stoneStick(ctx, m, x, y, w, h, ppm, r, bump) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (bump) {
+    ctx.fillStyle = '#b4b4b4';
+    ctx.fillRect(x, y, w, h);
+    ctx.filter = `blur(${Math.max(1, 0.001 * ppm)}px)`;
+    ctx.strokeStyle = '#6a6a6a';
+    ctx.lineWidth = 0.0016 * ppm;
+    ctx.strokeRect(x, y, w, h);
+    ctx.filter = 'none';
+    ctx.restore();
+    return;
+  }
+  const base = new THREE.Color(m.color).multiplyScalar(0.88 + r() * 0.24);
+  ctx.fillStyle = `#${base.getHexString()}`;
+  ctx.fillRect(x, y, w, h);
+  const hex = (f) => `#${base.clone().multiplyScalar(f).getHexString()}`;
+  // Mottling: big soft blobs a little lighter or darker.
+  ctx.filter = `blur(${Math.max(2, 0.006 * ppm)}px)`;
+  for (let i = 0; i < 5; i++) {
+    ctx.globalAlpha = 0.2 + r() * 0.2;
+    ctx.fillStyle = hex(r() < 0.5 ? 1.3 : 0.75);
+    ctx.beginPath();
+    ctx.ellipse(x + r() * w, y + r() * h, (0.1 + r() * 0.25) * w, (0.4 + r() * 0.6) * h, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.filter = 'none';
+  // Scuff patches: bunches of fine light lines at a shared diagonal angle.
+  const lw = Math.max(0.6, 0.00025 * ppm);
+  for (let p = r() < 0.85 ? 1 + Math.floor(r() * 3) : 0; p > 0; p--) {
+    const cx = x + r() * w, a = (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.4), len = (0.2 + r() * 0.35) * w;
+    ctx.strokeStyle = hex(1.8);
+    ctx.lineWidth = lw;
+    for (let k = 0; k < 24; k++) {
+      const ox = cx + (r() - 0.5) * 0.3 * w, oy = y + r() * h, l = len * (0.3 + r() * 0.7);
+      ctx.globalAlpha = 0.06 + r() * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(ox - Math.cos(a) * l / 2, oy - Math.sin(a) * l / 2);
+      ctx.lineTo(ox + Math.cos(a) * l / 2, oy + Math.sin(a) * l / 2);
+      ctx.stroke();
+    }
+  }
+  // Hairline veins: a thin wandering light line.
+  for (let v = r() < 0.6 ? 1 + Math.floor(r() * 2) : 0; v > 0; v--) {
+    ctx.strokeStyle = hex(1.8);
+    ctx.lineWidth = lw * 1.3;
+    ctx.globalAlpha = 0.3 + r() * 0.3;
+    let px = x + r() * w, py = y + (r() < 0.5 ? 0 : h);
+    const dx = (r() - 0.5) * 2, dy = py === y ? 1 : -1;
+    ctx.beginPath(); ctx.moveTo(px, py);
+    for (let k = 0; k < 6; k++) {
+      px += (dx + (r() - 0.5)) * h * 0.4; py += dy * h * (0.1 + r() * 0.25);
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  // Calcite vein: a white band straight across the stick (about one stick in seven).
+  if (r() < (m.veinRate ?? 0.14)) {
+    const vx = x + (0.1 + r() * 0.8) * w, lean = (r() - 0.5) * 0.25 * h, vw = (0.0012 + r() * 0.001) * ppm;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#d6d4d0';
+    ctx.beginPath();
+    ctx.moveTo(vx - vw / 2, y); ctx.lineTo(vx + vw / 2, y);
+    ctx.lineTo(vx + lean + vw * (0.3 + r() * 0.5), y + h); ctx.lineTo(vx + lean - vw * (0.3 + r() * 0.5), y + h);
+    ctx.closePath(); ctx.fill();
+  }
+  // Pits: a few tiny light and dark specks.
+  for (let k = 0; k < 10; k++) {
+    ctx.globalAlpha = 0.3 + r() * 0.3;
+    ctx.fillStyle = hex(r() < 0.5 ? 1.5 : 0.6);
+    ctx.fillRect(x + r() * w, y + r() * h, lw * 1.5, lw * 1.5);
+  }
+  // Tumbled edge: a soft dark rim.
+  ctx.globalAlpha = 0.7;
+  ctx.filter = `blur(${Math.max(1, 0.0008 * ppm)}px)`;
+  ctx.strokeStyle = hex(0.65);
+  ctx.lineWidth = 0.0012 * ppm;
+  ctx.strokeRect(x, y, w, h);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+const GRID_DESIGNS = { 'stone-sticks': stoneStick };
+
+// Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets, each `m.mosaic` = [cols, rows] sticks,
+// all on one even pitch: the joint inside a sheet equals the one between sheets, so a laid
+// mosaic shows no sheet edges. Grout is `m.accent` (colour) / low (bump).
+function paintGridDesign(ctx, m, W, H, ppm, bump) {
+  const r = rng(m.seed ?? 53);
+  const [cols, rows] = m.mosaic || [1, 1];
+  const n = GRID_SHEETS, jp = (m.joint || 0) * ppm;
+  const cw = W / (n * cols), ch = H / (n * rows); // stick pitch
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.accent);
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < n * cols; i++) {
+    for (let k = 0; k < n * rows; k++) {
+      const s = Math.floor(r() * 1e9);
+      GRID_DESIGNS[m.design](ctx, m, i * cw + jp / 2, k * ch + jp / 2, cw - jp, ch - jp, ppm, rng(s), bump);
+    }
+  }
+}
+
 function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return paintDesign(ctx, m, W, H, ppm);
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return paintBrickDesign(ctx, m, W, H, ppm, false);
+  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return paintGridDesign(ctx, m, W, H, ppm, false);
   const jp = Math.max(1.5, (m.joint || 0) * ppm); // joint in px, never invisible
   if (m.pattern === 'stagger') {
     const rowH = H / 3;
@@ -329,6 +442,9 @@ export function finishTexture(m, anisotropy = 1) {
 // Height map for designs that have one (same unit and seed as finishTexture, so the two
 // line up), else null. View 3D only: the AR 3D view's Lambert materials ignore it.
 export function finishBumpTexture(m, anisotropy = 1) {
+  if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
+    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true)), anisotropy);
+  }
   if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
   return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);
 }

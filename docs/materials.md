@@ -191,6 +191,33 @@ sets its strength and `edgeWobble` (m) the handmade edge wander.
 - **AR shows only the colour layer**: the AR 3D view's Lambert materials ignore bump and reflections, so
   the tile reads as flat white with faint joints there.
 
+## Mosaic products (a design on a grid of sheets)
+
+A mosaic is sold by the **sheet**, so the catalog piece is the sheet: `pattern: 'grid'`, `w`/`h` = the
+sheet, `pack: { pieces: 1 }`, and the takeoff counts sheets. `mosaic: [cols, rows]` gives the sticks on
+a sheet; the texture spaces them all on one even pitch (the joint inside a sheet equals the joint
+between sheets, as on a laid wall) over a 3 × 3 sheet unit, with a bump map like the brick designs.
+
+- `mosaic_blue_stone`: GoodHome Blue stone mosaic, "gris clair" (Castorama, EAN 5036581066864,
+  2026-09-26). From the page: natural stone, matte, not rectified, wall **and** floor (`surface:
+  'both'`), 30 × 30.4 cm sheet, 8 mm, 1 per pack. Photos (Scene7 codes): **02c** straight top-down
+  sheet, **36c** / **38c** angled close-ups, **37c** a laid wall about 1.2 m wide, **01i** a shower
+  room; 70t_FR is a recycling logo.
+  - The sheet layout was measured on **02c**: 3 × 18 sticks, about 98 × 15 mm, with 2 mm gaps. The
+    joint pitch in **37c** agrees (column : row pitch 6.0 there, against 10 : 1.7 cm).
+  - The stone is a mid grey despite the name: about (97, 94, 94) on **02c**. The render uses base
+    `0x686767`, which lands the median near the photo's under the preview light.
+  - The details are also from **02c** and the close-ups: diagonal scuff patches, hairline veins, a
+    white calcite vein across about one stick in seven, and tumbled edges.
+  - The grout colour (`0xe2e0dd`) comes from the laid renders. Those renders show a wider joint
+    (about 3.5 mm) than the 2 mm measured on the sheet; the entry keeps 2 mm.
+  - Proven:
+    - the build passes;
+    - scratch renders beside **02c**, **37c** and **01i**, with pixel medians of 95 (render stone)
+      and 101 (photo);
+    - takeoff (Node): a 2 × 1.5 m floor = 35 sheets (24 whole, 11 cut).
+  - Not yet seen in View 3D on a real room or in AR.
+
 ### View 3D reflections (owner decision, 2026-09-26: on demand)
 
 A **✦ Reflections** button under the View 3D lighting toggle sets `scene.environment` to three's

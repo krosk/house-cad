@@ -12,7 +12,8 @@
 //   pack     { pieces } per box, or { area } m² per pack (paint)
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
 //            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
-//            bump map in View 3D, `edgeWobble` m, `bumpScale`); `roughness` optional (3D)
+//            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
+//            sheet of `mosaic` = [cols, rows] sticks, with a bump map); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
@@ -73,6 +74,17 @@ export const BUILTIN_MATERIALS = [
     w: 0.301, h: 0.0754, joint: 0.003, thickness: 0.0085,
     color: 0xf4f4f0, accent: 0xf8f8f5, roughness: 0.12, bumpScale: 3, pack: { pieces: 40 },
     name: { en: 'Vernisse white tile 30×7.5', fr: 'Faïence Vernisse blanc 30×7,5', zh: 'Vernisse 白色墙砖 30×7.5' },
+  },
+  {
+    // GoodHome Blue stone mosaic, light grey (Castorama EAN 5036581066864): natural stone,
+    // matte, not rectified, wall and floor; sold per 30 × 30.4 cm sheet, 8 mm thick. A
+    // sheet is 3 × 18 sticks, about 98 × 15 mm with 2 mm joints (measured on the top-down
+    // photo). Stone colour from that photo (a mid grey despite "gris clair"); light grout
+    // from the retailer's laid renders.
+    id: 'mosaic_blue_stone', surface: 'both', pattern: 'grid', design: 'stone-sticks', mosaic: [3, 18],
+    w: 0.30, h: 0.304, joint: 0.002, thickness: 0.008,
+    color: 0x686767, accent: 0xe2e0dd, roughness: 0.8, bumpScale: 2, pack: { pieces: 1 },
+    name: { en: 'Blue stone mosaic 30×30.4', fr: 'Mosaïque Blue stone gris clair 30×30,4', zh: 'Blue stone 马赛克 30×30.4' },
   },
   {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like
