@@ -49,7 +49,7 @@ All project knowledge is **repo-backed**, so every agent and tool sees the same 
 
 Design docs: `docs/product-intent.md` (Phase-5 goal, survey method, drift, multi-floor, Guardian) ·
 `docs/ar-survey.md` (AR mechanics + traps) · `docs/electrical-workflow.md` ·
-`docs/plumbing-workflow.md` · `docs/furniture.md` · `docs/materials.md` (surface finishes, design) · `docs/share-view.md` · `docs/markers-plan.md` ·
+`docs/plumbing-workflow.md` · `docs/furniture.md` · `docs/materials.md` (surface finishes, design) · `docs/product-modelling.md` (modelling a product with no 3D model; skill `model-product`) · `docs/share-view.md` · `docs/markers-plan.md` ·
 `docs/ar-qa-checklist.md` (on-device QA record) · `packaging/quest-apk.md`.
 
 ## Core architecture

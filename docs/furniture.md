@@ -69,6 +69,8 @@ node tools/fetch-ikea-model.mjs https://www.ikea.com/fr/fr/p/...-s59511278/
 
 ## Procedural furniture (products with no IKEA model)
 
+How to make one (sources, photos, preview loop): `docs/product-modelling.md`.
+
 Discontinued ranges have no rotera model (Proven 2026-09-26: STOCKHOLM bed frames 402.846.00,
 202.846.01, 002.846.02, 302.846.05, 902.846.07 and the S-combos S590.142.03, S990.142.01,
 S090.142.05, S490.142.08, S090.142.10 all 404 on fr/fr, gb/en and us/en). For these, a catalog entry
