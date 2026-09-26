@@ -9,6 +9,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { computeFootprint } from './geometry2d.js';
 import { extrudeFootprint } from './extrude.js';
 import { zoneKind, stairClimb } from './zoneColors.js';
+import { resolveApertureOrient } from './apertureGlyph.js';
 
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
@@ -347,12 +348,12 @@ function apertureInsertBox(rect, z0, z1, depth = 0.035) {
     : { x0: cx - depth / 2, x1: cx + depth / 2, y0: b.y0, y1: b.y1, z0, z1 };
 }
 
-function apertureInsertGeometries(floor) {
+function apertureInsertGeometries(floor, skip = null) {
   const height = Math.max(0, floor?.height || 0);
   const doors = [];
   const windows = [];
   for (const rect of floor?.rectangles || []) {
-    if (!validBounds(rect.bounds)) continue;
+    if (!validBounds(rect.bounds) || skip?.has(rect.id)) continue;
     const kind = zoneKind(rect);
     if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
@@ -473,12 +474,44 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const wallBoxes = architecturalWallBoxes(floor, opts);
   const wallGeometry = boxesGeometry(wallBoxes);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
-  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor);
+  // Door zones carrying a door product draw that product instead (doorProductPlacements).
+  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, opts.productDoors);
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
     outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, wallBoxes),
   };
+}
+
+// Door products (docs/materials.md "Doors"): every DOOR zone whose `{rect}` finish is a
+// `surface: 'door'` material, with what src/ui/doorProducts.js needs to build it at
+// the opening's size. `materialOf(id)` resolves the catalog entry. Plan axes: the
+// door runs along its zone's long axis; `hingeEnd` 'lo'/'hi' is the hinge jamb on
+// that axis; `swingZ` is the swing face in the builder's local frame (+Z = world +Z
+// = plan −y for a door along X; plan +x for a door along Y, turned +90°).
+export function doorProductPlacements(floor, materialOf) {
+  const out = [];
+  const height = Math.max(0, floor?.height || 0);
+  for (const f of floor?.finishes || []) {
+    if (f.target?.edge) continue;
+    const rect = (floor.rectangles || []).find((r) => r.id === f.target?.rect);
+    if (!rect || zoneKind(rect) !== 'door' || !validBounds(rect.bounds)) continue;
+    const def = materialOf(f.material);
+    if (def?.surface !== 'door') continue;
+    const b = rect.bounds;
+    const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+    const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
+    out.push({
+      rectId: rect.id, material: f.material, def, alongX,
+      cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
+      width: alongX ? b.x1 - b.x0 : b.y1 - b.y0,
+      head: clipped(rect.head ?? 2.1, 0, height),
+      hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
+      swingZ: alongX ? -perp : perp,
+      leafDepth: def.leafDepth || 0.07,
+    });
+  }
+  return out;
 }
 
 // Surface finishes (docs/materials.md, phase 2): thin textured overlays laid just in

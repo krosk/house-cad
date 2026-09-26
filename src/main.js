@@ -2,7 +2,7 @@ import './style.css';
 import { Project, Rectangle } from './core/model.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
-import { buildArchitecturalFloor, finishGeometries } from './core/architectural3d.js';
+import { buildArchitecturalFloor, finishGeometries, doorProductPlacements } from './core/architectural3d.js';
 import { finishSurfaces } from './core/flooring.js';
 import { materialById } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
@@ -175,12 +175,16 @@ let currentGeometry = null; // merged mesh of all floors, kept for export
 let desktopGeometryDirty = false;
 let rebuildQueued = false;
 function rebuild() {
-  const floorGeos = project.floors.map((f, index) => ({
+  const floorGeos = project.floors.map((f, index) => {
+    const doorProducts = doorProductPlacements(f, (id) => materialById(project, id));
+    return {
     ...buildArchitecturalFloor(f, {
       downRise: index > 0
         ? Math.max(0.2, (f.elevation || 0) - (project.floors[index - 1].elevation || 0))
         : (f.height || 2.8),
+      productDoors: new Set(doorProducts.map((d) => d.rectId)),
     }),
+    doorProducts,
     // Textured finish overlays; UVs in plan metres (see finishGeometries).
     finishGeometries: finishGeometries(finishSurfaces(project, f))
       .map((g) => ({ ...g, def: materialById(project, g.material) })),
@@ -192,7 +196,8 @@ function rebuild() {
     furniture: f.furniture,
     constraints: f.constraints,
     rectangles: f.rectangles,
-  }));
+    };
+  });
   view.setGeometry(floorGeos);
   view.setFloorFilter(selected3DFloorId);
   render3DFloorList();

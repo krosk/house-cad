@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
-MATERIAL · FLOOR → WALL
+MATERIAL · FLOOR → WALL → DOOR
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -270,6 +270,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     mesh, rebuilt only when the target changes.
   - **Readout:** material, then this floor/face's `m² · pcs` (+ cabochons), then the whole-house
     `HOUSE <packs> packs`.
+  - **DOOR** (`id: mat_door`): trigger selects the DOOR zone under the reticle (or within 0.3 m);
+    thumbstick-y cycles door products (none first), B/Y clears. The zone tints in the product colour;
+    the product itself shows in the AR 3D view (LEFT X). Readout: product, opening `width × head`,
+    `MADE TO MEASURE`. Design in `docs/materials.md` "Doors".
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,

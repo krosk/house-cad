@@ -16,11 +16,12 @@ import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
+import { buildDoorProduct } from './doorProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces } from '../core/flooring.js';
-import { buildArchitecturalFloor, finishGeometries } from '../core/architectural3d.js';
+import { buildArchitecturalFloor, finishGeometries, doorProductPlacements } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
@@ -3117,12 +3118,17 @@ export function setupMR(view, project, getFootprint) {
   let matFaces = [];       // [{ rect, edge, face, comp }] with a non-empty boundary
   let matHoverRoom = null, matSelRoom = null;
   let matHoverFace = null, matSelFace = null;
+  let matDoors = [];       // DOOR zones of the active floor (MATERIAL · DOOR targets)
+  let matHoverDoor = null, matSelDoor = null;
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door']);
   let matHighlightKey = '';
   const MAT_NONE_COLOR = 0x94a3b8;
   const roomMaterialId = (comp) => (project.activeFloor.finishes || [])
     .find((f) => !f.target?.edge && comp?.ids.has(f.target?.rect))?.material || null;
   const faceMaterialId = (face) => (project.activeFloor.finishes || [])
     .find((f) => f.target?.rect === face?.rect.id && f.target?.edge === face?.edge)?.material || null;
+  const doorMaterialId = (rect) => (project.activeFloor.finishes || [])
+    .find((f) => !f.target?.edge && f.target?.rect === rect?.id)?.material || null;
   function matCellQuads(arr, colors, boxes, y, color, alpha) {
     const c = new THREE.Color(color);
     for (const b of boxes) {
@@ -3165,7 +3171,12 @@ export function setupMR(view, project, getFootprint) {
         }
       }
     }
+    matDoors = floor.rectangles.filter((r) => zoneKindOf(r) === 'door');
     const arr = [], colors = [];
+    for (const rect of matDoors) {
+      const id = doorMaterialId(rect);
+      if (id) matCellQuads(arr, colors, [rect.bounds], 0.0035, materialById(project, id)?.color ?? MAT_NONE_COLOR, 0.85);
+    }
     for (const region of matTakeoff.regions) {
       if (region.floorId !== floor.id) continue;
       matCellQuads(arr, colors, region.boxes, 0.0025, materialById(project, region.material)?.color ?? MAT_NONE_COLOR, 0.35);
@@ -3184,9 +3195,10 @@ export function setupMR(view, project, getFootprint) {
   function styleMaterialHighlight(modeId) {
     const hi = materialGroup.children.find((c) => c.userData.matHighlight);
     if (!hi) return;
-    const floorMode = modeId === 'mat_floor';
-    const sel = floorMode ? matSelRoom : matSelFace, hov = floorMode ? matHoverRoom : matHoverFace;
-    const keyOf = (x) => (!x ? '' : floorMode ? [...x.ids].join(',') : `${x.rect.id}:${x.edge}`);
+    const floorMode = modeId === 'mat_floor', doorMode = modeId === 'mat_door';
+    const sel = floorMode ? matSelRoom : doorMode ? matSelDoor : matSelFace;
+    const hov = floorMode ? matHoverRoom : doorMode ? matHoverDoor : matHoverFace;
+    const keyOf = (x) => (!x ? '' : floorMode ? [...x.ids].join(',') : doorMode ? x.id : `${x.rect.id}:${x.edge}`);
     const key = `${modeId}|${keyOf(sel)}|${keyOf(hov)}`;
     if (key === matHighlightKey) return;
     matHighlightKey = key;
@@ -3194,7 +3206,8 @@ export function setupMR(view, project, getFootprint) {
     const excludes = project.rectangles.filter((r) => r.op === 'subtract' && zoneKindOf(r) !== 'furniture').map((r) => r.bounds);
     const paint = (x, alpha) => {
       if (!x) return;
-      const boxes = floorMode ? regionBoxes(x.rectangles.map((r) => r.bounds), excludes) : faceStrip(x, 0.0, 0.14);
+      const boxes = floorMode ? regionBoxes(x.rectangles.map((r) => r.bounds), excludes)
+        : doorMode ? [x.bounds] : faceStrip(x, 0.0, 0.14);
       matCellQuads(arr, colors, boxes, floorMode ? 0.003 : 0.004, 0xffe14d, alpha);
     };
     if (hov && keyOf(hov) !== keyOf(sel)) paint(hov, floorMode ? 0.12 : 0.5);
@@ -3226,7 +3239,31 @@ export function setupMR(view, project, getFootprint) {
     }
     return best;
   }
+  // The DOOR zone under the reticle, or within 0.3 m of it (nearest centre).
+  function matDoorAt(px, py) {
+    let best = null, bestD = Infinity;
+    for (const rect of matDoors) {
+      const b = rect.bounds;
+      const dx = Math.max(b.x0 - px, 0, px - b.x1), dy = Math.max(b.y0 - py, 0, py - b.y1);
+      if (Math.hypot(dx, dy) > 0.3) continue;
+      const d = Math.hypot(px - (b.x0 + b.x1) / 2, py - (b.y0 + b.y1) / 2);
+      if (d < bestD) { bestD = d; best = rect; }
+    }
+    return best;
+  }
   function cycleMaterial(modeId, dir) {
+    if (modeId === 'mat_door') {
+      if (!matSelDoor) matSelDoor = matHoverDoor;
+      if (!matSelDoor) return;
+      const ids = [null, ...materialsFor(project, 'door').map((m) => m.id)];
+      const cur = ids.indexOf(doorMaterialId(matSelDoor));
+      const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
+      project.setDoorFinish(matSelDoor.id, next);
+      rlog('material set', { mode: modeId, material: next });
+      buildMaterials();
+      buildArch3d();
+      return;
+    }
     const floorMode = modeId === 'mat_floor';
     if (floorMode && !matSelRoom) matSelRoom = matHoverRoom;
     if (!floorMode && !matSelFace) matSelFace = matHoverFace;
@@ -3244,6 +3281,18 @@ export function setupMR(view, project, getFootprint) {
   // Readout lines [text, color]: the target's material, its own quantity, then the
   // whole-house total for that product (packs rounded once for the house).
   function materialReadout(modeId) {
+    if (modeId === 'mat_door') {
+      const rect = matSelDoor || matHoverDoor;
+      if (!rect) return [[t('mat.pickDoor'), 0xe2e8f0]];
+      const mat = materialById(project, doorMaterialId(rect));
+      const b = rect.bounds;
+      const width = Math.max(b.x1 - b.x0, b.y1 - b.y0);
+      return [
+        [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
+        [`${fmt(width)} × ${fmt(rect.head ?? 2.1)} ${unitLabel()}`, 0xe2e8f0],
+        ...(mat ? [[t('mat.toMeasure'), 0xfbbf24]] : []),
+      ];
+    }
     const floorMode = modeId === 'mat_floor';
     const target = floorMode ? (matSelRoom || matHoverRoom) : (matSelFace || matHoverFace);
     if (!target) return [[t(floorMode ? 'mat.pickRoom' : 'mat.pickWall'), 0xe2e8f0]];
@@ -3659,10 +3708,12 @@ export function setupMR(view, project, getFootprint) {
     const floors = allFloorsView ? project.floors : [project.activeFloor];
     for (const floor of floors) {
       const index = project.floors.indexOf(floor);
+      const doorProducts = doorProductPlacements(floor, (id) => materialById(project, id));
       const a = buildArchitecturalFloor(floor, {
         downRise: index > 0
           ? Math.max(0.2, (floor.elevation || 0) - (project.floors[index - 1].elevation || 0))
           : (floor.height || 2.8),
+        productDoors: new Set(doorProducts.map((d) => d.rectId)),
       });
       a.floorGeometry?.dispose(); a.ceilingGeometry?.dispose(); // real floor stays visible
       const y = (floor.elevation || 0) - displayElevation();
@@ -3671,6 +3722,9 @@ export function setupMR(view, project, getFootprint) {
         [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
         ...finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
+        // Door products (cached Lambert materials; only the geometry is disposed).
+        ...doorProducts.flatMap((d) => buildDoorProduct(d, { lambert: true }))
+          .map((mesh) => [mesh.geometry, mesh.material]),
       ];
       for (const [geometry, material] of parts) {
         if (!geometry) continue;
@@ -6426,6 +6480,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => { matSelFace = matHoverFace; },
     },
     {
+      id: 'mat_door', color: 0x2dd4bf,
+      // Trigger selects the DOOR zone under the reticle (none deselects).
+      onTouch: () => { matSelDoor = matHoverDoor; },
+    },
+    {
       id: 'circuit_check', color: 0xf97316,
       // Read-only diagnostics: trigger does nothing (see buildCheckOverlay).
       onTouch: () => {},
@@ -6654,7 +6713,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'furnish',
-    'mat_floor', 'mat_wall',
+    'mat_floor', 'mat_wall', 'mat_door',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -6662,7 +6721,7 @@ export function setupMR(view, project, getFootprint) {
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
-    mat_floor: 'material', mat_wall: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',
@@ -6759,9 +6818,9 @@ export function setupMR(view, project, getFootprint) {
     if (m.id === 'marker_wire' || m.id === 'circuit_check') buildRoutedWires();
     routedWireGroup.visible = m.id === 'marker_wire' || m.id === 'circuit_check';
     checkHover = null;
-    matHoverRoom = matSelRoom = matHoverFace = matSelFace = null;
-    if (m.id === 'mat_floor' || m.id === 'mat_wall') buildMaterials();
-    materialGroup.visible = m.id === 'mat_floor' || m.id === 'mat_wall';
+    matHoverRoom = matSelRoom = matHoverFace = matSelFace = matHoverDoor = matSelDoor = null;
+    if (MAT_MODES.has(m.id)) buildMaterials();
+    materialGroup.visible = MAT_MODES.has(m.id);
     if (m.id === 'circuit_check') buildCheckOverlay();
     checkGroup.visible = m.id === 'circuit_check';
     if (m.id === 'marker_pipe') buildPipes();
@@ -7169,6 +7228,14 @@ export function setupMR(view, project, getFootprint) {
 
   function deleteInMode() {
     const mode = modes[currentMode];
+    if (mode.id === 'mat_door') {
+      if (!matSelDoor || !doorMaterialId(matSelDoor)) return false;
+      project.setDoorFinish(matSelDoor.id, null);
+      rlog('material clear', { mode: mode.id });
+      buildMaterials();
+      buildArch3d();
+      return true;
+    }
     if (mode.id === 'mat_floor' || mode.id === 'mat_wall') {
       const floorMode = mode.id === 'mat_floor';
       const target = floorMode ? matSelRoom : matSelFace;
@@ -7649,7 +7716,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'marker_wire') cycleWireType(stickY < 0 ? 1 : -1); // retype selected / new-wire type
       else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
-      else if (modeId === 'mat_floor' || modeId === 'mat_wall') cycleMaterial(modeId, stickY < 0 ? 1 : -1);
+      else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
@@ -7860,7 +7927,7 @@ export function setupMR(view, project, getFootprint) {
       checkStatus = lines.join('\n'); checkColors = colors;
     }
     let matStatus = null, matColors = null;
-    if (modes[currentMode].id === 'mat_floor' || modes[currentMode].id === 'mat_wall') {
+    if (MAT_MODES.has(modes[currentMode].id)) {
       const lines = materialReadout(modes[currentMode].id);
       matStatus = lines.map(([text]) => text).join('\n'); matColors = lines.map(([, c]) => c);
     }
@@ -8433,16 +8500,17 @@ export function setupMR(view, project, getFootprint) {
           outlineMarker(endpoint, 'wall', 0xffe14d);
         }
       }
-    } else if (modeId === 'mat_floor' || modeId === 'mat_wall') {
+    } else if (MAT_MODES.has(modeId)) {
       hoverKey = null;
       numpadCursor.visible = false;
-      matHoverRoom = null; matHoverFace = null;
+      matHoverRoom = null; matHoverFace = null; matHoverDoor = null;
       const hit = rayFloorHit(editCtl);
       if (hit) {
         reticle.visible = true;
         reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
         if (modeId === 'mat_floor') matHoverRoom = matRoomAt(px, py);
+        else if (modeId === 'mat_door') matHoverDoor = matDoorAt(px, py);
         else matHoverFace = matFaceAt(px, py);
       } else {
         reticle.visible = false;

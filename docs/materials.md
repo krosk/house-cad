@@ -142,6 +142,34 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - Other free LEFT buttons: **Y** (`buttons[5]`) and the stick click (`buttons[3]`).
 4. **Custom products in AR:** the numpad enters w/h/joint/pack; the list is kept per project.
 
+## Doors (door products)
+
+Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a FURNISH item),
+authored in the MATERIAL group as **MATERIAL · DOOR**. Made-to-measure products take their size from
+the zone.
+
+- Stored like any finish: `{target: {rect: <door rect id>}, material}`. A door rect never belongs to a
+  room component, so it can't be mistaken for a floor finish; the takeoff ignores it.
+  `project.setDoorFinish(rectId, material)`.
+- Catalog entries have `surface: 'door'`, `pattern: 'door'`, a `design` (the leaf drawing), `color`
+  (leaf and frame), `accent` (glass), `leafDepth`.
+- 3D: `doorProductPlacements` (architectural3d.js) resolves each door's centre, axis, width, head,
+  hinge jamb and swing face from the zone; `buildArchitecturalFloor({productDoors})` skips the plain
+  door slab there; `src/ui/doorProducts.js` builds the frame (50 mm face, 80 mm deep), a steel
+  threshold, the leaf with its design texture on both faces (mirrored so the lock edge is the same
+  in the world from either side), handles and cylinder roses on both faces, and hinge knuckles on the
+  swing face. View 3D uses Standard materials; the AR 3D view uses cached Lambert ones.
+- **Lapeyre Ange-Line** (`door_ange_line`), aluminium, sold made to measure: no manufacturer 3D model,
+  so the design is inferred from Lapeyre's product photos: a full-height groove about 20% of the
+  width in from the lock edge; a satin-glass half-lens from that groove bulging about 36% of the width
+  toward the hinge, from 10% to 88% of the height; the same circle continued as grooves to the
+  lock-edge corners. Leaf 85 mm and frame 80 mm (Lapeyre spec sheet); colour an anthracite close to
+  RAL 7016 (a guess from the photos: the product colour is customisable).
+- Proven 2026-09-26: renders in a scratch preview (both faces, hinge either side) and in the real
+  desktop View 3D on an injected demo house (door along X and along Y). Not yet seen in AR.
+- Limits: `door` zones only (not sliding or garage); the leaf is drawn closed; the texture is
+  stretched over the leaf, so the design scales with the opening's proportions.
+
 ## Open questions
 
 - Until the AR 3D view exists, AR shows a wall face's material as a coloured strip along its edge on

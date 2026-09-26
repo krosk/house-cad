@@ -521,6 +521,16 @@ export class Project {
     this._emit({ solveRectangles: false });
   }
 
+  // Door: one product per DOOR zone, stored as a `{rect}` target on the door rect
+  // itself (a door rect is never part of a room component, so it can't collide with a
+  // floor finish). A null material clears it.
+  setDoorFinish(rectId, material) {
+    const floor = this.activeFloor;
+    floor.finishes = (floor.finishes || []).filter((f) => f.target?.edge || f.target?.rect !== rectId);
+    if (material) floor.finishes.push({ target: { rect: rectId }, material });
+    this._emit({ solveRectangles: false });
+  }
+
   // --- markers (wall-anchored survey annotations) -------------------------
   // Add a marker (plain object {type, x, y, z}) to the active floor, minting an
   // id if none was supplied. z is its inherent height above the floor.

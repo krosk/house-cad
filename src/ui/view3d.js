@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
+import { buildDoorProduct } from './doorProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
 
@@ -364,6 +365,19 @@ export class View3D {
         mesh.userData.architecturalRole = finish.role;
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
+      }
+      // Door products on DOOR zones (docs/materials.md "Doors"), in place of the plain slab.
+      for (const placement of entry.doorProducts || []) {
+        for (const mesh of buildDoorProduct(placement)) {
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.position.y = elevation || 0;
+          mesh.userData.floorId = floorId || null;
+          mesh.userData.floorName = name || '';
+          mesh.userData.architecturalRole = 'doors';
+          mesh.visible = this._meshVisible(mesh);
+          this.house.add(mesh);
+        }
       }
       if (outlineGeometry) {
         const lines = new THREE.LineSegments(outlineGeometry, this.outlineMaterial);
