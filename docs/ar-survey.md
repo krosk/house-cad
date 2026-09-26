@@ -17,6 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
+MATERIAL · FLOOR → WALL
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -257,6 +258,20 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
+- **MATERIAL · FLOOR / WALL** (`id: mat_floor` / `mat_wall`, its own group; design and owner decisions
+  in `docs/materials.md`). Active floor only; locked in ALL FLOORS.
+  - **FLOOR:** trigger selects the room component under the reticle.
+  - **WALL:** trigger selects the room wall face nearest the reticle (within 0.6 m, on the room side).
+  - **Both:** thumbstick up/down cycles the selection's material (none, then the catalog for that surface)
+    and applies it at once; B/Y clears it. Each wall face is set on its own: a copy-to-every-wall action
+    was built and removed at the owner's request (2026-09-26); don't re-add it.
+  - **Display:** finished floors tint in the material colour and finished faces draw a strip just inside
+    the wall, all in one batched mesh (`buildMaterials`). The yellow hover/selection highlight is a second
+    mesh, rebuilt only when the target changes.
+  - **Readout:** material, then this floor/face's `m² · pcs` (+ cabochons), then the whole-house
+    `HOUSE <packs> packs`.
+  - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
+    subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,
   IKEA models loaded on the fly through the Cloudflare Worker proxy; see `docs/furniture.md`),
   drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`. These are **NOT massing** — they never

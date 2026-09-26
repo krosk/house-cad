@@ -119,8 +119,26 @@ export function serializeFloor(f) {
     // conduitNodes/conduitSegments/wires/pipes are whole-house (top level), not per-floor.
     // `_demo`-flagged items (if any transient ones exist) never persist.
     furniture: (f.furniture || []).filter((x) => !x._demo).map(serializeFurniture),
+    finishes: (f.finishes || []).map(serializeFinish),
   };
 }
+function serializeFinish(f) {
+  const target = { rect: f.target.rect };
+  if (f.target.edge) target.edge = f.target.edge;
+  return { target, material: f.material };
+}
+// Additive fields (no FILE_VERSION bump): missing = none. Unknown shapes are dropped.
+function loadFinishes(list, rectIds = null) {
+  return (Array.isArray(list) ? list : []).flatMap((f) => {
+    const rect = rectIds ? rectIds.get(f?.target?.rect) : f?.target?.rect;
+    if (typeof rect !== 'string' || typeof f.material !== 'string') return [];
+    const edge = ['left', 'right', 'bottom', 'top'].includes(f.target.edge) ? f.target.edge : null;
+    return [{ target: edge ? { rect, edge } : { rect }, material: f.material }];
+  });
+}
+const loadMaterials = (list) => (Array.isArray(list) ? list : [])
+  .filter((m) => m && typeof m.id === 'string' && typeof m.pattern === 'string')
+  .map((m) => ({ ...m }));
 
 export function serializeProject(project) {
   return {
@@ -136,6 +154,7 @@ export function serializeProject(project) {
     wires: (project.wires || []).map(serializeWire),
     pipeNodes: (project.pipeNodes || []).map(serializePipeNode),
     pipes: (project.pipes || []).map(serializePipe),
+    materials: (project.materials || []).map((m) => ({ ...m })), // the owner's own products
   };
 }
 
@@ -333,6 +352,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   target.markers = markers;
   target.electricalLinks = electricalLinks;
   target.furniture = furniture;
+  target.finishes = loadFinishes(source.finishes, rectIds);
   // Append the remapped intra-floor network subset to the whole-house arrays.
   project.conduitNodes.push(...conduitNodes);
   project.conduitSegments.push(...conduitSegments);
@@ -440,9 +460,11 @@ export function deserializeInto(project, data) {
       ...verticalFields(x),
       rotationY: x.rotationY || 0, name: x.name || null,
     })),
+    finishes: loadFinishes(f.finishes),
   }));
 
   project.floors = floors;
+  project.materials = loadMaterials(data.materials);
   project.revision = Number.isFinite(data.revision) ? data.revision : 0; // 0 for pre-revision files
   project.groundFloorId = floors.some((f) => f.id === data.groundFloorId)
     ? data.groundFloorId : floors[0].id;

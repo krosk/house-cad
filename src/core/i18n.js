@@ -20,6 +20,7 @@ const STRINGS = {
   'group.plan':    { en: 'PLAN',    fr: 'PLAN',   zh: '平面' },
   'group.marker':  { en: 'MARKER', fr: 'MARQUEUR', zh: '标记' },
   'group.furnish': { en: 'FURNISH', fr: 'MEUBLER', zh: '布置' },
+  'group.material': { en: 'MATERIAL', fr: 'MATÉRIAU', zh: '材料' },
   'group.project': { en: 'PROJECT', fr: 'PROJET', zh: '项目' },
 
   // --- mode labels (key = mode.<id>) ------------------------------------------
@@ -54,6 +55,8 @@ const STRINGS = {
   'mode.conduit_dims': { en: 'CONDUIT DIMS', fr: 'COTES GAINE', zh: '管路尺寸' },
   'mode.conduit_edit': { en: 'CONDUIT EDIT', fr: 'MODIF. GAINE', zh: '编辑管路' },
   'mode.furnish':  { en: 'PLACE',  fr: 'PLACER',   zh: '放置' },
+  'mode.mat_floor': { en: 'FLOOR', fr: 'SOL', zh: '地面' },
+  'mode.mat_wall':  { en: 'WALL',  fr: 'MUR', zh: '墙面' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -192,6 +195,16 @@ const STRINGS = {
     en: 'Edit the conduit network. With nothing selected, grip cycles overlapping nodes and conduit segments; trigger selects the yellow target. A selected free node can be grip-dragged (near = 3D, far = floor reticle) or deleted with B/Y. B/Y deletes a selected conduit segment. Trigger again deselects. Marker-bound nodes cannot move.',
     fr: 'Modifiez le réseau de gaines. Sans sélection, la poignée parcourt les nœuds et gaines superposés ; la gâchette sélectionne la cible jaune. Une jonction libre sélectionnée se déplace avec poignée-glisser (près = 3D, loin = réticule sol) ou se supprime avec B/Y. B/Y supprime une gaine sélectionnée. Une nouvelle gâchette désélectionne.',
     zh: '编辑管路网络。未选择时，握把循环选择重叠的节点和管段；扳机选择黄色目标。选中的自由节点可用握把拖动（近=三维，远=地面准星）或按 B/Y 删除。B/Y 删除选中的管段。再次扣动可取消选择。绑定设备的节点不可移动。',
+  },
+  'help.mat_floor': {
+    en: 'Choose a floor finish. Trigger selects the room under the reticle; thumbstick up/down cycles its material (none first); B/Y clears it. Rooms with the same material through a doorway are laid as one. The readout shows the pieces for this floor and the packs for the whole house.',
+    fr: 'Choisissez un revêtement de sol. Gâchette : sélectionner la pièce visée ; joystick haut/bas : faire défiler le matériau (aucun d’abord) ; B/Y l’efface. Les pièces de même matériau reliées par une porte sont posées d’un seul tenant. Le panneau affiche les pièces pour ce sol et les paquets pour toute la maison.',
+    zh: '选择地面材料。扳机选择准星下的房间；摇杆上/下循环材料（首项为无）；B/Y 清除。通过门相连且材料相同的房间按一整块铺设。读数显示本地面的块数和全屋的包数。',
+  },
+  'help.mat_wall': {
+    en: 'Choose a wall finish, one face at a time. Trigger selects the wall nearest the reticle; thumbstick up/down cycles its material; B/Y clears it. Door and window openings are deducted.',
+    fr: 'Choisissez un revêtement mural, face par face. Gâchette : sélectionner le mur le plus proche du réticule ; joystick haut/bas : faire défiler le matériau ; B/Y l’efface. Les portes et fenêtres sont déduites.',
+    zh: '逐面选择墙面材料。扳机选择离准星最近的墙；摇杆上/下循环材料；B/Y 清除。门窗洞口已扣除。',
   },
   'help.furnish': {
     en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; B/Y deletes the selection. Models load on the fly.',
@@ -386,6 +399,12 @@ const STRINGS = {
   'wire.override':   { en: 'VIA',         fr: 'VIA',                  zh: '经由' },
   'wire.circuit':    { en: 'CIRCUIT',     fr: 'CIRCUIT',              zh: '回路' },
   'wire.shared':     { en: 'SHARED',      fr: 'PARTAGÉ',              zh: '共管' },
+  'mat.none':      { en: 'NO MATERIAL', fr: 'AUCUN MATÉRIAU', zh: '无材料' },
+  'mat.pickRoom':  { en: 'PICK ROOM',   fr: 'CHOISIR PIÈCE',  zh: '选择房间' },
+  'mat.pickWall':  { en: 'PICK WALL',   fr: 'CHOISIR MUR',    zh: '选择墙面' },
+  'mat.pcs':       { en: 'pcs',         fr: 'pcs',            zh: '片' },
+  'mat.packs':     { en: 'packs',       fr: 'paquets',        zh: '包' },
+  'mat.house':     { en: 'HOUSE',       fr: 'MAISON',         zh: '全屋' },
   'check.all':        { en: 'ALL ISSUES',  fr: 'TOUS PROBLÈMES',       zh: '全部问题' },
   'check.cross_tie':  { en: 'CROSS-TIE',   fr: 'DISJ. RELIÉS',         zh: '断路器互连' },
   'check.no_breaker': { en: 'NO BREAKER',  fr: 'SANS DISJONCTEUR',     zh: '无断路器' },

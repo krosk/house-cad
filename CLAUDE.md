@@ -49,7 +49,7 @@ All project knowledge is **repo-backed**, so every agent and tool sees the same 
 
 Design docs: `docs/product-intent.md` (Phase-5 goal, survey method, drift, multi-floor, Guardian) ·
 `docs/ar-survey.md` (AR mechanics + traps) · `docs/electrical-workflow.md` ·
-`docs/plumbing-workflow.md` · `docs/furniture.md` · `docs/share-view.md` · `docs/markers-plan.md` ·
+`docs/plumbing-workflow.md` · `docs/furniture.md` · `docs/materials.md` (surface finishes, design) · `docs/share-view.md` · `docs/markers-plan.md` ·
 `docs/ar-qa-checklist.md` (on-device QA record) · `packaging/quest-apk.md`.
 
 ## Core architecture
@@ -127,7 +127,7 @@ before the solver runs once, preserving all relative dimensions and marker pins.
 
 ### Persistence
 
-`src/io/serialize.js` serializes the parametric definition to JSON (**`FILE_VERSION = 3`**): each floor carries rectangles + constraints + markers + electrical links + furniture + height, and the **whole-house** conduit nodes/segments + wires live at the top level. The footprint/mesh is always recomputed, never stored. Back-compat: v1/v2 files stored the conduit network per-floor — on load, when the top-level arrays are absent, each floor's conduit/wires are gathered up and every node stamped with that floor's id (lossless, since each old network was single-floor). Missing `electricalLinks` default to `[]`. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`) and carries only the **intra-floor** conduit/wire subset; paste replaces the selected floor's authored plan with collision-free ids plus remapped references, re-stamping bare junctions to the destination floor. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
+`src/io/serialize.js` serializes the parametric definition to JSON (**`FILE_VERSION = 3`**): each floor carries rectangles + constraints + markers + electrical links + furniture + surface finishes (`finishes`, see `docs/materials.md`) + height, and the **whole-house** conduit nodes/segments + wires live at the top level. The footprint/mesh is always recomputed, never stored. Back-compat: v1/v2 files stored the conduit network per-floor — on load, when the top-level arrays are absent, each floor's conduit/wires are gathered up and every node stamped with that floor's id (lossless, since each old network was single-floor). Missing `electricalLinks` default to `[]`. On load, the id counters advance past loaded ids so new items don't collide. Floor copy/paste also lives here: a copied floor persists separately in `localStorage` (`house-cad:floor-clipboard:v1`) and carries only the **intra-floor** conduit/wire subset; paste replaces the selected floor's authored plan with collision-free ids plus remapped references, re-stamping bare junctions to the destination floor. The destination floor keeps its id, name, height, elevation, and ground designation. `main.js` also autosaves to `localStorage` (key `house-cad:autosave:v1`) on every change and restores on startup, seeding a demo house only on a truly empty first run.
 
 ### Plan sheets (printing / SVG export)
 

@@ -226,7 +226,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], furniture = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], furniture = [], finishes = [], height = 2.8, elevation = 0 } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -249,6 +249,10 @@ export class Floor {
     // on the fly by article via the CORS proxy — never stored here. Parallel lane; never
     // touches the footprint/boolean/extrude/solver pipeline.
     this.furniture = furniture;
+    // Surface finishes (docs/materials.md): { target: {rect} | {rect, edge}, material }.
+    // {rect} = the floor of that rect's connected ROOM component; {rect, edge} = that
+    // room edge's wall face. Never solved; quantities derive in src/core/flooring.js.
+    this.finishes = finishes;
     this.height = height; // storey height, meters
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
   }
@@ -272,6 +276,8 @@ export class Project {
     // ports; pipe segments connect nodes and carry service + diameter.
     this.pipeNodes = [];
     this.pipes = [];
+    // The owner's own finish products (same shape as BUILTIN_MATERIALS in materials.js).
+    this.materials = [];
     // Saved-revision counter: advanced by every explicit SAVE (desktop house.json,
     // AR slot) — NOT by autosave — so it tracks deliberate saves. Persisted with the
     // project and stamped on export filenames and printed sheets. 0 = never saved.
@@ -464,6 +470,7 @@ export class Project {
       this.constraints = this.constraints.filter(
         (c) => c.a.rect !== id && c.b.rect !== id,
       );
+      this.activeFloor.finishes = (this.activeFloor.finishes || []).filter((f) => f.target?.rect !== id);
       this._emit();
     }
   }
@@ -489,7 +496,29 @@ export class Project {
     this.markers = [];
     this.electricalLinks = [];
     this.furniture = [];
+    this.activeFloor.finishes = [];
     this._emit();
+  }
+
+  // --- surface finishes (docs/materials.md) ---------------------------------
+  // Floor: one finish per ROOM component. `componentIds` = every rect id of the room;
+  // the finish is stored on `seedId`, replacing any other rect's floor finish there.
+  // A null material clears it. Marker-like light emit: the rectangles don't change.
+  setFloorFinish(componentIds, seedId, material) {
+    const floor = this.activeFloor;
+    const ids = new Set(componentIds);
+    floor.finishes = (floor.finishes || []).filter((f) => f.target?.edge || !ids.has(f.target?.rect));
+    if (material) floor.finishes.push({ target: { rect: seedId }, material });
+    this._emit({ solveRectangles: false });
+  }
+
+  setWallFinish(faces, material) {
+    const floor = this.activeFloor;
+    const key = (t) => `${t.rect}:${t.edge}`;
+    const keys = new Set(faces.map(key));
+    floor.finishes = (floor.finishes || []).filter((f) => !f.target?.edge || !keys.has(key(f.target)));
+    if (material) for (const t of faces) floor.finishes.push({ target: { rect: t.rect, edge: t.edge }, material });
+    this._emit({ solveRectangles: false });
   }
 
   // --- markers (wall-anchored survey annotations) -------------------------
