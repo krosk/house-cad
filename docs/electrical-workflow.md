@@ -104,6 +104,12 @@ with union-find and classifies each component:
 | **≥2 breakers** | a **conflict** — an illegal cross-tie between breakers; flagged, unowned |
 | **0 breakers** | **unassigned** — wired devices not yet traced to a breaker; benign mid-survey |
 
+**Only electrical wires are power edges** (fixed 2026-09-26). Ethernet wires form their own
+networks (`deriveCircuits(project, { type: 'ethernet' })`) and are never judged against breakers.
+Before this fix, every Ethernet jack pair showed up as an "unassigned" circuit: 7 false components
+in the owner's rev 9 house. Selecting a wire in `MARKER · WIRE` highlights the component of that
+wire's own nature.
+
 You never "assign" a wire to a circuit — you wire the home run to a breaker and the circuit
 *is* that component. Circuit identity/metadata (`number`, `rating`, `poles`) live on the
 breaker marker; membership is **derived, never stored**. Control links are deliberately
@@ -126,6 +132,22 @@ While a wire is selected, the controller readout adds two lines (owner request, 
   **conduit** length, each run counted once, that carries both this component's wires of the
   selected nature and any wire of the other nature: Ethernet running beside power, or power
   beside Ethernet. It exists so separation or shielding needs can be sized.
+
+## Circuit diagnostics (`circuitDiagnostics`, AR `MARKER · CHECK`)
+
+Owner request, 2026-09-26. Each device carries at most one issue, most severe first:
+
+| Issue | Meaning | Ring |
+|---|---|---|
+| `cross_tie` | its power chain reaches 2+ breakers (an illegal tie); its breakers are flagged too | red |
+| `no_breaker` | wired, but its chain never reaches a breaker | orange |
+| `unwired` | a device that needs power has no electrical wire at all | white |
+
+**Needs power** (`needsPower`) is deliberately narrow: `outlet*`, `switch` and `light`. Radiators and
+boilers may be hydronic. Panels, Ethernet and plumbing markers are not fed by a breaker wire. Widen the
+list only with the owner. **Breakers feeding nothing are not flagged** (owner choice): a spare breaker is
+normal. Counts are whole-house: chains for `cross_tie`/`no_breaker`, devices for `unwired`. Proven on the
+owner's rev 9 house (Node): 0 cross-ties, 5 no-breaker chains, 93 unwired devices.
 
 ## Owner decisions and their rationale
 
@@ -160,7 +182,9 @@ These are settled; don't reopen them without the owner.
 - `breaker` marker type + `number`/`rating`/`poles` persistence, and `circuits.js`
   derivation: **implemented** as model helpers.
 - Selected-wire circuit membership highlighting in AR: **implemented**.
+- Circuit diagnostics (`MARKER · CHECK`: cross-tie, no breaker, unwired): **implemented**,
+  build- and Node-verified, not yet walked on device.
 - **Not yet done** (deliberately deferred): surfacing circuits in any output (the print
-  sheet stays as-is), per-circuit coloring/numbering/schedule, conflict warnings in the UI,
+  sheet stays as-is), per-circuit coloring/numbering/schedule, diagnostics outside AR (desktop/sheets),
   AR editing of breaker `number`/`rating`, and tying a breaker to a `panel` enclosure
   (`panelId`) for schedule grouping.

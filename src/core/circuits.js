@@ -10,7 +10,9 @@
 //
 // Derivation is pure and cheap (union-find over a house-sized graph), recomputed at
 // render time like wire routes (`conduit.js`). Control links (switch→light) are the
-// CONTROL lane and are deliberately NOT circuit edges here.
+// CONTROL lane and are deliberately NOT circuit edges here. Only ELECTRICAL wires are
+// power edges: Ethernet wires form their own networks (`type: 'ethernet'`), which are
+// never judged against breakers, so a jack-to-jack run is not a circuit missing one.
 //
 // Classification of each component by how many breakers it contains:
 //   1 breaker  → a circuit (the normal case; 0 wires = an empty, just-placed circuit)
@@ -68,18 +70,22 @@ function numOf(breaker) {
  *   circuitColor: Map<string, number>,          // breakerId → hex
  * }}
  */
-export function deriveCircuits(project) {
+export function deriveCircuits(project, { type = 'electrical' } = {}) {
   const markers = allMarkers(project);
   const byId = new Map(markers.map((m) => [m.id, m]));
-  // Only wires whose BOTH endpoints resolve to a real marker are edges.
-  const wires = (project?.wires || []).filter((w) => byId.has(w.fromMarkerId) && byId.has(w.toMarkerId));
+  // Only wires of this nature whose BOTH endpoints resolve to a real marker are edges.
+  const wires = (project?.wires || []).filter((w) => (w.type || 'electrical') === type
+    && byId.has(w.fromMarkerId) && byId.has(w.toMarkerId));
+  // Breakers only anchor power circuits; an Ethernet pass yields plain components
+  // (all "unassigned"), used to highlight a selected Ethernet run's network.
+  const power = type === 'electrical';
 
   // Which markers touch a wire? Those + all breakers are the graph's vertices.
   const touched = new Set();
   for (const w of wires) { touched.add(w.fromMarkerId); touched.add(w.toMarkerId); }
 
   const dsu = makeDSU();
-  for (const m of markers) if (isBreaker(m)) dsu.find(m.id); // an unwired breaker = its own (empty) circuit
+  if (power) for (const m of markers) if (isBreaker(m)) dsu.find(m.id); // an unwired breaker = its own (empty) circuit
   for (const w of wires) dsu.union(w.fromMarkerId, w.toMarkerId);
 
   // Bucket everything into components keyed by DSU root.
@@ -89,10 +95,11 @@ export function deriveCircuits(project) {
     return comp.get(root);
   };
   for (const m of markers) {
-    if (!isBreaker(m) && !touched.has(m.id)) continue; // isolated non-breaker markers aren't in any circuit
+    const anchor = power && isBreaker(m);
+    if (!anchor && !touched.has(m.id)) continue; // isolated non-breaker markers aren't in any circuit
     const c = ensure(dsu.find(m.id));
     c.deviceIds.push(m.id);
-    if (isBreaker(m)) c.breakerIds.push(m.id);
+    if (anchor) c.breakerIds.push(m.id);
   }
   for (const w of wires) ensure(dsu.find(w.fromMarkerId)).wireIds.push(w.id);
 
@@ -139,4 +146,48 @@ export function deriveCircuits(project) {
   for (const c of unassigned) { for (const id of c.deviceIds) deviceCircuit.set(id, null); for (const id of c.wireIds) wireCircuit.set(id, null); }
 
   return { circuits, conflicts, unassigned, deviceCircuit, wireCircuit, circuitColor };
+}
+
+// Device types that must end up on a power circuit. Deliberately narrow: outlets,
+// switches and lights. Radiators and boilers may be hydronic, and panels, Ethernet
+// and plumbing markers are not fed by a breaker wire, so none of those are flagged.
+export function needsPower(marker) {
+  const type = marker?.type || 'outlet';
+  return type === 'outlet' || type.startsWith('outlet_') || type === 'switch' || type === 'light';
+}
+
+// Survey diagnostics for the power lane (owner request, 2026-09-26), most severe
+// first. A device carries at most one issue:
+//   cross_tie  — its circuit reaches 2+ breakers (illegal tie; breakers flagged too)
+//   no_breaker — it is wired, but its chain never reaches a breaker
+//   unwired    — a device that needs power (needsPower) with no electrical wire
+// Breakers feeding nothing are NOT flagged (owner choice: a spare is normal).
+// `components` counts cross_tie/no_breaker chains, `unwired` counts devices.
+export function circuitDiagnostics(project) {
+  const derived = deriveCircuits(project);
+  const markerIssue = new Map();
+  const wireIssue = new Map();
+  const mark = (list, issue) => {
+    for (const c of list) {
+      for (const id of c.deviceIds) markerIssue.set(id, issue);
+      for (const id of c.wireIds) wireIssue.set(id, issue);
+    }
+  };
+  mark(derived.conflicts, 'cross_tie');
+  mark(derived.unassigned, 'no_breaker');
+  const powered = new Set();
+  for (const w of project?.wires || []) {
+    if ((w.type || 'electrical') !== 'electrical') continue;
+    powered.add(w.fromMarkerId); powered.add(w.toMarkerId);
+  }
+  let unwired = 0;
+  for (const m of allMarkers(project)) {
+    if (markerIssue.has(m.id) || powered.has(m.id) || !needsPower(m)) continue;
+    markerIssue.set(m.id, 'unwired');
+    unwired++;
+  }
+  return {
+    markerIssue, wireIssue,
+    counts: { cross_tie: derived.conflicts.length, no_breaker: derived.unassigned.length, unwired },
+  };
 }

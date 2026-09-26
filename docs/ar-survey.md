@@ -15,7 +15,7 @@ editor (`docs/product-intent.md`).
 ```text
 SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
-MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → PIPE
+MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
@@ -205,7 +205,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (a one-shot `wireEndpointPickAfterKey` request), and the first candidate takes over only when
   the highlighted one leaves the reticle. A selected wire's readout adds `CIRCUIT <len>` and, when
   non-zero, `SHARED <len>` in the other nature's color (definitions in `docs/electrical-workflow.md`).
-  The readout pill takes up to 3 lines (`makeLabel(96)`); lengths are memoized per selection and
+  The readout pill takes up to 4 lines (`makeLabel(128)`); lengths are memoized per selection and
   wire-layer rebuild, never computed per frame. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` as narrow ribbons colored by nature (electrical amber, Ethernet cyan), showing
@@ -214,6 +214,19 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `PICK START`, `PICK END`, then `VIA · <n>`. The wall/ceiling/floor surface of each segment is
   **inferred** from geometry (`segmentSurface`), never stored. This REPLACES the removed
   per-wire-waypoint model (`MARKER · WIRE`-trace + `WIRE EDIT`); routing lives in `src/core/conduit.js`.
+- **MARKER · CHECK** (`id: circuit_check`, owner request 2026-09-26) — **read-only** circuit
+  diagnostics from `circuitDiagnostics()` (`src/core/circuits.js`; definitions in
+  `docs/electrical-workflow.md`). Each flagged device gets a floor halo ring plus a vertical pin up to
+  its wall glyph: **red** = cross-tie (its chain reaches 2+ breakers), **orange** = wired but no
+  breaker, **white** = an outlet/switch/light with no electrical wire. The flagged chains' wires are
+  recolored the same way over the dimmed wire layer. Thumbstick up/down filters
+  `ALL → CROSS-TIE → NO BREAKER → UNWIRED`. Aiming at a flagged device outlines it yellow and names its
+  type and issue in the readout, above per-issue counts for the whole house (chains for cross-tie and
+  no-breaker, devices for unwired). Trigger/grip/B/Y do nothing. The owner chose **not** to flag breakers
+  that feed nothing, because spare breakers are normal. Rings and pins are **two batched draw calls**
+  (`buildCheckOverlay`), rebuilt on mode entry, filter change, or view change; never one object per
+  device, since 90+ devices are flagged mid-survey. Available in ALL FLOORS. In a single-floor view only
+  the active floor's devices get rings, though the counts are whole-house.
 - **MARKER · PIPE** (`id: marker_pipe`) — author a separate whole-house plumbing graph. Trigger a
   fixture, existing pipe node, or empty space to start a pen; empty space creates a free junction,
   and subsequent triggers create segments and advance the pen for bends, branches, loops, and
@@ -570,8 +583,8 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
 - **ALL FLOORS** renders every floor's footprint, edge state, dimensions, and markers at its
   derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged and hides
   the height pad. Architecture, marker placement, dimensions, and furniture remain read-only, but
-  the whole-house topology tools **MARKER · CONDUIT**, **CONDUIT · EDIT**, and **MARKER · WIRE**
-  remain available. They render nodes/devices/routes across every storey, so a segment between
+  the whole-house topology tools **MARKER · CONDUIT**, **CONDUIT · EDIT**, **MARKER · WIRE**, and the
+  read-only **MARKER · CHECK** remain available. They render nodes/devices/routes across every storey, so a segment between
   floors becomes a riser without changing active floor.
   **Reticle rule (owner decision, 2026-09-26):** the reticle never lands further than one slab away.
   "My storey" is the one whose elevation band holds the headset (`allFloorsReticleFloor`). Aiming

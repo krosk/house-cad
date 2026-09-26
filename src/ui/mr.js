@@ -36,7 +36,7 @@ import {
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
-import { deriveCircuits } from '../core/circuits.js';
+import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
@@ -769,9 +769,10 @@ export function setupMR(view, project, getFootprint) {
     // A larger pill above the mode label that shows the value of whichever
     // constraint the ray is pointing at — a legible "close-up" of small in-world
     // dimension text. Hidden until the ray hovers a dimension.
-    const readout = makeLabel(96); // up to 3 lines (MARKER · WIRE selection lengths)
-    readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.readout, TIP_OFFSET.z);
-    readout.sprite.scale.set(0.2, 0.075, 1); // 256×96 aspect; a single line keeps its old size
+    const readout = makeLabel(128); // up to 4 lines (WIRE lengths, CHECK counts)
+    // Raised by half the extra height so taller pills grow upward, away from the mode label.
+    readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.readout + 0.0125, TIP_OFFSET.z);
+    readout.sprite.scale.set(0.2, 0.1, 1); // 256×128 aspect; a single line keeps its old size
     readout.sprite.visible = false;
     readout.sprite.renderOrder = HUD_ORDER;
     c.add(readout.sprite);
@@ -1025,6 +1026,10 @@ export function setupMR(view, project, getFootprint) {
   const pipeGroup = new THREE.Group();
   pipeGroup.visible = false;
   planGroup.add(pipeGroup);
+  // MARKER · CHECK diagnostic rings + pins (one batched mesh + one line batch).
+  const checkGroup = new THREE.Group();
+  checkGroup.visible = false;
+  planGroup.add(checkGroup);
   // Cross-floor authoring targets: in a single-floor view the floor directly above/below
   // is dimmed at its true height. ALL FLOORS already renders every marker/node directly,
   // so it does not need this duplicate target layer.
@@ -2966,7 +2971,8 @@ export function setupMR(view, project, getFootprint) {
   // a survey is incomplete, so it intentionally covers all three classifications.
   function wireComponent(wire) {
     if (!wire) return { markerIds: new Set(), wireIds: new Set() };
-    const derived = deriveCircuits(project);
+    // Components are per nature: an Ethernet wire highlights its Ethernet network only.
+    const derived = deriveCircuits(project, { type: wire.type || 'electrical' });
     const components = [...derived.circuits, ...derived.conflicts, ...derived.unassigned];
     const component = components.find((candidate) => candidate.wireIds.includes(wire.id));
     return {
@@ -3003,6 +3009,76 @@ export function setupMR(view, project, getFootprint) {
     const stats = { circuit, shared, otherType: WIRE_TYPES.find((t) => t !== type) };
     wireLengthMemo = { key, batch: wireBatch, stats };
     return stats;
+  }
+
+  // ---- MARKER · CHECK: circuit diagnostics (owner request, 2026-09-26) ---------
+  // Read-only. circuitDiagnostics() gives each flagged device ONE issue; this draws a
+  // halo ring on the floor under each flagged device plus a vertical pin up to its
+  // wall glyph, all in two draw calls (never one object per device: 90+ are flagged
+  // mid-survey). Thumbstick-y filters to one issue. Rebuilt on mode entry and when
+  // the view (active floor / ALL FLOORS) changes; the model can't change in this mode.
+  const CHECK_COLORS = { cross_tie: 0xef4444, no_breaker: 0xf97316, unwired: 0xf8fafc };
+  const CHECK_FILTERS = ['all', 'cross_tie', 'no_breaker', 'unwired'];
+  let checkFilter = 'all';
+  let checkDiag = null; // circuitDiagnostics() snapshot for the current overlay
+  let checkOverlayKey = '';
+  let checkHover = null; // { marker, issue } under the reticle
+  const checkShows = (issue) => !!issue && (checkFilter === 'all' || checkFilter === issue);
+  // Floors whose markers are drawn in the current view.
+  const checkFloors = () => (allFloorsView ? project.floors : [project.activeFloor]);
+  function buildCheckOverlay() {
+    for (const child of [...checkGroup.children]) {
+      checkGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+    }
+    checkDiag = circuitDiagnostics(project);
+    checkOverlayKey = `${allFloorsView}|${project.activeFloorId}|${checkFilter}`;
+    const ring = [], ringColors = [], pins = [], pinColors = [];
+    const c = new THREE.Color();
+    const R = 0.075; // halo just outside the 10 cm floor icon
+    for (const floor of checkFloors()) {
+      for (const m of floor.markers) {
+        const issue = checkDiag.markerIssue.get(m.id);
+        if (!checkShows(issue)) continue;
+        c.setHex(CHECK_COLORS[issue]);
+        const base = planLocalZ({ x: m.x, y: m.y, z: floor.elevation || 0 });
+        const y = base.z + 0.02;
+        const q = [[-R, -R, 0, 0], [R, -R, 1, 0], [R, R, 1, 1], [-R, -R, 0, 0], [R, R, 1, 1], [-R, R, 0, 1]];
+        for (const [dx, dy, u, v] of q) {
+          ring.push(m.x + dx, y, -(m.y + dy), u, v);
+          ringColors.push(c.r, c.g, c.b);
+        }
+        pins.push(m.x, y, -m.y, m.x, base.z + (m.z || 0), -m.y);
+        pinColors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      }
+    }
+    if (!ring.length) return;
+    const pos = [], uv = [];
+    for (let i = 0; i < ring.length; i += 5) { pos.push(ring[i], ring[i + 1], ring[i + 2]); uv.push(ring[i + 3], ring[i + 4]); }
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    rg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    rg.setAttribute('color', new THREE.Float32BufferAttribute(ringColors, 3));
+    const rings = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({
+      map: markerOutlineTexture(), vertexColors: true, transparent: true,
+      side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+    }));
+    rings.renderOrder = 34; // above the marker batches (31/32) and outlines (33)
+    rings.frustumCulled = false;
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(pins, 3));
+    pg.setAttribute('color', new THREE.Float32BufferAttribute(pinColors, 3));
+    const pinLines = new THREE.LineSegments(pg, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.7, depthTest: false, depthWrite: false,
+    }));
+    pinLines.renderOrder = 34;
+    pinLines.frustumCulled = false;
+    checkGroup.add(rings, pinLines);
+  }
+  function cycleCheckFilter(dir) {
+    const i = CHECK_FILTERS.indexOf(checkFilter);
+    checkFilter = CHECK_FILTERS[((i + dir) % CHECK_FILTERS.length + CHECK_FILTERS.length) % CHECK_FILTERS.length];
+    buildCheckOverlay();
+    rlog('check filter', { filter: checkFilter });
   }
 
   // ---- Cross-floor authoring targets (risers + cross-floor wires) --------------
@@ -6048,6 +6124,11 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'circuit_check', color: 0xf97316,
+      // Read-only diagnostics: trigger does nothing (see buildCheckOverlay).
+      onTouch: () => {},
+    },
+    {
       id: 'marker_pipe', color: 0x38bdf8,
       onTouch: (pos) => {
         if (!placed) return;
@@ -6269,14 +6350,14 @@ export function setupMR(view, project, getFootprint) {
   const MODE_ORDER = [
     'register', 'floor', 'level', 'recal', 'teleport',
     'drop', 'edge', 'plan_dims', 'edit',
-    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'marker_pipe',
+    'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'furnish',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
-    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
+    marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
@@ -6370,8 +6451,12 @@ export function setupMR(view, project, getFootprint) {
     const showConduits = m.id === 'marker_conduit' || m.id === 'conduit_edit' || m.id === 'marker_wire' || m.id === 'conduit_dims';
     if (showConduits) buildConduits();
     conduitGroup.visible = showConduits;
-    if (m.id === 'marker_wire') buildRoutedWires();
-    routedWireGroup.visible = m.id === 'marker_wire';
+    // CHECK also shows the wires, with the flagged chains emphasized (frame loop).
+    if (m.id === 'marker_wire' || m.id === 'circuit_check') buildRoutedWires();
+    routedWireGroup.visible = m.id === 'marker_wire' || m.id === 'circuit_check';
+    checkHover = null;
+    if (m.id === 'circuit_check') buildCheckOverlay();
+    checkGroup.visible = m.id === 'circuit_check';
     if (m.id === 'marker_pipe') buildPipes();
     pipeGroup.visible = m.id === 'marker_pipe';
     // Cross-floor authoring targets: CONDUIT (risers) + WIRE (cross-floor wires) only.
@@ -6383,7 +6468,7 @@ export function setupMR(view, project, getFootprint) {
   // The stacked overview remains read-only for architecture and marker placement,
   // but the whole-house topology tools are deliberately available there: every
   // storey's existing devices/nodes can be joined without changing active floor.
-  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire', 'marker_pipe']);
+  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe']);
   const modeAvailable = (index) => {
     const id = modes[index].id;
     if (MODE_HIDDEN.has(id)) return false; // parked tools: never a cycle stop
@@ -7245,6 +7330,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'marker_wire') cycleWireType(stickY < 0 ? 1 : -1); // retype selected / new-wire type
+      else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
@@ -7433,6 +7519,22 @@ export function setupMR(view, project, getFootprint) {
       ? (selectedConduitSegmentId ? t('conduit.editSeg')
         : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickTarget'))
       : null;
+    // CHECK: the hovered device's problem on top (yellow), then the filter's counts,
+    // one line per issue in its ring color.
+    let checkStatus = null, checkColors = null;
+    if (modes[currentMode].id === 'circuit_check' && checkDiag) {
+      const lines = [], colors = [];
+      if (checkHover) {
+        lines.push(`${t(`marker.${checkHover.marker.type || 'outlet'}`)} · ${t(`check.${checkHover.issue}`)}`);
+        colors.push(0xffe14d);
+      } else {
+        lines.push(t(`check.${checkFilter}`)); colors.push(0xf97316);
+      }
+      const issues = CHECK_FILTERS.slice(1).filter((k) => checkFilter === 'all' || checkFilter === k);
+      if (issues.every((k) => !checkDiag.counts[k])) { lines.push(t('check.ok')); colors.push(0x4ade80); }
+      else for (const k of issues) { lines.push(`${t(`check.${k}`)} ${checkDiag.counts[k]}`); colors.push(CHECK_COLORS[k]); }
+      checkStatus = lines.join('\n'); checkColors = colors;
+    }
     const pipeStatus = modes[currentMode].id === 'marker_pipe'
       ? pendingPipeMerge
         ? `${t(`pipe.service.${project.pipeServiceAtNode(pendingPipeMerge.targetNodeId)}`)} → ${t(`pipe.service.${pendingPipeMerge.service}`)} · ${t('pipe.confirmMerge')}`
@@ -7450,9 +7552,10 @@ export function setupMR(view, project, getFootprint) {
         : currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
       : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || pipeStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || checkStatus || pipeStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : furnishStatus ? 0xa78bfa
+      : checkStatus ? checkColors
       : pipeStatus ? pipeColor(selectedPipe || { service: currentPipeService })
       : wireStatus ? (modes[currentMode].id === 'marker_conduit' || modes[currentMode].id === 'conduit_edit'
         ? CONDUIT_COLOR
@@ -7992,6 +8095,30 @@ export function setupMR(view, project, getFootprint) {
           outlineMarker(endpoint, 'wall', 0xffe14d);
         }
       }
+    } else if (modeId === 'circuit_check') {
+      // Read-only: the reticle names the flagged device under it (readout).
+      hoverKey = null;
+      numpadCursor.visible = false;
+      if (checkOverlayKey !== `${allFloorsView}|${project.activeFloorId}|${checkFilter}`) {
+        buildRoutedWires(); buildCheckOverlay();
+      }
+      checkHover = null;
+      const hit = rayFloorHit(editCtl);
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        const flagged = (pickFloor()?.markers || []).filter((m) => checkShows(checkDiag?.markerIssue.get(m.id)));
+        const marker = markerAtFloorPoint(px, py, flagged);
+        if (marker) checkHover = { marker, issue: checkDiag.markerIssue.get(marker.id) };
+      } else {
+        reticle.visible = false;
+      }
+      outlineMarker(checkHover?.marker, 'floor', 0xffe14d);
+      outlineMarker(checkHover?.marker, 'wall', 0xffe14d);
+      const emphasis = [];
+      for (const [id, issue] of checkDiag?.wireIssue || []) if (checkShows(issue)) emphasis.push([id, CHECK_COLORS[issue]]);
+      styleRoutedWires(emphasis);
     } else if (modeId === 'marker_pipe') {
       hoverKey = null;
       numpadCursor.visible = false;
