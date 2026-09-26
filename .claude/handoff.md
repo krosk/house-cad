@@ -15,11 +15,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile products, View 3D reflections, door products: owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon products, View 3D reflections, door and window products: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 30)
-**Status:** Proven (git + live `version.json`): `origin/main` = `c0e135d` and Pages serves it; this
+**Status:** Proven (git + live `version.json`): `origin/main` = the band-label fix below (after `a9a30fd`); this
 handoff's own commit changes only this file. The tree is clean apart from the owner's untracked
 `Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
 everything from session 30 is verified by build, Node or a desktop browser only, and **parked for the owner
@@ -46,7 +46,7 @@ boots straight into passthrough AR):
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
-   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials and door
+   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials, door and window
    products**, save/load in 6
    slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X**. Mode list:
    `docs/ar-survey.md`.
@@ -90,16 +90,26 @@ Read `docs/product-intent.md` before planning AR work.
    (`src/ui/doorProducts.js`). `docs/materials.md` "Doors".
 8. **Workflow recorded** (`2972e7a`): `docs/product-modelling.md` + the `/model-product` skill, from
    how the bed and door were made.
-9. **Surface products** (`docs/materials.md` "Flooring products", "Wall tile products"): a finish
+9. **Surface products** (`docs/materials.md` "Flooring products", "Wall tile products", "Mosaic products", "Octagon + tozzetto products"): a finish
    material can name a `design`, a procedural texture drawn in `src/ui/finishTextures.js`:
    - Beaulieu oak charme 118×16.4 floor (`ac10962`, Leroy Merlin 92245930), `design: 'oak-rustic'`;
    - GoodHome Vernisse white gloss wall tile 30×7.5 (`c0e135d`, Castorama), `design: 'handmade-gloss'`
-     with a **bump texture** (`finishBumpTexture`) that View 3D applies.
+     with a **bump texture** (`finishBumpTexture`) that View 3D applies;
+   - GoodHome Blue stone mosaic (`38dc935`, Castorama), floor **and** wall: the piece is the 30 × 30.4 cm
+     sheet (takeoff counts sheets), `mosaic: [3, 18]` sticks drawn by the grid design `'stone-sticks'`;
+   - Etruria Design HEX 15×15 octagon in MATTONE + 6.2×6.2 BIANCO tozzetto (`f9a75c6`), the owner's real
+     octagon floor, `design: 'porcelain-matte'`; it **replaced** the generic `octagon_200` placeholder.
 10. **View 3D ✦ Reflections** (`c0e135d`): an opt-in environment map (RoomEnvironment) for glossy
     finishes; the glazed tile only looks right with it. `docs/materials.md` "View 3D reflections".
 11. **`tools/product-images.mjs`** (`efca116`, Castorama added in `c0e135d`): per-retailer photo
     extraction (IKEA, Lapeyre, Castorama, leboncoin from Node; Leroy Merlin through a Chrome snippet,
     since it runs DataDome). `docs/product-modelling.md` step 3; the `/model-product` skill uses it.
+12. **Window products** (`a9a30fd`): the owner's Lapeyre Héméra white PVC windows as a material of a
+    WINDOW zone, new AR **MATERIAL · WINDOW** (shares the door path via `APT_KIND` in `mr.js`), built by
+    `src/ui/windowProducts.js`. The zone's hinge picks the leaves (both = two); the handle/hinges face
+    the side with a ROOM rect behind it. `docs/materials.md` "Windows".
+13. **Fix:** the PLAN · EDIT sill/head pad now redraws the floor→sill/head labels and the AR 3D view on
+    commit (owner report: the head label didn't update). Unconfirmed on the Quest.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -137,7 +147,11 @@ Read `docs/product-intent.md` before planning AR work.
   `procedural` furniture builder or a door `design`. A non-code model would go in
   `public/furniture/models/` (not built). Follow `docs/product-modelling.md` / `/model-product`.
 - **A door product is a material of its DOOR zone** (owner decision), authored in MATERIAL · DOOR;
-  made-to-measure products take the zone's size.
+  made-to-measure products take the zone's size. **Window products follow the same rule** (WINDOW zone,
+  MATERIAL · WINDOW).
+- **Catalog entries for the owner's real products replace generic placeholders** when the owner says
+  so (`octagon_200` removed for Etruria). A saved finish naming a removed id shows as no material:
+  every `materialById` caller handles null.
 - **Product textures are procedural too** (seeded canvas, no stored images); photos are references
   only and stay in the session scratchpad.
 - **View 3D reflections are on demand, per device** (owner: some devices struggle): off by default,
@@ -191,7 +205,7 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `c0e135d` before the handoff commit), all with descriptive bodies.
+All pushed (`origin/main` = `a9a30fd` before the handoff commit), all with descriptive bodies.
 Doc-only commits are omitted.
 - **Session 30:**
   - `47c08de` stair `climb`;
@@ -201,7 +215,9 @@ Doc-only commits are omitted.
     `f0f6bf1` AR 3D view + the `PLAN_OVERLAY_GROUPS` fix;
   - products: `63cfd17` TV bench (+ previous handoff) · `4abecef` procedural furniture / STOCKHOLM bed ·
     `cc55640` door products / Ange-Line · `2972e7a` modelling workflow + skill ·
-    `ac10962` Beaulieu oak floor · `efca116` photo extractor · `c0e135d` Vernisse tile + Reflections.
+    `ac10962` Beaulieu oak floor · `efca116` photo extractor · `c0e135d` Vernisse tile + Reflections ·
+    `38dc935` Blue stone mosaic · `f9a75c6` Etruria octagon (placeholder removed) · `a9a30fd` Héméra
+    windows + MATERIAL · WINDOW · then the band-label redraw fix.
 - **Session 29:**
   - 3D walls/faceplates: `f457bd5`, `309d807`;
   - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
@@ -239,10 +255,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
-| `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s (`DESIGNS`, `BRICK_DESIGNS`) and the brick-design bump map |
+| `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s per pattern (`DESIGNS` stagger, `BRICK_DESIGNS`, `GRID_DESIGNS` mosaic sheets, `OCT_DESIGNS`) and their bump maps |
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries); used by FURNISH and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf design, hardware) from `doorProductPlacements` |
+| `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware) from `windowProductPlacements` |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
 
@@ -251,8 +268,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). The owner said they would verify later. First, check that the four overlays that never
   rendered before `f0f6bf1` now show: Z-dims, adjacent-floor dots, CHECK rings, MATERIAL tints. Then:
-  - MATERIAL · FLOOR/WALL/DOOR (set the Ange-Line on the real entrance door zone; Beaulieu oak on a
-    room and Vernisse tile on a wall; watch PERF: each design texture is 2048 px);
+  - MATERIAL · FLOOR/WALL/DOOR/WINDOW (the Ange-Line on the real entrance door zone; Héméra on the
+    windows, checking which side the handle faces; Beaulieu oak, Etruria octagons in the upstairs
+    bathroom, Blue stone mosaic and Vernisse tile; watch PERF: each design texture is 2048 px);
   - View 3D ✦ Reflections on a phone (does it hold frame rate?);
   - FURNISH: the STOCKHOLM bed and the TV bench (does a real IKEA model replace the box on the APK?);
   - the LEFT X AR 3D view, with **PROJECT · PERF** on;
@@ -287,13 +305,17 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the readout pill, which grew to 4 lines and sits 1.25 cm higher in every mode;
   - how the textures look in a browser;
   - the bed and the door in AR (both rendered only in a desktop browser);
-  - the oak floor and Vernisse tile on real rooms (seen only in scratch previews), and Reflections on
-    any device other than a desktop Chrome.
+  - the oak floor, Vernisse tile, Blue stone mosaic and Etruria octagons on real rooms (seen only in
+    scratch previews), and Reflections on any device other than a desktop Chrome;
+  - Héméra windows in AR, and on the owner's real window zones (seen only on an injected demo house in
+    desktop View 3D). The frame is centred in the zone's depth; real fitting position is not modelled.
 
   Estimates to confirm with a tape measure or the owner: the bed's rail height, headboard lean and
   cushion size (from photos); the door colour (anthracite ~RAL 7016 guessed; Lapeyre colours are
   customisable) and which door zone in the owner's house is the entrance; the oak's 2 mm bevel and the
-  tile's 3 mm joint (photo estimates).
+  tile's 3 mm joint (photo estimates); the mosaic's 2 mm joint (renders suggest ~3.5 mm); the Etruria
+  joint, grout colour and **pack size** (entered as 1 piece per pack); Héméra profile faces are
+  scaled by an assumed ~160 mm handle.
 
   Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
   with markers, labels, conduits and wires since the batching, and reported them working.
