@@ -14,13 +14,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, FURNISH |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
+| `docs/materials.md` | Surface finishes: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-26 (session 29, continued)
-**Status:** Proven (git + live `version.json`): `origin/main` served `9bce6e7` (stacked-marker readout) before
-this handoff's own commit, which changes only this file. The tree is clean apart from the owner's
-untracked `Document from Alexis He.json`.
-The AR performance work is **owner-confirmed on the Quest**; the rest of this session is build/Node-verified only.
+**Date:** 2026-09-26 (session 30)
+**Status:** Proven (git + live `version.json`): `origin/main` served `f0f6bf1` before this handoff's
+own commit, which changes only this file. The tree is clean apart from the owner's untracked
+`Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
+everything from session 30 is build/Node-verified only and **parked for the owner to walk** (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -36,86 +37,47 @@ boots straight into passthrough AR):
    clouds vs a saved slot), DXF + a simplified Coohom DXF, STL/OBJ/GLB mesh, JSON save.
 2. **Desktop/mobile 3D viewer (`◈ View 3D`).** An **architectural** reading of the plan
    (`src/core/architectural3d.js`): room floor slabs, an inferred 12 cm outer wall shell, WALL and
-   INSULATION zones as solids, doors and windows cut through the full wall from their sill/head,
-   procedural stairs, **8 cm marker faceplates** mounted on the nearest wall surface, IKEA furniture,
-   procedural textures, and light markers that light the room. One floor at a time; top-down
-   **overview** ↔ tap a room for a **1.65 m POV**. **Mesh exports still use the legacy extrusion.**
+   INSULATION zones as solids, doors and windows cut from their sill/head, procedural stairs, 8 cm
+   marker faceplates, IKEA furniture, light markers that light the room, and **textured surface
+   finishes**. One floor at a time; top-down overview ↔ tap a room for a 1.65 m POV. **Mesh exports
+   still use the legacy extrusion.**
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
-   dimensions via a 3D numpad, markers (electrical, network, TV antenna, plumbing fixtures), heights,
-   electrical conduit + wires (electrical or Ethernet), a plumbing pipe network, furniture, save/load
-   in 6 slots, and export (sheets, DXF, JSON, view link, QR). Mode list: `docs/ar-survey.md`.
+   dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
+   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials**, save/load in 6
+   slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X**. Mode list:
+   `docs/ar-survey.md`.
 
-**Sharing:** `🔗 Share view` (desktop) or the AR `link`/`qr` export opens a **read-only** session
-(pan/zoom, 3D view, throwaway measurement dims, no autosave). Detail: `docs/share-view.md`.
+**Sharing:** `🔗 Share view` (desktop) or the AR `link`/`qr` export opens a **read-only** session.
+Detail: `docs/share-view.md`.
 
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 29
+## What changed in session 30
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
 > decisions" or "Findings" and delete this list.
 
-1. **Memory → docs** (`c391395`) and the **claim-labelling rule** (`7308e44`, top of `CLAUDE.md`).
-2. **3D viewer:** walls no longer cover doors/windows (`f457bd5`); markers are 8 cm faceplates facing
-   open air, insulation renders as wall (`309d807`). Proven by Node checks on the owner's house only.
-3. **AR conduit pen** (`dce02f1`): B/Y undoes the last pen step; triggering an existing run makes a
-   T-junction. Proven by a Node replay. **AR Z-dims** drawn like X/Y dims (`fb56fbc`).
-4. **AR performance** (owner-reported: the ground floor ran at ~18 fps; below 30 with conduits). In order:
-   - **Diagnostics:**
-     - HUD `fps:`/`draw:`/`time:` lines (`7bca037`, `f4bca98`, `332b6dd`);
-     - a GPU layer sweep, **PROJECT · PERF** (`36fa3d1`, `425c2e5`). A menu toggle is needed because
-       the APK can't pass `?perf`.
-   - **Fixes:**
-     - conduit layer batched (`54d1b15`);
-     - dim labels on an atlas (`4369ac2`);
-     - controller label redraw guarded (`7f329c3`);
-     - **markers batched on a glyph atlas** (`4af1d20`), the big one: PERF measured the markers at
-       47.2 ms of GPU per frame, equal to the whole plan;
-     - routed wires batched (`4d3610b`).
-   - **Result, owner-confirmed on the Quest:** ~90 fps with the whole ground floor in view; >80 fps in
-     `MARKER · WIRE` with under 130 draw calls. The rules that came out of this are in
-     `docs/ar-survey.md` → "Performance notes".
-5. **Breaker glyph** (`dee978f`): breakers drew as outlets in AR and on sheets; now a DIN-module-with-
-   lever icon matching the 3D fixture. Proven by rendering both glyph functions to PNG; not yet seen
-   on the Quest.
-6. **ALL FLOORS reticle** (`2f7d7df`, owner-reported: "no floor reticle" in ALL FLOORS, so there was
-   no way to pick conduits or wires). The reticle now lands on your storey's floor when you aim down,
-   and on the floor of the storey above when you aim up. Picking favours that storey, and grip cycles
-   outward to farther storeys. A strict per-storey filter blocked a basement breaker → upstairs outlet
-   wire, so it was replaced by ranking. LEFT stick up/down in ALL FLOORS teleports one storey
-   while keeping the mode (`navLift`/`groundY()`). The rules are in `docs/ar-survey.md`. `2f7d7df`
-   also fixes a latent ReferenceError when the pen hovers a riser. Build-verified only.
-7. **MARKER · WIRE pick cycle** (owner-reported: with a device in the reticle, grip never reached
-   the wires). Devices and wires now share one grip cycle (`wireTargetAtFloorPoint`), and the yellow
-   target is sticky like CONDUIT · EDIT (`wireHoverKey`). Proven by a Node harness of the pick
-   function; not yet on device.
-8. **Circuit lengths** (owner request): a selected wire's readout shows `CIRCUIT <len>` and
-   `SHARED <len>` (conduit shared with the other wire nature). The definitions are in
-   `docs/electrical-workflow.md`. Proven on a synthetic 5 m shared run (Node harness); not yet on device.
-9. **The APK shares storage with the Quest Browser.** Proven over adb DevTools: a Quest Browser tab
-   read the APK's six slots (identical `savedAt`) and its autosave. So on-device JSON import/export is
-   the 2D page's 📂 Load / 💾 Save, and whichever app saves last wins. Runbook: `packaging/quest-apk.md`.
-10. **Owner fixture replaced** with their rev 9 export: 229 conduit nodes, 47 wires (40 electrical,
-    7 Ethernet), 14 circuits. It is near-identical to AR slot 5. The previous rev 4 file (0 wires) was
-    not kept in the repo.
-11. **Stairs rotate like doors** (`47c08de`, owner request). A/X in PLAN · EDIT, or the desktop
-    ↻ Rotate button, turns the ascent 90° clockwise per press. The stored value is an optional `climb`
-    field, the physical climb direction. Sheet, DXF, a new AR floor glyph and View 3D treads all read it.
-    Details: `docs/ar-survey.md` (A/X rotate). Proven by build + Node harness (cycle, save round-trip,
-    legacy arrow identical to the old sheet, 3D treads rise along `climb`). **Parked:** the owner could
-    not verify on device yet.
-12. **MARKER · CHECK** (`0ad552d`, owner request): a read-only AR circuit-diagnostics mode between WIRE
-    and PIPE. Rings: red = cross-tie (2+ breakers), orange = wired but no breaker, white = unwired
-    outlet/switch/light; thumbstick-y filters. Also fixed: Ethernet wires were counted as power edges
-    (7 false "no breaker" components); circuits are now per nature. Definitions + owner choices
-    (spare breakers not flagged, narrow `needsPower`): `docs/electrical-workflow.md`. Proven by build +
-    Node on rev 9 (0 cross-tie / 5 no-breaker / 93 unwired). **Parked**, not seen on device.
-13. **Stacked-marker readout** (`9bce6e7`): a double switch stays two switch markers at one point
-    (owner decision; LINK needs one marker per rocker). Hovering a marker that shares its point adds
-    `<type> i/n → k× light` and outlines its lights cyan. Drawing stacked markers apart was rejected:
-    see `docs/ar-survey.md` "Stacked devices". Proven by build + Node on rev 9. **Parked**, not seen on device.
+1. **Stairs rotate like doors** (`47c08de`): A/X in PLAN · EDIT / desktop ↻ Rotate turns the ascent 90°.
+   Optional `climb` field = physical climb direction; sheet, DXF, a new AR floor glyph and View 3D
+   treads read it. `docs/ar-survey.md` (A/X rotate).
+2. **MARKER · CHECK** (`0ad552d`): read-only circuit diagnostics (red cross-tie, orange no breaker,
+   white unwired outlet/switch/light; thumbstick-y filters). **Also fixed: Ethernet wires were power
+   edges** (7 false "no breaker" circuits in the owner's house); circuits are per nature now.
+   `docs/electrical-workflow.md`.
+3. **Stacked-marker readout** (`9bce6e7`): a double switch stays two markers at one point (owner
+   decision); hovering adds `<type> i/n → k× light`. `docs/ar-survey.md` "Stacked devices".
+4. **Surface materials, phases 1–3** (`72ca05a`, `92975bf`, `f0f6bf1`), design and every owner decision in
+   **`docs/materials.md`**:
+   - AR MATERIAL · FLOOR / WALL, a catalog, and a whole-house takeoff (pieces, packs);
+   - View 3D textures;
+   - the AR 3D view on LEFT X.
+
+   Phase 4 (the owner's own products entered in AR) is not started.
+5. **Proven bug, fixed in `f0f6bf1`:** `clearPlanGeometry` detached four planGroup overlay groups on the
+   first plan build, so **Z-dims, adjacent-floor target dots, CHECK rings and MATERIAL tints never
+   rendered in AR** (picking still worked). All overlay groups are now in `PLAN_OVERLAY_GROUPS`.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -141,12 +103,28 @@ Read `docs/product-intent.md` before planning AR work.
 - **Shared views are read-only.**
 - **This machine is a Steam Deck** (Node v20 via nvm); the fnm/PowerShell block in `CLAUDE.md` is
   Windows-only.
+- **Circuits are derived per wire nature**; Ethernet never counts toward breakers. CHECK flags only
+  `needsPower` devices (outlet*/switch/light), and never flags spare breakers (owner choices).
+- **A double switch = two switch markers at one point**; never draw stacked markers apart in AR.
+- **Materials** (`docs/materials.md`):
+  - patterns are anchored at the plan origin (continuity over efficiency, owner-acknowledged);
+  - same-material rooms joined by a doorway are one region; different materials meet mid-doorway;
+  - packs are rounded once per product for the whole house;
+  - wall faces are set one at a time: the owner removed a copy-to-every-wall action, so don't re-add it.
+- **LEFT controller:** trigger = teleport, grip = hold-to-view sheet, stick-x = rotate plan, stick-y =
+  storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the stick click are free.
 
 ## Findings / traps worth knowing
 
 - **`mr.js` does NOT subscribe to `project.onChange`.** AR model changes must call the rebuild by hand
   (`buildPlan()`, `buildConduits()`, `buildRoutedWires()`, …). Wire picking deliberately uses the legs
   cached by the last `buildRoutedWires` (it picks what is drawn).
+- **Every planGroup overlay group must be in `PLAN_OVERLAY_GROUPS`** (`mr.js`), or the first
+  `buildPlan` silently detaches it. That already hid four layers for several sessions.
+- **Wall faces follow the finished surface, not the room rect edge** (`edgeFace` in `flooring.js`):
+  - wall/insulation linings over the room edge inset the face (the owner's house has 18–21 cm linings);
+  - edges onto stairwells are open;
+  - half walls cut the face above their sill.
 - **AR code runs only inside the XR closure.** Verify it in Node by slicing the verbatim functions out
   of `mr.js` into a harness with stubs (the scratchpad pattern used all session), or replaying model
   bookkeeping against `Project`. Say which you did.
@@ -176,22 +154,24 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `9bce6e7` before the handoff commit). Session 29, all with descriptive bodies:
-- **3D / docs:** `f457bd5` 3D walls/doors · `c391395` memory→docs · `7308e44` claim rule ·
-  `309d807` 3D faceplates.
-- **Conduit pen and Z-dims:** `dce02f1` pen undo + T · `fb56fbc` Z-dims.
-- **Performance:** `7bca037`/`f4bca98`/`332b6dd` HUD perf lines · `54d1b15` conduit batch ·
-  `4369ac2` label atlas · `7f329c3` label redraw guard · `36fa3d1`/`425c2e5` PERF sweep ·
-  `4af1d20` marker atlas · `4d3610b` wire batch.
-- **Glyph:** `dee978f` breaker glyph.
-- **ALL FLOORS + wiring UX:** `2f7d7df` reticle within one slab · `47c5b66` storey-ranked picks ·
-  `245cb3f` LEFT stick-y storey teleport · `5698fb7` WIRE device+wire cycle, sticky highlight ·
-  `8603501` CIRCUIT/SHARED lengths.
-- **Stairs:** `47c08de` rotatable stair direction (`climb`).
-- **Circuits:** `0ad552d` MARKER · CHECK diagnostics + power-only circuits · `9bce6e7` stacked-marker readout.
+All pushed (`origin/main` = `f0f6bf1` before the handoff commit), all with descriptive bodies.
+Doc-only commits are omitted.
+- **Session 30:**
+  - `47c08de` stair `climb`;
+  - `0ad552d` MARKER · CHECK + per-nature circuits;
+  - `9bce6e7` stacked-marker readout;
+  - materials: `72ca05a` catalog/takeoff/AR modes · `92975bf` View 3D textures + wall-face fixes ·
+    `f0f6bf1` AR 3D view + the `PLAN_OVERLAY_GROUPS` fix.
+- **Session 29:**
+  - 3D walls/faceplates: `f457bd5`, `309d807`;
+  - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
+  - performance: batching `54d1b15` `4369ac2` `4af1d20` `4d3610b`, PERF sweep `36fa3d1`/`425c2e5`;
+  - breaker glyph `dee978f`;
+  - ALL FLOORS: `2f7d7df` `47c5b66` `245cb3f`;
+  - WIRE: `5698fb7` `8603501`.
 
-Doc-only commits are omitted. **Never stage** `Document from Alexis He.json` (untracked): it is the
-owner's real 3-storey house and a useful read-only Node fixture.
+**Never stage** `Document from Alexis He.json` (untracked): it is the owner's real 3-storey house (rev 9,
+47 wires) and the read-only Node fixture for almost every check.
 
 ## Resuming from a clean checkout
 
@@ -217,55 +197,49 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph + routing |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
+| `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
+| `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
+| `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
 
 ## Next step
 
-- **A — Owner walks the unconfirmed work**, then update `docs/ar-qa-checklist.md`:
-  - breaker glyph;
-  - ALL FLOORS reticle, storey-ranked picking, LEFT stick-y storey teleport;
-  - WIRE device+wire grip cycle with sticky highlight; CIRCUIT/SHARED length readout;
-  - conduit pen undo + T-junction;
-  - stair rotation (parked 2026-09-26, owner could not verify yet): A/X arrow turns, STAIRS DOWN above
-    points the opposite way, sheet/DXF/View 3D follow (checklist item in `docs/ar-qa-checklist.md`);
-  - MARKER · CHECK rings/filter/counts and frame rate with ~100 rings (parked 2026-09-26);
-  - stacked-marker readout `switch i/n → k× light` on the double switches (parked 2026-09-26);
-  - Z-dim look;
-  - 3D-viewer wall/door and faceplate fixes (desktop);
-  - then the older backlog (plumbing, cross-floor conduit, RECAL, left-grip sheet, `link`/`qr`).
-- **B — More conduit-drawing speed-ups** (T-junction + undo done). Suggested order:
-  1. height snap + "ceiling run" toggle (thumbstick-y is free in `MARKER · CONDUIT`);
-  2. straight runs;
-  3. one-press drop from a device;
-  4. snap-to-wall + auto-pin;
-  5. desktop conduit authoring;
-  6. suggested routing.
-
-  The owner decides priority.
-- **C — Remaining AR per-object layers**, only if a mode drops frames: adjacent-floor target spheres,
-  pipes, furniture, control links. Measure with PERF first.
-- **D — Solid thick walls in 3D / plumbing + circuits in output / 3D model → exports or AR** — each
-  only on request (E needs an owner decision).
-- ~~Floor-fill overdraw as the AR GPU cost~~ — refuted by PERF: all floor layers together were < 10 ms;
-  the per-marker objects were the cost.
-- ~~Ray-picking wires in 3D~~ — offered; the owner said floor-projection picking works, so it isn't needed.
-- ~~Height-aware extrude that carves `[sill,head]`~~ — superseded for viewing by the 3D viewer; only
-  mesh export still ignores bands (see D).
+- **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
+  for each). The owner said they would verify later. First, check that the four overlays that never
+  rendered before `f0f6bf1` now show: Z-dims, adjacent-floor dots, CHECK rings, MATERIAL tints. Then:
+  - MATERIAL · FLOOR/WALL;
+  - the LEFT X AR 3D view, with **PROJECT · PERF** on;
+  - View 3D textures (desktop);
+  - MARKER · CHECK;
+  - the stacked readout;
+  - stair rotation;
+  - then session 29's list: ALL FLOORS reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T.
+- **B — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
+  `project.materials`. Possible improvements the owner has not asked for (see `docs/materials.md`):
+  - per-region pattern offset to cut waste;
+  - a plank texture drawn from the real cut plan;
+  - the hidden face below a half wall that stands inside a room.
+- **C — Conduit-drawing speed-ups:** height snap + "ceiling run" toggle, straight runs, one-press drop
+  from a device, snap-to-wall + auto-pin. The owner decides priority.
+- **D — Remaining AR per-object layers**, only if a mode drops frames (adjacent-floor spheres, pipes,
+  furniture, control links). Measure with PERF first.
+- ~~Draw stacked markers apart in AR~~ — rejected: the floor icon, pick, dims and sheet all use the
+  shared point, so an offset would draw glyphs where the data isn't.
+- ~~Copy a wall material to every wall of the room (A/X)~~ — built, then removed at the owner's request.
+- ~~Floor-fill overdraw as the AR GPU cost~~ — refuted by PERF; the per-marker objects were the cost.
+- ~~Ray-picking wires in 3D~~ — the owner said floor-projection picking works.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only:**
-  - the breaker glyph on the Quest;
-  - the conduit pen undo/T;
-  - whether the Z-dim restyle reads well;
-  - the 3D viewer fixes (never viewed in a browser);
-  - stair rotation (`47c08de`): whether the new AR stair arrow reads over the stairs' fill tint;
-  - MARKER · CHECK (`0ad552d`): whether 1-px pins read, whether white rings are distinct from the yellow
-    hover outline, and whether ~100 rings hold frame rate. The readout pill grew to 4 lines and sits
-    1.25 cm higher in every mode.
+- **Unwalked, Hypothesis only.** Session 30:
+  - everything in Next step A;
+  - frame cost of the AR 3D view (Lambert walls + textures; opaque walls may hide the real room);
+  - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
+  - the readout pill, which grew to 4 lines and sits 1.25 cm higher in every mode;
+  - how the textures look in a browser.
 
-  The owner has used AR with markers, labels, conduits and wires since the batching, and reported
-  them working.
+  Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
+  with markers, labels, conduits and wires since the batching, and reported them working.
 - **Why 168 per-marker canvas textures cost ~47 ms** is unexplained. The batching fixed it; the
   mechanism is a Hypothesis (per-texture handling in the Quest browser).
 - **`EXT_disjoint_timer_query_webgl2` on the Quest:** the owner's PERF line prefix (`gpu:` vs

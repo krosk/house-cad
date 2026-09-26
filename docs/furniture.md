@@ -30,6 +30,10 @@ module's GLB bounding box matched IKEA's published dimensions to about 1%.
   server-side. Not used; the GLB bounding box is accurate enough.
 - **Article id:** from a product URL `…-s<digits>/` (e.g. `…-s59511278/` → `59511278`). Each
   color/variant is a different article.
+- **IKEA app share links** (`https://applink.ikea.com/<token>--<article>--<cc>--<lang>`) don't
+  redirect server-side, but the article sits in the link itself (Proven once, 2026-09-26:
+  `…--40586508--fr--fr` → STOCKHOLM 2025 TV bench, 1788 × 562 × 432 mm). IKEA search pages
+  don't give the product name to curl or WebFetch, so ask the owner for it.
 
 ## Delivery: on the fly through a CORS proxy (owner decision)
 
