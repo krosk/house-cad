@@ -282,7 +282,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,
   IKEA models loaded on the fly through the Cloudflare Worker proxy; see `docs/furniture.md`),
-  drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`. These are **NOT massing** — they never
+  drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`, **only while the AR 3D view is on
+  (LEFT X)**; otherwise as flat plan pieces on the floor (`furniturePlanGroup`, docs/furniture.md
+  "Rendering"). These are **NOT massing** — they never
   enter the footprint/boolean/extrude pipeline (distinct from the `furniture` *zone* kind, a
   `[foot,top]` placeholder rect authored in PLAN). Trigger empty space to **drop** the current article
   at the tip (at the catalog's `mountZMm` foot height for a wall-hung product, else on the floor); trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a

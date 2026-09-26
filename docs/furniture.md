@@ -112,6 +112,12 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 - **AR** (`mr.js`): `furnitureGroup` under `planGroup` (rides plan yaw and floor elevation). Plan
   `(x, y)` → group-local `(x, z, -y)`. Emissive hover (yellow) and select (amber) use per-instance
   material clones. Grip-drag is floor-planar; the foot elevation is set on the FURNISH pad.
+  **The models show only with the AR 3D view on (LEFT X)** (owner decision, 2026-09-26: at full
+  size they occluded the plan while furnishing). Otherwise each item draws as a flat **plan piece**
+  on the floor (`furniturePlanGroup`): its catalog footprint (width × depth) as a violet fill and
+  outline, a V notch on the front edge, and a dashed outline when the item is raised (wall-hung,
+  like an overhead line on a plan); hover turns it yellow, selection amber. `buildArch3d` swaps the
+  two groups' visibility.
 - **Desktop and shared 3D** (`view3d.js`): renders `floor.furniture` through the same proxy and
   catalog. Shared view links include furniture placements by default (`docs/share-view.md`).
 

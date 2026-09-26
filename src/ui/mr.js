@@ -1058,8 +1058,14 @@ export function setupMR(view, project, getFootprint) {
   // their own group under planGroup so they ride the plan's yaw + per-floor elevation
   // for free — a parallel lane like markers, never touching the boolean/extrude/solver
   // pipeline. Async-loaded and skipped by clearPlanGeometry (see buildFurniture).
+  // The models show only with the AR 3D view (LEFT X): at full size they occlude the
+  // plan. Otherwise each item draws as a flat plan piece on the floor (its footprint,
+  // front notch, dashed when wall-hung) in furniturePlanGroup.
   const furnitureGroup = new THREE.Group();
+  furnitureGroup.visible = false;
   planGroup.add(furnitureGroup);
+  const furniturePlanGroup = new THREE.Group();
+  planGroup.add(furniturePlanGroup);
   // Vertical (Z) dimensions: a static height readout for any object whose height is
   // DEFINED (zDatum set). Its own group under planGroup — always visible like the X/Y dim
   // lines, rebuilt by buildMarkers, and NON-interactive (height is typed on the pad, never
@@ -1588,7 +1594,7 @@ export function setupMR(view, project, getFootprint) {
   // Any new planGroup overlay group belongs in this set.
   const PLAN_OVERLAY_GROUPS = new Set([
     markerGroup, electricalGroup, conduitGroup, routedWireGroup, pipeGroup, furnitureGroup,
-    zDimGroup, adjacentGroup, checkGroup, materialGroup, arch3dGroup,
+    furniturePlanGroup, zDimGroup, adjacentGroup, checkGroup, materialGroup, arch3dGroup,
   ]);
   function clearPlanGeometry() {
     // Clear any previous geometry. Dispose per-rebuild geometry/sprite materials; dim
@@ -3541,10 +3547,12 @@ export function setupMR(view, project, getFootprint) {
     // Remove previous instances. Instance materials are cloned per item (see
     // instantiateFurniture); dispose them so repeated rebuilds don't leak. Geometry +
     // textures belong to the cached source and are left intact.
-    for (const child of [...furnitureGroup.children]) {
-      furnitureGroup.remove(child);
-      child.traverse?.((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
-    }
+    clearFurniture();
+    // Plan pieces need the catalog footprint; it is usually loaded by now.
+    const items = [...(floor.furniture || [])];
+    furnitureCatalogReady.then(() => {
+      if (token === furnitureBuildToken) for (const item of items) furniturePlanGroup.add(furniturePlanPiece(item));
+    });
     for (const item of floor.furniture || []) {
       const place = (obj) => {
         if (token !== furnitureBuildToken) return; // a newer rebuild superseded this one
@@ -3557,6 +3565,49 @@ export function setupMR(view, project, getFootprint) {
         .then((src) => place(instantiateFurniture(src)))
         .catch((err) => { place(furnitureBox(item.article)); rlog('furniture load → box', { article: item.article, err: String(err) }); });
     }
+  }
+
+  function clearFurniture() {
+    for (const child of [...furnitureGroup.children]) {
+      furnitureGroup.remove(child);
+      child.traverse?.((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
+    }
+    for (const child of [...furniturePlanGroup.children]) {
+      furniturePlanGroup.remove(child);
+      child.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+    }
+  }
+
+  // A furniture item's plan piece: its catalog footprint (w × d) as a translucent fill
+  // plus outline, a notch on the front edge (+Z, the model's front), dashed when the
+  // item is raised off the floor (a wall-hung unit, drawn like an overhead line on a
+  // plan). Sits 4 mm above the floor so it doesn't z-fight the real one.
+  const FURN_PLAN_COLOR = 0xa78bfa; // the FURNISH mode colour
+  function furniturePlanPiece(item) {
+    const [w, , d] = (furnitureCatalog[item.article]?.sizeMm || [600, 600, 600]).map((v) => v / 1000);
+    const g = new THREE.Group();
+    const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({
+      color: FURN_PLAN_COLOR, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    fill.rotation.x = -Math.PI / 2;
+    const x0 = -w / 2, x1 = w / 2, z0 = -d / 2, z1 = d / 2;
+    const notch = Math.min(0.08, w / 4, d / 3);
+    const pts = [
+      [x0, z0], [x1, z0], [x1, z0], [x1, z1], [x1, z1], [x0, z1], [x0, z1], [x0, z0],
+      [-notch, z1], [0, z1 - notch], [0, z1 - notch], [notch, z1], // front notch (a "V" into the piece)
+    ].map(([x, z]) => new THREE.Vector3(x, 0.001, z));
+    const raised = (item.z || 0) > 1e-3;
+    const lineMat = raised
+      ? new THREE.LineDashedMaterial({ color: FURN_PLAN_COLOR, dashSize: 0.05, gapSize: 0.035 })
+      : new THREE.LineBasicMaterial({ color: FURN_PLAN_COLOR });
+    const outline = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+    if (raised) outline.computeLineDistances();
+    g.add(fill, outline);
+    g.position.set(item.x, 0.004, -item.y);
+    g.rotation.y = THREE.MathUtils.degToRad(item.rotationY || 0);
+    g.userData.furnitureId = item.id;
+    g.userData.fill = fill.material;
+    return g;
   }
 
   // Nearest placed furniture item under the reticle (by plan distance), for hover/pick.
@@ -3647,6 +3698,8 @@ export function setupMR(view, project, getFootprint) {
     project.moveFurniture(gripDrag.furnitureId, { x: px, y: py }, { emit: false });
     const clone = furnitureGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
     if (clone) clone.position.set(px, clone.position.y, -py); // preserve foot elevation (y)
+    const piece = furniturePlanGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
+    if (piece) piece.position.set(px, piece.position.y, -py);
   }
 
   // Emissive highlight (per-instance materials): reset all, then hover=yellow, selected=amber.
@@ -3661,6 +3714,14 @@ export function setupMR(view, project, getFootprint) {
     }
     tint(hoverFurnitureId, 0x4a4416);   // dim yellow
     tint(selectedFurnitureId, 0x5a3d0a); // dim amber (wins if it coincides)
+    // Plan pieces: hover yellow, selected amber, stronger fill.
+    for (const piece of furniturePlanGroup.children) {
+      const id = piece.userData.furnitureId;
+      const hex = id === selectedFurnitureId ? 0xf59e0b : id === hoverFurnitureId ? 0xfacc15 : FURN_PLAN_COLOR;
+      piece.userData.fill.color.setHex(hex);
+      piece.userData.fill.opacity = hex === FURN_PLAN_COLOR ? 0.22 : 0.4;
+      piece.children[1].material.color.setHex(hex);
+    }
   }
 
   // All existing model-changing call sites rebuild through this dispatcher, so a
@@ -3712,6 +3773,8 @@ export function setupMR(view, project, getFootprint) {
       arch3dGroup.remove(child); child.geometry?.dispose(); // materials are shared
     }
     arch3dGroup.visible = arch3dOn;
+    furnitureGroup.visible = arch3dOn;        // models only in the 3D view…
+    furniturePlanGroup.visible = !arch3dOn;   // …plan pieces otherwise
     if (!arch3dOn) return;
     const floors = allFloorsView ? project.floors : [project.activeFloor];
     for (const floor of floors) {
@@ -6959,7 +7022,7 @@ export function setupMR(view, project, getFootprint) {
     refreshFloorEditState();
     buildPlan();
     if (!allFloorsView) buildFurniture(); // per-floor furniture; hide in ALL FLOORS
-    else for (const child of [...furnitureGroup.children]) furnitureGroup.remove(child);
+    else clearFurniture();
     applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
     sheetDirty = true;
     if (exportMenu.group.visible) redrawExportMenu();
@@ -7562,7 +7625,7 @@ export function setupMR(view, project, getFootprint) {
     ['zdims', () => [zDimGroup]],
     ['links', () => [electricalGroup, routedWireGroup]],
     ['condt', () => [conduitGroup, adjacentGroup, pipeGroup]],
-    ['furn', () => [furnitureGroup]],
+    ['furn', () => [furnitureGroup, furniturePlanGroup]],
     ['plan', () => [planGroup]], // the whole plan; what remains is HUD + controllers
   ];
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
