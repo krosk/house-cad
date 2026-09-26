@@ -80,6 +80,9 @@ project's active floor; POV reveals that floor's ceiling, which stays hidden in 
 Floor slabs use a lightweight procedural wood-plank material; walls and POV ceilings use neutral
 white procedural plaster. These CanvasTextures are generated locally (no network/assets), repeat in
 UV space, and use restrained bump/roughness so they remain mobile-friendly.
+Surface finishes (`floor.finishes`, `docs/materials.md`) draw as 2 mm textured overlays in front of the
+slab/wall (`finishSurfaces` → `finishGeometries` → `src/ui/finishTextures.js`), UVs in plan metres so
+patterns are anchored at the plan origin; they are presentation-only and never reach exports.
 Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
 puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
 authority; the fixture/light are presentation-only.

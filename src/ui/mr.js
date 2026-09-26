@@ -3115,7 +3115,7 @@ export function setupMR(view, project, getFootprint) {
   }
   // A strip just inside a wall face, `d0..d1` metres from it (plan boxes).
   const faceStrip = (f, d0, d1) => f.face.segments.map((s) => {
-    const n0 = f.face.at + f.face.inward * d0, n1 = f.face.at + f.face.inward * d1;
+    const n0 = f.face.at + f.face.inward * (s.inset + d0), n1 = f.face.at + f.face.inward * (s.inset + d1);
     const [lo, hi] = [Math.min(n0, n1), Math.max(n0, n1)];
     return f.face.vertical ? { x0: lo, x1: hi, y0: s.a, y1: s.b } : { x0: s.a, x1: s.b, y0: lo, y1: hi };
   });
@@ -3198,9 +3198,11 @@ export function setupMR(view, project, getFootprint) {
     let best = null, bestD = 0.6;
     for (const f of matFaces) {
       const n = f.face.vertical ? px : py, u = f.face.vertical ? py : px;
-      const signed = (n - f.face.at) * f.face.inward;
+      const seg = f.face.segments.find((s) => u >= s.a - 0.05 && u <= s.b + 0.05);
+      if (!seg) continue;
+      // Measured from the finished surface (past any lining), not the rect edge.
+      const signed = (n - f.face.at) * f.face.inward - seg.inset;
       if (signed < -0.3) continue;
-      if (!f.face.segments.some((s) => u >= s.a - 0.05 && u <= s.b + 0.05)) continue;
       const d = Math.abs(signed);
       if (d < bestD) { bestD = d; best = f; }
     }

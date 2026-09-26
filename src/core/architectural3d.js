@@ -480,3 +480,53 @@ export function buildArchitecturalFloor(floor, opts = {}) {
     outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, wallBoxes),
   };
 }
+
+// Surface finishes (docs/materials.md, phase 2): thin textured overlays laid just in
+// front of the slab / wall surface, one merged geometry per material. UVs are PLAN
+// METRES (floors: x,y; walls: the plan coordinate along the face, height), so every
+// pattern is anchored at the plan origin and equal materials run continuously
+// through doorways and along coplanar faces. The viewer scales UVs to the pattern's
+// repeat unit. Planks swap U/V where the region runs along Y (plankAlongX), matching
+// the takeoff's lay direction. `surfaces` = finishSurfaces(project, floor).
+const FINISH_LIFT = 0.002; // above the slab top / in front of the wall face
+export function finishGeometries(surfaces) {
+  // One bucket per (role, material): floor overlays keep the 'floor' role (POV tap
+  // target), wall overlays the 'walls' role, so the viewer treats them like the surface.
+  const byMaterial = new Map();
+  const bucket = (role, id) => {
+    const key = `${role}|${id}`;
+    return byMaterial.get(key) ?? byMaterial.set(key, { role, material: id, pos: [], uv: [], normal: [] }).get(key);
+  };
+  const quad = (b, corners, uvs, n) => {
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      b.pos.push(...corners[i]); b.uv.push(...uvs[i]); b.normal.push(...n);
+    }
+  };
+  for (const region of surfaces?.floors || []) {
+    const b = bucket('floor', region.material);
+    for (const r of region.boxes) {
+      const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+      quad(b, pts.map(([x, y]) => [x, FINISH_LIFT, -y]),
+        pts.map(([x, y]) => (region.alongX ? [x, y] : [y, x])), [0, 1, 0]);
+    }
+  }
+  for (const wall of surfaces?.walls || []) {
+    const b = bucket('walls', wall.material);
+    const { face } = wall;
+    for (const r of wall.boxes) { // (u = along, v = height) boxes
+      // The finished surface may sit past a lining: each box carries its inset.
+      const n = face.at + face.inward * ((r.inset || 0) + FINISH_LIFT);
+      const at = (u, v) => (face.vertical ? [n, v, -u] : [u, v, -n]);
+      const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+      const normal = face.vertical ? [face.inward, 0, 0] : [0, 0, -face.inward];
+      quad(b, pts.map(([u, v]) => at(u, v)), pts, normal);
+    }
+  }
+  return [...byMaterial.values()].filter((b) => b.pos.length).map((b) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(b.normal, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+    return { material: b.material, role: b.role, geometry };
+  });
+}

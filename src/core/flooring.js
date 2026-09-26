@@ -22,8 +22,9 @@ import { materialById } from './materials.js';
 const EPS = 1e-6;
 // Door-family zones a floor runs through (full-height openings).
 const DOORWAY_KINDS = new Set(['door', 'sliding', 'garage']);
-// Openings cut out of a wall face's area.
-const OPENING_KINDS = new Set(['door', 'sliding', 'garage', 'window']);
+// Openings cut out of a wall face's area. A half wall is open ABOVE its sill (its
+// `head` is null → the band runs to the ceiling), so it cuts the face there too.
+const OPENING_KINDS = new Set(['door', 'sliding', 'garage', 'window', 'halfwall']);
 // A doorway/opening belongs to a room or face within this gap (AR-authored plans are
 // rarely exact to the millimetre; a real wall is thicker than this is loose).
 const TOUCH = 0.05;
@@ -121,9 +122,13 @@ function latticeCount(material, boxes) {
 // Planks: rows across the region's long axis at the global row phase. Each row is
 // laid left to right; a row starts with a pooled offcut when that keeps every joint
 // ≥ minStagger from the previous row's and the piece ≥ minPiece, else a fresh plank.
-function staggerCount(material, boxes) {
+// Planks run along the region's long axis (shared by the count and the 3D texture).
+export function plankAlongX(boxes) {
   const bb = bboxOf(boxes);
-  const alongX = bb.x1 - bb.x0 >= bb.y1 - bb.y0;
+  return bb.x1 - bb.x0 >= bb.y1 - bb.y0;
+}
+function staggerCount(material, boxes) {
+  const alongX = plankAlongX(boxes);
   // Work in (u along the row, v across rows) coordinates.
   const uv = boxes.map((b) => (alongX
     ? { u0: b.x0, u1: b.x1, v0: b.y0, v1: b.y1 }
@@ -211,7 +216,7 @@ function doorwayHalf(door, component) {
   return side < cy ? { ...b, y1: cy } : { ...b, y0: cy };
 }
 
-export function floorRegions(project, floor) {
+export function floorRegions(project, floor, { count = true } = {}) {
   const rects = floor.rectangles || [];
   const components = connectedRoomComponents(rects);
   const mats = components.map((c) => {
@@ -248,7 +253,8 @@ export function floorRegions(project, floor) {
   return [...groups.values()].map((g) => {
     const boxes = regionBoxes(g.include, excludes, g.add);
     const material = materialById(project, g.material);
-    return { floorId: floor.id, material: g.material, rectIds: g.rectIds, boxes, count: countPieces(material, boxes) };
+    return { floorId: floor.id, material: g.material, rectIds: g.rectIds, boxes,
+      count: count ? countPieces(material, boxes) : null };
   });
 }
 
@@ -261,7 +267,10 @@ export function edgeFace(floor, rect, edge) {
   const at = edge === 'left' ? b.x0 : edge === 'right' ? b.x1 : edge === 'bottom' ? b.y0 : b.y1;
   const inward = edge === 'left' || edge === 'bottom' ? 1 : -1;
   const lo = vertical ? b.y0 : b.x0, hi = vertical ? b.y1 : b.x1;
-  const rooms = (floor.rectangles || []).filter((r) => r !== rect && zoneKind(r) === 'room');
+  // Stairs are circulation space: a room edge onto a stairwell is open, with no wall
+  // (the same rule architecturalWallBoxes uses), so it is not a wall face.
+  const rooms = (floor.rectangles || []).filter((r) => r !== rect
+    && ['room', 'stairs_up', 'stairs_down'].includes(zoneKind(r)));
   const cuts = new Set([lo, hi]);
   for (const r of rooms) {
     const rb = r.bounds;
@@ -277,7 +286,52 @@ export function edgeFace(floor, rect, edge) {
     const last = out[out.length - 1];
     if (last && Math.abs(last.b - C[i]) <= EPS) last.b = C[i + 1]; else out.push({ a: C[i], b: C[i + 1] });
   }
-  return { vertical, at, inward, segments: out };
+  return { vertical, at, inward, segments: insetSegments(floor, vertical, at, inward, out) };
+}
+
+// The finished surface is often INSIDE the room rect: a wall or insulation lining
+// zone drawn over the room edge (owner's house: 18–21 cm linings on Ground/Upper).
+// Split each boundary segment where linings start/stop, and give every piece its
+// `inset` = how far the lining(s) reach into the room from the edge line. Stacked
+// linings (wall then insulation) chain. Pieces with equal insets re-merge.
+const LINING_KINDS = new Set(['wall', 'insulation']);
+function insetSegments(floor, vertical, at, inward, segments) {
+  const linings = (floor.rectangles || []).filter((r) => LINING_KINDS.has(zoneKind(r))).map((r) => {
+    const b = r.bounds;
+    return vertical ? { n0: b.x0, n1: b.x1, u0: b.y0, u1: b.y1 } : { n0: b.y0, n1: b.y1, u0: b.x0, u1: b.x1 };
+  });
+  const out = [];
+  for (const seg of segments) {
+    const cuts = new Set([seg.a, seg.b]);
+    for (const l of linings) for (const v of [l.u0, l.u1]) if (v > seg.a && v < seg.b) cuts.add(v);
+    const C = [...cuts].sort((p, q) => p - q);
+    for (let i = 0; i < C.length - 1; i++) {
+      if (C[i + 1] - C[i] < 1e-3) continue; // float slivers
+      const m = (C[i] + C[i + 1]) / 2;
+      let inset = 0, covered = false;
+      for (let guard = 0; guard < 4 && !covered; guard++) { // follow chained linings inward
+        const face = at + inward * inset;
+        let reach = inset;
+        for (const l of linings) {
+          if (!(m > l.u0 && m < l.u1)) continue;
+          // The lining must touch the current surface and extend into the room.
+          const near = inward > 0 ? l.n0 : l.n1, far = inward > 0 ? l.n1 : l.n0;
+          if ((near - face) * inward > 0.01 || (far - face) * inward <= EPS) continue;
+          // Deeper than it runs along this edge = it crosses this wall (the corner end of
+          // a lining along the NEIGHBOUR wall): that stretch is hidden, not inset.
+          if ((far - face) * inward > l.u1 - l.u0) { covered = true; break; }
+          reach = Math.max(reach, (far - at) * inward);
+        }
+        if (covered || reach <= inset + EPS) break;
+        inset = reach;
+      }
+      if (covered) continue;
+      const last = out[out.length - 1];
+      if (last && Math.abs(last.b - C[i]) <= EPS && Math.abs(last.inset - inset) <= EPS) last.b = C[i + 1];
+      else out.push({ a: C[i], b: C[i + 1], inset });
+    }
+  }
+  return out;
 }
 
 // A wall face as (u, v) boxes: u = plan coordinate along the edge (global origin),
@@ -299,7 +353,26 @@ export function wallFaceBoxes(floor, rect, edge) {
     const sill = r.sill || 0, head = r.head == null ? H : Math.min(H, r.head);
     if (head - sill > EPS) exclude.push({ x0: u0, x1: u1, y0: sill, y1: head });
   }
-  return { face, boxes: regionBoxes(include, exclude) };
+  // Per segment, so each box keeps its segment's lining `inset` (regionBoxes would
+  // merge neighbouring segments that sit at different depths).
+  const boxes = include.flatMap((inc, i) =>
+    regionBoxes([inc], exclude).map((box) => ({ ...box, inset: face.segments[i].inset })));
+  return { face, boxes };
+}
+
+// Geometry-only view of one floor's finishes for the 3D view: no piece counting
+// (that runs per model change on desktop; the texture does not need it).
+export function finishSurfaces(project, floor) {
+  const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
+  const floors = floorRegions(project, floor, { count: false })
+    .map((r) => ({ material: r.material, boxes: r.boxes, alongX: plankAlongX(r.boxes) }));
+  const walls = [];
+  for (const f of floor.finishes || []) {
+    if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;
+    const rect = floor.rectangles.find((r) => r.id === f.target.rect);
+    walls.push({ material: f.material, ...wallFaceBoxes(floor, rect, f.target.edge) });
+  }
+  return { floors, walls };
 }
 
 // ---- whole-house takeoff ---------------------------------------------------------

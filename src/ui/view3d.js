@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
+import { finishTexture } from './finishTextures.js';
 
 function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
   const canvas = document.createElement('canvas');
@@ -350,6 +351,19 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
+      // Surface finishes (docs/materials.md): textured overlays, one mesh per material
+      // and role, treated like the floor/wall they cover (visibility, POV tap target).
+      for (const finish of entry.finishGeometries || []) {
+        const mesh = new THREE.Mesh(finish.geometry, this._finishMaterial(finish.def));
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        mesh.position.y = elevation || 0;
+        mesh.userData.floorId = floorId || null;
+        mesh.userData.floorName = name || '';
+        mesh.userData.architecturalRole = finish.role;
+        mesh.visible = this._meshVisible(mesh);
+        this.house.add(mesh);
+      }
       if (outlineGeometry) {
         const lines = new THREE.LineSegments(outlineGeometry, this.outlineMaterial);
         lines.position.y = elevation || 0;
@@ -609,6 +623,28 @@ export class View3D {
     this.floor.receiveShadow = this.lightingEnabled;
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
+  }
+
+  // One cached material per catalog entry (keyed by its content, so an edited custom
+  // product gets a fresh texture). Never disposed with the per-build geometry.
+  _finishMaterial(def) {
+    this.finishMaterials ??= new Map();
+    const key = JSON.stringify(def || {});
+    let material = this.finishMaterials.get(key);
+    if (material) return material;
+    const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    const map = finishTexture(def, anisotropy);
+    material = new THREE.MeshStandardMaterial({
+      color: map ? 0xffffff : (def?.color ?? 0xffffff),
+      map,
+      roughness: def?.pattern === 'stagger' ? 0.72 : def?.pattern === 'paint' ? 0.92 : 0.45,
+      metalness: 0,
+      side: THREE.DoubleSide,
+      // Pull the 2 mm overlay firmly in front of the slab/wall it covers.
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    this.finishMaterials.set(key, material);
+    return material;
   }
 
   _meshVisible(mesh) {

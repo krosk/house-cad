@@ -1,8 +1,8 @@
 # Materials (surface finishes): design
 
-Status (2026-09-26): **phase 1 implemented**: catalog, finishes, takeoff, AR MATERIAL · FLOOR / WALL.
-Build- and Node-verified on the owner's house; **not yet walked on device**. Phases 2–4 are not
-started. This file records the owner's decisions so later sessions build the same thing.
+Status (2026-09-26): **phases 1–2 implemented**: catalog, finishes, takeoff, AR MATERIAL · FLOOR /
+WALL, and View 3D textures. Build- and Node-verified on the owner's house; **not yet seen in a browser
+or on device**. Phases 3–4 are not started. This file records the owner's decisions so later sessions build the same thing.
 
 ## Goal
 
@@ -87,7 +87,15 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   - an octagon counts as its full lattice cell, so a region that only grazes its chamfered corner
     still counts it;
   - planks run along the region's long axis;
-  - wall faces ignore a wall zone set inside the room (the face stays on the room-rect edge);
+  - a wall face follows the **finished surface**:
+    - a wall/insulation lining drawn over the room edge insets it by the lining's depth (the owner's
+      house has 18–21 cm linings), with stacked linings chaining;
+    - a lining that reaches deeper than it runs along the edge is the corner end of the neighbouring
+      wall's lining, so that stretch is hidden and dropped;
+    - an edge onto a stairwell is open (no wall), as in `architecturalWallBoxes`;
+    - a half wall cuts the face above its sill;
+    - known gap: the part below a half wall standing *inside* the room stays on the room edge, hidden
+      inside the half wall;
   - a doorway belongs to a room within 5 cm, and an opening pierces a face when it sits within
     45 cm behind it.
 - Always show the naive `area ÷ piece + waste%` beside the laid-out count. Round packs up **once per
@@ -113,8 +121,18 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - **WALL:** aim near a room edge picks that face (one face at a time).
 
    AR shows a floor tint plus the readout (material, pieces, packs, m²).
-2. **3D textures:** View 3D floors and wall faces use the material pattern, with the global origin
-   and real joints. They also feed the **AR 3D view** below.
+2. **3D textures** (implemented): `finishSurfaces` (flooring.js, no counting) → `finishGeometries`
+   (architectural3d.js: 2 mm overlays, one mesh per material and role, UVs in plan metres) →
+   `finishTexture` (src/ui/finishTextures.js: one canvas repeat unit per material, `repeat = 1/unit`).
+   - Floor overlays keep the `floor` role, so they are POV tap targets; wall overlays keep the `walls`
+     role.
+   - Planks swap U/V where the region runs along Y, matching the takeoff.
+   - **The plank texture is a representative ⅓ stagger, not the takeoff's cut plan**: the count
+     comes from the simulation, the picture only shows the product.
+   - Paint is a flat colour.
+   - Checked in Node: with every room on Ground and Upper finished, 133 of 134 wall overlay quads sit
+     on a solid 3D wall, just in front of it. The 1 exception is the half-wall gap above.
+   The same geometry and textures are meant to feed the **AR 3D view** below.
 3. **AR 3D view** (owner intent): a LEFT-controller button toggles an architectural 3D layer in AR.
    It uses the same `src/core/architectural3d.js` interpretation, which was built to be reused by an
    opt-in AR layer. Proven free on LEFT today: **X** (`buttons[4]`), **Y** (`buttons[5]`) and the

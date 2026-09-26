@@ -2,7 +2,9 @@ import './style.css';
 import { Project, Rectangle } from './core/model.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
-import { buildArchitecturalFloor } from './core/architectural3d.js';
+import { buildArchitecturalFloor, finishGeometries } from './core/architectural3d.js';
+import { finishSurfaces } from './core/flooring.js';
+import { materialById } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { setupMR } from './ui/mr.js';
@@ -179,6 +181,9 @@ function rebuild() {
         ? Math.max(0.2, (f.elevation || 0) - (project.floors[index - 1].elevation || 0))
         : (f.height || 2.8),
     }),
+    // Textured finish overlays; UVs in plan metres (see finishGeometries).
+    finishGeometries: finishGeometries(finishSurfaces(project, f))
+      .map((g) => ({ ...g, def: materialById(project, g.material) })),
     elevation: f.elevation,
     floorId: f.id,
     name: f.name,
