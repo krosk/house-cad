@@ -16,6 +16,52 @@ Neither is massing. GLB furniture is a **parallel lane like markers**: it never 
 footprint, boolean, extrude, or solver pipeline. `z` is the **foot elevation** above the floor
 (0 = on the floor; raise it for a wall-hung unit). The mesh supplies the height.
 
+## Planned: merge the two into one furniture zone (design, not built)
+
+Status: design agreed 2026-09-26 (all three owner decisions below); nothing implemented. Until it lands, the two lanes
+above stay distinct.
+
+**Why.** Each lane has what the other lacks. The zone can be dimensioned to walls and prints on
+sheets/DXF, but has no 3D. The FURNISH item has the real product in 3D, but no constraints and no
+sheet/DXF output. Since FURNISH items draw as flat plan pieces in AR ("Rendering"), the two also
+look alike. Proven 2026-09-26 from the owner's house file: 14 furniture zones (9 ground, 5 upper)
+and 0 FURNISH items. So the zone is the lane in real use.
+
+**Shape of the merge.** Follow the door/window product pattern: the zone owns placement, and an
+optional product draws the 3D.
+- A `furniture` zone gains an optional `article` (a catalog key, IKEA or procedural). The zone keeps
+  position, constraints, sheets and DXF; the product supplies the 3D model; the zone's `foot` is the
+  mounting height (the catalog `mountZMm` seeds it).
+- Assigning a product sizes the zone to its footprint (w × d, swapped when turned 90°). Sizing stays
+  constraint-first; the owner dimensions its position.
+- A `facing` field picks the front side, like a door's hinge field.
+- `floor.furniture[]` is retired. On load, existing items migrate to zones, rotation snapped to the
+  nearest 90°. Sources that can hold items: saved files, `_demo` seed items, and share links, whose
+  compact form carries furniture (`shareView.js`). The owner's house has none (Proven, above).
+
+**Constraints: furniture is solved one-way, after the structure.** Proven 2026-09-26 with a Node run
+of the real solver: a 3 m room, and a `furniture` zone 2.0 m wide dimensioned 0.5 m and 0.3 m from
+the two walls (2.8 m total). The zone pulled the room's right wall from 3.0 to 2.8 m with no conflict
+flag. With the room width also dimensioned, all four dimensions were flagged and the room's left wall
+moved 5 cm. So today a furniture dimension can silently move a wall. The merge fixes that:
+1. Walls and rooms solve first, from their own dimensions only. Furniture never moves them.
+2. Each furniture zone is then placed one-way, like a marker pin. Its position comes from its
+   dimensions to walls. Its size comes from the product; with no product, or a `madeToMeasure`
+   product, it comes from the owner's dimensions.
+3. **An over-specified furniture dimension is deleted, not flagged** (owner, 2026-09-26). Example: a
+   product pinned on both sides that doesn't fit the gap. The first dimension (the anchor) stays; the
+   one that no longer fits is removed, so no conflicted dimension is ever shown. The deletion should
+   say so in the readout, with the miss, so it isn't silent (e.g. "dimension removed: 20 cm short").
+   The same rule applies when a product change or a 90° turn makes an existing pair over-specify.
+
+**Owner decisions**
+- **Four facing directions only** (owner, 2026-09-26). Zones are axis-aligned, so free rotation is
+  dropped; diagonal placement is accepted as lost.
+- **FURNISH = drop + assign in one mode** (owner, 2026-09-26). Trigger on a furniture zone assigns
+  or cycles its product. Trigger on empty floor drops a new zone already sized to the chosen product.
+- **Sheets and DXF print the zone's rectangle plus a front notch** (owner, 2026-09-26): the plain
+  footprint as today, and a small V on the front edge so facing reads on paper. No product silhouette.
+
 ## Where the models come from: IKEA "rotera"
 
 IKEA products with a 3D view on their product page expose a real GLB through IKEA's **rotera**
@@ -144,3 +190,9 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 - FURNISH authoring (drop/select/move/rotate/delete, foot pad) is AR-unwalked.
 - Offline Cache API reuse across a real no-wifi session is unverified.
 - Deferred: env-map lighting, snap-to-wall/grid on drop, multi-select.
+  **The models show only with the AR 3D view on (LEFT X)** (owner decision, 2026-09-26: at full
+  size they occluded the plan while furnishing). Otherwise each item draws as a flat **plan piece**
+  on the floor (`furniturePlanGroup`): its catalog footprint (width × depth) as a violet fill and
+  outline, a V notch on the front edge, and a dashed outline when the item is raised (wall-hung,
+  like an overhead line on a plan); hover turns it yellow, selection amber. `buildArch3d` swaps the
+  two groups' visibility.
