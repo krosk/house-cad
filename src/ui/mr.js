@@ -6018,6 +6018,10 @@ export function setupMR(view, project, getFootprint) {
     if (lower != null && m <= lower) { rlog('band upper rejected (<= lower)', { id: selectedRect.id, m }); return; }
     selectedRect[bandField] = m;
     project.touch(); // band bounds aren't solver inputs, but mark dirty → autosave + listeners
+    // mr.js doesn't listen to onChange: redraw the floor→sill/head value labels and the
+    // AR 3D view (openings, window products) by hand.
+    if (!allFloorsView) buildZDims();
+    buildArch3d();
     rlog('band edit', { id: selectedRect.id, field: bandField, m: +m.toFixed(3) });
     refreshBandPad(); // stay open so the other bound can be typed next
   }
