@@ -2924,9 +2924,10 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // All routed wires whose plan projection passes within WIRE_PICK_M, nearest first.
-  // Multiple wires commonly share exactly one conduit, so `afterId` advances through
-  // that overlap stack instead of making the first-created wire permanently win.
-  function routedWireAtFloorPoint(px, py, afterId = null) {
+  // Multiple wires commonly share exactly one conduit, so the MARKER · WIRE grip cycle
+  // (wireTargetAtFloorPoint) advances through that overlap stack instead of making the
+  // first-created wire permanently win.
+  function routedWireCandidates(px, py) {
     const candidates = [];
     const rank = pickRanker();
     for (let order = 0; order < project.wires.length; order++) {
@@ -2942,10 +2943,7 @@ export function setupMR(view, project, getFootprint) {
       }
       if (bestR < Infinity) candidates.push({ wire, rank: bestR, distance: bestD, order });
     }
-    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.order - b.order);
-    if (!candidates.length) return null;
-    const current = candidates.findIndex((item) => item.wire.id === afterId);
-    return candidates[(current + 1) % candidates.length].wire;
+    return candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.order - b.order);
   }
 
   // Every device in the connected wire component containing `wire`, whether the
@@ -3371,7 +3369,8 @@ export function setupMR(view, project, getFootprint) {
   let markerLinkPickAfterId = null;
   // MARKER · WIRE (routed): the pending first endpoint of a new wire pair.
   let wireFromMarker = null;
-  let wireEndpointPickAfterKey = null;
+  let wireEndpointPickAfterKey = null; // one-shot grip-cycle request (consumed per frame)
+  let wireHoverKey = null; // the sticky yellow MARKER · WIRE target ('marker:<id>' / 'wire:<id>')
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
@@ -3397,7 +3396,6 @@ export function setupMR(view, project, getFootprint) {
   // MARKER · WIRE (routed): the selected wire (for via override) + per-frame hover.
   let selectedRoutedWire = null;
   let hoverRoutedWire = null;
-  let routedWirePickAfterId = null;
   let routedWirePreviewLine = null; // live pending-pair preview (from marker → hovered/tip)
   let pipePenNodeId = null;
   let pipePickAfterKey = null;
@@ -5279,10 +5277,9 @@ export function setupMR(view, project, getFootprint) {
     return best;
   }
 
-  // MARKER · WIRE endpoint picker. Grip advances `afterKey`; trigger commits the
-  // yellow marker as PICK START or PICK END. Nearby and vertically stacked devices
-  // share one distance-then-height ordered cycle.
-  function wireMarkerAtFloorPoint(px, py, afterKey = null) {
+  // MARKER · WIRE endpoint candidates. Nearby and vertically stacked devices share one
+  // distance-then-height order.
+  function wireMarkerCandidates(px, py) {
     const floors = allFloorsView
       ? project.floors
       : [project.activeFloor, ...adjacentFloors()].filter(Boolean);
@@ -5297,9 +5294,31 @@ export function setupMR(view, project, getFootprint) {
       .filter((candidate) => candidate.distance <= RETICLE_OUTER && candidate.rank < Infinity)
       .sort((a, b) => a.rank - b.rank || a.distance - b.distance || b.z - a.z
         || a.floorOrder - b.floorOrder || a.order - b.order);
+    return candidates;
+  }
+
+  // MARKER · WIRE pick cycle: devices AND existing wires under the reticle share one
+  // grip cycle, so a wire running past a device stays selectable (owner report: with a
+  // marker in the reticle, grip never reached the wires). Order: storey rank (ALL
+  // FLOORS), then devices before wires, then each list's own order. Grip advances
+  // `afterKey` ('marker:<id>' / 'wire:<id>'); trigger commits the yellow target. Wires
+  // are left out while a first endpoint is pending (the next pick must be a device).
+  // Like CONDUIT · EDIT: reticle jitter or new items entering the reticle never steal
+  // the highlight — `currentKey` stays while still present; only a grip (`afterKey`)
+  // advances.
+  function wireTargetAtFloorPoint(px, py, currentKey = null, afterKey = null, withWires = true) {
+    const candidates = [
+      ...wireMarkerCandidates(px, py).map((c) => ({ ...c, kind: 'marker' })),
+      ...(withWires ? routedWireCandidates(px, py).map((c) => ({
+        kind: 'wire', wire: c.wire, key: `wire:${c.wire.id}`, rank: c.rank,
+      })) : []),
+    ].sort((a, b) => a.rank - b.rank); // stable: devices stay ahead of wires per rank
     if (!candidates.length) return null;
-    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
-    return candidates[(current + 1) % candidates.length];
+    if (afterKey) {
+      const current = candidates.findIndex((candidate) => candidate.key === afterKey);
+      return candidates[current < 0 ? 0 : (current + 1) % candidates.length];
+    }
+    return candidates.find((candidate) => candidate.key === currentKey) || candidates[0];
   }
 
   // MARKER · EDIT disambiguates any marker types sharing the exact same floor
@@ -5966,7 +5985,7 @@ export function setupMR(view, project, getFootprint) {
         if (!wireFromMarker) {
           if (endMarker) { wireFromMarker = endMarker; wireEndpointPickAfterKey = null; rlog('wire from', { id: endMarker.id }); return; }
           if (hoverRoutedWire) {
-            selectedRoutedWire = hoverRoutedWire; routedWirePickAfterId = null;
+            selectedRoutedWire = hoverRoutedWire; wireEndpointPickAfterKey = null;
             rlog('wire select', { id: hoverRoutedWire.id }); return;
           }
           return;
@@ -6275,7 +6294,7 @@ export function setupMR(view, project, getFootprint) {
     selectedMarker = null; markerEditPickAfterId = null; // ...and marker edit picker
     selectedLinkSwitch = null; markerLinkPickAfterId = null; // ...and link picker/source
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
-    selectedRoutedWire = null; routedWirePickAfterId = null; // ...and routed-wire selection picker
+    selectedRoutedWire = null; // ...and routed-wire selection (its cycle key is wireEndpointPickAfterKey)
     pipePenNodeId = null; pipePickAfterKey = null; hoverPipeNode = null; selectedPipe = null; pendingPipeMerge = null;
     penNodeId = null; conduitPickAfterKey = null; conduitPenHistory = []; hoverPenSplit = null; // ...and lift/reset the conduit pen picker + its undo
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
@@ -6901,8 +6920,8 @@ export function setupMR(view, project, getFootprint) {
         return;
       }
       if (!selectedRoutedWire && !wireFromMarker && hoverRoutedWire) {
-        routedWirePickAfterId = hoverRoutedWire.id;
-        rlog('routed wire target cycle', { after: routedWirePickAfterId });
+        wireEndpointPickAfterKey = `wire:${hoverRoutedWire.id}`;
+        rlog('wire target cycle', { after: wireEndpointPickAfterKey });
         return;
       }
       if (wireFromMarker) {
@@ -7830,19 +7849,16 @@ export function setupMR(view, project, getFootprint) {
           hoverConduitNode = conduitNodeAtFloorPoint(px, py);
           if (!hoverConduitNode) hoverMarker = markerAtFloorPoint(px, py, pickFloor()?.markers || []);
         } else {
-          const endpoint = wireMarkerAtFloorPoint(px, py, wireEndpointPickAfterKey);
-          if (endpoint && (allFloorsView || endpoint.floorId === project.activeFloorId)) hoverMarker = endpoint.marker;
-          else if (endpoint) hoverAdjacent = {
-            kind: 'marker', id: endpoint.marker.id, floorId: endpoint.floorId,
+          const target = wireTargetAtFloorPoint(
+            px, py, wireHoverKey, wireEndpointPickAfterKey, !wireFromMarker,
+          );
+          wireEndpointPickAfterKey = null; // consume the explicit grip-cycle request
+          wireHoverKey = target?.key || null;
+          if (target?.kind === 'wire') hoverRoutedWire = target.wire;
+          else if (target && (allFloorsView || target.floorId === project.activeFloorId)) hoverMarker = target.marker;
+          else if (target) hoverAdjacent = {
+            kind: 'marker', id: target.marker.id, floorId: target.floorId,
           };
-          if (!endpoint) {
-            wireEndpointPickAfterKey = null;
-          }
-        }
-        if (!selectedRoutedWire && !wireFromMarker
-            && !hoverMarker && !hoverConduitNode && !hoverAdjacent) {
-          hoverRoutedWire = routedWireAtFloorPoint(px, py, routedWirePickAfterId);
-          if (!hoverRoutedWire) routedWirePickAfterId = null;
         }
       } else {
         reticle.visible = false;

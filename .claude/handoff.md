@@ -85,8 +85,12 @@ Read `docs/product-intent.md` before planning AR work.
    and on the floor of the storey above when you aim up. Picking favours that storey, and grip cycles
    outward to farther storeys. A strict per-storey filter blocked a basement breaker → upstairs outlet
    wire, so it was replaced by ranking. LEFT stick up/down in ALL FLOORS teleports one storey
-   while keeping the mode (`navLift`/`groundY()`). The rules are in `docs/ar-survey.md`. The same commit fixes a latent ReferenceError when the pen hovers a riser.
-   Build-verified only.
+   while keeping the mode (`navLift`/`groundY()`). The rules are in `docs/ar-survey.md`. `2f7d7df`
+   also fixes a latent ReferenceError when the pen hovers a riser. Build-verified only.
+7. **MARKER · WIRE pick cycle** (owner-reported: with a device in the reticle, grip never reached
+   the wires). Devices and wires now share one grip cycle (`wireTargetAtFloorPoint`), and the yellow
+   target is sticky like CONDUIT · EDIT (`wireHoverKey`). Proven by a Node harness of the pick
+   function; not yet on device.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -184,6 +188,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **A — Owner walks the unconfirmed work**, then update `docs/ar-qa-checklist.md`:
   - breaker glyph;
   - ALL FLOORS reticle, storey-ranked picking, LEFT stick-y storey teleport;
+  - WIRE device+wire grip cycle with sticky highlight;
   - conduit pen undo + T-junction;
   - Z-dim look;
   - 3D-viewer wall/door and faceplate fixes (desktop);

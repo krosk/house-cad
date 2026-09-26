@@ -295,6 +295,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] CONDUIT · EDIT: trigger a free junction selects it and opens a height pad; trigger a segment between nodes splits it with a new junction at the reticle and selects it; trigger empty space deselects
 - [ ] Grip-drag a node NEAR the tip carries it 1:1 in full 3D (direct); FAR moves only X/Y via the floor reticle while z holds (remote); release persists; height pad typing + ENTER sets a free junction's z
 - [ ] A marker-bound node cannot be moved (follows its device) and opens no pad; grip away from a selected node deletes the node + its segments and drops `via` references to it
+- [ ] MARKER · WIRE: with a device AND a wire in the reticle, grip cycles device → wire (and on through the stack); trigger on the yellow wire selects it
+- [ ] MARKER · WIRE: the yellow target stays put when another device/wire drifts into the reticle; only grip moves it
 - [ ] MARKER · WIRE: trigger two device markers to define a wire (readout PICK START→PICK END→VIA·n); its route draws instantly as the auto shortest path through the conduits, per-surface colored
 - [ ] With a wire selected, triggering conduit nodes forces the route through them (via override, existing vias read cyan); grip pops the last via, and with none left deletes the wire
 - [ ] An unroutable wire (no conduit path) draws nothing but is retained; trigger an existing wire to re-select it; trigger empty space to deselect

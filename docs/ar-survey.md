@@ -195,8 +195,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   under the reticle without committing**, and trigger chooses the yellow endpoint. While a
   wire is selected, trigger conduit **nodes** to force the route through them (`addWireVia`, a manual
   override); grip **pops the last via** (`popWireVia`), and **B/Y deletes the wire** (`removeWire`).
-  With no endpoint pending, grip also cycles every existing wire whose route overlaps under the
-  reticle and trigger selects the yellow ribbon; trigger empty space deselects it. The
+  With no endpoint pending, devices **and** existing wires under the reticle share **one** grip
+  cycle (`wireTargetAtFloorPoint`): devices first, then every wire whose route overlaps there (in
+  ALL FLOORS, ordered by storey rank first). Trigger selects the yellow ribbon, and trigger on empty
+  space deselects it. An earlier version offered wires only when no device was in the reticle, so
+  a wire running past a device could not be selected (owner report); keep the single cycle.
+  As in CONDUIT · EDIT, the yellow target is **sticky** (`wireHoverKey`). It stays highlighted
+  while it remains in the reticle, even when new devices or wires enter it. Only grip advances
+  (a one-shot `wireEndpointPickAfterKey` request), and the first candidate takes over only when
+  the highlighted one leaves the reticle. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` as narrow ribbons colored by nature (electrical amber, Ethernet cyan), showing
   the legs touching the active floor. A
