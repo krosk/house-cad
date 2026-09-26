@@ -594,7 +594,9 @@ on a pad** (`nextDatum`/`datumWord`/`datumSwapLabel`, shared by the marker and n
   vertical line has no floor plane, so each dash is a crossed pair of vertical strips (ticks: crossed
   flat strips) — thin from any side. Styling follows the piece's X/Y pins: markers amber strips +
   amber label (floor→z, shown iff `zDatum`), bare conduit junctions amber strips + **cyan** label
-  (like `CONDUIT · DIMS` pins; was purple in s28), apertures blue: floor→sill and floor→head as two
+  (like `CONDUIT · DIMS` pins; was purple in s28) shown only while the conduit network is (CONDUIT, CONDUIT
+  EDIT, WIRE, CONDUIT · DIMS; `buildZDims` reads `conduitGroup.visible`, and leaving those modes rebuilds
+  the dims without them), apertures blue: floor→sill and floor→head as two
   side-by-side dims 4 cm either side of the centre along the wall (zero sill and open top omitted).
   Heights are typed, never dragged, so the dims are display-only. `zDimGroup`/`buildZDims()` are rebuilt inside both `buildMarkers()` and
   `buildConduits()`, active floor only (`clearZDims()` runs in `buildAllFloors`). GLB foot is not

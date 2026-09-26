@@ -2230,8 +2230,9 @@ export function setupMR(view, project, getFootprint) {
     for (const m of project.activeFloor.markers || []) {
       if (m.zDatum && (m.z || 0) > 1e-4) batch.add(m.x, m.y, 0, m.z, m.z, markerDimMat, '#ff9f43');
     }
-    // Marker-bound nodes follow their device and are never dimensioned.
-    for (const n of project.conduitNodes || []) {
+    // Marker-bound nodes follow their device and are never dimensioned. A junction's
+    // dim only shows with the conduit network itself (the CONDUIT/WIRE modes).
+    for (const n of conduitGroup.visible ? project.conduitNodes || [] : []) {
       if (n.markerId || !n.zDatum || !((n.z || 0) > 1e-4)) continue;
       if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
       batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
@@ -6834,8 +6835,10 @@ export function setupMR(view, project, getFootprint) {
     // CONDUIT authoring/editing and WIRE routing all need the network on screen;
     // WIRE additionally draws the routed wires it defines over that network.
     const showConduits = m.id === 'marker_conduit' || m.id === 'conduit_edit' || m.id === 'marker_wire' || m.id === 'conduit_dims';
-    if (showConduits) buildConduits();
-    conduitGroup.visible = showConduits;
+    const conduitsWereShown = conduitGroup.visible;
+    conduitGroup.visible = showConduits; // set first: buildZDims reads it for the junction dims
+    if (showConduits) buildConduits(); // also rebuilds the Z dims
+    else if (conduitsWereShown && !allFloorsView) buildZDims(); // drop the junction dims
     // CHECK also shows the wires, with the flagged chains emphasized (frame loop).
     if (m.id === 'marker_wire' || m.id === 'circuit_check') buildRoutedWires();
     routedWireGroup.visible = m.id === 'marker_wire' || m.id === 'circuit_check';

@@ -303,6 +303,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Patch panel is selectable as a marker and renders as a rack-style bank of ports in AR, sheets, legends, and detailed DXF
 - [ ] Panel/consumer-unit is selectable as a marker and renders as a breaker-bank enclosure in AR, sheets, legends, and detailed DXF (`MARKER_PANEL`)
 ### CONDUIT + WIRE (two-layer model, replaces the removed per-wire-waypoint lane)  ⬜ NEW — build-verified only
+- [ ] A bare junction's cyan floor→height dim shows in CONDUIT / CONDUIT EDIT / WIRE / CONDUIT · DIMS and disappears in every other mode (markers' amber and apertures' blue height dims stay)
 - [ ] MARKER · CONDUIT: trigger a marker/node to start the pen (readout START PEN→RUN CONDUIT); trigger empty space drops a junction + runs a segment; trigger another node joins/branches/loops; grip lifts the pen (no deletion)
 - [ ] The live network draws in `conduitGroup` colored per inferred surface, with a node sphere per vertex (marker-bound dimmer); the pen node is amber, hover yellow, and a preview runs pen→tip
 - [ ] CONDUIT · EDIT: trigger a free junction selects it and opens a height pad; trigger a segment between nodes splits it with a new junction at the reticle and selects it; trigger empty space deselects
