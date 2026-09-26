@@ -203,7 +203,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   As in CONDUIT · EDIT, the yellow target is **sticky** (`wireHoverKey`). It stays highlighted
   while it remains in the reticle, even when new devices or wires enter it. Only grip advances
   (a one-shot `wireEndpointPickAfterKey` request), and the first candidate takes over only when
-  the highlighted one leaves the reticle. The
+  the highlighted one leaves the reticle. A selected wire's readout adds `CIRCUIT <len>` and, when
+  non-zero, `SHARED <len>` in the other nature's color (definitions in `docs/electrical-workflow.md`).
+  The readout pill takes up to 3 lines (`makeLabel(96)`); lengths are memoized per selection and
+  wire-layer rebuild, never computed per frame. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` as narrow ribbons colored by nature (electrical amber, Ethernet cyan), showing
   the legs touching the active floor. A

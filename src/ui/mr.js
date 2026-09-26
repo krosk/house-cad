@@ -35,7 +35,7 @@ import {
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints } from '../core/electrical.js';
-import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments } from '../core/conduit.js';
+import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, verticalBandFields } from '../core/zoneColors.js';
@@ -107,10 +107,12 @@ export function setupMR(view, project, getFootprint) {
 
   // A small floating text label (canvas texture) that rides a controller tip and
   // always shows the current mode — so a shared touch gesture can't be misfired.
-  function makeLabel() {
+  // `height` > 64 leaves room for multi-line text ('\n'-separated; colorHex may then be
+  // an array of per-line colors). One line still draws the original centered pill.
+  function makeLabel(height = 64) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
-    canvas.height = 64;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
@@ -123,21 +125,31 @@ export function setupMR(view, project, getFootprint) {
       const key = `${colorHex}|${text}`;
       if (key === shown) return;
       shown = key;
-      ctx.clearRect(0, 0, 256, 64);
+      const lines = String(text).split('\n').slice(0, Math.max(1, Math.floor((height - 16) / 26)));
+      const multi = lines.length > 1;
+      const pitch = multi ? 26 : 40;
+      const boxH = multi ? lines.length * pitch + 12 : 48;
+      const top = (height - boxH) / 2;
+      ctx.clearRect(0, 0, 256, height);
       // Dark backing pill so the label stays legible over passthrough.
       ctx.fillStyle = 'rgba(15, 18, 24, 0.78)';
       ctx.beginPath();
-      ctx.roundRect(8, 8, 240, 48, 12);
+      ctx.roundRect(8, top, 240, boxH, 12);
       ctx.fill();
-      ctx.fillStyle = '#' + colorHex.toString(16).padStart(6, '0');
       // Breadcrumbs are longer than the old flat labels. Fit them within the pill
       // while keeping short tool names at the original, highly legible size.
-      ctx.font = 'bold 40px sans-serif';
-      const fontSize = Math.max(24, Math.min(40, Math.floor(40 * 216 / Math.max(216, ctx.measureText(text).width))));
-      ctx.font = `bold ${fontSize}px sans-serif`;
+      const maxFont = multi ? 24 : 40;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, 128, 34);
+      lines.forEach((line, i) => {
+        ctx.font = `bold ${maxFont}px sans-serif`;
+        const fontSize = Math.max(multi ? 16 : 24, Math.min(maxFont,
+          Math.floor(maxFont * 216 / Math.max(216, ctx.measureText(line).width))));
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const hex = Array.isArray(colorHex) ? (colorHex[i] ?? colorHex[0]) : colorHex;
+        ctx.fillStyle = '#' + hex.toString(16).padStart(6, '0');
+        ctx.fillText(line, 128, multi ? top + 6 + pitch * (i + 0.5) + 1 : top + 26);
+      });
       tex.needsUpdate = true;
     };
     return { sprite, setText };
@@ -757,9 +769,9 @@ export function setupMR(view, project, getFootprint) {
     // A larger pill above the mode label that shows the value of whichever
     // constraint the ray is pointing at — a legible "close-up" of small in-world
     // dimension text. Hidden until the ray hovers a dimension.
-    const readout = makeLabel();
+    const readout = makeLabel(96); // up to 3 lines (MARKER · WIRE selection lengths)
     readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.readout, TIP_OFFSET.z);
-    readout.sprite.scale.set(0.2, 0.05, 1);
+    readout.sprite.scale.set(0.2, 0.075, 1); // 256×96 aspect; a single line keeps its old size
     readout.sprite.visible = false;
     readout.sprite.renderOrder = HUD_ORDER;
     c.add(readout.sprite);
@@ -2959,6 +2971,36 @@ export function setupMR(view, project, getFootprint) {
       markerIds: new Set(component?.deviceIds || [wire.fromMarkerId, wire.toMarkerId]),
       wireIds: new Set(component?.wireIds || [wire.id]),
     };
+  }
+
+  // MARKER · WIRE selection lengths (owner request). `circuit` = total routed cable
+  // length of every wire in the selected wire's component (what is highlighted).
+  // `shared` = conduit length (each run once) carrying both this component's wires of
+  // the selected nature and any wire of the other nature (Ethernet beside power, or
+  // vice versa). Memoized per selection + wire-layer rebuild (one Dijkstra per wire).
+  let wireLengthMemo = { key: null, batch: null, stats: null };
+  function selectedCircuitLengths(wire) {
+    const type = wire.type || 'electrical';
+    const key = `${wire.id}|${type}`;
+    if (wireLengthMemo.key === key && wireLengthMemo.batch === wireBatch) return wireLengthMemo.stats;
+    const ids = wireComponent(wire).wireIds;
+    const legLength = (legs) => legs.reduce((sum, { a, b }) =>
+      sum + Math.hypot(b.x - a.x, b.y - a.y, (b.z || 0) - (a.z || 0)), 0);
+    let circuit = 0;
+    const mine = new Set(), other = new Set();
+    for (const w of project.wires) {
+      const inCircuit = ids.has(w.id), same = (w.type || 'electrical') === type;
+      if (inCircuit) circuit += legLength(wireBatch?.segs.get(w.id) ?? wireRouteSegments(project, w));
+      if (same && !inCircuit) continue; // same-nature wires elsewhere don't matter
+      for (const segId of wireSegmentPath(project, w) || []) (same ? mine : other).add(segId);
+    }
+    let shared = 0;
+    for (const seg of conduitNetworkSegments(project)) {
+      if (mine.has(seg.id) && other.has(seg.id)) shared += legLength([seg]);
+    }
+    const stats = { circuit, shared, otherType: WIRE_TYPES.find((t) => t !== type) };
+    wireLengthMemo = { key, batch: wireBatch, stats };
+    return stats;
   }
 
   // ---- Cross-floor authoring targets (risers + cross-floor wires) --------------
@@ -7371,10 +7413,17 @@ export function setupMR(view, project, getFootprint) {
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
       ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
+    // A selected wire adds its circuit length and, when non-zero, the conduit length it
+    // shares with the other wire nature. That line reads "SHARED <len>" in the OTHER
+    // nature's color (naming it would overflow the pill).
+    const wireLengths = modes[currentMode].id === 'marker_wire' && selectedRoutedWire
+      ? selectedCircuitLengths(selectedRoutedWire) : null;
     const wireStatus = modes[currentMode].id === 'marker_wire'
       ? `${t(`wire.type.${selectedRoutedWire?.type || currentWireType}`)} · ${selectedRoutedWire
         ? `${t('wire.override')} ${(selectedRoutedWire.via || []).length}`
         : wireFromMarker ? t('wire.pickEnd') : t('wire.pickStart')}`
+        + (wireLengths ? `\n${t('wire.circuit')} ${fmt(wireLengths.circuit)} ${unitLabel()}` : '')
+        + (wireLengths?.shared > 5e-4 ? `\n${t('wire.shared')} ${fmt(wireLengths.shared)} ${unitLabel()}` : '')
       : modes[currentMode].id === 'marker_conduit'
       ? (penNodeId ? t('conduit.run') : t('conduit.pickStart'))
       : modes[currentMode].id === 'conduit_edit'
@@ -7403,7 +7452,10 @@ export function setupMR(view, project, getFootprint) {
       : furnishStatus ? 0xa78bfa
       : pipeStatus ? pipeColor(selectedPipe || { service: currentPipeService })
       : wireStatus ? (modes[currentMode].id === 'marker_conduit' || modes[currentMode].id === 'conduit_edit'
-        ? CONDUIT_COLOR : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
+        ? CONDUIT_COLOR
+        : wireLengths ? [wireTypeColor(selectedRoutedWire), wireTypeColor(selectedRoutedWire),
+          wireTypeColor({ type: wireLengths.otherType })]
+        : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
       : exportStatus ? C_EXPORT : 0x38bdf8;
     controllers.forEach((c, i) => {
       const on = c.userData.inputSource === editCtl && !!readoutText;

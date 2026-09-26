@@ -118,6 +118,15 @@ wires remain dim in their normal type color. This inspection works for a normal 
 circuit, an unfinished unassigned component, and a multi-breaker conflict; it does not modify
 or store membership. In `ALL FLOORS`, every member glyph is outlined at its true elevation.
 
+While a wire is selected, the controller readout adds two lines (owner request, 2026-09-26;
+`selectedCircuitLengths`):
+- **`CIRCUIT <len>`** is the total routed **cable** length of every wire in that component. Parallel
+  wires in one conduit each count, because each is a separate cable.
+- **`SHARED <len>`** is drawn in the *other* nature's color and shown only when non-zero. It is the
+  **conduit** length, each run counted once, that carries both this component's wires of the
+  selected nature and any wire of the other nature: Ethernet running beside power, or power
+  beside Ethernet. It exists so separation or shielding needs can be sized.
+
 ## Owner decisions and their rationale
 
 These are settled; don't reopen them without the owner.

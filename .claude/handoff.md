@@ -91,6 +91,9 @@ Read `docs/product-intent.md` before planning AR work.
    the wires). Devices and wires now share one grip cycle (`wireTargetAtFloorPoint`), and the yellow
    target is sticky like CONDUIT · EDIT (`wireHoverKey`). Proven by a Node harness of the pick
    function; not yet on device.
+8. **Circuit lengths** (owner request): a selected wire's readout shows `CIRCUIT <len>` and
+   `SHARED <len>` (conduit shared with the other wire nature). The definitions are in
+   `docs/electrical-workflow.md`. Proven on a synthetic 5 m shared run (Node harness); not yet on device.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -188,7 +191,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **A — Owner walks the unconfirmed work**, then update `docs/ar-qa-checklist.md`:
   - breaker glyph;
   - ALL FLOORS reticle, storey-ranked picking, LEFT stick-y storey teleport;
-  - WIRE device+wire grip cycle with sticky highlight;
+  - WIRE device+wire grip cycle with sticky highlight; CIRCUIT/SHARED length readout;
   - conduit pen undo + T-junction;
   - Z-dim look;
   - 3D-viewer wall/door and faceplate fixes (desktop);

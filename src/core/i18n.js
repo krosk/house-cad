@@ -378,6 +378,8 @@ const STRINGS = {
   'wire.pickStart':  { en: 'PICK START',  fr: 'CHOISIR DÉBUT',        zh: '选择起点' },
   'wire.pickEnd':    { en: 'PICK END',    fr: 'CHOISIR FIN',          zh: '选择终点' },
   'wire.override':   { en: 'VIA',         fr: 'VIA',                  zh: '经由' },
+  'wire.circuit':    { en: 'CIRCUIT',     fr: 'CIRCUIT',              zh: '回路' },
+  'wire.shared':     { en: 'SHARED',      fr: 'PARTAGÉ',              zh: '共管' },
   'wire.type.electrical': { en: 'ELECTRICAL', fr: 'ÉLECTRIQUE', zh: '电力' },
   'wire.type.ethernet': { en: 'ETHERNET', fr: 'ETHERNET', zh: '以太网' },
   'conduit.pickStart': { en: 'START PEN', fr: 'DÉBUT TRACÉ',        zh: '落笔' },
