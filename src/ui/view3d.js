@@ -659,7 +659,7 @@ export class View3D {
     material = new THREE.MeshStandardMaterial({
       color: map ? 0xffffff : (def?.color ?? 0xffffff),
       map,
-      roughness: def?.pattern === 'stagger' ? 0.72 : def?.pattern === 'paint' ? 0.92 : 0.45,
+      roughness: def?.roughness ?? (def?.pattern === 'stagger' ? 0.72 : def?.pattern === 'paint' ? 0.92 : 0.45),
       metalness: 0,
       side: THREE.DoubleSide,
       // Pull the 2 mm overlay firmly in front of the slab/wall it covers.

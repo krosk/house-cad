@@ -11,15 +11,16 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/ar-qa-checklist.md` | What has actually been walked on the Quest (mostly stale — see Open questions) |
 | `docs/electrical-workflow.md` | Conduit / wire / control-link lanes, derived circuits, owner decisions |
 | `docs/plumbing-workflow.md` | The pipe lane (first slice) and what's deferred |
-| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, FURNISH |
+| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, FURNISH, procedural furniture (products with no IKEA model) |
+| `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos; run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes: owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes and door products: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 30)
-**Status:** Proven (git + live `version.json`): `origin/main` served `f0f6bf1` before this handoff's
-own commit, which changes only this file. The tree is clean apart from the owner's untracked
+**Status:** Proven (git + live `version.json`): `origin/main` includes the flooring commit that
+also carries this handoff (verify the tip with `git log -1 origin/main`). The tree is clean apart from the owner's untracked
 `Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
 everything from session 30 is build/Node-verified only and **parked for the owner to walk** (Next step A).
 
@@ -44,7 +45,8 @@ boots straight into passthrough AR):
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
-   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials**, save/load in 6
+   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials and door
+   products**, save/load in 6
    slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X**. Mode list:
    `docs/ar-survey.md`.
 
@@ -78,6 +80,18 @@ Read `docs/product-intent.md` before planning AR work.
 5. **Proven bug, fixed in `f0f6bf1`:** `clearPlanGeometry` detached four planGroup overlay groups on the
    first plan build, so **Z-dims, adjacent-floor target dots, CHECK rings and MATERIAL tints never
    rendered in AR** (picking still worked). All overlay groups are now in `PLAN_OVERLAY_GROUPS`.
+6. **Furniture catalog:** IKEA STOCKHOLM 2025 TV bench (`40586508`, a real IKEA model, `63cfd17`), and
+   **procedural furniture** (`4abecef`): a catalog entry with `procedural: <kind>` is built in code
+   (`src/ui/proceduralFurniture.js`) instead of fetched. First one: the owner's discontinued STOCKHOLM
+   bed (`stockholm-bed-160x200`; no IKEA model for any of the 10 articles tried). `docs/furniture.md`.
+7. **Door products** (`cc55640`): the owner's Lapeyre Ange-Line entrance door as a material of a DOOR
+   zone, AR **MATERIAL · DOOR**, drawn at the zone's size/hinge/swing in View 3D and the AR 3D view
+   (`src/ui/doorProducts.js`). `docs/materials.md` "Doors".
+8. **Workflow recorded** (`2972e7a`): `docs/product-modelling.md` + the `/model-product` skill, from
+   how the bed and door were made.
+9. **Flooring product** (the commit that carries this handoff): Beaulieu oak charme 118×16.4 (Leroy
+   Merlin 92245930) as a floor material with a procedural `design: 'oak-rustic'` texture, tuned
+   against the product's top-down gallery photo. `docs/materials.md` "Flooring products".
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -111,6 +125,11 @@ Read `docs/product-intent.md` before planning AR work.
   - same-material rooms joined by a doorway are one region; different materials meet mid-doorway;
   - packs are rounded once per product for the whole house;
   - wall faces are set one at a time: the owner removed a copy-to-every-wall action, so don't re-add it.
+- **Products with no manufacturer model are code, never stored GLBs** (owner decision): a
+  `procedural` furniture builder or a door `design`. A non-code model would go in
+  `public/furniture/models/` (not built). Follow `docs/product-modelling.md` / `/model-product`.
+- **A door product is a material of its DOOR zone** (owner decision), authored in MATERIAL · DOOR;
+  made-to-measure products take the zone's size.
 - **LEFT controller:** trigger = teleport, grip = hold-to-view sheet, stick-x = rotate plan, stick-y =
   storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the stick click are free.
 
@@ -154,14 +173,17 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `f0f6bf1` before the handoff commit), all with descriptive bodies.
+All pushed (`origin/main` = `2972e7a` before the handoff commit), all with descriptive bodies.
 Doc-only commits are omitted.
 - **Session 30:**
   - `47c08de` stair `climb`;
   - `0ad552d` MARKER · CHECK + per-nature circuits;
   - `9bce6e7` stacked-marker readout;
   - materials: `72ca05a` catalog/takeoff/AR modes · `92975bf` View 3D textures + wall-face fixes ·
-    `f0f6bf1` AR 3D view + the `PLAN_OVERLAY_GROUPS` fix.
+    `f0f6bf1` AR 3D view + the `PLAN_OVERLAY_GROUPS` fix;
+  - products: `63cfd17` TV bench (+ previous handoff) · `4abecef` procedural furniture / STOCKHOLM bed ·
+    `cc55640` door products / Ange-Line · `2972e7a` modelling workflow + skill ·
+    the Beaulieu oak flooring commit (with this handoff).
 - **Session 29:**
   - 3D walls/faceplates: `f457bd5`, `309d807`;
   - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
@@ -200,6 +222,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
 | `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries); used by FURNISH and View 3D |
+| `src/ui/doorProducts.js` | Door product builder (frame, leaf design, hardware) from `doorProductPlacements` |
+| `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
 
 ## Next step
@@ -207,13 +232,17 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). The owner said they would verify later. First, check that the four overlays that never
   rendered before `f0f6bf1` now show: Z-dims, adjacent-floor dots, CHECK rings, MATERIAL tints. Then:
-  - MATERIAL · FLOOR/WALL;
+  - MATERIAL · FLOOR/WALL/DOOR (set the Ange-Line on the real entrance door zone; Beaulieu oak on a
+    room, watch PERF: its texture is 2048 px);
+  - FURNISH: the STOCKHOLM bed and the TV bench (does a real IKEA model replace the box on the APK?);
   - the LEFT X AR 3D view, with **PROJECT · PERF** on;
   - View 3D textures (desktop);
   - MARKER · CHECK;
   - the stacked readout;
   - stair rotation;
   - then session 29's list: ALL FLOORS reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T.
+- **B′ — More products** as the owner names them: run `/model-product <link>`; a real manufacturer
+  model is always checked first.
 - **B — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
   `project.materials`. Possible improvements the owner has not asked for (see `docs/materials.md`):
   - per-region pattern offset to cut waste;
@@ -236,7 +265,12 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - frame cost of the AR 3D view (Lambert walls + textures; opaque walls may hide the real room);
   - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
   - the readout pill, which grew to 4 lines and sits 1.25 cm higher in every mode;
-  - how the textures look in a browser.
+  - how the textures look in a browser;
+  - the bed and the door in AR (both rendered only in a desktop browser).
+
+  Estimates to confirm with a tape measure or the owner: the bed's rail height, headboard lean and
+  cushion size (from photos); the door colour (anthracite ~RAL 7016 guessed; Lapeyre colours are
+  customisable) and which door zone in the owner's house is the entrance.
 
   Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
   with markers, labels, conduits and wires since the batching, and reported them working.

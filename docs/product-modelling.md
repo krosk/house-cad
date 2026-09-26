@@ -8,6 +8,10 @@ iterations with the owner. Follow the same steps for the next product; the skill
 Where the result goes:
 - **furniture** → a `procedural: <kind>` entry in `public/furniture/index.json` and a builder in
   `proceduralFurniture.js` (`docs/furniture.md` "Procedural furniture");
+- **flooring (or other finish)** → a `surface: 'floor'` material in `src/core/materials.js` with the
+  published piece size and pack, plus an optional `design` drawn in `src/ui/finishTextures.js`
+  (`docs/materials.md` "Flooring products"); tune colour and figure against a room photo from the top
+  and at a low perspective angle;
 - **door (or other product that fills a zone)** → a `surface: 'door'` material in
   `src/core/materials.js` and a `design` drawing in `doorProducts.js` (`docs/materials.md` "Doors").
 
@@ -41,13 +45,16 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
 ## 3. Getting photos that automated access can reach
 
 - **Blocked** (402/403 to curl and WebFetch): IKEAPEDIA (ikeaddict.com), AptDeco, ikea-club.org,
-  manuall.
+  manuall, Leroy Merlin (read it in the Chrome tools instead: the page renders there).
 - **Worked:** Design Plus Gallery, lot-art, and manufacturer image hosts
   (`statics-lapeyre.fr`), all by plain `curl` + a regex for `https?://…\.(jpe?g|png|webp)`.
 - **Leboncoin:** curl a search-landing page such as `https://www.leboncoin.fr/ck/ameublement/lit-stockholm`,
   parse `<script id="__NEXT_DATA__">` JSON, walk objects that have `subject` + `images`, and filter
   on the product name. `images.urls_large` gives full photos. Listings sometimes repost the
   manufacturer's own studio shots, which are the best side views.
+- Open the product page's **gallery** (and sibling variants: other widths/colours of the same range);
+  the HTML often carries only the main image. For a surface, a straight top-down photo is the best
+  reference: render at the same scale beside it and compare pixel statistics, not just by eye.
 - Save photos to the session scratchpad (never the repo), view them with Read, and pick one straight
   front view, one straight side view, and one in-context photo.
 
@@ -80,8 +87,9 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
   `localStorage['house-cad:autosave:v1']` (add zones/finishes/furniture), reload, open View 3D.
 - **Owner review per iteration:** show front + side renders beside the photo views. The bed's first
   version had half-width cushions; the owner caught it by comparing with the front photos.
-- Stop the servers with `kill $(pgrep -f "[b]edview/…")`: a plain `pkill -f` matches its own
-  shell and kills it.
+- Stop the servers by port: `ss -ltnp | grep :5190` gives the pid, then `kill <pid>`. A plain
+  `pkill -f <pattern>` matches its own shell and kills it, and a `pgrep -f` on the scratch folder name
+  misses a server started from inside that folder (its command line is just `vite.js --config …`).
 
 ## 6. Measure, record, verify
 

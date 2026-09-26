@@ -10,6 +10,8 @@
 //   w, h     piece size in metres (octagon: w = octagon width); joint in metres
 //   surface  floor | wall | both
 //   pack     { pieces } per box, or { area } m² per pack (paint)
+//   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
+//            with `bevel` = long-edge V-bevel width, m); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
@@ -51,6 +53,16 @@ export const BUILTIN_MATERIALS = [
     id: 'paint_white', surface: 'wall', pattern: 'paint', w: 0, h: 0, joint: 0,
     color: 0xfafaf9, accent: 0xd6d3d1, pack: { area: 12 },
     name: { en: 'White paint', fr: 'Peinture blanche', zh: '白色涂料' },
+  },
+  {
+    // Beaulieu Flooring engineered oak, natural, "charme" (rustic) grade, vitrified
+    // (Leroy Merlin ref 92245930): 1180 × 164 mm, 14 mm thick (3.3 mm oak wear layer),
+    // V-bevel on the 2 long sides, click, 8 planks = 1.548 m² per pack. Colour from the
+    // product's room photo; bevel width is a photo estimate.
+    id: 'oak_beaulieu_charme', surface: 'floor', pattern: 'stagger', design: 'oak-rustic',
+    w: 1.18, h: 0.164, joint: 0, bevel: 0.002, thickness: 0.014,
+    color: 0xc0a585, accent: 0x6a5038, roughness: 0.55, pack: { pieces: 8 },
+    name: { en: 'Beaulieu oak charme 118×16.4', fr: 'Parquet chêne charme Beaulieu 118×16,4', zh: 'Beaulieu 橡木地板 118×16.4' },
   },
   {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like

@@ -142,6 +142,34 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - Other free LEFT buttons: **Y** (`buttons[5]`) and the stick click (`buttons[3]`).
 4. **Custom products in AR:** the numpad enters w/h/joint/pack; the list is kept per project.
 
+## Flooring products (a design on a plank material)
+
+A real flooring product is an ordinary `surface: 'floor'`, `pattern: 'stagger'` catalog entry with its
+published plank size and pack, so the takeoff (`src/core/flooring.js`) counts it like any plank. An
+optional `design` swaps the generic 3-row stagger texture for a drawn product look
+(`src/ui/finishTextures.js`, `DESIGNS`), over a larger repeat unit (3 planks × 10 rows, joints at
+seeded random offsets) so the repeat is hard to spot. `bevel` (m) draws V-bevelled long edges;
+`roughness` overrides the View 3D default. The texture stays representative: it is not the takeoff's
+cut plan.
+
+- `oak_beaulieu_charme`: Beaulieu Flooring engineered oak, natural, charme (rustic) grade, vitrified
+  (Leroy Merlin ref 92245930, 2026-09-26). From the page's characteristics: 1180 × 164 mm, 14 mm thick,
+  3.3 mm wear layer, V-bevel on the 2 long sides, click, 8 planks = 1.548 m² per pack (8 × 1.18 ×
+  0.164 = 1.548, consistent). Look tuned against the product gallery (media.adeo.com ids): **799228**, a
+  straight top-down shot of the laid floor (the main reference: render at the same 2 m scale beside
+  it; mean colour matched by pixel statistics, rendered #b79c7b vs photo #b69977), **1045179** (edge
+  close-up: knot, grain), room shots **1587720** and **964334** (these two disagree in warmth: studio
+  lighting), and the same wood in the M (13 cm) and XL (18.7 cm) widths. Figure: mild per-plank tone,
+  fine broken grain, small flames on about half the planks, clusters of pin knots, some larger knots.
+  The bevel width (2 mm) is an estimate. The gallery images load only when the gallery is opened; the
+  page HTML carries just the main image.
+  Proven: build; scratch browser renders beside photos 799228 and 964334; takeoff of a 5 × 4 m room = 107 planks
+  (Node). Not yet seen in View 3D on a real room or in AR.
+- Leroy Merlin blocks curl and WebFetch (403); the page reads fine in the Chrome tools, where the
+  characteristics are in the DOM as label/value rows. Images come from `media.adeo.com/media/<id>/media.jpeg`.
+- Texture cost: the design canvas is 2048 × 949 px (about 10 MB of GPU memory with mipmaps), four times
+  the generic planks. Hypothesis: fine on Quest for one or two such materials; watch PERF in the AR 3D view.
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a FURNISH item),
