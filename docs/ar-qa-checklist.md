@@ -54,6 +54,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] ALL FLOORS hides the height numpad and trigger cannot change a storey height
 - [ ] While ALL FLOORS is selected, horizontal navigation skips every PLAN and MARKER mode in both directions
 - [ ] ALL FLOORS reticle: aiming down lands on your own storey's floor, aiming up on the floor above (none from the top storey). Conduit/wire/pipe picks favour that storey, and grip cycles to farther storeys (basement breaker → upstairs outlet wire)
+- [ ] PLAN · EDIT: select a STAIRS zone, A/X turns its floor arrow 90° clockwise per press; the printed sheet, DXF and View 3D treads follow; STAIRS DOWN on the storey above points the opposite way for the same `climb`
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors
 - [ ] Returning to a real floor restores PLAN/MARKER traversal and editing
 - [ ] Thumbstick-y changes floor **only in LEVEL** (no-op in modes without a cycle action)

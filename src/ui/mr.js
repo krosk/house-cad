@@ -38,8 +38,8 @@ import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, verticalBandFields } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -1606,7 +1606,7 @@ export function setupMR(view, project, getFootprint) {
   };
 
   // Plan symbols for the aperture zones (door swing, window casement, half-wall
-  // hatch), drawn as thin floor strips so AR and the printed sheet stay legible
+  // hatch) and the stairs' tread/arrow, drawn as thin floor strips so AR and the printed sheet stay legible
   // side by side. Segments come from the SAME shared module the sheet/DXF use, so
   // the three surfaces can't drift. Each glyph strip is a flat quad per segment
   // with a proper perpendicular (the door arc segments aren't axis-aligned).
@@ -1615,7 +1615,7 @@ export function setupMR(view, project, getFootprint) {
     const byKind = new Map();
     for (const r of floor.rectangles) {
       const k = zoneKind(r);
-      if (!isAperture(k)) continue;
+      if (!isAperture(k) && !isStairs(k)) continue;
       (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
     }
     for (const [k, rects] of byKind) {
@@ -1623,7 +1623,9 @@ export function setupMR(view, project, getFootprint) {
       for (const r of rects) {
         const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
         const { hingeEnd, perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
-        const segs = k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
+        const stair = isStairs(k) && resolveStairOrient(r, b.x0, b.x1, b.y0, b.y1);
+        const segs = stair ? Object.values(stairSegments(bw, bh, stair.axis, stair.dir, k === 'stairs_up')).flat()
+          : k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
           : k === 'garage' ? garageDoorSegments(bw, bh, { depth: 2.10, side: 0.15, perp })
           : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
             : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
@@ -7211,7 +7213,8 @@ export function setupMR(view, project, getFootprint) {
     if (aBtn && !btn.a) {
       if (isDimMode(modes[currentMode].id) && dimRefA && dimRefB) swapDim();
       else if (modes[currentMode].id === 'translate' && translateEdge) pressTranslateKey('swap');
-      // PLAN EDIT: A/X rotates the selected aperture (door: hinge×swing, window: hinge).
+      // PLAN EDIT: A/X rotates the selected aperture (door: hinge×swing, window: hinge)
+      // or turns a stair's ascent 90°.
       else if (modes[currentMode].id === 'edit' && selectedRect?.rotateAperture(1)) {
         project.touch(); buildPlan(); applyPlanMatrix();
       }

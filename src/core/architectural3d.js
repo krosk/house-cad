@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { computeFootprint } from './geometry2d.js';
 import { extrudeFootprint } from './extrude.js';
-import { zoneKind } from './zoneColors.js';
+import { zoneKind, stairClimb } from './zoneColors.js';
 
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
@@ -366,9 +366,10 @@ function apertureInsertGeometries(floor) {
   return { doorGeometry: boxesGeometry(doors), windowGeometry: boxesGeometry(windows) };
 }
 
-// Lightweight procedural staircase: one merged thin tread per riser. The long
-// rectangle axis is the run. STAIRS UP climbs min→max along that axis; STAIRS DOWN
-// represents the same convention from the storey above, descending max→min.
+// Lightweight procedural staircase: one merged thin tread per riser. The flight
+// runs along the stair's `climb` (stairClimb: legacy = long axis toward max). STAIRS
+// UP climbs from this floor up along it; STAIRS DOWN is the same flight seen from
+// the storey above, so it descends against it.
 // Keeping treads as thin slabs (rather than a solid stepped mass) makes both the
 // direction and the opening below readable while staying cheap on mobile GPUs.
 function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
@@ -378,9 +379,11 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
     if ((kind !== 'stairs_up' && kind !== 'stairs_down') || !validBounds(rect.bounds)) continue;
     const b = rect.bounds;
     const width = b.x1 - b.x0, depth = b.y1 - b.y0;
-    const horizontal = width >= depth;
-    const run = horizontal ? width : depth;
-    const cross = horizontal ? depth : width;
+    const climb = stairClimb(rect);
+    const alongX = climb[1] === 'x';
+    const forward = climb[0] === '+';
+    const run = alongX ? width : depth;
+    const cross = alongX ? depth : width;
     const rise = Math.max(0.2, kind === 'stairs_down' ? downRise : (floor.height || 2.8));
     const count = Math.max(3, Math.min(24, Math.ceil(rise / 0.18)));
     const treadRun = run / count;
@@ -388,11 +391,13 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
     for (let i = 0; i < count; i++) {
       const t = count === 1 ? 0 : i / (count - 1);
       const level = kind === 'stairs_up' ? t * rise : -rise + t * rise;
-      const geometry = horizontal
+      const geometry = alongX
         ? new THREE.BoxGeometry(treadRun, slab, cross)
         : new THREE.BoxGeometry(cross, slab, treadRun);
-      const planX = horizontal ? b.x0 + treadRun * (i + 0.5) : (b.x0 + b.x1) / 2;
-      const planY = horizontal ? (b.y0 + b.y1) / 2 : b.y0 + treadRun * (i + 0.5);
+      // i-th tread from the bottom of the flight, walking the climb direction.
+      const s = forward ? treadRun * (i + 0.5) : run - treadRun * (i + 0.5);
+      const planX = alongX ? b.x0 + s : (b.x0 + b.x1) / 2;
+      const planY = alongX ? (b.y0 + b.y1) / 2 : b.y0 + s;
       geometry.translate(planX, level - slab / 2, -planY);
       geometries.push(geometry);
     }

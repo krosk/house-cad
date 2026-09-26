@@ -26,7 +26,8 @@ const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3)
 
 // Aperture band + orientation fields only exist on door/garage/window/half-wall/heater/sliding; a
 // plain zone carries none, so they are emitted only when present.
-const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top'];
+// `climb` (stairs) is appended last so older links, which stop at `top`, still decode.
+const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top', 'climb'];
 
 // Project → compact view object. Furniture placements are compact enough to include by
 // default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
@@ -111,7 +112,7 @@ export function loadView(project, view) {
     rectangles: (f.rects || []).map((rc) => ({
       id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
       op: rc.op || 'add', kind: rc.kind || 'room',
-      sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top,
+      sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
     })),
     constraints: [], // a view carries no parametric relationships (solver is a no-op)
     markers: (f.markers || []).map((m) => ({

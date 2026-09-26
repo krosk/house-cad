@@ -19,7 +19,7 @@ import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOp
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
-import { ZONE_KINDS, isAperture } from './core/zoneColors.js';
+import { ZONE_KINDS, isAperture, isStairs, stairClimb } from './core/zoneColors.js';
 import { t, localizedFloorName, revLabels, getLang, LANGS, LANG_ORDER } from './core/i18n.js';
 import { checkForUpdate, onVersionStatus, startVersionChecks } from './core/versionCheck.js';
 
@@ -398,12 +398,15 @@ function updateProps() {
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
-  // Rotate control: only apertures have an orientation. Show the current state so
+  // Rotate control: only apertures and stairs have an orientation. Show the current state so
   // it's clear what each click changes (door: hinge·swing, window: hinge side).
-  const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage';
+  const stairs = isStairs(r.kind);
+  const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage' || stairs;
   pApertureRow.hidden = !aperture;
   if (aperture) {
-    const state = r.kind === 'garage' ? r.swing
+    // Stairs show their ascent as a screen arrow (the sketch draws plan +y up).
+    const state = stairs ? `climbs ${{ '+x': '→', '-x': '←', '+y': '↑', '-y': '↓' }[stairClimb(r)]}`
+      : r.kind === 'garage' ? r.swing
       : (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;
   }

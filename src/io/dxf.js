@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -199,26 +199,9 @@ function writeZoneSymbol(w, rect, kind) {
       }
     }
   } else if (kind === 'stairs_up' || kind === 'stairs_down') {
-    const up = kind === 'stairs_up';
-    for (let i = 1; i < 6; i++) {
-      if (horizontal) w.line('STAIRS', b.x0 + width * i / 6, b.y0, b.x0 + width * i / 6, b.y1);
-      else w.line('STAIRS', b.x0, b.y0 + height * i / 6, b.x1, b.y0 + height * i / 6);
-    }
-    if (horizontal) {
-      const cy = (b.y0 + b.y1) / 2;
-      const tail = b.x0 + width * (up ? 0.18 : 0.82), tip = b.x0 + width * (up ? 0.82 : 0.18);
-      const back = b.x0 + width * (up ? 0.68 : 0.32);
-      w.line('STAIRS', tail, cy, tip, cy);
-      w.line('STAIRS', tip, cy, back, b.y0 + height * 0.25);
-      w.line('STAIRS', tip, cy, back, b.y0 + height * 0.75);
-    } else {
-      const cx = (b.x0 + b.x1) / 2;
-      const tail = b.y0 + height * (up ? 0.18 : 0.82), tip = b.y0 + height * (up ? 0.82 : 0.18);
-      const back = b.y0 + height * (up ? 0.68 : 0.32);
-      w.line('STAIRS', cx, tail, cx, tip);
-      w.line('STAIRS', cx, tip, b.x0 + width * 0.25, back);
-      w.line('STAIRS', cx, tip, b.x0 + width * 0.75, back);
-    }
+    const { axis, dir } = resolveStairOrient(rect, b.x0, b.x1, b.y0, b.y1);
+    const { treads, arrow } = stairSegments(width, height, axis, dir, kind === 'stairs_up');
+    segs('STAIRS', [...treads, ...arrow]);
   } else if (kind === 'cabinet') {
     w.line('CABINET', b.x0, b.y0, b.x1, b.y1);
     w.line('CABINET', b.x0, b.y1, b.x1, b.y0);

@@ -55,6 +55,22 @@ export const APERTURE_DEFAULTS = {
   sliding:  { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
 };
 
+// Stairs orientation. `climb` is the PHYSICAL ascent direction in plan ('+x',
+// '-y', '-x', '+y'; listed clockwise seen from above, the A/X rotate order). It is
+// the same on both storeys a stair joins: STAIRS UP draws its arrow along `climb`,
+// STAIRS DOWN (the same flight seen from above) against it. A stair saved before
+// `climb` existed has none and keeps its legacy reading: it climbs its long axis
+// toward the larger coordinate.
+export const STAIR_CLIMBS = ['+x', '-y', '-x', '+y'];
+export function isStairs(kind) {
+  return kind === 'stairs_up' || kind === 'stairs_down' || kind === 'stairs';
+}
+export function stairClimb(rect) {
+  if (STAIR_CLIMBS.includes(rect?.climb)) return rect.climb;
+  const b = rect.bounds;
+  return b.x1 - b.x0 >= b.y1 - b.y0 ? '+x' : '+y';
+}
+
 export function isAperture(kind) {
   return Object.prototype.hasOwnProperty.call(APERTURE_DEFAULTS, kind);
 }

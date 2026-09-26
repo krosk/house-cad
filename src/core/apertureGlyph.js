@@ -13,6 +13,8 @@
 // hinge authored on the wall's min-coordinate jamb ("left") always renders on
 // the correct side regardless of axis flips.
 
+import { stairClimb } from './zoneColors.js';
+
 function arcSegments(cx, cy, r, a0, a1, steps, out) {
   for (let i = 0; i < steps; i++) {
     const t0 = a0 + ((a1 - a0) * i) / steps;
@@ -209,4 +211,37 @@ export function resolveApertureOrient(rect, sx0, sx1, sy0, sy1) {
   // perpendicular axis)? +plan-normal maps there only when that axis isn't flipped.
   const flip = horizontal ? (sy1 >= sy0 ? 1 : -1) : (sx1 >= sx0 ? 1 : -1);
   return { hingeEnd, perp: (swingIn ? 1 : -1) * flip };
+}
+
+// Stairs: five tread divisions across the flight plus a direction arrow along it,
+// split so the sheet can stroke treads lighter than the arrow. `axis` ('x'/'y')
+// and `dir` (+1/-1) are the ascent in the CALLER'S space (from
+// resolveStairOrient); `up` false (STAIRS DOWN) reverses the arrow, since from the
+// upper storey you walk the same flight downward.
+export function stairSegments(w, h, axis, dir, up = true) {
+  const along = axis === 'x' ? w : h, cross = axis === 'x' ? h : w;
+  // (s along, c across) → box (x, y)
+  const P = (s, c) => (axis === 'x' ? [s, c] : [c, s]);
+  const seg = (a, b) => [...P(...a), ...P(...b)];
+  const treads = [];
+  for (let i = 1; i < 6; i++) treads.push(seg([along * i / 6, 0], [along * i / 6, cross]));
+  const fwd = (up ? dir : -dir) > 0;
+  const at = (f) => along * (fwd ? f : 1 - f);
+  const mid = cross / 2, tip = at(0.82), back = at(0.68);
+  const arrow = [
+    seg([at(0.18), mid], [tip, mid]),
+    seg([tip, mid], [back, cross * 0.25]),
+    seg([tip, mid], [back, cross * 0.75]),
+  ];
+  return { treads, arrow };
+}
+
+// Resolve a stair's plan `climb` (stairClimb) into the caller's space, given the
+// rectangle's corners as mapped there — same contract as resolveApertureOrient, so
+// the Y-flipped print page keeps the arrow pointing the same real-world way.
+export function resolveStairOrient(rect, sx0, sx1, sy0, sy1) {
+  const climb = stairClimb(rect);
+  const axis = climb[1];
+  const flip = axis === 'x' ? (sx1 >= sx0 ? 1 : -1) : (sy1 >= sy0 ? 1 : -1);
+  return { axis, dir: (climb[0] === '+' ? 1 : -1) * flip };
 }

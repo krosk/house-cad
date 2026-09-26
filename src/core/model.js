@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
-import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
 let _id = 0;
@@ -113,7 +113,7 @@ export function syncFloorIdCounter(ids) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -139,6 +139,10 @@ export class Rectangle {
       // an aperture opening). Explicit values win on deserialize/clone.
       this.foot = foot !== undefined ? foot : FURNITURE_BAND.foot;
       this.top  = top  !== undefined ? top  : FURNITURE_BAND.top;
+    } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
+      // Stairs keep an authored ascent direction once rotated; absent = legacy
+      // long-axis reading (see stairClimb in zoneColors.js).
+      this.climb = climb;
     }
   }
 
@@ -151,6 +155,8 @@ export class Rectangle {
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
+    // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.
+    if (!isStairs(this.kind)) delete this.climb;
     if (d) {
       this.sill = d.sill; this.head = d.head; this.hinge = d.hinge;
       if (d.swing !== undefined) this.swing = d.swing; else delete this.swing;
@@ -165,8 +171,14 @@ export class Rectangle {
 
   // Cycle an aperture through its orientations (used by the AR A/X flip and the
   // desktop panel). A door has 4: hinge left/right × swing in/out. A window has 3:
-  // hinge left → right → both. Half walls / non-apertures have nothing to rotate.
+  // hinge left → right → both. Stairs turn their ascent 90° (4 states, clockwise).
+  // Half walls / other zones have nothing to rotate.
   rotateAperture(dir = 1) {
+    if (isStairs(this.kind)) {
+      const i = STAIR_CLIMBS.indexOf(stairClimb(this));
+      this.climb = STAIR_CLIMBS[((i + dir) % 4 + 4) % 4];
+      return true;
+    }
     // A garage door has no jamb hinge: rotation only chooses which wall face its
     // 2.1 m overhead footprint extends into.
     if (this.kind === 'garage') {

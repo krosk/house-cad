@@ -67,8 +67,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   zones and trigger confirms the yellow candidate; trigger again deselects. B/Y deletes it, and thumbstick up/down cycles the selected zone's kind
   through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs up→stairs down→cabinet→
   furniture). **When the selection is an aperture** (door/garage/window/halfwall/heater/sliding), **A/X
-  rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge; halfwall/heater
-  return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
+  rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge, stairs 4-way
+  ascent; halfwall/heater return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
   bounds — see "Apertures & vertical bands". Selecting a **furniture** placeholder zone opens the same
   band pad for its `[foot,top]`. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller
@@ -484,7 +484,12 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   page keeps left/right and in/out correct — never bake orientation into the glyph functions.
 - **A/X rotates the selected aperture** in PLAN EDIT (`rotateAperture`): door/sliding cycle 4 states
   `[left,in]→[right,in]→[right,out]→[left,out]`, window cycles 3 hinge states `left→right→both`.
-  Garage toggles its inward face (`in↔out`). Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
+  Garage toggles its inward face (`in↔out`). **Stairs** (owner request, 2026-09-26) turn their ascent
+  90° clockwise per press: `climb` cycles `+x→-y→-x→+y`. `climb` is the *physical* climb direction, so
+  the same value holds on both storeys: STAIRS UP draws its arrow along it, STAIRS DOWN against it. A
+  stair with no `climb` (saved before this) keeps the legacy reading, long axis toward max, until it is
+  first rotated. The sheet, DXF, AR floor glyph (`stairSegments`/`resolveStairOrient`) and View 3D treads
+  all read it. Climbing along the short axis is allowed, because wide flights exist. Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
   not collide with A/X = FLIP in DIMS/TRANSLATE.
 - **Band pad** — selecting a band-carrying rect in PLAN EDIT opens the reused DIMS numpad as a band
   editor (`activateBandPad`/`syncBandPad`/`commitBandField`). `verticalBandFields(rect)` is the

@@ -19,8 +19,8 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
-import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient } from '../core/apertureGlyph.js';
+import { zoneKind, isStairs } from '../core/zoneColors.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
@@ -413,7 +413,7 @@ function drawFootprint(be, L, footprint) {
 // sit over the corresponding cutouts in the computed footprint so a door,
 // window, stair or cabinet no longer prints as an anonymous rectangular hole.
 // The same function draws the compact legend samples below.
-function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1, over = 0, mmPerM = 1) {
+function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, perp = 1, over = 0, mmPerM = 1, stair = null) {
   if (!(w > 0 && h > 0)) return;
   const x1 = x + w, y1 = y + h;
   const horizontal = w >= h;
@@ -462,26 +462,13 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
       }
     }
   } else if (kind === 'stairs_up' || kind === 'stairs_down') {
-    // Five tread divisions plus an arrow showing ascent/descent. Legacy STAIRS
-    // migrates to STAIRS UP, so its established arrow direction is preserved.
-    const up = kind === 'stairs_up';
-    for (let i = 1; i < 6; i++) {
-      if (horizontal) line(x + (w * i) / 6, y, x + (w * i) / 6, y1, 0.13);
-      else line(x, y + (h * i) / 6, x1, y + (h * i) / 6, 0.13);
-    }
-    if (horizontal) {
-      const cy = y + h / 2, tail = x + w * (up ? 0.18 : 0.82), tip = x + w * (up ? 0.82 : 0.18);
-      const back = x + w * (up ? 0.68 : 0.32);
-      line(tail, cy, tip, cy, 0.25);
-      line(tip, cy, back, y + h * 0.25, 0.25);
-      line(tip, cy, back, y + h * 0.75, 0.25);
-    } else {
-      const cx = x + w / 2, tail = y + h * (up ? 0.82 : 0.18), tip = y + h * (up ? 0.18 : 0.82);
-      const back = y + h * (up ? 0.32 : 0.68);
-      line(cx, tail, cx, tip, 0.25);
-      line(cx, tip, x + w * 0.25, back, 0.25);
-      line(cx, tip, x + w * 0.75, back, 0.25);
-    }
+    // Five tread divisions plus an arrow showing ascent/descent along the authored
+    // `climb` (resolved in page space by the caller). The legend sample has no rect,
+    // so it keeps the long-axis, left-to-right reading.
+    const { axis, dir } = stair ?? { axis: horizontal ? 'x' : 'y', dir: horizontal ? 1 : -1 };
+    const { treads, arrow } = stairSegments(w, h, axis, dir, kind === 'stairs_up');
+    segs(treads, 0.13);
+    segs(arrow, 0.25);
   } else if (kind === 'cabinet') {
     // Cabinet carcass/front: crossed diagonals distinguish it from openings.
     line(x, y, x1, y1);
@@ -510,6 +497,7 @@ function drawZones(be, L, floor, layers) {
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
       kind, hingeEnd, false, perp, over, Math.abs(L.X(1) - L.X(0)),
+      isStairs(kind) ? resolveStairOrient(rect, sx0, sx1, sy0, sy1) : null,
     );
   }
 }
