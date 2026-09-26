@@ -12,17 +12,18 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/electrical-workflow.md` | Conduit / wire / control-link lanes, derived circuits, owner decisions |
 | `docs/plumbing-workflow.md` | The pipe lane (first slice) and what's deferred |
 | `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, FURNISH, procedural furniture (products with no IKEA model) |
-| `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos; run by the `/model-product` skill |
+| `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes and door products: owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile products, View 3D reflections, door products: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-26 (session 30)
-**Status:** Proven (git + live `version.json`): `origin/main` includes the flooring commit that
-also carries this handoff (verify the tip with `git log -1 origin/main`). The tree is clean apart from the owner's untracked
+**Status:** Proven (git + live `version.json`): `origin/main` = `c0e135d` and Pages serves it; this
+handoff's own commit changes only this file. The tree is clean apart from the owner's untracked
 `Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
-everything from session 30 is build/Node-verified only and **parked for the owner to walk** (Next step A).
+everything from session 30 is verified by build, Node or a desktop browser only, and **parked for the owner
+to walk** (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -89,9 +90,16 @@ Read `docs/product-intent.md` before planning AR work.
    (`src/ui/doorProducts.js`). `docs/materials.md` "Doors".
 8. **Workflow recorded** (`2972e7a`): `docs/product-modelling.md` + the `/model-product` skill, from
    how the bed and door were made.
-9. **Flooring product** (the commit that carries this handoff): Beaulieu oak charme 118×16.4 (Leroy
-   Merlin 92245930) as a floor material with a procedural `design: 'oak-rustic'` texture, tuned
-   against the product's top-down gallery photo. `docs/materials.md` "Flooring products".
+9. **Surface products** (`docs/materials.md` "Flooring products", "Wall tile products"): a finish
+   material can name a `design`, a procedural texture drawn in `src/ui/finishTextures.js`:
+   - Beaulieu oak charme 118×16.4 floor (`ac10962`, Leroy Merlin 92245930), `design: 'oak-rustic'`;
+   - GoodHome Vernisse white gloss wall tile 30×7.5 (`c0e135d`, Castorama), `design: 'handmade-gloss'`
+     with a **bump texture** (`finishBumpTexture`) that View 3D applies.
+10. **View 3D ✦ Reflections** (`c0e135d`): an opt-in environment map (RoomEnvironment) for glossy
+    finishes; the glazed tile only looks right with it. `docs/materials.md` "View 3D reflections".
+11. **`tools/product-images.mjs`** (`efca116`, Castorama added in `c0e135d`): per-retailer photo
+    extraction (IKEA, Lapeyre, Castorama, leboncoin from Node; Leroy Merlin through a Chrome snippet,
+    since it runs DataDome). `docs/product-modelling.md` step 3; the `/model-product` skill uses it.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -130,6 +138,11 @@ Read `docs/product-intent.md` before planning AR work.
   `public/furniture/models/` (not built). Follow `docs/product-modelling.md` / `/model-product`.
 - **A door product is a material of its DOOR zone** (owner decision), authored in MATERIAL · DOOR;
   made-to-measure products take the zone's size.
+- **Product textures are procedural too** (seeded canvas, no stored images); photos are references
+  only and stay in the session scratchpad.
+- **View 3D reflections are on demand, per device** (owner: some devices struggle): off by default,
+  `localStorage`, never in project/share data, and **cleared for AR sessions** (Quest cost). AR
+  reflections were asked about, not built: `docs/materials.md` lists what they would need.
 - **LEFT controller:** trigger = teleport, grip = hold-to-view sheet, stick-x = rotate plan, stick-y =
   storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the stick click are free.
 
@@ -157,6 +170,11 @@ Read `docs/product-intent.md` before planning AR work.
 - **Never run `adb shell pm clear com.krosk.housecad`** casually: it wipes the owner's autosave and
   save slots too. To pick up a new build, relaunch the APK and check the HUD `update:` line.
   adb is at `~/Android/Sdk/platform-tools/adb`; the headset has been connected over wireless adb.
+- **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
+  curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
+  of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
+- **Chrome tools:** a preview tab can hang its screenshots after a while; open a fresh tab. Stop
+  scratch Vite servers by port (`ss -ltnp | grep :5190`), not `pkill -f` (it kills its own shell).
 - **Deploy check:** `curl -s https://krosk.github.io/house-cad/version.json` (the commit it serves).
   The unauthenticated Actions API rate-limits quickly, and there is no `gh` CLI here.
 - **Solved coordinates carry float noise**; grids built from edges must snap (`snap()` in
@@ -173,7 +191,7 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `2972e7a` before the handoff commit), all with descriptive bodies.
+All pushed (`origin/main` = `c0e135d` before the handoff commit), all with descriptive bodies.
 Doc-only commits are omitted.
 - **Session 30:**
   - `47c08de` stair `climb`;
@@ -183,7 +201,7 @@ Doc-only commits are omitted.
     `f0f6bf1` AR 3D view + the `PLAN_OVERLAY_GROUPS` fix;
   - products: `63cfd17` TV bench (+ previous handoff) · `4abecef` procedural furniture / STOCKHOLM bed ·
     `cc55640` door products / Ange-Line · `2972e7a` modelling workflow + skill ·
-    the Beaulieu oak flooring commit (with this handoff).
+    `ac10962` Beaulieu oak floor · `efca116` photo extractor · `c0e135d` Vernisse tile + Reflections.
 - **Session 29:**
   - 3D walls/faceplates: `f457bd5`, `309d807`;
   - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
@@ -221,7 +239,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
-| `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view |
+| `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s (`DESIGNS`, `BRICK_DESIGNS`) and the brick-design bump map |
+| `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries); used by FURNISH and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf design, hardware) from `doorProductPlacements` |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
@@ -233,7 +252,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   for each). The owner said they would verify later. First, check that the four overlays that never
   rendered before `f0f6bf1` now show: Z-dims, adjacent-floor dots, CHECK rings, MATERIAL tints. Then:
   - MATERIAL · FLOOR/WALL/DOOR (set the Ange-Line on the real entrance door zone; Beaulieu oak on a
-    room, watch PERF: its texture is 2048 px);
+    room and Vernisse tile on a wall; watch PERF: each design texture is 2048 px);
+  - View 3D ✦ Reflections on a phone (does it hold frame rate?);
   - FURNISH: the STOCKHOLM bed and the TV bench (does a real IKEA model replace the box on the APK?);
   - the LEFT X AR 3D view, with **PROJECT · PERF** on;
   - View 3D textures (desktop);
@@ -266,11 +286,14 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
   - the readout pill, which grew to 4 lines and sits 1.25 cm higher in every mode;
   - how the textures look in a browser;
-  - the bed and the door in AR (both rendered only in a desktop browser).
+  - the bed and the door in AR (both rendered only in a desktop browser);
+  - the oak floor and Vernisse tile on real rooms (seen only in scratch previews), and Reflections on
+    any device other than a desktop Chrome.
 
   Estimates to confirm with a tape measure or the owner: the bed's rail height, headboard lean and
   cushion size (from photos); the door colour (anthracite ~RAL 7016 guessed; Lapeyre colours are
-  customisable) and which door zone in the owner's house is the entrance.
+  customisable) and which door zone in the owner's house is the entrance; the oak's 2 mm bevel and the
+  tile's 3 mm joint (photo estimates).
 
   Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
   with markers, labels, conduits and wires since the batching, and reported them working.
