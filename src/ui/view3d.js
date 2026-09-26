@@ -8,6 +8,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { buildDoorProduct } from './doorProducts.js';
+import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture, finishBumpTexture } from './finishTextures.js';
 
@@ -378,6 +379,19 @@ export class View3D {
           mesh.userData.floorId = floorId || null;
           mesh.userData.floorName = name || '';
           mesh.userData.architecturalRole = 'doors';
+          mesh.visible = this._meshVisible(mesh);
+          this.house.add(mesh);
+        }
+      }
+      // Window products on WINDOW zones (docs/materials.md "Windows"), in place of the pane.
+      for (const placement of entry.windowProducts || []) {
+        for (const mesh of buildWindowProduct(placement)) {
+          mesh.castShadow = !mesh.material.transparent;
+          mesh.receiveShadow = true;
+          mesh.position.y = elevation || 0;
+          mesh.userData.floorId = floorId || null;
+          mesh.userData.floorName = name || '';
+          mesh.userData.architecturalRole = 'windows';
           mesh.visible = this._meshVisible(mesh);
           this.house.add(mesh);
         }

@@ -274,6 +274,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     thumbstick-y cycles door products (none first), B/Y clears. The zone tints in the product colour;
     the product itself shows in the AR 3D view (LEFT X). Readout: product, opening `width × head`,
     `MADE TO MEASURE`. Design in `docs/materials.md` "Doors".
+  - **WINDOW** (`id: mat_window`): the same for WINDOW zones and `surface: 'window'` products (shares
+    the DOOR code path through `APT_KIND`). Readout: product, `width × (head − sill)`, `1 LEAF` /
+    `2 LEAVES` (the zone's hinge: both = two), `MADE TO MEASURE`. Design in `docs/materials.md`
+    "Windows".
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,

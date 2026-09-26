@@ -20,6 +20,11 @@
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
 // `accent` the glass, `leafDepth` the leaf thickness (m). Made-to-measure: the size
 // comes from the zone. No takeoff.
+//
+// Window products (`surface: 'window'`, `pattern: 'window'`) go on a WINDOW zone the same
+// way: `design` picks the profile in src/ui/windowProducts.js, `color` the PVC, `accent`
+// the glass tint, `frameDepth`/`sashDepth` the published profile depths. The zone's
+// width, sill, head and hinge (both = two leaves) size it. No takeoff.
 
 export const BUILTIN_MATERIALS = [
   {
@@ -99,6 +104,15 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, leafDepth: 0.085,
     color: 0x3c4146, accent: 0xf1f4f7, pack: null,
     name: { en: 'Lapeyre Ange-Line door', fr: 'Porte Ange-Line Lapeyre', zh: 'Lapeyre Ange-Line 入户门' },
+  },
+  {
+    // Lapeyre Héméra PVC window, white, made to measure (FPC5837268, 2026-09-26): hidden
+    // sash ("ouvrant caché"), frame 80 mm and sash 84 mm deep, 4/20/4 glazing. Profile
+    // faces measured on the product photos (src/ui/windowProducts.js PROFILES.hemera).
+    id: 'window_hemera_white', surface: 'window', pattern: 'window', design: 'hemera',
+    w: 0, h: 0, joint: 0, frameDepth: 0.08, sashDepth: 0.084,
+    color: 0xf5f5f3, accent: 0xcfe0e6, pack: null,
+    name: { en: 'Lapeyre Héméra PVC window, white', fr: 'Fenêtre PVC Héméra Lapeyre, blanc', zh: 'Lapeyre Héméra 白色 PVC 窗' },
   },
 ];
 

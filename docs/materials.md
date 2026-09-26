@@ -297,6 +297,41 @@ the zone.
 - Limits: `door` zones only (not sliding or garage); the leaf is drawn closed; the texture is
   stretched over the leaf, so the design scales with the opening's proportions.
 
+## Windows (window products)
+
+Same model as doors: a window product is a **material of a WINDOW zone**, stored as a `{rect}` finish on
+the zone (`project.setWindowFinish`, an alias of `setDoorFinish`), authored in AR as
+**MATERIAL · WINDOW**, made to measure from the zone (width, sill, head). No takeoff.
+
+- Catalog entries: `surface: 'window'`, `pattern: 'window'`, `design` (the profile set in
+  `src/ui/windowProducts.js`), `color` (PVC), `accent` (glass tint), `frameDepth`, `sashDepth`.
+- **Leaves come from the zone's hinge**: left/right = one leaf hinged on that side, both = two leaves
+  (the hinge the plan already cycles with the A/X flip). Tilt-and-turn vs casement is not modelled.
+- 3D: `windowProductPlacements` (architectural3d.js) resolves centre, axis, width, sill, head, leaves,
+  hinge end and the **room side**. That is the side whose probe point, 10 cm past the zone, is inside
+  a ROOM rect, falling back to the zone's swing side when both or neither are. The builder puts the
+  handle and hinges on that side. `buildArchitecturalFloor({productWindows})` skips the plain pane.
+  The frame is centred in the zone's depth; real fitting (flush with the inside face, renovation
+  frame) is not modelled.
+- **Lapeyre Héméra, white PVC** (`window_hemera_white`), made to measure (page FPC5837268, 2026-09-26).
+  - From the page: hidden sash ("ouvrant caché"), frame 80 mm and sash 84 mm deep, 4/20/4 glazing;
+    leaves and opening type are chosen at order; the handle is sold separately.
+  - Profile faces were measured on the straight-on photos: `202443669_2` (two leaves, inside),
+    `202443668` (one leaf, inside) and `202443669_3` (two leaves, outside). The scale comes from the
+    handle (about 160 mm), and the one- and two-leaf photos agree within 1 mm. Measurements:
+    - inside: a 19 mm frame lip, then a 62 mm sash face;
+    - outside: one 76 mm face (the sash is hidden);
+    - two leaves: an 80 mm centre where they meet.
+  - Also modelled: a white handle on the lock stile, or the centre on two leaves; three hinges per
+    hinged side (two below 1 m); a black glazing gasket and drain caps outside.
+  - **Estimates:** the handle size is the photo scale, and the colour is a white close to RAL 9016.
+  - Proven 2026-09-26:
+    - the build passes;
+    - scratch renders beside the photos: one and two leaves, inside and outside;
+    - the real desktop View 3D on an injected demo house: two leaves along X, one leaf along Y on
+      both sides; handle and hinges face the room; no console errors.
+  - Not yet seen in AR.
+
 ## Open questions
 
 - Until the AR 3D view exists, AR shows a wall face's material as a coloured strip along its edge on

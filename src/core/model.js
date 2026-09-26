@@ -521,9 +521,10 @@ export class Project {
     this._emit({ solveRectangles: false });
   }
 
-  // Door: one product per DOOR zone, stored as a `{rect}` target on the door rect
-  // itself (a door rect is never part of a room component, so it can't collide with a
-  // floor finish). A null material clears it.
+  // Door or window: one product per DOOR / WINDOW zone, stored as a `{rect}` target on
+  // the zone itself (an aperture rect is never part of a room component, so it can't
+  // collide with a floor finish). A null material clears it.
+  setWindowFinish(rectId, material) { this.setDoorFinish(rectId, material); }
   setDoorFinish(rectId, material) {
     const floor = this.activeFloor;
     floor.finishes = (floor.finishes || []).filter((f) => f.target?.edge || f.target?.rect !== rectId);

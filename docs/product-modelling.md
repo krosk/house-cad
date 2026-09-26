@@ -15,6 +15,9 @@ Where the result goes:
   toggle to look right (`docs/materials.md` "Wall tile products");
 - **door (or other product that fills a zone)** → a `surface: 'door'` material in
   `src/core/materials.js` and a `design` drawing in `doorProducts.js` (`docs/materials.md` "Doors").
+- **window** → a `surface: 'window'` material and a profile set in `windowProducts.js` (`docs/materials.md`
+  "Windows"). Measure the profile faces on straight-on photos, inside and outside, scaled by a known
+  part (the handle, about 160 mm).
 
 Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md`).
 

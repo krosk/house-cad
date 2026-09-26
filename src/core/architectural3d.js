@@ -474,8 +474,10 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const wallBoxes = architecturalWallBoxes(floor, opts);
   const wallGeometry = boxesGeometry(wallBoxes);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
-  // Door zones carrying a door product draw that product instead (doorProductPlacements).
-  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, opts.productDoors);
+  // Door/window zones carrying a product draw that product instead
+  // (doorProductPlacements / windowProductPlacements).
+  const skip = new Set([...(opts.productDoors || []), ...(opts.productWindows || [])]);
+  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip);
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
@@ -509,6 +511,47 @@ export function doorProductPlacements(floor, materialOf) {
       hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
       swingZ: alongX ? -perp : perp,
       leafDepth: def.leafDepth || 0.07,
+    });
+  }
+  return out;
+}
+
+// Window products (docs/materials.md "Windows"): every WINDOW zone whose `{rect}` finish
+// is a `surface: 'window'` material, with what src/ui/windowProducts.js needs. The zone's
+// hinge picks the leaves (both = two). `roomZ` is the room side in the builder's local
+// frame (same convention as a door's swingZ): the side whose probe point, just past the
+// zone, falls in a ROOM rect; when both or neither do, the zone's swing side.
+export function windowProductPlacements(floor, materialOf) {
+  const out = [];
+  const height = Math.max(0, floor?.height || 0);
+  const rooms = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'room' && validBounds(r.bounds));
+  const inRoom = (x, y) => rooms.some((r) => {
+    const b = r.bounds;
+    return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1;
+  });
+  for (const f of floor?.finishes || []) {
+    if (f.target?.edge) continue;
+    const rect = (floor.rectangles || []).find((r) => r.id === f.target?.rect);
+    if (!rect || zoneKind(rect) !== 'window' || !validBounds(rect.bounds)) continue;
+    const def = materialOf(f.material);
+    if (def?.surface !== 'window') continue;
+    const b = rect.bounds;
+    const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
+    // Plan side (+1 = toward the larger perpendicular coordinate) that is the room.
+    const reach = (alongX ? b.y1 - b.y0 : b.x1 - b.x0) / 2 + 0.1;
+    const plus = alongX ? inRoom(cx, cy + reach) : inRoom(cx + reach, cy);
+    const minus = alongX ? inRoom(cx, cy - reach) : inRoom(cx - reach, cy);
+    const side = plus !== minus ? (plus ? 1 : -1) : perp;
+    const sill = clipped(rect.sill ?? 0.9, 0, height);
+    out.push({
+      rectId: rect.id, material: f.material, def, alongX, cx, cy,
+      width: alongX ? b.x1 - b.x0 : b.y1 - b.y0,
+      sill, head: clipped(rect.head ?? 2.1, sill, height),
+      leaves: (rect.hinge ?? 'left') === 'both' ? 2 : 1,
+      hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
+      roomZ: alongX ? -side : side,
     });
   }
   return out;
