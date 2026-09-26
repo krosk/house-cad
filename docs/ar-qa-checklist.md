@@ -355,6 +355,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] With the 3D view off, placed items show only as flat violet footprints on the floor (V notch on the front edge, dashed for a wall-hung unit); hover yellow, selected amber; grip-drag moves the footprint; rotate turns it
 - [ ] LEFT X on: the 3D models appear and the footprints disappear; LEFT X off: back to footprints
 - [ ] Cycle to `daikin-ctxm15a` and drop it on a wall: it starts with its bottom at 2.0 m (foot pad shows 2.00), back flat to the wall once rotated, flap and sensors facing the room at the bottom right; its size looks right against the real wall
+- [ ] Same for `daikin-ftxm60a`: visibly wider (997 mm) and deeper than the CTXM15A
 
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)

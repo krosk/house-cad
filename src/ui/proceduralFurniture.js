@@ -216,8 +216,8 @@ function stockholmBed(entry) {
   return g;
 }
 
-// Daikin Perfera CTXM-A wall-mounted AC indoor unit (sources in docs/furniture.md).
-// W × H × D from the catalog `sizeMm` (Daikin: 804 × 298 × 252 mm). Back against the
+// Daikin Perfera CTXM-A / FTXM-A wall-mounted AC indoor units (sources in docs/furniture.md).
+// W × H × D from the catalog `sizeMm` (Daikin: 804 × 298 × 252 or 997 × 298 × 292 mm). Back against the
 // wall at −Z; the catalog `mountZMm` lifts it on drop (the foot is the unit's bottom).
 //
 // Shape, from Daikin's installer guide drawings and retailer front photos:
@@ -279,8 +279,8 @@ function daikinWallUnit(entry) {
     (flapX[0] + flapX[1]) / 2, 0.5, 0.002);
   // Sensor windows: light grey discs with a dark centre (cylinder axis = local Y = normal).
   const lens = new THREE.MeshStandardMaterial({ color: 0xcfd0d0, roughness: 0.35 });
-  for (const [xmm, r] of [[700, 0.009], [745, 0.012]]) {
-    const x = xmm / 1000 - W / 2;
+  for (const [xmm, rmm] of p.sensorsMm || [[700, 9], [745, 12]]) { // [centre from the left, radius]
+    const x = xmm / 1000 - W / 2, r = rmm / 1000;
     onSlope(new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.003, 20), lens), x, 0.45, 0.0015);
     onSlope(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.4, r * 0.4, 0.003, 16), dark), x, 0.45, 0.0025);
   }

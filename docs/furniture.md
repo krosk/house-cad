@@ -106,6 +106,14 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   to a side wall on each side. The builder doesn't check them. Proven in a scratch browser preview (bounding box 0.804 × 0.298 ×
   0.253 m, the extra 1 mm is the logo) and in the real View 3D overview on a wall of the demo house;
   not yet seen in FURNISH or on device.
+- `daikin-ftxm60a`: Daikin Perfera FTXM60A wall-mounted AC indoor unit (6 kW), 997 × 298 × 292 mm,
+  14.5 kg (Daikin's FTXM-A spec table; the FTXM71A shares the body). Same `daikin-wall-unit` builder
+  and installation rules as the CTXM15A. Front layout measured on condizionati.fr's straight front photo
+  (gallery image 153627, scaled by the 997 mm width): panel lower edge 49 mm up, flap 88–820 mm from the
+  left, sensors centred at 894 and 946 mm (`params.sensorsMm`), logo 216 mm below the top; photo
+  estimates, not measurements. Retailer galleries mix generations: enrplus and climaled show a single
+  round sensor (Hypothesis: the older FTXM-R body), so they were not used. Proven in a scratch browser preview
+  (bounding box 0.997 × 0.298 × 0.293 m); not yet seen in FURNISH or on device.
 
 ## Rendering
 

@@ -60,9 +60,50 @@
         65,
         674
       ],
-      "logoFromTopMm": 206
+      "logoFromTopMm": 206,
+      "sensorsMm": [
+        [
+          700,
+          9
+        ],
+        [
+          745,
+          12
+        ]
+      ]
     },
     "source": "procedural: Daikin Perfera CTXM15A wall-mounted AC indoor unit (no manufacturer 3D model); size from Daikin's CTXM-A spec table, shape from the CTXM-A installer reference guide 4P518023-17P + retailer photos",
+    "registeredAt": "2026-09-26T00:00:00.000Z"
+  },
+  "daikin-ftxm60a": {
+    "name": "daikin-ftxm60a",
+    "article": "daikin-ftxm60a",
+    "sizeMm": [
+      997,
+      298,
+      292
+    ],
+    "mountZMm": 2000,
+    "procedural": "daikin-wall-unit",
+    "params": {
+      "panelBottomMm": 49,
+      "flapMm": [
+        88,
+        820
+      ],
+      "logoFromTopMm": 216,
+      "sensorsMm": [
+        [
+          894,
+          11
+        ],
+        [
+          946,
+          14
+        ]
+      ]
+    },
+    "source": "procedural: Daikin Perfera FTXM60A wall-mounted AC indoor unit (no manufacturer 3D model); size from Daikin's FTXM-A spec table, shape from the CTXM-A/FTXM-A installer reference guide 4P518023-17P + condizionati.fr front photo",
     "registeredAt": "2026-09-26T00:00:00.000Z"
   }
 }
