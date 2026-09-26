@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
 
@@ -257,7 +258,7 @@ export class View3D {
     this.ikeaProxy = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
     const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
     this.furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
-    fetch(import.meta.env.BASE_URL + 'furniture/index.json')
+    this.furnitureCatalogReady = fetch(import.meta.env.BASE_URL + 'furniture/index.json')
       .then((response) => (response.ok ? response.json() : {}))
       .then((catalog) => { this.furnitureCatalog = catalog || {}; })
       .catch(() => { this.furnitureCatalog = {}; });
@@ -422,6 +423,13 @@ export class View3D {
   async _loadFurnitureSource(article) {
     if (this.furnitureSources.has(article)) return this.furnitureSources.get(article);
     if (this.furniturePending.has(article)) return this.furniturePending.get(article);
+    await this.furnitureCatalogReady;
+    const entry = this.furnitureCatalog[article];
+    if (isProcedural(entry)) {
+      const scene = buildProceduralFurniture(entry);
+      this.furnitureSources.set(article, scene);
+      return scene;
+    }
     if (!this.ikeaProxy) throw new Error('no VITE_IKEA_PROXY');
     const url = `${this.ikeaProxy}/${article}`;
     const pending = (async () => {

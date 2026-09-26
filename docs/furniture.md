@@ -67,6 +67,32 @@ node tools/fetch-ikea-model.mjs 59511278=jattebo-green
 node tools/fetch-ikea-model.mjs https://www.ikea.com/fr/fr/p/...-s59511278/
 ```
 
+## Procedural furniture (products with no IKEA model)
+
+Discontinued ranges have no rotera model (Proven 2026-09-26: STOCKHOLM bed frames 402.846.00,
+202.846.01, 002.846.02, 302.846.05, 902.846.07 and the S-combos S590.142.03, S990.142.01,
+S090.142.05, S490.142.08, S090.142.10 all 404 on fr/fr, gb/en and us/en). For these, a catalog entry
+carries `procedural: <kind>` (plus optional `params`) and a non-numeric key, and
+`src/ui/proceduralFurniture.js` builds it from simple solids at `sizeMm`, with canvas textures
+(stained wood grain, quilted leather, mattress fabric). It follows the GLB convention (metres, Y up,
+floor at 0, centred, front +Z), so FURNISH and View 3D treat it like a downloaded model; both loaders
+await the catalog first so a procedural key never reaches the proxy. Entries are added to
+`index.json` by hand (the fetch tool only registers rotera models).
+
+**Storage (owner decision, 2026-09-26): code only, no GLB.** The builder plus the catalog entry is the
+stored form; an exported GLB would be a second copy that drifts. (Measured for reference: the bed
+exports to a 204 KB uncompressed GLB, 14 meshes, 1,624 triangles.) A model that can't be expressed
+as code (hand-modelled, photo-to-3D) would go in `public/furniture/models/<key>.glb`, which is
+not in the Workbox precache and would ride the furniture Cache API; not built yet.
+
+- `stockholm-bed-160x200`: IKEA STOCKHOLM bed frame 590.142.03, 1720 × 920 × 2230 mm, 35 cm at the
+  foot (size from an ikea-club listing). Shape from IKEA's assembly drawing AA-809121 and sale
+  photos (leboncoin, Design Plus Gallery): tapered square legs, thick rails, head posts leaning
+  back about 8° with two slats, two channel-seamed leather cushions filling the width between the posts, slatted base; mattress optional
+  (`params.mattress`), 25 cm thick (`params.mattressHeightMm`, owner choice). The rail height, lean and cushion size are estimates from photos, not
+  measurements. Proven in a scratch browser preview (bounding box 1.72 × 0.93 × 2.23 m); not yet
+  seen in FURNISH or on device.
+
 ## Rendering
 
 - **AR** (`mr.js`): `furnitureGroup` under `planGroup` (rides plan yaw and floor elevation). Plan

@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName } from '../core/materials.js';
@@ -3396,7 +3397,9 @@ export function setupMR(view, project, getFootprint) {
   let furnitureBuildToken = 0; // bumped per buildFurniture so stale async adds are dropped
 
   // Load the catalog (bundled, tiny) so box fallbacks + labels know real dimensions.
-  fetch(import.meta.env.BASE_URL + 'furniture/index.json')
+  // Awaited by loadFurnitureSource: a procedural entry must be known before an item
+  // is routed to the proxy.
+  const furnitureCatalogReady = fetch(import.meta.env.BASE_URL + 'furniture/index.json')
     .then((r) => (r.ok ? r.json() : {}))
     .then((c) => { furnitureCatalog = c || {}; if (!currentFurnitureArticle) currentFurnitureArticle = Object.keys(furnitureCatalog)[0] || null; })
     .catch(() => { furnitureCatalog = {}; });
@@ -3422,6 +3425,13 @@ export function setupMR(view, project, getFootprint) {
   async function loadFurnitureSource(article) {
     if (furnitureSrc.has(article)) return furnitureSrc.get(article);
     if (furniturePending.has(article)) return furniturePending.get(article);
+    await furnitureCatalogReady;
+    const entry = furnitureCatalog[article];
+    if (isProcedural(entry)) {
+      const scene = buildProceduralFurniture(entry);
+      furnitureSrc.set(article, scene);
+      return scene;
+    }
     const url = furnitureUrl(article);
     if (!url) throw new Error('no VITE_IKEA_PROXY');
     const p = (async () => {

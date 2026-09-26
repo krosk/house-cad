@@ -20,5 +20,28 @@
     ],
     "source": "https://web-api.ikea.com/fr/fr/rotera/static/models/59511278-mini.glb",
     "registeredAt": "2026-09-17T15:47:16.124Z"
+  },
+  "stockholm-bed-160x200": {
+    "name": "stockholm-bed-160x200",
+    "article": "stockholm-bed-160x200",
+    "sizeMm": [
+      1720,
+      920,
+      2230
+    ],
+    "procedural": "stockholm-bed",
+    "params": {
+      "footHeightMm": 350,
+      "mattressMm": [
+        1600,
+        2000
+      ],
+      "woodColor": 5978662,
+      "cushionColor": 2761762,
+      "mattress": true,
+      "mattressHeightMm": 250
+    },
+    "source": "procedural: IKEA STOCKHOLM bed frame 590.142.03 (discontinued, no IKEA 3D model); size from ikea-club listing, shape from assembly AA-809121 + sale photos",
+    "registeredAt": "2026-09-26T00:00:00.000Z"
   }
 }
