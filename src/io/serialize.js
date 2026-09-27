@@ -133,7 +133,9 @@ export function serializeFloor(f) {
 function serializeFinish(f) {
   const target = { rect: f.target.rect };
   if (f.target.edge) target.edge = f.target.edge;
-  return { target, material: f.material };
+  const out = { target, material: f.material };
+  if (f.anchor) out.anchor = { rect: f.anchor.rect, corner: f.anchor.corner };
+  return out;
 }
 // Additive fields (no FILE_VERSION bump): missing = none. Unknown shapes are dropped.
 function loadFinishes(list, rectIds = null) {
@@ -141,7 +143,13 @@ function loadFinishes(list, rectIds = null) {
     const rect = rectIds ? rectIds.get(f?.target?.rect) : f?.target?.rect;
     if (typeof rect !== 'string' || typeof f.material !== 'string') return [];
     const edge = ['left', 'right', 'bottom', 'top'].includes(f.target.edge) ? f.target.edge : null;
-    return [{ target: edge ? { rect, edge } : { rect }, material: f.material }];
+    const out = { target: edge ? { rect, edge } : { rect }, material: f.material };
+    // Floor pattern start corner (docs/materials.md "Pattern start corner").
+    const anchorRect = rectIds ? rectIds.get(f.anchor?.rect) : f.anchor?.rect;
+    if (!edge && typeof anchorRect === 'string' && ['bl', 'br', 'tl', 'tr'].includes(f.anchor.corner)) {
+      out.anchor = { rect: anchorRect, corner: f.anchor.corner };
+    }
+    return [out];
   });
 }
 const loadMaterials = (list) => (Array.isArray(list) ? list : [])

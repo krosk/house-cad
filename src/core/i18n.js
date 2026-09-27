@@ -202,9 +202,9 @@ const STRINGS = {
     zh: '编辑管路网络。未选择时，握把循环选择重叠的节点和管段；扳机选择黄色目标。选中的自由节点可用握把拖动（近=三维，远=地面准星）或按 B/Y 删除。B/Y 删除选中的管段。再次扣动可取消选择。绑定设备的节点不可移动。',
   },
   'help.mat_floor': {
-    en: 'Choose a floor finish. Trigger selects the room under the reticle; thumbstick up/down cycles its material (none first); B/Y clears it. Rooms with the same material through a doorway are laid as one. The readout shows the pieces for this floor and the packs for the whole house.',
-    fr: 'Choisissez un revêtement de sol. Gâchette : sélectionner la pièce visée ; joystick haut/bas : faire défiler le matériau (aucun d’abord) ; B/Y l’efface. Les pièces de même matériau reliées par une porte sont posées d’un seul tenant. Le panneau affiche les pièces pour ce sol et les paquets pour toute la maison.',
-    zh: '选择地面材料。扳机选择准星下的房间；摇杆上/下循环材料（首项为无）；B/Y 清除。通过门相连且材料相同的房间按一整块铺设。读数显示本地面的块数和全屋的包数。',
+    en: 'Choose a floor finish. Trigger selects the room under the reticle; thumbstick up/down cycles its material (none first); B/Y clears it. Rooms with the same material through a doorway are laid as one. A/X starts the pattern at the room corner nearest the reticle (amber L); A/X on that corner again returns it to the plan origin. The readout shows the pieces for this floor and the packs for the whole house.',
+    fr: 'Choisissez un revêtement de sol. Gâchette : sélectionner la pièce visée ; joystick haut/bas : faire défiler le matériau (aucun d’abord) ; B/Y l’efface. Les pièces de même matériau reliées par une porte sont posées d’un seul tenant. A/X fait partir le calepinage de l’angle de la pièce le plus proche du réticule (L orange) ; A/X sur ce même angle le ramène à l’origine du plan. Le panneau affiche les pièces pour ce sol et les paquets pour toute la maison.',
+    zh: '选择地面材料。扳机选择准星下的房间；摇杆上/下循环材料（首项为无）；B/Y 清除。通过门相连且材料相同的房间按一整块铺设。A/X 让铺贴从离准星最近的房间墙角开始（橙色 L 形）；在同一墙角再按 A/X 则恢复为平面原点。读数显示本地面的块数和全屋的包数。',
   },
   'help.mat_wall': {
     en: 'Choose a wall finish, one face at a time. Trigger selects the wall nearest the reticle; thumbstick up/down cycles its material; B/Y clears it. Door and window openings are deducted.',
@@ -432,6 +432,7 @@ const STRINGS = {
   'mat.pickDoor':  { en: 'PICK DOOR',   fr: 'CHOISIR PORTE',  zh: '选择门' },
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
   'mat.pickFurniture': { en: 'PICK FURNITURE', fr: 'CHOISIR MOBILIER', zh: '选择家具' },
+  'mat.fromCorner': { en: '⌞ CORNER', fr: '⌞ ANGLE', zh: '⌞ 墙角起铺' },
   'mat.furnitureTurn': { en: 'A/X: TURN 90°', fr: 'A/X : TOURNER 90°', zh: 'A/X：旋转 90°' },
   'dims.removed':  { en: 'DIM REMOVED', fr: 'COTE SUPPRIMÉE', zh: '已删除尺寸' },
   'mat.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },

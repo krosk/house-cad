@@ -23,7 +23,7 @@ import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE } from '../core/materials.js';
-import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces } from '../core/flooring.js';
+import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces, anchorNear } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
@@ -3130,6 +3130,7 @@ export function setupMR(view, project, getFootprint) {
   let matRooms = [];       // connectedRoomComponents of the active floor
   let matFaces = [];       // [{ rect, edge, face, comp }] with a non-empty boundary
   let matHoverRoom = null, matSelRoom = null;
+  let matReticle = null;   // plan point under the reticle (MATERIAL · FLOOR start corner pick)
   let matHoverFace = null, matSelFace = null;
   let matDoors = [];       // DOOR + WINDOW + FURNITURE zones of the active floor (their MATERIAL targets)
   let matHoverDoor = null, matSelDoor = null;
@@ -3229,6 +3230,15 @@ export function setupMR(view, project, getFootprint) {
       const area = (r) => Math.abs(r.w * r.h);
       const big = comp.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m));
       matBadge(arr, colors, ...centre(big.bounds), colorOf(id));
+    }
+    // A region whose pattern starts at a corner: an amber L in that corner, 25 cm along
+    // each wall, so the start is visible without the 3D view.
+    for (const r of matTakeoff.regions) {
+      if (r.floorId !== floor.id || !r.anchor) continue;
+      const { x, y, corner } = r.anchor, L = 0.25, T = 0.03;
+      const sx = corner[1] === 'l' ? 1 : -1, sy = corner[0] === 'b' ? 1 : -1; // into the room
+      const box = (ax, ay, bx, by) => ({ x0: Math.min(ax, bx), x1: Math.max(ax, bx), y0: Math.min(ay, by), y1: Math.max(ay, by) });
+      matCellQuads(arr, colors, [box(x, y, x + sx * L, y + sy * T), box(x, y + sy * T, x + sx * T, y + sy * L)], 0.004, 0xfbbf24, 1);
     }
     // A wall face: the middle of its longest visible run, 12 cm into the room.
     for (const f of matFaces) {
@@ -3398,6 +3408,21 @@ export function setupMR(view, project, getFootprint) {
     buildMaterials();
     buildArch3d();
   }
+  // The laying region (takeoff) of a selected room on the active floor, or null.
+  const matRegionOf = (comp) => matTakeoff?.regions.find((r) => r.floorId === project.activeFloor.id
+    && comp && r.rectIds.has(comp.rectangles[0].id)) || null;
+  function setFloorStartCorner() {
+    const region = matRegionOf(matSelRoom);
+    if (!region || !matReticle) return;
+    const pick = anchorNear(region.rects, region.boxes, matReticle.px, matReticle.py);
+    if (!pick) return;
+    const same = region.anchor && Math.hypot(region.anchor.x - pick.point.x, region.anchor.y - pick.point.y) < 1e-3;
+    const comp = matRooms.find((c) => c.ids.has(pick.anchor.rect));
+    project.setFloorAnchor([...region.rectIds], [...(comp?.ids || [])], same ? null : pick.anchor);
+    rlog('floor start corner', { corner: same ? null : pick.anchor.corner });
+    buildMaterials();
+    buildArch3d();
+  }
   // Readout lines [text, color]: the target's material, its own quantity, then the
   // whole-house total for that product (packs rounded once for the house).
   function materialReadout(modeId) {
@@ -3456,7 +3481,8 @@ export function setupMR(view, project, getFootprint) {
       .sort((a, b) => parseFloat(b.split('×')[0]) * parseFloat(b.split('×')[1]) - parseFloat(a.split('×')[0]) * parseFloat(a.split('×')[1]));
     const formatLines = (formats, color) => bySize(formats)
       .map((k) => [`${k} ${formats[k].pieces} ${t('mat.pcs')} (${formats[k].pieces - formats[k].whole} ${t('mat.cut')})`, color]);
-    if (item) lines.push([qty(item.count), 0xe2e8f0]);
+    // A pattern starting at a room corner says so on the quantity line (the pill is full).
+    if (item) lines.push([qty(item.count) + (floorMode && item.anchor ? ` · ${t('mat.fromCorner')}` : ''), 0xe2e8f0]);
     if (item?.count.formats) lines.push(...formatLines(item.count.formats, 0xe2e8f0));
     else if (floorMode) lines.push([`${target.area.toFixed(2)} m²`, 0xe2e8f0]);
     const total = id && matTakeoff?.totals.get(id);
@@ -7862,6 +7888,9 @@ export function setupMR(view, project, getFootprint) {
         project.touch();
         buildPlan(); applyPlanMatrix(); buildMaterials();
       }
+      // MATERIAL · FLOOR: A/X starts the selected room's pattern at the corner nearest the
+      // reticle; A/X on that same corner again returns it to the plan origin.
+      else if (modes[currentMode].id === 'mat_floor') setFloorStartCorner();
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();
@@ -8683,7 +8712,7 @@ export function setupMR(view, project, getFootprint) {
           // The grip's pick holds while the reticle stays on the group (as MARKER · EDIT).
           matHoverDevice = matDeviceAt(px, py, DEVICE_MODE[modeId], matDevicePickAfterId);
           if (!matHoverDevice) matDevicePickAfterId = null;
-        } else if (modeId === 'mat_floor') matHoverRoom = matRoomAt(px, py);
+        } else if (modeId === 'mat_floor') { matHoverRoom = matRoomAt(px, py); matReticle = { px, py }; }
         else if (APT_KIND[modeId]) matHoverDoor = matDoorAt(px, py, APT_KIND[modeId]);
         else matHoverFace = matFaceAt(px, py);
       } else {

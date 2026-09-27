@@ -588,8 +588,8 @@ export function windowProductPlacements(floor, materialOf) {
 
 // Surface finishes (docs/materials.md, phase 2): thin textured overlays laid just in
 // front of the slab / wall surface, one merged geometry per material. UVs are PLAN
-// METRES (floors: x,y; walls: the plan coordinate along the face, height), so every
-// pattern is anchored at the plan origin and equal materials run continuously
+// METRES (floors: x,y from the plan origin or the region's start corner; walls: the plan
+// coordinate along the face, height), so every pattern is anchored at the plan origin and equal materials run continuously
 // through doorways and along coplanar faces. The viewer scales UVs to the pattern's
 // repeat unit. Planks swap U/V where the region runs along Y (plankAlongX), matching
 // the takeoff's lay direction. `surfaces` = finishSurfaces(project, floor).
@@ -609,10 +609,12 @@ export function finishGeometries(surfaces) {
   };
   for (const region of surfaces?.floors || []) {
     const b = bucket('floor', region.material);
+    // A region with a start corner (`anchor`, flooring.js) measures its UVs from it.
+    const ax = region.anchor?.x || 0, ay = region.anchor?.y || 0;
     for (const r of region.boxes) {
       const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
       quad(b, pts.map(([x, y]) => [x, FINISH_LIFT, -y]),
-        pts.map(([x, y]) => (region.alongX ? [x, y] : [y, x])), [0, 1, 0]);
+        pts.map(([x, y]) => (region.alongX ? [x - ax, y - ay] : [y - ay, x - ax])), [0, 1, 0]);
     }
   }
   for (const wall of surfaces?.walls || []) {

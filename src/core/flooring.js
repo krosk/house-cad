@@ -10,7 +10,8 @@
 // `edge` is left|right|bottom|top, the same vocabulary dimension constraints use.
 //
 // Continuity (owner decisions): every pattern is anchored at the plan origin, so equal
-// materials line up everywhere. Rooms with the SAME floor material joined through a
+// materials line up everywhere, unless a floor region names its own start corner
+// (`anchor`, below): its pattern then starts there, still continuous across the region. Rooms with the SAME floor material joined through a
 // doorway (door/sliding/garage zone touching both) are ONE laying region that includes
 // the doorway strip; different materials each run to the middle of the doorway. Packs
 // are rounded once per product for the whole house.
@@ -240,13 +241,63 @@ const touches = (a, b, gap = TOUCH) =>
   Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > -gap && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > -gap
   && (Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > EPS || Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > EPS);
 
-// The floor finish (material id) held by any rect of a room component.
-function componentMaterial(floor, component) {
-  for (const f of floor.finishes || []) {
-    if (!f.target?.edge && component.ids.has(f.target?.rect)) return f.material;
-  }
-  return null;
+// The floor finish held by any rect of a room component.
+function componentFinish(floor, component) {
+  return (floor.finishes || []).find((f) => !f.target?.edge && component.ids.has(f.target?.rect)) || null;
 }
+
+// ---- pattern start corner ----------------------------------------------------------
+// A laying region's pattern may start at one of its corners instead of the plan origin
+// (owner, 2026-09-27): a floor finish's `anchor` = { rect, corner: bl|br|tl|tr } names a
+// corner of a ROOM rect (b = min y, l = min x), so it follows the walls when the plan is
+// edited. It resolves to the region's own outline corner of the same type nearest that
+// rect corner: the laid floor stops at wall/insulation linings, so its real corner can
+// sit inside the rect's. One anchor per region; with several, the first finish wins.
+export const CORNERS = ['bl', 'br', 'tl', 'tr'];
+const rectCorner = (b, corner) => ({ x: corner[1] === 'l' ? b.x0 : b.x1, y: corner[0] === 'b' ? b.y0 : b.y1 });
+const inBoxes = (boxes, x, y) => boxes.some((b) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1);
+// Convex outline corners of a box set: [{x, y, corner}], the region filling only the
+// quadrant the corner type points into (a 'bl' corner has floor up and to the right).
+export function regionCorners(boxes) {
+  const seen = new Set(), out = [], e = 1e-4;
+  for (const b of boxes) {
+    for (const [x, y] of [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1]]) {
+      const key = `${x.toFixed(5)},${y.toFixed(5)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const q = { tr: inBoxes(boxes, x + e, y + e), tl: inBoxes(boxes, x - e, y + e),
+        br: inBoxes(boxes, x + e, y - e), bl: inBoxes(boxes, x - e, y - e) };
+      const filled = Object.keys(q).filter((k) => q[k]);
+      if (filled.length !== 1) continue;
+      // The filled quadrant is where the floor is; the corner type is the opposite side.
+      const corner = { tr: 'bl', tl: 'br', br: 'tl', bl: 'tr' }[filled[0]];
+      out.push({ x, y, corner });
+    }
+  }
+  return out;
+}
+const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+// The plan point {x, y, corner} a region's pattern starts at, or null (the plan origin).
+export function resolveAnchor(rects, anchor, boxes) {
+  const rect = anchor && rects.find((r) => r.id === anchor.rect);
+  if (!rect || !CORNERS.includes(anchor.corner)) return null;
+  const p = rectCorner(rect.bounds, anchor.corner);
+  const same = regionCorners(boxes).filter((c) => c.corner === anchor.corner);
+  if (!same.length) return { ...p, corner: anchor.corner };
+  const best = same.reduce((m, c) => (dist2(c, p) < dist2(m, p) ? c : m));
+  return { x: best.x, y: best.y, corner: anchor.corner };
+}
+// The anchor for the region corner nearest plan point (px, py): the room rect of the
+// region whose same-type corner is nearest that outline corner. `rects` = the region's
+// room rects. Returns { anchor: {rect, corner}, point } or null.
+export function anchorNear(rects, boxes, px, py) {
+  const corners = regionCorners(boxes);
+  if (!corners.length || !rects.length) return null;
+  const c = corners.reduce((m, k) => (dist2(k, { x: px, y: py }) < dist2(m, { x: px, y: py }) ? k : m));
+  const rect = rects.reduce((m, r) => (dist2(rectCorner(r.bounds, c.corner), c) < dist2(rectCorner(m.bounds, c.corner), c) ? r : m));
+  return { anchor: { rect: rect.id, corner: c.corner }, point: { x: c.x, y: c.y } };
+}
+const shiftBoxes = (boxes, a) => (a ? boxes.map((b) => ({ ...b, x0: b.x0 - a.x, x1: b.x1 - a.x, y0: b.y0 - a.y, y1: b.y1 - a.y })) : boxes);
 
 // Half of a doorway box on the side of `component` (across the doorway's short axis).
 function doorwayHalf(door, component) {
@@ -264,10 +315,8 @@ function doorwayHalf(door, component) {
 export function floorRegions(project, floor, { count = true } = {}) {
   const rects = floor.rectangles || [];
   const components = connectedRoomComponents(rects);
-  const mats = components.map((c) => {
-    const id = componentMaterial(floor, c);
-    return materialById(project, id) ? id : null;
-  });
+  const finishes = components.map((c) => componentFinish(floor, c));
+  const mats = finishes.map((f) => (materialById(project, f?.material) ? f.material : null));
   const parent = components.map((_, i) => i);
   const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   const adds = components.map(() => []);
@@ -289,17 +338,21 @@ export function floorRegions(project, floor, { count = true } = {}) {
   components.forEach((c, i) => {
     if (!mats[i]) return;
     const root = find(i);
-    const g = groups.get(root) || { material: mats[i], rectIds: new Set(), include: [], add: [] };
-    for (const r of c.rectangles) { g.rectIds.add(r.id); g.include.push(r.bounds); }
+    const g = groups.get(root) || { material: mats[i], rectIds: new Set(), rects: [], include: [], add: [], anchor: null };
+    for (const r of c.rectangles) { g.rectIds.add(r.id); g.rects.push(r); g.include.push(r.bounds); }
     g.add.push(...adds[i]);
+    g.anchor ??= finishes[i]?.anchor || null;
     groups.set(root, g);
   });
   for (const [bounds, i] of merged) groups.get(find(i))?.add.push(bounds);
   return [...groups.values()].map((g) => {
     const boxes = regionBoxes(g.include, excludes, g.add);
     const material = materialById(project, g.material);
-    return { floorId: floor.id, material: g.material, rectIds: g.rectIds, boxes,
-      count: count ? countPieces(material, boxes) : null };
+    // The pattern starts at `anchor` (plan point) or the plan origin: count in the
+    // pattern's own frame by shifting the region, not the lattice.
+    const anchor = resolveAnchor(g.rects, g.anchor, boxes);
+    return { floorId: floor.id, material: g.material, rectIds: g.rectIds, rects: g.rects, boxes, anchor,
+      count: count ? countPieces(material, shiftBoxes(boxes, anchor)) : null };
   });
 }
 
@@ -418,7 +471,7 @@ export function wallFaceBoxes(floor, rect, edge) {
 export function finishSurfaces(project, floor) {
   const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
   const floors = floorRegions(project, floor, { count: false })
-    .map((r) => ({ material: r.material, boxes: r.boxes, alongX: plankAlongX(r.boxes) }));
+    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: plankAlongX(r.boxes) }));
   const walls = [];
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;

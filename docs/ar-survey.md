@@ -266,6 +266,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   - **Both:** thumbstick up/down cycles the selection's material (none, then the catalog for that surface)
     and applies it at once; B/Y clears it. Each wall face is set on its own: a copy-to-every-wall action
     was built and removed at the owner's request (2026-09-26); don't re-add it.
+  - **FLOOR start corner:** with a room selected, A/X starts its laying region's pattern at the room
+    corner nearest the reticle (`setFloorStartCorner` → `project.setFloorAnchor`); A/X on that same
+    corner returns it to the plan origin. An amber L (25 cm along each wall) marks the corner, and
+    the quantity line ends with `⌞ CORNER`. A/X, not the thumbstick, because the thumbstick already
+    cycles the material and A/X is the flip/turn button in every other mode.
   - **Display:** every target that has a material shows **one small swatch badge** (a 6 cm disc in the
     material colour inside a white ring, `matBadge`) at the centre of its plan box, **never a coloured
     fill or strip** (owner, 2026-09-27: full overlays made the plan hard to read). Room: the centre of

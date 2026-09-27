@@ -63,7 +63,19 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   from 10 × 12 = 120 octagons at the best phase to 11 × 13 = 143 at the worst. Continuity only needs
   one phase per **connected same-material region**, not per house. A possible improvement: anchor
   each region at its own offset, chosen to minimize pieces and avoid slivers under ⅓ of a piece.
-  Not adopted yet; the owner is fine with the global origin.
+  Not adopted as an automatic optimiser.
+- **Pattern start corner (owner, 2026-09-27):** a laying region may instead start its pattern at one
+  of its corners. The owner chose a corner (not a wall line, not a numeric offset) and one start
+  point per **laying region**, so joints still run continuously through a doorway between rooms of
+  the same material. Stored on the floor finish as `anchor: { rect, corner: bl|br|tl|tr }` (a room
+  rect's corner, b = min y, l = min x), so it follows the walls when the plan is edited. It resolves
+  (`resolveAnchor`, flooring.js) to the region's own outline corner of that type nearest the rect
+  corner, so a wall/insulation lining drawn over the room edge moves it to where the floor really
+  starts. The takeoff counts the region shifted by that point; the 3D UVs subtract it. One anchor per
+  region; if merged regions carry several, the first finish wins. Changing the material keeps it;
+  clearing the material drops it. Deleting its rect falls back to the origin. Share links carry no
+  finishes, so they carry no anchor either. Rooms without an anchor keep the plan origin (their
+  counts are unchanged). Floors only: wall faces still use the global origin.
 - **Quantities merge adjacent same-material rooms into one laying region.** Two rooms joined through
   a door/opening zone that touches both are one region, and **the doorway strip is included**.
   Doorway kinds: DOOR, **PASSAGE** (an open doorway with no leaf, added 2026-09-27 as a separator
@@ -258,7 +270,7 @@ the joint.
 30×30, with 30×50 / 50×30 in the corners. The layout lives once in `src/core/flooring.js`
 (`PINWHEEL`, `pinwheelCells`), so the takeoff and the texture read the same cells. Every row and
 column of the module crosses three tiles, so the pitch is 1.30 m + 3 joints (1.315 m at 5 mm),
-anchored at the plan origin like every pattern. `w = h = 1.3` (the module). The texture unit is
+anchored at the plan origin (or the region's start corner) like every pattern. `w = h = 1.3` (the module). The texture unit is
 2 × 2 modules (`m.modules`), 36 different faces, about 0.78 px/mm; `PINWHEEL_DESIGNS` draws each tile.
 
 - `monastere_beige_pinwheel`: Leroy Merlin Monastère beige, glazed matte porcelain, aged limestone
