@@ -126,5 +126,26 @@
     },
     "source": "procedural: Sensea NEO extra-flat resin shower tray 120 x 80 cm, white (Leroy Merlin 95043721, no manufacturer 3D model); size, 27 mm thickness and 21 x 13 cm grille from the Leroy Merlin spec table, layout from its top-down photo (media 5368981)",
     "registeredAt": "2026-09-27T00:00:00.000Z"
+  },
+  "hoffmann-v120": {
+    "name": "hoffmann-v120-upright-piano",
+    "article": "hoffmann-v120",
+    "sizeMm": [
+      1510,
+      1200,
+      620
+    ],
+    "procedural": "upright-piano",
+    "params": {
+      "caseDepthMm": 370,
+      "keyTopMm": 720,
+      "keybedBottomMm": 640,
+      "armTopMm": 790,
+      "fallboardTopMm": 890,
+      "slipInsetMm": 75,
+      "legDepthMm": 60
+    },
+    "source": "procedural: W. Hoffmann Vision V120 upright piano, traditional cabinet, polished black with brass fittings (owner's own; C. Bechstein, no manufacturer 3D model); size 151 x 120 x 62 cm and 245 kg from Morley Pianos / Bechstein, shape from Park Pianos and Morley 3/4 product photos; depths and heights are standard upright proportions",
+    "registeredAt": "2026-09-27T00:00:00.000Z"
   }
 }

@@ -173,6 +173,20 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   different lighting. Proven in a scratch browser preview (bounding box 0.800 × 0.027 × 1.200 m, top-down
   and perspective views beside the photos); the photo-measured positions are estimates; not yet seen in
   FURNISH, View 3D or on device.
+- `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
+  cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
+  1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives
+  62.5 cm deep). No straight front or side photo exists; the shape comes from the Park Pianos and
+  Morley ¾ product photos (`W-Hoffmann-Vision-V-120-top.jpg`, Morley gallery image 1): full-height
+  case with a slightly overhanging lid, rounded fallboard with a brass strip and the maker's mark just
+  above the keys, music-desk bar, cheek blocks beside the keys, slender curved legs on toe blocks with
+  brass castors, recessed lower panel with three brass pedals. Builder `upright-piano`. The heights
+  and depths are standard upright proportions, not measurements (`params`, mm): upper case 370 deep,
+  white-key top 720, keybed bottom 640, cheek top 790, fallboard top 890, key slip 75 behind the
+  front, legs 60 deep. Keys: 52 white at 23.55 mm (1.225 m) and 36 black keys merged into one mesh;
+  27 meshes in all. The polished look needs View 3D's Reflections toggle. Proven in a scratch browser
+  preview (bounding box 1.518 × 1.200 × 0.624 m: the lid overhang and castors add a few mm; ¾, front
+  and side views beside the Park Pianos photo); not yet seen in FURNISH, View 3D or on device.
 
 ## Rendering
 

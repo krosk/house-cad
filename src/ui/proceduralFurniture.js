@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const css = (hex) => `#${new THREE.Color(hex).getHexString()}`;
 const shade = (hex, f) => `#${new THREE.Color(hex).multiplyScalar(f).getHexString()}`;
@@ -364,7 +365,127 @@ function showerTray(entry) {
   return g;
 }
 
-const BUILDERS = { 'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray };
+// Upright piano, traditional cabinet (W. Hoffmann Vision V120; sources in docs/furniture.md).
+// W × H × D from the catalog `sizeMm` (151 × 120 × 62 cm). Back at −Z, keys toward +Z.
+// Heights and depths not published are standard upright proportions, as `params` (mm):
+//   - the upper case (lid, upper panel, sides) is `caseDepthMm` deep from the back;
+//   - the keybed juts forward to about the leg fronts; white-key top at `keyTopMm`;
+//   - 88 keys (52 white, 23.55 mm pitch) centred between the cheek blocks;
+//   - curved front legs on toe blocks that reach the full depth, brass castors;
+//   - a recessed lower panel with three brass pedals. Polished black, brass fittings.
+function uprightPiano(entry) {
+  const [W, H, D] = (entry.sizeMm || [1510, 1200, 620]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const caseD = mm(p.caseDepthMm, 370);    // upper case depth from the back
+  const keyTop = mm(p.keyTopMm, 720);      // white-key top
+  const keybedBottom = mm(p.keybedBottomMm, 640);
+  const armTop = mm(p.armTopMm, 790);      // cheek block top
+  const lidT = 0.022, sideT = 0.028;
+  const zb = -D / 2, zCase = zb + caseD;   // back face, upper-case front face
+  const zSlip = D / 2 - mm(p.slipInsetMm, 75); // key-slip front
+  const keysW = 52 * 0.02355;
+  const black = new THREE.MeshStandardMaterial({ color: p.color ?? 0x0a0a0b, roughness: 0.12, metalness: 0.05 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xc9a44c, roughness: 0.28, metalness: 1 });
+  const ebony = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.4 });
+  const felt = new THREE.MeshStandardMaterial({ color: 0x5a1a1d, roughness: 0.9 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'upright-piano';
+
+  // Case: two full-height sides, back, lid (overhanging a little), upper panel.
+  for (const sx of [-1, 1]) {
+    g.add(box([sx < 0 ? -W / 2 : W / 2 - sideT, 0.02, zb], [sx < 0 ? -W / 2 + sideT : W / 2, H - lidT, zCase], black));
+  }
+  g.add(box([-W / 2 + sideT, 0.02, zb], [W / 2 - sideT, H - lidT, zb + 0.02], black));
+  g.add(box([-W / 2 - 0.004, H - lidT, zb - 0.004], [W / 2 + 0.004, H, zCase + 0.012], black));
+  const fallTop = mm(p.fallboardTopMm, 890);
+  g.add(box([-W / 2 + sideT, fallTop, zCase - 0.03], [W / 2 - sideT, H - lidT, zCase], black));
+  // Cheek blocks beside the keys, from the keybed to the arm top, out to the key slip.
+  const cheekW = (W - keysW) / 2;
+  for (const sx of [-1, 1]) {
+    const xo = sx * W / 2, xi = sx * (keysW / 2);
+    const c = new THREE.Mesh(new RoundedBoxGeometry(cheekW, armTop - keybedBottom, zSlip - zCase + 0.02, 2, 0.012), black);
+    c.position.set((xo + xi) / 2, (armTop + keybedBottom) / 2, (zCase - 0.02 + zSlip) / 2);
+    g.add(c);
+  }
+  // Keybed and key slip under the keys.
+  g.add(box([-keysW / 2, keybedBottom, zCase - 0.02], [keysW / 2, keyTop - 0.024, zSlip], black));
+  // Fallboard: from behind the keys up to the upper panel, its front rounded.
+  const fb = new THREE.Mesh(new RoundedBoxGeometry(keysW, fallTop - (keyTop + 0.012) + 0.01, 0.085, 3, 0.02), black);
+  fb.position.set(0, (keyTop + 0.012 + fallTop) / 2, zCase + 0.085 / 2 - 0.035);
+  g.add(fb);
+  // Brass strip along the fallboard just above the keys (photos), the maker's mark on it,
+  // and the music-desk bar above the fallboard.
+  const fbFront = zCase + 0.05;
+  g.add(box([-keysW / 2 + 0.01, keyTop + 0.024, fbFront - 0.004], [keysW / 2 - 0.01, keyTop + 0.029, fbFront + 0.001], brass));
+  g.add(box([-0.04, keyTop + 0.034, fbFront - 0.004], [0.04, keyTop + 0.042, fbFront + 0.001], brass));
+  g.add(box([-0.32, fallTop + 0.05, zCase], [0.32, fallTop + 0.085, zCase + 0.025], black));
+  // Keys: a white-key slab with the 52 key divisions drawn on top, red felt strip behind,
+  // and the 36 black keys merged into one mesh.
+  const keyZ0 = zCase + 0.012, keyZ1 = zSlip - 0.004, keyLen = keyZ1 - keyZ0;
+  const keyMap = canvasTexture(1024, (ctx, S) => {
+    ctx.fillStyle = '#f3f1ea';
+    ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = '#9d9a92';
+    for (let i = 1; i < 52; i++) ctx.fillRect((S * i) / 52 - 1, 0, 2, S);
+  });
+  keyMap.wrapS = keyMap.wrapT = THREE.ClampToEdgeWrapping;
+  const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  const whiteTop = new THREE.MeshStandardMaterial({ map: keyMap, roughness: 0.3 });
+  const whites = new THREE.Mesh(new THREE.BoxGeometry(keysW, 0.022, keyLen), [white, white, whiteTop, white, white, white]);
+  whites.position.set(0, keyTop - 0.011, (keyZ0 + keyZ1) / 2);
+  g.add(whites);
+  g.add(box([-keysW / 2, keyTop, keyZ0 - 0.004], [keysW / 2, keyTop + 0.006, keyZ0 + 0.006], felt));
+  const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const blacks = [];
+  for (let i = 0; i < 51; i++) { // a black key after A, C, D, F, G (never after the top C)
+    if (!'ACDFG'.includes(names[i % 7])) continue;
+    const bg = new THREE.BoxGeometry(0.0135, 0.012, 0.095);
+    bg.translate(-keysW / 2 + (i + 1) * 0.02355, keyTop + 0.006, keyZ0 + 0.095 / 2);
+    blacks.push(bg);
+  }
+  g.add(new THREE.Mesh(mergeGeometries(blacks), ebony));
+  // Lower panel, recessed at the case front, with a kick rail; three brass pedals.
+  g.add(box([-W / 2 + sideT, 0.02, zCase - 0.03], [W / 2 - sideT, keybedBottom, zCase - 0.01], black));
+  for (const [i, x] of [-0.07, 0, 0.07].entries()) {
+    const ped = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.1), brass);
+    ped.position.set(x, 0.07 - (i === 1 ? 0.004 : 0), zCase + 0.03);
+    ped.rotation.x = 0.12;
+    g.add(ped);
+  }
+  // Toe blocks from the case sides forward to the full depth, legs standing on them.
+  const legX = W / 2 - cheekW / 2, toeH = 0.065, toeW = 0.055;
+  const legD = mm(p.legDepthMm, 60), legFront = zSlip - 0.01;
+  for (const sx of [-1, 1]) {
+    const x = sx * legX;
+    g.add(box([x - toeW / 2, 0.02, zCase - 0.02], [x + toeW / 2, 0.02 + toeH, D / 2], black));
+    // Leg: side profile in (z, y), front edge swelling out toward the foot, extruded across X.
+    const s = new THREE.Shape();
+    const y0 = 0.02 + toeH, y1 = keybedBottom;
+    s.moveTo(legFront - legD, y0);
+    s.lineTo(legFront + 0.018, y0);
+    s.bezierCurveTo(legFront - 0.02, y0 + 0.12, legFront + 0.01, y1 - 0.25, legFront, y1);
+    s.lineTo(legFront - legD, y1);
+    s.bezierCurveTo(legFront - legD - 0.015, y1 - 0.2, legFront - legD + 0.012, y0 + 0.2, legFront - legD, y0);
+    const lg = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: false, curveSegments: 10 });
+    lg.rotateY(-Math.PI / 2); // shape x → world +Z, extrusion → −X
+    lg.translate(x + 0.025, 0, 0);
+    g.add(new THREE.Mesh(lg, black));
+    // Brass castors: under each toe block's front and under the case back.
+    for (const z of [D / 2 - 0.03, zb + 0.04]) {
+      const cst = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.02, 16), brass);
+      cst.rotation.z = Math.PI / 2;
+      cst.position.set(x, 0.018, z);
+      g.add(cst);
+    }
+  }
+  return g;
+}
+
+const BUILDERS = {
+  'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
+  'upright-piano': uprightPiano,
+};
 
 export function isProcedural(entry) {
   return !!(entry && BUILDERS[entry.procedural]);
