@@ -11,6 +11,7 @@
 // buildDoorProduct, so a caller only lifts them by the floor elevation.
 
 import * as THREE from 'three';
+import { exteriorGlassMaterial } from './exteriorView.js';
 
 // Profile faces (m), measured on Lapeyre's straight-on Héméra photos, scaled by the
 // handle (about 160 mm): see docs/materials.md. The sash hides behind the frame's
@@ -35,9 +36,9 @@ function materialsFor(def, lambert) {
   const pvc = lambert ? {} : { roughness: 0.35, metalness: 0 };
   const m = {
     pvc: new M({ color: def.color, ...pvc }),
-    glass: new M({
-      color: def.accent, transparent: true, opacity: 0.22, depthWrite: false,
-      ...(lambert ? {} : { roughness: 0.05, metalness: 0 }),
+    // AR (lambert): opaque glass showing a generic exterior, as the plain panes (mr.js).
+    glass: lambert ? exteriorGlassMaterial() : new M({
+      color: def.accent, transparent: true, opacity: 0.22, depthWrite: false, roughness: 0.05, metalness: 0,
     }),
     gasket: new M({ color: 0x222428, ...(lambert ? {} : { roughness: 0.6, metalness: 0 }) }),
     hinge: new M({ color: 0xc9ccd1, ...(lambert ? {} : { roughness: 0.3, metalness: 0.5 }) }),

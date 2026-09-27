@@ -18,6 +18,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
+import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
@@ -3815,8 +3816,9 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- AR 3D view (LEFT X) --------------------------------------------------------
   // Reuses src/core/architectural3d.js exactly as View 3D does, so AR and desktop show
-  // one interpretation. The real floor stays visible (no wood slab, no ceiling): only
-  // walls, door/window inserts, stairs, crease outlines and the finish overlays draw.
+  // one interpretation. The real floor stays visible (no wood slab): walls, a white
+  // painted ceiling, door/window inserts (glass shows a generic exterior), stairs,
+  // crease outlines and the finish overlays draw.
   // Lambert materials under the scene's existing hemisphere/sun lights, no shadows:
   // the AR frame budget is tight (docs/ar-survey.md "Performance notes"). Rebuilt with
   // every buildPlan and after a MATERIAL edit, only while on.
@@ -3824,9 +3826,10 @@ export function setupMR(view, project, getFootprint) {
   const arch3dMats = {
     walls: new THREE.MeshLambertMaterial({ color: 0xf1f0ec, side: THREE.DoubleSide }),
     doors: new THREE.MeshLambertMaterial({ color: 0xa9794f, side: THREE.DoubleSide }),
-    windows: new THREE.MeshLambertMaterial({
-      color: 0x9ed8ea, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide,
-    }),
+    // Opaque glass showing a generic exterior, and a white painted ceiling (owner,
+    // 2026-09-27): the real room no longer shows through the model's glass or overhead.
+    windows: exteriorGlassMaterial(),
+    ceiling: new THREE.MeshLambertMaterial({ color: 0xf7f6f2, side: THREE.DoubleSide }),
     stairs: new THREE.MeshLambertMaterial({ color: 0xd6c3a5, side: THREE.DoubleSide }),
     outlines: new THREE.LineBasicMaterial({ color: 0x475569 }),
   };
@@ -3866,11 +3869,12 @@ export function setupMR(view, project, getFootprint) {
         openDoors: true, // door leaves swung open, as in View 3D (owner, 2026-09-27)
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
       });
-      a.floorGeometry?.dispose(); a.ceilingGeometry?.dispose(); // real floor stays visible
+      a.floorGeometry?.dispose(); // real floor stays visible; the ceiling is drawn (painted white)
       const y = (floor.elevation || 0) - displayElevation();
       const parts = [
         [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
         [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
+        [a.ceilingGeometry, arch3dMats.ceiling],
         ...finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
         // Door products (cached Lambert materials; only the geometry is disposed).

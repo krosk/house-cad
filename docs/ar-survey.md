@@ -441,7 +441,11 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   **LEFT X** toggles the **AR 3D view** (owner choice, 2026-09-26; `toggleArch3d`/`buildArch3d`). This is
   the desktop `architectural3d.js` interpretation for the floors on show (active floor, or all in
   ALL FLOORS): walls, door/window inserts, stairs, crease outlines, and the textured finish overlays
-  from `docs/materials.md`. The real floor stays visible (no wood slab, no ceiling). It uses Lambert
+  from `docs/materials.md`. The real floor stays visible (no wood slab). Since 2026-09-27 (owner: the
+  real room showed through) the **ceiling** draws as opaque white paint (the storey-height slab, matte
+  Lambert) and **window glass**, plain panes and window products alike, is opaque and shows one generic
+  daylight exterior per pane (`src/ui/exteriorView.js`: sky, clouds, tree line, lawn; unlit, so it stays
+  bright). Desktop View 3D keeps its transparent glass and POV-only plaster ceiling. It uses Lambert
   materials under the shared scene lights, with no shadows. It rebuilds with every `buildPlan` and
   after a MATERIAL edit, only while on. Off by default; it is not a mode, so it works in any mode.
   Its frame cost is unmeasured: check PROJECT · PERF with it on.
