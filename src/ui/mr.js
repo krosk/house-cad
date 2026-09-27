@@ -3162,6 +3162,21 @@ export function setupMR(view, project, getFootprint) {
     const [lo, hi] = [Math.min(n0, n1), Math.max(n0, n1)];
     return f.face.vertical ? { x0: lo, x1: hi, y0: s.a, y1: s.b } : { x0: s.a, x1: s.b, y0: lo, y1: hi };
   });
+  // A material badge: a 6 cm swatch disc in the material's colour inside a white ring,
+  // flat on the floor at plan (x, y). Batched into the one material mesh (triangles).
+  const BADGE_SEGS = 20;
+  function matBadge(arr, colors, x, y, color) {
+    const disc = (r, h, c) => {
+      for (let i = 0; i < BADGE_SEGS; i++) {
+        const a0 = (i / BADGE_SEGS) * Math.PI * 2, a1 = ((i + 1) / BADGE_SEGS) * Math.PI * 2;
+        for (const [px, py] of [[x, y], [x + r * Math.cos(a0), y + r * Math.sin(a0)], [x + r * Math.cos(a1), y + r * Math.sin(a1)]]) {
+          arr.push(px, h, -py); colors.push(c.r, c.g, c.b, 1);
+        }
+      }
+    };
+    disc(0.075, 0.0035, new THREE.Color(0xffffff));
+    disc(0.06, 0.004, new THREE.Color(color));
+  }
   function matMesh(arr, colors, order) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
@@ -3191,27 +3206,38 @@ export function setupMR(view, project, getFootprint) {
       }
     }
     matDoors = floor.rectangles.filter((r) => ['door', 'window', 'furniture'].includes(zoneKindOf(r)));
+    // A target that has a material shows one small swatch badge at the centre of its plan
+    // box, not a coloured fill (owner, 2026-09-27: full overlays made the plan hard to read).
     const arr = [], colors = [];
+    const centre = (b) => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+    const colorOf = (id) => materialById(project, id)?.color ?? MAT_NONE_COLOR;
     for (const rect of matDoors) {
       if (zoneKindOf(rect) === 'furniture') {
-        if (rect.article) matCellQuads(arr, colors, [rect.bounds], 0.0035, FURN_TINT, 0.5);
+        if (rect.article) matBadge(arr, colors, ...centre(rect.bounds), FURN_TINT);
         continue;
       }
       const id = doorMaterialId(rect);
-      if (id) matCellQuads(arr, colors, [rect.bounds], 0.0035, materialById(project, id)?.color ?? MAT_NONE_COLOR, 0.85);
+      if (id) matBadge(arr, colors, ...centre(rect.bounds), colorOf(id));
     }
-    for (const region of matTakeoff.regions) {
-      if (region.floorId !== floor.id) continue;
-      matCellQuads(arr, colors, region.boxes, 0.0025, materialById(project, region.material)?.color ?? MAT_NONE_COLOR, 0.35);
+    // A room: its largest rect's centre (an L-shaped room's box centre can fall outside it).
+    for (const comp of matRooms) {
+      const id = roomMaterialId(comp);
+      if (!id) continue;
+      const area = (r) => Math.abs(r.w * r.h);
+      const big = comp.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m));
+      matBadge(arr, colors, ...centre(big.bounds), colorOf(id));
     }
+    // A wall face: the middle of its longest visible run, 12 cm into the room.
     for (const f of matFaces) {
       const id = faceMaterialId(f);
-      if (id) matCellQuads(arr, colors, faceStrip(f, 0.02, 0.09), 0.0035, materialById(project, id)?.color ?? MAT_NONE_COLOR, 0.9);
+      if (!id) continue;
+      const seg = f.face.segments.reduce((m, sg) => (sg.b - sg.a > m.b - m.a ? sg : m));
+      const u = (seg.a + seg.b) / 2, n = f.face.at + f.face.inward * (seg.inset + 0.12);
+      matBadge(arr, colors, f.face.vertical ? n : u, f.face.vertical ? u : n, colorOf(id));
     }
-    if (DEVICE_MODE[modes[currentMode]?.id]) { // a small floor square under each switch with a product
+    if (DEVICE_MODE[modes[currentMode]?.id]) { // a badge under each device with a product
       for (const m of floor.markers) {
-        const def = markerProduct(project, m);
-        if (def) matCellQuads(arr, colors, [{ x0: m.x - 0.05, x1: m.x + 0.05, y0: m.y - 0.05, y1: m.y + 0.05 }], 0.0035, 0x2dd4bf, 0.9);
+        if (markerProduct(project, m)) matBadge(arr, colors, m.x, m.y, 0x2dd4bf);
       }
     }
     if (arr.length) materialGroup.add(matMesh(arr, colors, 12));

@@ -62,12 +62,13 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
   looked for the same material option for **furniture** and found none: furniture products live in
   FURNISH as separate items, not on the furniture zones. Fixed the same day by the furniture merge
   (MATERIAL · FURNITURE; items under FURNISH below).
-- [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (tint appears), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
-- [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; strips sit inside the walls; door/window area deducted in the m² line
-- [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (zone tints anthracite); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
+- [ ] MATERIAL badges (2026-09-27): a room, wall face, door, window or furniture zone with a material shows only a small swatch disc (white ring) at its centre, no colour fill; the plan stays readable; the yellow hover/selection highlight still shows the whole target
+- [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (a swatch badge appears at the room's centre, no colour fill), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
+- [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; a badge sits just inside the middle of the face; door/window area deducted in the m² line
+- [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (an anthracite badge at the zone centre); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
 - [ ] MATERIAL · DOOR: set Lapeyre LINE acoustic (white) on a door: a white leaf with three thin tan grooves by the lock edge on both faces, a white frame, no threshold
-- [ ] MATERIAL · SWITCH: aim at a double switch (two markers at one point): grip steps the outline between them and the readout shows 1/2, 2/2; trigger selects (amber); thumbstick-y sets Schneider Ovalis; a teal square appears under it; LEFT X shows a white pyramid-shaped plate with a stadium rocker (upper face flat, lower face slanted) flush on the wall at the right height, facing the room; B/Y clears
-- [ ] MATERIAL · SWITCH: on a double switch (two markers at one point), set Ovalis double on either: both markers take it (teal squares), LEFT X shows ONE plate with a split rocker at their mean height; cycling back to the single keeps it on the selected marker only
+- [ ] MATERIAL · SWITCH: aim at a double switch (two markers at one point): grip steps the outline between them and the readout shows 1/2, 2/2; trigger selects (amber); thumbstick-y sets Schneider Ovalis; a teal badge appears under it; LEFT X shows a white pyramid-shaped plate with a stadium rocker (upper face flat, lower face slanted) flush on the wall at the right height, facing the room; B/Y clears
+- [ ] MATERIAL · SWITCH: on a double switch (two markers at one point), set Ovalis double on either: both markers take it (teal badges), LEFT X shows ONE plate with a split rocker at their mean height; cycling back to the single keeps it on the selected marker only
 - [ ] MATERIAL · OUTLET: trigger an outlet, thumbstick-y sets Schneider Ovalis outlet; LEFT X shows the white plate with a flat round socket (two light pin holes, earth pin above) flush on the wall at the outlet's height; a shutter outlet is not offered as a target
 - [ ] MATERIAL · ETHERNET: trigger a single Ethernet socket, thumbstick-y sets Schneider Ovalis RJ45; LEFT X shows the white plate with a flat insert (screw, icon disc, dust cover with its tab at lower right) flush on the wall at the socket's height; a dual Ethernet socket is not offered as a target
 - [ ] MATERIAL · WINDOW: trigger a WINDOW zone, thumbstick-y sets Lapeyre Héméra; readout shows size and 1/2 LEAVES; LEFT X shows the white frame in the opening with the handle and hinges on the room side (hinge both = two leaves); B/Y clears back to the plain pane
@@ -80,7 +81,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · WALL: set Lucia ivory stone 30×90 on a wall; LEFT X shows pale ivory landscape tiles stacked with thin joints; takeoff counts tiles and packs of 5
 - [ ] FURNISH: drop the W. Hoffmann V120 piano against a wall; black case 1.51 × 1.20 m with the keys facing the room, brass pedals and castors; true size against the real piano
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
-- [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL tints
+- [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL badges
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors
 - [ ] Returning to a real floor restores PLAN/MARKER traversal and editing
 - [ ] Thumbstick-y changes floor **only in LEVEL** (no-op in modes without a cycle action)
@@ -368,8 +369,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 
 - [ ] FURNISH: thumbstick up/down cycles the product (readout shows its name); trigger drops an orange FURNITURE zone sized to it, centred on the reticle, with a violet plan piece and a V notch on the front edge
 - [ ] The dropped zone behaves like any PLAN zone: EDGE/DIMS dimension it to a wall, PLAN · EDIT moves or deletes it, A/X in PLAN · EDIT turns it 90° (the zone swaps width/depth about its centre)
-- [ ] MATERIAL · FURNITURE: trigger a FURNITURE zone drawn in PLAN; thumbstick up/down cycles the catalog (none first); the zone resizes to the product; readout shows name and w × d × h; the zone tints violet
-- [ ] MATERIAL · FURNITURE: A/X turns the selected product 90°; B/Y clears it (the zone keeps its size, the violet tint goes)
+- [ ] MATERIAL · FURNITURE: trigger a FURNITURE zone drawn in PLAN; thumbstick up/down cycles the catalog (none first); the zone resizes to the product; readout shows name and w × d × h; a violet badge sits at the zone centre
+- [ ] MATERIAL · FURNITURE: A/X turns the selected product 90°; B/Y clears it (the zone keeps its size, the violet badge goes)
 - [ ] A furniture zone dimensioned to both walls, then given a product too wide for the gap: the second dimension disappears and the label flashes `DIM REMOVED · <miss>`; the walls don't move
 - [ ] A slot saved before this build with FURNISH items loads with each item as a furniture zone carrying its product, at the same place and height, turned to the nearest 90°
 - [ ] With the 3D view off, product zones show flat violet footprints on the floor (V notch on the front edge, dashed for a wall-hung unit)

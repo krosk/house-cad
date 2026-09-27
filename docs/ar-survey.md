@@ -265,8 +265,12 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   - **Both:** thumbstick up/down cycles the selection's material (none, then the catalog for that surface)
     and applies it at once; B/Y clears it. Each wall face is set on its own: a copy-to-every-wall action
     was built and removed at the owner's request (2026-09-26); don't re-add it.
-  - **Display:** finished floors tint in the material colour and finished faces draw a strip just inside
-    the wall, all in one batched mesh (`buildMaterials`). The yellow hover/selection highlight is a second
+  - **Display:** every target that has a material shows **one small swatch badge** (a 6 cm disc in the
+    material colour inside a white ring, `matBadge`) at the centre of its plan box, **never a coloured
+    fill or strip** (owner, 2026-09-27: full overlays made the plan hard to read). Room: the centre of
+    its largest rect; wall face: the middle of its longest visible run, 12 cm into the room; DOOR /
+    WINDOW / FURNITURE zone: its centre; device: under the marker (SWITCH/OUTLET/ETHERNET only). All
+    badges are one batched mesh (`buildMaterials`). The yellow hover/selection highlight is a second
     mesh, rebuilt only when the target changes.
   - **Readout:** material, then this floor/face's `m² · pcs` (+ cabochons), then the whole-house
     `HOUSE <packs> packs`.
@@ -285,7 +289,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     zone keeps its size). Shares the DOOR code path (`APT_KIND`), with its own branches in
     `cycleMaterial`/`materialReadout`/`deleteInMode` because the choices come from the furniture
     catalog, not `materialsFor`. Readout: product name, `w × d × h`, `A/X: TURN 90°`. A product
-    zone is tinted violet in every MATERIAL mode.
+    zone shows a violet badge in every MATERIAL mode.
   - **SWITCH** (`id: mat_switch`): trigger selects the switch marker within the reticle; where
     switches overlap (a stack at one plan point, or neighbours in the reticle), **grip cycles** them
     first (owner request, 2026-09-27), and the readout shows `n/N · GRIP: NEXT`. Thumbstick-y cycles

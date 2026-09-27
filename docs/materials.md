@@ -126,7 +126,8 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - **FLOOR:** aim at a room, thumbstick-y cycles the material, B/Y clears;
    - **WALL:** aim near a room edge picks that face (one face at a time).
 
-   AR shows a floor tint plus the readout (material, pieces, packs, m²).
+   AR shows a swatch badge at the room's centre plus the readout (material, pieces, packs, m²); no
+   coloured fill (owner, 2026-09-27).
 2. **3D textures** (implemented): `finishSurfaces` (flooring.js, no counting) → `finishGeometries`
    (architectural3d.js: 2 mm overlays, one mesh per material and role, UVs in plan metres) →
    `finishTexture` (src/ui/finishTextures.js: one canvas repeat unit per material, `repeat = 1/unit`).
@@ -590,5 +591,5 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
 
 ## Open questions
 
-- Until the AR 3D view exists, AR shows a wall face's material as a coloured strip along its edge on
-  the floor plan.
+- On the AR plan, a wall face's material is a swatch badge 12 cm inside the middle of the face (it was
+  a coloured strip until 2026-09-27; the owner found full overlays hard to read).
