@@ -15,15 +15,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon products, View 3D reflections, door and window products: owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon products, View 3D reflections, door, window, **switch and outlet** products: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-09-27 (session 30, continued)
-**Status:** Proven (git): `origin/main` = `06e7cfc` plus this handoff's commit (live `version.json` served
-`3899fe3` before the last push; check it); this handoff's own commit changes only this file. The tree is clean apart from the owner's untracked
-`Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
-everything from session 30 is verified by build, Node or a desktop browser only, and **parked for the owner
-to walk** (Next step A).
+**Status:** Proven (git): `origin/main` = `a2e7038` plus this handoff's commit; the live `version.json`
+served `c6d2664` minutes after the outlet push (Pages lags a few minutes; re-check). The tree is clean apart
+from the owner's untracked `Document from Alexis He.json`. AR performance (session 29) is
+**owner-confirmed on the Quest**; everything from session 30 is verified by build, Node or a desktop
+browser only, and **parked for the owner to walk** (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -46,8 +46,8 @@ boots straight into passthrough AR):
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
-   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials, door and window
-   products**, save/load in 6
+   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials, door, window,
+   switch and outlet products**, save/load in 6
    slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X**. Mode list:
    `docs/ar-survey.md`.
 
@@ -60,75 +60,26 @@ Read `docs/product-intent.md` before planning AR work.
 ## What changed in session 30
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list.
+> decisions" or "Findings" and delete this list. Detail for every item is in the named doc.
 
-1. **Stairs rotate like doors** (`47c08de`): A/X in PLAN · EDIT / desktop ↻ Rotate turns the ascent 90°.
-   Optional `climb` field = physical climb direction; sheet, DXF, a new AR floor glyph and View 3D
-   treads read it. `docs/ar-survey.md` (A/X rotate).
-2. **MARKER · CHECK** (`0ad552d`): read-only circuit diagnostics (red cross-tie, orange no breaker,
-   white unwired outlet/switch/light; thumbstick-y filters). **Also fixed: Ethernet wires were power
-   edges** (7 false "no breaker" circuits in the owner's house); circuits are per nature now.
-   `docs/electrical-workflow.md`.
-3. **Stacked-marker readout** (`9bce6e7`): a double switch stays two markers at one point (owner
-   decision); hovering adds `<type> i/n → k× light`. `docs/ar-survey.md` "Stacked devices".
-4. **Surface materials, phases 1–3** (`72ca05a`, `92975bf`, `f0f6bf1`), design and every owner decision in
-   **`docs/materials.md`**:
-   - AR MATERIAL · FLOOR / WALL, a catalog, and a whole-house takeoff (pieces, packs);
-   - View 3D textures;
-   - the AR 3D view on LEFT X.
-
-   Phase 4 (the owner's own products entered in AR) is not started.
-5. **Proven bug, fixed in `f0f6bf1`:** `clearPlanGeometry` detached four planGroup overlay groups on the
-   first plan build, so **Z-dims, adjacent-floor target dots, CHECK rings and MATERIAL tints never
-   rendered in AR** (picking still worked). All overlay groups are now in `PLAN_OVERLAY_GROUPS`.
-6. **Furniture catalog:** IKEA STOCKHOLM 2025 TV bench (`40586508`, a real IKEA model, `63cfd17`), and
-   **procedural furniture** (`4abecef`): a catalog entry with `procedural: <kind>` is built in code
-   (`src/ui/proceduralFurniture.js`) instead of fetched. First one: the owner's discontinued STOCKHOLM
-   bed (`stockholm-bed-160x200`; no IKEA model for any of the 10 articles tried). `docs/furniture.md`.
-7. **Door products** (`cc55640`): the owner's Lapeyre Ange-Line entrance door as a material of a DOOR
-   zone, AR **MATERIAL · DOOR**, drawn at the zone's size/hinge/swing in View 3D and the AR 3D view
-   (`src/ui/doorProducts.js`). `docs/materials.md` "Doors".
-8. **Workflow recorded** (`2972e7a`): `docs/product-modelling.md` + the `/model-product` skill, from
-   how the bed and door were made.
-9. **Surface products** (`docs/materials.md` "Flooring products", "Wall tile products", "Mosaic products", "Octagon + tozzetto products"): a finish
-   material can name a `design`, a procedural texture drawn in `src/ui/finishTextures.js`:
-   - Beaulieu oak charme 118×16.4 floor (`ac10962`, Leroy Merlin 92245930), `design: 'oak-rustic'`;
-   - GoodHome Vernisse white gloss wall tile 30×7.5 (`c0e135d`, Castorama), `design: 'handmade-gloss'`
-     with a **bump texture** (`finishBumpTexture`) that View 3D applies;
-   - GoodHome Blue stone mosaic (`38dc935`, Castorama), floor **and** wall: the piece is the 30 × 30.4 cm
-     sheet (takeoff counts sheets), `mosaic: [3, 18]` sticks drawn by the grid design `'stone-sticks'`;
-   - Etruria Design HEX 15×15 octagon in MATTONE + 6.2×6.2 BIANCO tozzetto (`f9a75c6`), the owner's real
-     octagon floor, `design: 'porcelain-matte'`; it **replaced** the generic `octagon_200` placeholder.
-10. **View 3D ✦ Reflections** (`c0e135d`): an opt-in environment map (RoomEnvironment) for glossy
-    finishes; the glazed tile only looks right with it. `docs/materials.md` "View 3D reflections".
-11. **`tools/product-images.mjs`** (`efca116`, Castorama added in `c0e135d`): per-retailer photo
-    extraction (IKEA, Lapeyre, Castorama, leboncoin from Node; Leroy Merlin through a Chrome snippet,
-    since it runs DataDome). `docs/product-modelling.md` step 3; the `/model-product` skill uses it.
-12. **Window products** (`a9a30fd`): the owner's Lapeyre Héméra white PVC windows as a material of a
-    WINDOW zone, new AR **MATERIAL · WINDOW** (shares the door path via `APT_KIND` in `mr.js`), built by
-    `src/ui/windowProducts.js`. The zone's hinge picks the leaves (both = two); the handle/hinges face
-    the side with a ROOM rect behind it. `docs/materials.md` "Windows".
-13. **Fix:** the PLAN · EDIT sill/head pad now redraws the floor→sill/head labels and the AR 3D view on
-    commit (owner report: the head label didn't update). Unconfirmed on the Quest.
-14. **Wall-hung AC units** (`23dd7c7`, `3519eb2`): Daikin Perfera CTXM15A (804 × 298 × 252) and FTXM60A
-    (997 × 298 × 292) as procedural furniture, one `daikin-wall-unit` builder with per-size `params`.
-    New catalog field **`mountZMm`**: a FURNISH drop starts at that foot height (2.0 m here). Daikin's
-    clearance rules (bottom ≥ 1.8 m, ≥ 30 mm to the ceiling, ≥ 50 mm each side) are recorded in
-    `docs/furniture.md`, not enforced.
-15. **AR furniture is drawn as floor plan pieces** (`e9d5ace`, owner request): the 3D models show only
-    with the AR 3D view (LEFT X). Otherwise each item is a violet footprint with a front V notch, dashed
-    when wall-hung (`furniturePlanGroup`).
-16. **Conduit junction height labels** show only in the conduit modes (`1b32d12`, owner request).
-17. **Lapeyre LINE acoustic white door** (`3899fe3`): second door product (`design: 'line'`, three raw-MDF
-    grooves). The door builder's frame size, threshold, key-rose drop and finish are now catalog fields.
-    `tools/product-images.mjs` also reads Lapeyre's `zoom1/` gallery path.
-18. **Furniture merge designed, not built** (`cc9165e`): the PLAN `furniture` zone gains an optional
-    product and `floor.furniture[]` is retired. Full design and all owner decisions in `docs/furniture.md`
-    "Planned: merge the two into one furniture zone". This is **Next step B**.
-19. **Sensea NEO 120 × 80 shower tray** (`6018048`): procedural `shower-tray`; top relief drawn as a
-    texture, positions measured on the top-down photo. Owner hasn't reviewed the render yet.
-20. **Product extractor** (`06e7cfc`): full Leroy Merlin gallery (thumbnail strip, .png and .jpg),
-    PDF documents, spec tables, id-named files, `--sheet` contact sheets (`docs/product-modelling.md` step 3).
+1. **Electrical:** stairs rotate (`climb`); **MARKER · CHECK** circuit diagnostics, circuits per wire nature
+   (Ethernet no longer counts as power); stacked-marker readout. `docs/electrical-workflow.md`, `docs/ar-survey.md`.
+2. **Materials phases 1–3:** AR MATERIAL · FLOOR / WALL, catalog + whole-house takeoff, View 3D textures,
+   the **AR 3D view on LEFT X**, and the `PLAN_OVERLAY_GROUPS` fix (four AR overlay layers had never
+   rendered). `docs/materials.md`.
+3. **Products modelled from photos** (`docs/product-modelling.md`, `/model-product`, `tools/product-images.mjs`
+   now also fetches documents, spec tables and contact sheets):
+   - finishes: Beaulieu oak, Vernisse tile (+ View 3D ✦ Reflections), Blue stone mosaic, Etruria octagon;
+   - DOOR / WINDOW zone products: Lapeyre Ange-Line and LINE doors, Héméra windows (MATERIAL · DOOR / WINDOW);
+   - procedural furniture: STOCKHOLM bed, Daikin CTXM15A / FTXM60A (`mountZMm`), Sensea NEO shower tray;
+   - **switch and outlet products** (`c6d2664`, `a2e7038`): Schneider Ovalis single switch, double switch
+     and flush outlet, on the marker (`marker.product`), drawn in View 3D and the AR 3D view in place of the
+     faceplate; AR **MATERIAL · SWITCH / OUTLET** with grip cycling overlapping devices. The owner reviewed
+     the switch shape until happy (stadium rocker, two flat faces, pyramid plate). `docs/materials.md`
+     "Switches and outlets".
+4. **AR furniture = floor plan pieces** unless the AR 3D view is on; junction height labels only in the
+   conduit modes.
+5. **Furniture merge designed, not built** (`cc9165e`): **Next step B**. `docs/furniture.md` "Planned: merge…".
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -144,7 +95,8 @@ Read `docs/product-intent.md` before planning AR work.
 - **Axis-aligned rectangles only** for Phase 5; exact size only from dimension constraints.
 - **Drift = RECAL + tape; no per-room anchors, no Quest room scan.** → `docs/product-intent.md`
 - **Heights are floor-referenced only**; Z is not in the solver. → `docs/ar-survey.md`
-- **Every marker is an 8 cm × 8 cm fixture** (owner spec); 3D placement is presentation-only.
+- **Every marker is an 8 cm × 8 cm fixture** (owner spec) unless it carries a switch/outlet product;
+  3D placement is presentation-only.
 - **Exports stay on the legacy extrusion** until the architectural 3D model is visually accepted.
 - **Markers, conduit, wires, pipes, furniture are parallel lanes**, never in the solver/footprint
   pipeline; circuits are derived, never stored, not in any output. → the workflow docs
@@ -168,6 +120,11 @@ Read `docs/product-intent.md` before planning AR work.
 - **A door product is a material of its DOOR zone** (owner decision), authored in MATERIAL · DOOR;
   made-to-measure products take the zone's size. **Window products follow the same rule** (WINDOW zone,
   MATERIAL · WINDOW).
+- **Switch and outlet products are a material category on the marker** (owner, 2026-09-27): stored as
+  `marker.product` (not a finish), switch products on switches, outlet products on `outlet` /
+  `outlet_appliance` only. **Model only the visible parts** (plate, rocker, socket), never the in-wall
+  mechanism. A double switch stays two markers; a multi-rocker product is set on the whole stack and
+  drawn once. Where targets overlap, **grip cycles them before the trigger selects** (owner).
 - **Catalog entries for the owner's real products replace generic placeholders** when the owner says
   so (`octagon_200` removed for Etruria). A saved finish naming a removed id shows as no material:
   every `materialById` caller handles null.
@@ -213,7 +170,10 @@ Read `docs/product-intent.md` before planning AR work.
 - **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
   curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
   of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
-- **Chrome tools:** a preview tab can hang its screenshots after a while; open a fresh tab. Stop
+- **Chrome tools:** screenshots of a WebGL preview tab can time out even though the page rendered.
+  Instead the scratch page POSTs `canvas.toDataURL()` to a tiny local receiver (`scratchpad/bedview/recv.mjs`
+  on :5191), and ffmpeg builds side-by-side comparisons with the photos. The javascript tool returns a bare
+  async IIFE as `{}` (prefix `await`) and blocks output containing a query string. Stop
   scratch Vite servers by port (`ss -ltnp | grep :5190`), not `pkill -f` (it kills its own shell).
 - **Deploy check:** `curl -s https://krosk.github.io/house-cad/version.json` (the commit it serves).
   The unauthenticated Actions API rate-limits quickly, and there is no `gh` CLI here.
@@ -237,7 +197,7 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `06e7cfc` before the handoff commit), all with descriptive bodies.
+All pushed (`origin/main` = `a2e7038` before the handoff commit), all with descriptive bodies.
 Doc-only commits are omitted, except the design commit.
 - **Session 30:**
   - `47c08de` stair `climb`;
@@ -252,7 +212,8 @@ Doc-only commits are omitted, except the design commit.
     windows + MATERIAL · WINDOW · `416d2fa` band-label redraw fix · `23dd7c7` CTXM15A + `mountZMm` ·
     `1b32d12` junction labels · `e9d5ace` AR furniture plan pieces · `3519eb2` FTXM60A ·
     `cc9165e` furniture merge design (docs) · `3899fe3` LINE door · `6018048` NEO shower tray ·
-    `06e7cfc` product extractor.
+    `06e7cfc` product extractor · `c6d2664` switch products + MATERIAL · SWITCH ·
+    `a2e7038` outlet product + MATERIAL · OUTLET.
 - **Session 29:**
   - 3D walls/faceplates: `f457bd5`, `309d807`;
   - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
@@ -294,6 +255,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units); used by FURNISH and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE; hardware) from `doorProductPlacements` |
+| `src/ui/deviceProducts.js` | Switch/outlet product builder: shared `plate()` (pyramid + stadium collar), `rocker` (single/double) and `socket` designs, lofted from radial outlines; cached per entry, clones share geometry |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware) from `windowProductPlacements` |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
@@ -310,6 +272,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - FURNISH: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on the APK?) and
     both Daikin units (drop at 2.0 m); the violet floor plan pieces, and the models with LEFT X;
   - the LINE door on an interior door zone; junction height labels only in the conduit modes;
+  - MATERIAL · SWITCH / OUTLET on real devices: grip cycling on a double switch, the double drawn once,
+    the Ovalis models flush on the wall at the right height with LEFT X (and in desktop View 3D POV);
   - the LEFT X AR 3D view, with **PROJECT · PERF** on;
   - View 3D textures (desktop);
   - MARKER · CHECK;
@@ -356,6 +320,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the Daikin units, the LINE door and the FURNISH plan pieces in AR (the plan-piece outline is a
     1 px line; a ribbon is the fix if it reads faint). The FTXM60A and the LINE door were only seen in a
     scratch preview, not in View 3D;
+  - the Ovalis switch, double switch and outlet in the real View 3D and in AR (seen only in scratch
+    renders; an 8.7 cm device is invisible from the View 3D overview, and the POV couldn't be aimed);
   - Héméra windows in AR, and on the owner's real window zones (seen only on an injected demo house in
     desktop View 3D). The frame is centred in the zone's depth; real fitting position is not modelled.
 
@@ -366,7 +332,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   joint, grout colour and **pack size** (entered as 1 piece per pack); Héméra profile faces are
   scaled by an assumed ~160 mm handle; the Daikin front layouts (panel edge, flap, sensors: photo
   estimates); the LINE grooves (photo estimates, assumed on both faces) and its lever handle (the
-  product ships without one: ask which handle the owner buys).
+  product ships without one: ask which handle the owner buys); the NEO tray's layout (top-down photo) and
+  the Ovalis depths (read on side-photo silhouettes).
 
   Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
   with markers, labels, conduits and wires since the batching, and reported them working.
