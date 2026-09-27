@@ -8,6 +8,7 @@
 // count comes from src/core/flooring.js, the picture only shows the product.
 
 import * as THREE from 'three';
+import { pinwheelCells, pinwheelPitch } from '../core/flooring.js';
 
 const css = (hex) => `#${(hex >>> 0).toString(16).padStart(6, '0')}`;
 const GROUT = 0xcbd5e1;
@@ -24,10 +25,15 @@ const GRID_SHEETS = 3;
 const gridSheets = (m) => m.sheets || GRID_SHEETS;
 // Octagon + tozzetto designs: OCT_CELLS × OCT_CELLS octagons (tone varies per tile).
 const OCT_CELLS = 4;
+// Pinwheel designs: PINWHEEL_MODULES × PINWHEEL_MODULES modules of nine tiles (`m.modules`
+// overrides it), so 36 different faces before the picture repeats.
+const PINWHEEL_MODULES = 2;
+const pinwheelModules = (m) => m.modules || PINWHEEL_MODULES;
 const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
   || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design])
   || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design])
-  || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design]);
+  || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design])
+  || (m.pattern === 'pinwheel' && !!PINWHEEL_DESIGNS[m.design]);
 
 // Repeat unit (metres) of a pattern.
 export function patternUnit(m) {
@@ -36,6 +42,10 @@ export function patternUnit(m) {
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [gridSheets(m) * px, gridSheets(m) * py];
   if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return [OCT_CELLS * px, OCT_CELLS * py];
+  if (m.pattern === 'pinwheel') {
+    const u = pinwheelPitch(m) * (PINWHEEL_DESIGNS[m.design] ? pinwheelModules(m) : 1);
+    return [u, u];
+  }
   if (m.pattern === 'stagger') return [m.w, 3 * py];
   if (m.pattern === 'brick') return [px, 2 * py];
   return [px, py];
@@ -547,11 +557,139 @@ function paintOctDesign(ctx, m, W, H, ppm, bump) {
   grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 67) + 1), bump ? 0.12 : 0.05);
 }
 
+// Aged limestone-look porcelain with tumbled edges (Leroy Merlin Monastère, tuned against
+// its top-down tile photo, media 1165024, then the owner's showroom photo of a laid wall,
+// 2026-09-27: faint clouds, per-tile tone, cream joints): a greige face (`m.color`) with soft darker tan
+// clouds (`m.accent`) and lighter patches (`m.light`), small brown pits (`m.pit`) that
+// gather in the clouds, and a wavy, slightly chipped outline (`m.edgeWobble` m, inward
+// only so the joint never closes). Bump: pits and the rounded edge read low.
+function agedStone(ctx, m, x, y, w, h, ppm, r, bump) {
+  const mm = ppm / 1000, wob = (m.edgeWobble ?? 0.002) * ppm;
+  // Outline: walk each side in ~8 mm steps, inset by a smooth wave plus the odd chip.
+  const pts = [];
+  const side = (ax, ay, bx, by, nx, ny) => {
+    const len = Math.hypot(bx - ax, by - ay), steps = Math.max(4, Math.round(len / (8 * mm)));
+    const p1 = r() * 6.28, p2 = r() * 6.28, f1 = 2 + r() * 3, f2 = 7 + r() * 6;
+    let chip = 0;
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps;
+      if (chip <= 0 && r() < 0.02) chip = 2 + Math.floor(r() * 3);
+      const e = wob * (0.5 + 0.3 * Math.sin(t * f1 * 6.28 + p1) + 0.2 * Math.sin(t * f2 * 6.28 + p2))
+        + (chip-- > 0 ? wob * (0.8 + r()) : 0);
+      const ends = Math.min(1, t * steps, (1 - t) * steps); // corners stay put
+      pts.push([ax + (bx - ax) * t + nx * e * ends, ay + (by - ay) * t + ny * e * ends]);
+    }
+  };
+  side(x, y, x + w, y, 0, 1); side(x + w, y, x + w, y + h, -1, 0);
+  side(x + w, y + h, x, y + h, 0, -1); side(x, y + h, x, y, 1, 0);
+  const outline = () => {
+    ctx.beginPath();
+    pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+    ctx.closePath();
+  };
+  ctx.save();
+  outline();
+  const tone = 0.95 + r() * 0.08; // per-tile shade (the showroom wall varies tile to tile)
+  ctx.fillStyle = bump ? '#b4b4b4' : `#${new THREE.Color(m.color).multiplyScalar(tone).getHexString()}`;
+  ctx.fill();
+  ctx.clip();
+  // Clouds: a smooth noise field over the tile (coarse + medium value noise, drawn from a
+  // small canvas scaled up with smoothing): warm tan (`m.accent`) where it is high,
+  // lighter cream (`m.light`) where it is low; fine mottling everywhere.
+  const N = 48, field = new Float32Array(N * N);
+  const grid = (g) => Float32Array.from({ length: (g + 1) * (g + 1) }, () => r());
+  const g1 = 3 + Math.floor(r() * 3), g2 = 11, v1 = grid(g1), v2 = grid(g2);
+  const lerp2 = (v, g, u, t) => {
+    const X = u * g, Y = t * g, i = Math.min(g - 1, Math.floor(X)), j = Math.min(g - 1, Math.floor(Y));
+    const fx = X - i, fy = Y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const at = (a, b) => v[b * (g + 1) + a];
+    return (at(i, j) * (1 - sx) + at(i + 1, j) * sx) * (1 - sy) + (at(i, j + 1) * (1 - sx) + at(i + 1, j + 1) * sx) * sy;
+  };
+  const bias = (m.clouds ?? 0.5) - 0.5; // + = more cloud
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      field[j * N + i] = 0.62 * lerp2(v1, g1, i / (N - 1), j / (N - 1)) + 0.3 * lerp2(v2, g2, i / (N - 1), j / (N - 1))
+        + 0.08 * r() + bias;
+    }
+  }
+  const smooth = (e0, e1, v) => { const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  const layer = document.createElement('canvas');
+  layer.width = layer.height = N;
+  const lx = layer.getContext('2d'), img = lx.createImageData(N, N);
+  const tan = new THREE.Color(bump ? 0x8a8a8a : m.accent), lt = new THREE.Color(bump ? 0xc8c8c8 : m.light ?? 0xf0ede6);
+  for (let k = 0; k < N * N; k++) {
+    const v = field[k], dark = smooth(0.5, 0.9, v), light = smooth(0.45, 0.2, v);
+    const c = dark > light ? tan : lt, a = Math.max(dark * 0.13, light * 0.2);
+    img.data.set([c.r * 255, c.g * 255, c.b * 255, a * 255], k * 4);
+  }
+  lx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(layer, x, y, w, h);
+  // Mottling: dense small specks, tan (denser where the field is high) and cream, so
+  // the clouds read as grainy stone rather than smooth stains.
+  const at = (px, py) => field[Math.min(N - 1, Math.floor((py - y) / h * N)) * N + Math.min(N - 1, Math.floor((px - x) / w * N))];
+  const nm = Math.round((w / mm) * (h / mm) * 0.012);
+  for (let k = 0; k < nm; k++) {
+    const px = x + r() * w, py = y + r() * h, v = at(px, py), rad = (0.5 + r() ** 2 * 2.5) * mm, al = 0.12 + r() * 0.25;
+    const tanSpeck = r() < 0.2 + 0.7 * smooth(0.35, 0.75, v);
+    ctx.globalAlpha = al;
+    ctx.fillStyle = css(bump ? (tanSpeck ? 0x7a7a7a : 0xd8d8d8) : tanSpeck ? m.accent : m.light ?? 0xf0ede6);
+    ctx.fillRect(px - rad, py - rad, rad * 2, rad * 2 * (0.6 + r() * 0.8));
+  }
+  // Pits: many tiny holes, most where the clouds are.
+  const npit = Math.round((w / mm) * (h / mm) * 0.003);
+  const pit = new THREE.Color(m.pit ?? 0x9a8a78);
+  for (let k = 0; k < npit; k++) {
+    const px = x + r() * w, py = y + r() * h, keep = r() < 0.15 + 0.85 * smooth(0.45, 0.8, at(px, py));
+    const s = Math.max(0.8, (0.4 + r() ** 3 * 1.8) * mm), al = 0.25 + r() * 0.45, f = 0.85 + r() * 0.3, e = 0.6 + r() * 0.8;
+    if (!keep) continue;
+    ctx.globalAlpha = al;
+    ctx.fillStyle = bump ? '#303030' : `#${pit.clone().multiplyScalar(f).getHexString()}`;
+    ctx.fillRect(px, py, s, s * e);
+  }
+  ctx.globalAlpha = 1;
+  // Tumbled edge: a soft darker rim just inside the outline (rounded in the bump map).
+  outline();
+  ctx.lineWidth = 6 * mm;
+  ctx.strokeStyle = bump ? 'rgba(40,40,40,0.5)' : `#${new THREE.Color(m.accent).getHexString()}`;
+  ctx.globalAlpha = bump ? 1 : 0.3;
+  ctx.stroke();
+  ctx.lineWidth = 2.5 * mm; // the worn arris itself, darker
+  ctx.globalAlpha = bump ? 1 : 0.3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+const PINWHEEL_DESIGNS = { 'aged-stone': agedStone };
+
+// Pinwheel modules (src/core/flooring.js PINWHEEL, the count's own layout) over the joint
+// colour `m.grout`; each tile drawn by the design with its own seed. Without a design,
+// plain `m.color` tiles.
+function paintPinwheel(ctx, m, W, H, ppm, bump) {
+  const r = rng(m.seed ?? 71), design = PINWHEEL_DESIGNS[m.design];
+  const n = design ? pinwheelModules(m) : 1, P = pinwheelPitch(m) * ppm, jp = (m.joint || 0) * ppm;
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.grout ?? GROUT);
+  ctx.fillRect(0, 0, W, H);
+  for (let mj = 0; mj < n; mj++) {
+    for (let mi = 0; mi < n; mi++) {
+      for (const c of pinwheelCells(m)) {
+        const x = mi * P + c.x0 * ppm + jp / 2, y = mj * P + c.y0 * ppm + jp / 2;
+        const w = (c.x1 - c.x0) * ppm - jp, h = (c.y1 - c.y0) * ppm - jp;
+        if (design) design(ctx, m, x, y, w, h, ppm, rng(Math.floor(r() * 1e9)), bump);
+        else { ctx.fillStyle = css(m.color); ctx.fillRect(x, y, w, h); }
+      }
+    }
+  }
+  if (design) grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 71) + 1), bump ? 0.2 : 0.09);
+}
+
 function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return paintDesign(ctx, m, W, H, ppm);
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return paintBrickDesign(ctx, m, W, H, ppm, false);
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return paintGridDesign(ctx, m, W, H, ppm, false);
   if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return paintOctDesign(ctx, m, W, H, ppm, false);
+  if (m.pattern === 'pinwheel') return paintPinwheel(ctx, m, W, H, ppm, false);
   const jp = Math.max(1.5, (m.joint || 0) * ppm); // joint in px, never invisible
   if (m.pattern === 'stagger') {
     const rowH = H / 3;
@@ -640,6 +778,9 @@ export function finishBumpTexture(m, anisotropy = 1) {
   }
   if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
     return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true)), anisotropy);
+  }
+  if (m?.pattern === 'pinwheel' && PINWHEEL_DESIGNS[m.design]) {
+    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintPinwheel(ctx, m, W, H, ppm, true)), anisotropy);
   }
   if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
   return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);

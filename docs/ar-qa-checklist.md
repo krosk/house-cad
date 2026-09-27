@@ -71,6 +71,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · FLOOR (and WALL): set Blue stone mosaic 30×30.4 on a floor; LEFT X shows mid-grey stone sticks (3 × 18 per sheet) with light joints; PERF usable; takeoff counts sheets (1 per pack)
 - [ ] MATERIAL · FLOOR: set Etruria HEX octagon Mattone + white tozzetto 15 on the upstairs bathroom; LEFT X shows terracotta octagons with white corner diamonds and thin light joints; the readout shows octagons + tozzetti
 - [ ] MATERIAL · FLOOR: set Terrazzo marble cream 60×60 on a room; LEFT X shows an off-white floor speckled with pale marble chips and faint 60 cm joints; PERF usable; takeoff counts tiles
+- [ ] MATERIAL · FLOOR: set Monastère beige stone, pinwheel 30/50 on a room; LEFT X shows greige stone tiles in the 130 cm pinwheel (a 30×30 centre, 50×50 arms, 30×50 corners) with cream joints; the readout lists pieces per format (50×50 · 30×50 · 30×30)
 - [ ] FURNISH: drop the W. Hoffmann V120 piano against a wall; black case 1.51 × 1.20 m with the keys facing the room, brass pedals and castors; true size against the real piano
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
 - [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL tints

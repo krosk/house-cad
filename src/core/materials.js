@@ -6,15 +6,17 @@
 //
 //   pattern  stagger (planks: rows, offcut starts the next row) | grid | brick (rows
 //            offset half a piece) | octagon (octagon + cabochon at each lattice corner)
-//            | paint (area only)
+//            | pinwheel (30/50 cm opus module of 9 tiles, w = h = the module) | paint (area only)
 //   w, h     piece size in metres (octagon: w = octagon width); joint in metres
 //   surface  floor | wall | both
-//   pack     { pieces } per box, or { area } m² per pack (paint)
+//   pack     { pieces } per box, or { area } m² per pack (paint), or { formats: { '50×50': n } }
+//            pieces per box for each format of a pinwheel
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
 //            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
 //            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
 //            sheet of `mosaic` = [cols, rows] sticks, with a bump map; octagon: 'porcelain-matte',
-//            accent = the tozzetto colour, `grout` = the joint colour); `roughness` optional (3D)
+//            accent = the tozzetto colour, `grout` = the joint colour; pinwheel: 'aged-stone',
+//            accent = cloud, `light`, `pit`, `grout`, `edgeWobble` m); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
@@ -113,6 +115,24 @@ export const BUILTIN_MATERIALS = [
     chips: [[0xd0c6b6, 5], [0xdcd8cf, 3], [0xc2b8a7, 2], [0xdbc6b0, 0.6], [0xcecbc3, 1]],
     pack: { pieces: 1 },
     name: { en: 'Terrazzo marble cream 60×60', fr: 'Terrazzo marbre ciment crème 60×60', zh: '水磨石 奶白 60×60' },
+  },
+  {
+    // Leroy Merlin Monastère beige (ref 72831325, 50 × 50; leroymerlin.fr/produits/carrelage-mur-
+    // interieur-sol-interieur-effet-pierre-beige-monastere-l-50-x-l-50-72831325.html): matte
+    // glazed porcelain, aged limestone look, irregular edges, 9 mm, 5 mm joint advised (the
+    // showroom board says 3 mm), 20 face designs (board: 24), box 5 tiles = 1.25 m². The
+    // range also comes in 30×30 and 30×50; the owner lays all three as a pinwheel
+    // (src/core/flooring.js PINWHEEL, 2026-09-27), so w/h = the 1.30 m module and the
+    // takeoff counts each format. Only the 50×50 box is known (packs stay unknown until the
+    // 30×30 and 30×50 boxes are). Colours: the retailer's top-down tile photo (media
+    // 1165024) for the base and pixel spread, then the owner's showroom photo (2026-09-27,
+    // not stored) for the greige tone, the cream grout, the even surface and the edges.
+    id: 'monastere_beige_pinwheel', surface: 'floor', pattern: 'pinwheel', design: 'aged-stone',
+    w: 1.3, h: 1.3, joint: 0.005, thickness: 0.009, edgeWobble: 0.002,
+    color: 0xd4cfc3, accent: 0xb3a288, light: 0xe4e0d6, pit: 0x8f7f6c, grout: 0xe6dfcd,
+    roughness: 0.8, bumpScale: 1.5,
+    pack: { formats: { '50×50': 5 } },
+    name: { en: 'Monastère beige stone, pinwheel 30/50', fr: 'Monastère effet pierre beige, opus 30/50', zh: 'Monastère 米色石纹 风车铺 30/50' },
   },
   {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like

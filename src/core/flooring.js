@@ -119,6 +119,49 @@ function latticeCount(material, boxes) {
   return out;
 }
 
+// Pinwheel (opus) of 30/50 cm tiles (owner spec, 2026-09-27): a 130 × 130 cm module of
+// nine tiles, [x, y, w, h] in nominal cm from its top-left: four 50×50 arms spiral
+// clockwise round a 30×30, and 30×50 / 50×30 fill the corners. Every row and column of
+// the module crosses exactly three tiles (30 + 50 + 50), so with joints the module
+// pitch is 1.30 m + 3 joints and a nominal coordinate c shifts by one joint per tile
+// before it.
+export const PINWHEEL = [
+  [30, 0, 50, 50], [80, 30, 50, 50], [50, 80, 50, 50], [0, 50, 50, 50], // arms
+  [50, 50, 30, 30], // centre
+  [0, 0, 30, 50], [80, 0, 50, 30], [100, 80, 30, 50], [0, 100, 50, 30], // corners
+];
+const pinwheelAt = (c, j) => c / 100 + j * (c === 0 ? 0 : c <= 50 ? 1 : c <= 100 ? 2 : 3);
+export const pinwheelPitch = (material) => pinwheelAt(130, material.joint || 0);
+// Module cells in metres ({x0, y0, x1, y1} incl. the joint, like a lattice cell) with
+// their format key ('50×50', '30×50', '30×30'; a 50×30 is a turned 30×50).
+export function pinwheelCells(material) {
+  const j = material.joint || 0;
+  return PINWHEEL.map(([x, y, w, h]) => ({
+    x0: pinwheelAt(x, j), y0: pinwheelAt(y, j), x1: pinwheelAt(x + w, j), y1: pinwheelAt(y + h, j),
+    format: `${Math.min(w, h)}×${Math.max(w, h)}`,
+  }));
+}
+
+// Pinwheel: one piece per module cell the region touches, whole vs cut, per format.
+function pinwheelCount(material, boxes) {
+  const P = pinwheelPitch(material), cells = pinwheelCells(material), bb = bboxOf(boxes);
+  const formats = {};
+  let whole = 0, cut = 0;
+  for (let mj = Math.floor(bb.y0 / P); mj * P < bb.y1 - EPS; mj++) {
+    for (let mi = Math.floor(bb.x0 / P); mi * P < bb.x1 - EPS; mi++) {
+      for (const c of cells) {
+        const x0 = mi * P + c.x0, x1 = mi * P + c.x1, y0 = mj * P + c.y0, y1 = mj * P + c.y1;
+        const a = overlapArea(boxes, x0, x1, y0, y1);
+        if (a < 1e-6) continue; // a sub-mm² touch needs no piece
+        const f = formats[c.format] || (formats[c.format] = { pieces: 0, whole: 0 });
+        f.pieces++;
+        if (a >= (x1 - x0) * (y1 - y0) * (1 - 1e-6)) { whole++; f.whole++; } else cut++;
+      }
+    }
+  }
+  return { pieces: whole + cut, whole, cut, formats };
+}
+
 // Planks: rows across the region's long axis at the global row phase. Each row is
 // laid left to right; a row starts with a pooled offcut when that keeps every joint
 // ≥ minStagger from the previous row's and the piece ≥ minPiece, else a fresh plank.
@@ -184,9 +227,11 @@ export function countPieces(material, boxes) {
   const area = boxesArea(boxes);
   if (!material || !boxes.length) return { area, pieces: 0 };
   if (material.pattern === 'paint' || !(material.w > 0 && material.h > 0)) return { area, pieces: 0 };
-  const counted = material.pattern === 'stagger' ? staggerCount(material, boxes) : latticeCount(material, boxes);
-  // Naive estimate beside it: area ÷ piece area + 10 % waste.
-  const naive = Math.ceil(area / (material.w * material.h) * 1.1);
+  const counted = material.pattern === 'stagger' ? staggerCount(material, boxes)
+    : material.pattern === 'pinwheel' ? pinwheelCount(material, boxes) : latticeCount(material, boxes);
+  // Naive estimate beside it: area ÷ piece area + 10 % waste (pinwheel: the mean piece).
+  const piece = material.pattern === 'pinwheel' ? 1.69 / PINWHEEL.length : material.w * material.h;
+  const naive = Math.ceil(area / piece * 1.1);
   return { area, ...counted, naive };
 }
 
@@ -404,11 +449,21 @@ export function materialTakeoff(project) {
   for (const item of [...regions, ...walls]) {
     const t = totals.get(item.material) || { area: 0, pieces: 0, cabochons: 0 };
     t.area += item.count.area; t.pieces += item.count.pieces || 0; t.cabochons += item.count.cabochons || 0;
+    for (const [k, f] of Object.entries(item.count.formats || {})) {
+      t.formats ??= {};
+      t.formats[k] = (t.formats[k] || 0) + f.pieces;
+    }
     totals.set(item.material, t);
   }
   for (const [id, t] of totals) {
     const pack = materialById(project, id)?.pack || {};
     t.packs = pack.pieces ? Math.ceil(t.pieces / pack.pieces) : pack.area ? Math.ceil(t.area / pack.area) : null;
+    if (t.formats) { // mixed formats: each is its own article and box; packs only when all are known
+      t.packsByFormat = Object.fromEntries(Object.entries(t.formats)
+        .map(([k, n]) => [k, pack.formats?.[k] ? Math.ceil(n / pack.formats[k]) : null]));
+      const known = Object.values(t.packsByFormat);
+      t.packs = known.every((n) => n != null) ? known.reduce((a, n) => a + n, 0) : null;
+    }
   }
   return { regions, walls, totals };
 }

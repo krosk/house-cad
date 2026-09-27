@@ -81,6 +81,9 @@ later `herringbone`. `pack` is pieces per box or m² per box.
 - **Tiles (`grid`/`brick`)**: count the lattice cells that intersect the region, whole vs cut.
 - **Octagon + cabochon**: the repeat cell is one octagon with one cabochon at its lattice corner.
   Count the octagons and cabochons intersecting the region, whole vs cut.
+- **Pinwheel (30/50 opus)**: count the module cells (9 per 1.30 m module, `PINWHEEL`) that
+  intersect the region, whole vs cut, per format (50×50, 30×50, 30×30); each format is its own
+  article and box, so whole-house packs need every format's box size (`pack.formats`).
 - **Walls**: net face area = face length × height, minus door and window openings on that face
   (their `sill/head` bands are known). Paint = m²; tile = the lattice count on the face rectangle.
 - Implementation limits (v1):
@@ -244,6 +247,43 @@ the joint.
       render 201 / 173 / 209 / 217, photo 197 / 164 / 204 / 217;
     - takeoff (Node): a 4 × 3.5 m floor = 42 tiles (30 whole, 12 cut).
   - Not yet seen in View 3D on a real room or in AR; the owner has not yet judged the render.
+
+## Pinwheel products (mixed 30/50 cm tiles)
+
+`pattern: 'pinwheel'` lays three formats of one range as the owner's pinwheel (owner spec,
+2026-09-27): a 130 × 130 cm module of nine tiles, four 50×50 arms spiralling clockwise round a
+30×30, with 30×50 / 50×30 in the corners. The layout lives once in `src/core/flooring.js`
+(`PINWHEEL`, `pinwheelCells`), so the takeoff and the texture read the same cells. Every row and
+column of the module crosses three tiles, so the pitch is 1.30 m + 3 joints (1.315 m at 5 mm),
+anchored at the plan origin like every pattern. `w = h = 1.3` (the module). The texture unit is
+2 × 2 modules (`m.modules`), 36 different faces, about 0.78 px/mm; `PINWHEEL_DESIGNS` draws each tile.
+
+- `monastere_beige_pinwheel`: Leroy Merlin Monastère beige, glazed matte porcelain, aged limestone
+  look ([ref 72831325](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-effet-pierre-beige-monastere-l-50-x-l-50-72831325.html), the 50×50).
+  - From the page: irregular edges, 9 mm, 5 mm joint advised, 20 face designs, PEI 4/5, box
+    5 tiles = 1.25 m²; formats 30×30, 30×50, 50×50, 80×80.
+  - The owner's showroom photo (2026-09-27, scratchpad only) shows the board: 3 mm joints, 24
+    designs, PEI 5/5, R10. The page and the board disagree on the joint; 5 mm is used (it moves
+    the module by 6 mm).
+  - Design `aged-stone`: per-tile tone (±4%), a faint tan / cream value-noise cloud, dense fine
+    mottle and pits gathered in the clouds, a wavy slightly chipped outline drawn inward
+    (`edgeWobble`), a darker worn rim; the bump map lowers pits, edges and joint.
+  - Sources: the retailer's top-down tile photo (media 1165024) for the base and spread, then the
+    owner's showroom photo for the greige tone, cream grout and the even surface (the first
+    version's clouds were far too strong beside it). The retailer's room render (944246) is
+    warm-lit and was only a laid-look reference.
+  - Proven:
+    - the build passes;
+    - Node: the 9 cells cover the module exactly (no overlap; area = pitch²); a 4 × 3.5 m floor =
+      86 tiles (17 cut): 39 × 50×50, 38 × 30×50, 9 × 30×30;
+    - texture grey on a 50×50 face (mean / p5 / p50 / p95): 203 / 191 / 203 / 214 against the
+      top-down photo 217 / 199 / 218 / 233. It is deliberately darker, toward the showroom photo, where
+      the tile reads about 15% darker than the grout (the texture: about 9%).
+  - Hypothesis / unknown:
+    - the 30×30 and 30×50 box contents (the whole-house pack total stays blank until they are
+      known);
+    - grout colour `0xe6dfcd` and tile brightness, which the owner accepted for now (2026-09-27);
+    - not yet seen in the real app's View 3D or in AR.
 
 ## Octagon + tozzetto products
 
