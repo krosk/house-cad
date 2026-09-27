@@ -18,9 +18,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon products, View 3D reflections, door and window products: owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-26 (session 30)
-**Status:** Proven (git + live `version.json`): `origin/main` = the band-label fix below (after `a9a30fd`); this
-handoff's own commit changes only this file. The tree is clean apart from the owner's untracked
+**Date:** 2026-09-27 (session 30, continued)
+**Status:** Proven (git): `origin/main` = `06e7cfc` plus this handoff's commit (live `version.json` served
+`3899fe3` before the last push; check it); this handoff's own commit changes only this file. The tree is clean apart from the owner's untracked
 `Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
 everything from session 30 is verified by build, Node or a desktop browser only, and **parked for the owner
 to walk** (Next step A).
@@ -110,6 +110,25 @@ Read `docs/product-intent.md` before planning AR work.
     the side with a ROOM rect behind it. `docs/materials.md` "Windows".
 13. **Fix:** the PLAN · EDIT sill/head pad now redraws the floor→sill/head labels and the AR 3D view on
     commit (owner report: the head label didn't update). Unconfirmed on the Quest.
+14. **Wall-hung AC units** (`23dd7c7`, `3519eb2`): Daikin Perfera CTXM15A (804 × 298 × 252) and FTXM60A
+    (997 × 298 × 292) as procedural furniture, one `daikin-wall-unit` builder with per-size `params`.
+    New catalog field **`mountZMm`**: a FURNISH drop starts at that foot height (2.0 m here). Daikin's
+    clearance rules (bottom ≥ 1.8 m, ≥ 30 mm to the ceiling, ≥ 50 mm each side) are recorded in
+    `docs/furniture.md`, not enforced.
+15. **AR furniture is drawn as floor plan pieces** (`e9d5ace`, owner request): the 3D models show only
+    with the AR 3D view (LEFT X). Otherwise each item is a violet footprint with a front V notch, dashed
+    when wall-hung (`furniturePlanGroup`).
+16. **Conduit junction height labels** show only in the conduit modes (`1b32d12`, owner request).
+17. **Lapeyre LINE acoustic white door** (`3899fe3`): second door product (`design: 'line'`, three raw-MDF
+    grooves). The door builder's frame size, threshold, key-rose drop and finish are now catalog fields.
+    `tools/product-images.mjs` also reads Lapeyre's `zoom1/` gallery path.
+18. **Furniture merge designed, not built** (`cc9165e`): the PLAN `furniture` zone gains an optional
+    product and `floor.furniture[]` is retired. Full design and all owner decisions in `docs/furniture.md`
+    "Planned: merge the two into one furniture zone". This is **Next step B**.
+19. **Sensea NEO 120 × 80 shower tray** (`6018048`): procedural `shower-tray`; top relief drawn as a
+    texture, positions measured on the top-down photo. Owner hasn't reviewed the render yet.
+20. **Product extractor** (`06e7cfc`): full Leroy Merlin gallery (thumbnail strip, .png and .jpg),
+    PDF documents, spec tables, id-named files, `--sheet` contact sheets (`docs/product-modelling.md` step 3).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -157,6 +176,13 @@ Read `docs/product-intent.md` before planning AR work.
 - **View 3D reflections are on demand, per device** (owner: some devices struggle): off by default,
   `localStorage`, never in project/share data, and **cleared for AR sessions** (Quest cost). AR
   reflections were asked about, not built: `docs/materials.md` lists what they would need.
+- **AR furniture models show only with the AR 3D view on**; otherwise flat plan pieces (owner, 2026-09-27).
+- **Furniture merge** (owner, 2026-09-26/27, `docs/furniture.md`):
+  - four facing directions only;
+  - FURNISH = drop + assign in one mode;
+  - sheets/DXF print the rectangle plus a front notch;
+  - furniture solves one-way after the structure;
+  - an over-specified furniture dimension is **deleted, never shown as a conflict**.
 - **LEFT controller:** trigger = teleport, grip = hold-to-view sheet, stick-x = rotate plan, stick-y =
   storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the stick click are free.
 
@@ -191,6 +217,12 @@ Read `docs/product-intent.md` before planning AR work.
   scratch Vite servers by port (`ss -ltnp | grep :5190`), not `pkill -f` (it kills its own shell).
 - **Deploy check:** `curl -s https://krosk.github.io/house-cad/version.json` (the commit it serves).
   The unauthenticated Actions API rate-limits quickly, and there is no `gh` CLI here.
+- **Today a furniture zone's dimensions can move a wall** (Proven with the real solver: a room's wall
+  moved 3.0 → 2.8 m, no conflict flag). The merge's one-way rule fixes it; until then it's live.
+- **Splitting mixed hunks into separate commits:** `git apply --cached --unidiff-zero` misplaces pure
+  insertions (one landed at the end of a file). `git stash --keep-index` + `pop` then merged the bad
+  staged copy back into the working file as a duplicate. Build the staged file as a blob instead
+  (`git hash-object -w` + `git update-index --cacheinfo`), and diff the result before committing.
 - **Solved coordinates carry float noise**; grids built from edges must snap (`snap()` in
   `architectural3d.js`).
 - **`addConduitSegment` / `ensureConduitNodeAtMarker` return EXISTING items**; `addWire` returns
@@ -205,8 +237,8 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `a9a30fd` before the handoff commit), all with descriptive bodies.
-Doc-only commits are omitted.
+All pushed (`origin/main` = `06e7cfc` before the handoff commit), all with descriptive bodies.
+Doc-only commits are omitted, except the design commit.
 - **Session 30:**
   - `47c08de` stair `climb`;
   - `0ad552d` MARKER · CHECK + per-nature circuits;
@@ -217,7 +249,10 @@ Doc-only commits are omitted.
     `cc55640` door products / Ange-Line · `2972e7a` modelling workflow + skill ·
     `ac10962` Beaulieu oak floor · `efca116` photo extractor · `c0e135d` Vernisse tile + Reflections ·
     `38dc935` Blue stone mosaic · `f9a75c6` Etruria octagon (placeholder removed) · `a9a30fd` Héméra
-    windows + MATERIAL · WINDOW · then the band-label redraw fix.
+    windows + MATERIAL · WINDOW · `416d2fa` band-label redraw fix · `23dd7c7` CTXM15A + `mountZMm` ·
+    `1b32d12` junction labels · `e9d5ace` AR furniture plan pieces · `3519eb2` FTXM60A ·
+    `cc9165e` furniture merge design (docs) · `3899fe3` LINE door · `6018048` NEO shower tray ·
+    `06e7cfc` product extractor.
 - **Session 29:**
   - 3D walls/faceplates: `f457bd5`, `309d807`;
   - conduit pen undo/T `dce02f1`, Z-dims `fb56fbc`;
@@ -257,8 +292,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
 | `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s per pattern (`DESIGNS` stagger, `BRICK_DESIGNS`, `GRID_DESIGNS` mosaic sheets, `OCT_DESIGNS`) and their bump maps |
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries); used by FURNISH and View 3D |
-| `src/ui/doorProducts.js` | Door product builder (frame, leaf design, hardware) from `doorProductPlacements` |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units); used by FURNISH and View 3D |
+| `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE; hardware) from `doorProductPlacements` |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware) from `windowProductPlacements` |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
@@ -272,16 +307,27 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     windows, checking which side the handle faces; Beaulieu oak, Etruria octagons in the upstairs
     bathroom, Blue stone mosaic and Vernisse tile; watch PERF: each design texture is 2048 px);
   - View 3D ✦ Reflections on a phone (does it hold frame rate?);
-  - FURNISH: the STOCKHOLM bed and the TV bench (does a real IKEA model replace the box on the APK?);
+  - FURNISH: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on the APK?) and
+    both Daikin units (drop at 2.0 m); the violet floor plan pieces, and the models with LEFT X;
+  - the LINE door on an interior door zone; junction height labels only in the conduit modes;
   - the LEFT X AR 3D view, with **PROJECT · PERF** on;
   - View 3D textures (desktop);
   - MARKER · CHECK;
   - the stacked readout;
   - stair rotation;
   - then session 29's list: ALL FLOORS reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T.
+- **B — Build the furniture merge** (design agreed, `docs/furniture.md` "Planned: merge…"). Rough order:
+  1. the model: an optional `article` + `facing` on furniture zones;
+  2. the one-way furniture solve (walls never move for furniture), with over-specified dims deleted
+     plus a readout;
+  3. load-time migration of `floor.furniture[]`: saved files, `_demo` seed, and share links (`shareView.js`);
+  4. FURNISH as drop + assign;
+  5. View 3D and the AR 3D view draw the product in the zone;
+  6. the sheet/DXF front notch.
+  Verify the solver change in Node against the owner's house (14 furniture zones, read-only).
 - **B′ — More products** as the owner names them: run `/model-product <link>`; a real manufacturer
   model is always checked first.
-- **B — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
+- **B″ — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
   `project.materials`. Possible improvements the owner has not asked for (see `docs/materials.md`):
   - per-region pattern offset to cut waste;
   - a plank texture drawn from the real cut plan;
@@ -307,6 +353,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the bed and the door in AR (both rendered only in a desktop browser);
   - the oak floor, Vernisse tile, Blue stone mosaic and Etruria octagons on real rooms (seen only in
     scratch previews), and Reflections on any device other than a desktop Chrome;
+  - the Daikin units, the LINE door and the FURNISH plan pieces in AR (the plan-piece outline is a
+    1 px line; a ribbon is the fix if it reads faint). The FTXM60A and the LINE door were only seen in a
+    scratch preview, not in View 3D;
   - Héméra windows in AR, and on the owner's real window zones (seen only on an injected demo house in
     desktop View 3D). The frame is centred in the zone's depth; real fitting position is not modelled.
 
@@ -315,7 +364,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   customisable) and which door zone in the owner's house is the entrance; the oak's 2 mm bevel and the
   tile's 3 mm joint (photo estimates); the mosaic's 2 mm joint (renders suggest ~3.5 mm); the Etruria
   joint, grout colour and **pack size** (entered as 1 piece per pack); Héméra profile faces are
-  scaled by an assumed ~160 mm handle.
+  scaled by an assumed ~160 mm handle; the Daikin front layouts (panel edge, flap, sensors: photo
+  estimates); the LINE grooves (photo estimates, assumed on both faces) and its lever handle (the
+  product ships without one: ask which handle the owner buys).
 
   Session 29: breaker glyph, conduit pen undo/T, Z-dim look, 3D-viewer fixes. The owner has used AR
   with markers, labels, conduits and wires since the batching, and reported them working.
