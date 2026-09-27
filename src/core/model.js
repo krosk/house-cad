@@ -532,6 +532,17 @@ export class Project {
     this._emit({ solveRectangles: false });
   }
 
+  // Switch (later outlet) product on a marker of the ACTIVE floor (docs/materials.md
+  // "Switches"): stored on the marker itself, so it follows copy/paste and deletion.
+  // A null material clears it.
+  setMarkerProduct(markerId, material) {
+    const marker = this.activeFloor.markers.find((m) => m.id === markerId);
+    if (!marker) return;
+    if (material) marker.product = material;
+    else delete marker.product;
+    this._emit({ solveRectangles: false });
+  }
+
   // --- markers (wall-anchored survey annotations) -------------------------
   // Add a marker (plain object {type, x, y, z}) to the active floor, minting an
   // id if none was supplied. z is its inherent height above the floor.

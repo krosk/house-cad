@@ -4,7 +4,7 @@ import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from './core/architectural3d.js';
 import { finishSurfaces } from './core/flooring.js';
-import { materialById } from './core/materials.js';
+import { materialById, markerProductDraws } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { setupMR } from './ui/mr.js';
@@ -213,6 +213,8 @@ function rebuild() {
     name: f.name,
     height: f.height,
     markers: f.markers,
+    // Switch products replace the standard faceplate (docs/materials.md "Switches").
+    markerProducts: markerProductDraws(project, f.markers),
     furniture: f.furniture,
     constraints: f.constraints,
     rectangles: f.rectangles,

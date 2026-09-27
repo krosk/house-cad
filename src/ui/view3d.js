@@ -8,6 +8,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { buildDoorProduct } from './doorProducts.js';
+import { buildDeviceProduct } from './deviceProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture, finishBumpTexture } from './finishTextures.js';
@@ -408,7 +409,12 @@ export class View3D {
       }
       for (const marker of entry.markers || []) {
         const light = marker.type === 'light';
-        const fixture = light ? this._lightMarkerFixture(marker) : this._wallMarkerFixture(marker);
+        // A product (docs/materials.md "Switches"): { def, z }, or null when another
+        // marker of the same double switch draws it.
+        const product = light ? undefined : entry.markerProducts?.get(marker.id);
+        if (product === null) continue;
+        const fixture = light ? this._lightMarkerFixture(marker)
+          : product ? this._productMarkerFixture(product.def) : this._wallMarkerFixture(marker);
         fixture.userData.floorId = floorId || null;
         fixture.userData.markerId = marker.id || null;
         // Wall fixtures sit flush on their nearest finished face, turned to face the
@@ -420,7 +426,7 @@ export class View3D {
         if (place) fixture.rotation.y = Math.atan2(place.nx, -place.ny);
         fixture.position.set(
           px,
-          (elevation || 0) + (Number.isFinite(marker.z)
+          (elevation || 0) + (product ? product.z : Number.isFinite(marker.z)
             ? marker.z
             : (light ? (entry.height || 2.5) : 1.1)),
           -py,
@@ -568,6 +574,14 @@ export class View3D {
     source.shadow.bias = -0.001;
     source.visible = this.lightingEnabled;
     fixture.add(source);
+    return fixture;
+  }
+
+  // A switch carrying a product (docs/materials.md "Switches") shows that product in
+  // place of the standard faceplate, in the same convention (back at z = 0, front +Z).
+  _productMarkerFixture(def) {
+    const fixture = buildDeviceProduct(def);
+    fixture.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     return fixture;
   }
 

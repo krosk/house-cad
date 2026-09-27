@@ -25,6 +25,11 @@
 // way: `design` picks the profile in src/ui/windowProducts.js, `color` the PVC, `accent`
 // the glass tint, `frameDepth`/`sashDepth` the published profile depths. The zone's
 // width, sill, head and hinge (both = two leaves) size it. No takeoff.
+//
+// Switch products (`surface: 'switch'`, `pattern: 'device'`) go on a switch MARKER
+// (`marker.product`, not a finish): `design` picks the builder in src/ui/deviceProducts.js,
+// which draws only the visible plate and rocker; sizes are `*Mm` fields. Outlet products
+// will follow the same way (`surface: 'outlet'`). No takeoff.
 
 export const BUILTIN_MATERIALS = [
   {
@@ -124,6 +129,28 @@ export const BUILTIN_MATERIALS = [
     color: 0xf5f5f3, accent: 0xcfe0e6, pack: null,
     name: { en: 'Lapeyre Héméra PVC window, white', fr: 'Fenêtre PVC Héméra Lapeyre, blanc', zh: 'Lapeyre Héméra 白色 PVC 窗' },
   },
+  {
+    // Schneider Electric Ovalis two-way switch, white (Leroy Merlin 85231759): 87 mm square
+    // polycarbonate plate, one oval rocker. Depths and rocker size measured on the Leroy
+    // Merlin photos (docs/materials.md "Switches").
+    id: 'switch_ovalis_white', surface: 'switch', pattern: 'device', design: 'rocker',
+    w: 0.087, h: 0.087, joint: 0, plateMm: 87, plateCornerMm: 10, rimDepthMm: 4.4,
+    collarMm: [54, 64], collarDepthMm: 8.1, openingDepthMm: 9.7, rockerMm: [43, 52],
+    rockerTopMm: 11, rockerBottomMm: 13.8, rockerFoldMm: 0,
+    color: 0xf2f2f0, roughness: 0.35, pack: null,
+    name: { en: 'Schneider Ovalis switch, white', fr: 'Interrupteur Ovalis Schneider, blanc', zh: '施耐德 Ovalis 开关（白）' },
+  },
+  {
+    // Schneider Electric Ovalis double two-way switch, white (Leroy Merlin 85231783): the
+    // same plate and rocker, split into two halves (a ~0.5 mm gap on the front photo).
+    id: 'switch_ovalis_double_white', surface: 'switch', pattern: 'device', design: 'rocker',
+    w: 0.087, h: 0.087, joint: 0, plateMm: 87, plateCornerMm: 10, rimDepthMm: 4.4,
+    collarMm: [54, 64], collarDepthMm: 8.1, openingDepthMm: 9.7, rockerMm: [43, 52],
+    rockerTopMm: 11, rockerBottomMm: 13.8, rockerFoldMm: 0,
+    rockers: 2, splitMm: 0.5,
+    color: 0xf2f2f0, roughness: 0.35, pack: null,
+    name: { en: 'Schneider Ovalis double switch, white', fr: 'Double interrupteur Ovalis Schneider, blanc', zh: '施耐德 Ovalis 双联开关（白）' },
+  },
 ];
 
 export function allMaterials(project) {
@@ -138,6 +165,37 @@ export function materialById(project, id) {
 // Materials offered for a surface ('floor' | 'wall'), catalog order.
 export function materialsFor(project, surface) {
   return allMaterials(project).filter((m) => m.surface === surface || m.surface === 'both');
+}
+
+// The product a marker carries (`marker.product`), if it suits the marker's type:
+// switch products on switch markers only (outlet products will match outlets).
+export const DEVICE_SURFACE = { switch: 'switch' };
+export function markerProduct(project, marker) {
+  const surface = DEVICE_SURFACE[marker?.type];
+  const def = surface ? materialById(project, marker.product) : null;
+  return def && def.surface === surface ? def : null;
+}
+
+// What to draw for a floor's markers: Map markerId → { def, z }, or null for a marker
+// drawn by another. A double switch is surveyed as two switch markers at one plan point
+// (one per rocker); when they carry the same multi-rocker product it draws once, at
+// their mean height (docs/materials.md "Switches").
+export function markerProductDraws(project, markers) {
+  const out = new Map();
+  const zOf = (m) => (Number.isFinite(m.z) ? m.z : 1.1);
+  for (const m of markers) {
+    if (out.has(m.id)) continue;
+    const def = markerProduct(project, m);
+    if (!def) continue;
+    if ((def.rockers ?? 1) > 1) {
+      const stack = markers.filter((o) => o.x === m.x && o.y === m.y && markerProduct(project, o)?.id === def.id);
+      for (const o of stack) out.set(o.id, null);
+      out.set(m.id, { def, z: stack.reduce((sum, o) => sum + zOf(o), 0) / stack.length });
+    } else {
+      out.set(m.id, { def, z: zOf(m) });
+    }
+  }
+  return out;
 }
 
 export function materialName(material, lang = 'en') {

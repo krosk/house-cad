@@ -64,8 +64,10 @@ function breakerFields(m) {
   return out;
 }
 
+// A switch/outlet product (docs/materials.md "Switches"): additive, no FILE_VERSION bump.
+const productFields = (m) => (typeof m.product === 'string' && m.product ? { product: m.product } : {});
 function serializeMarker(m) {
-  return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z, ...verticalFields(m), ...breakerFields(m) };
+  return { id: m.id, type: m.type, x: m.x, y: m.y, z: m.z, ...verticalFields(m), ...breakerFields(m), ...productFields(m) };
 }
 function serializeRoute(route) {
   const mode = route?.mode || 'ceiling';
@@ -228,6 +230,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       id: nextMarkerId(), type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
       ...verticalFields(m),
       ...breakerFields(m),
+      ...productFields(m),
       _locked: { x: false, y: false },
     };
     markerIds.set(m.id, copy.id);
@@ -446,6 +449,7 @@ export function deserializeInto(project, data) {
       id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
       ...verticalFields(m),
       ...breakerFields(m),
+      ...productFields(m),
       _locked: { x: false, y: false },
     })),
     electricalLinks: (f.electricalLinks || []).map((link) => ({

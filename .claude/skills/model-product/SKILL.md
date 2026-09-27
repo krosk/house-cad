@@ -15,6 +15,8 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
    - a FURNISH item (free-placed furniture) → a builder in `src/ui/proceduralFurniture.js`;
    - a product that fills a plan zone: a door → a `surface: 'door'` material + `src/ui/doorProducts.js`;
      a window → a `surface: 'window'` material + a profile in `src/ui/windowProducts.js`;
+   - a switch (later an outlet) → a `surface: 'switch'` material + a `design` in `src/ui/deviceProducts.js`,
+     set on a switch marker; model only the visible plate and rocker;
    - a surface finish (flooring, tiles, wall covering) → a `surface: 'floor'|'wall'` material with the
      published piece size and pack (the takeoff counts it), plus an optional `design` drawn in
      `src/ui/finishTextures.js`.

@@ -59,6 +59,7 @@ const STRINGS = {
   'mode.mat_wall':  { en: 'WALL',  fr: 'MUR', zh: '墙面' },
   'mode.mat_door':  { en: 'DOOR',  fr: 'PORTE', zh: '门' },
   'mode.mat_window': { en: 'WINDOW', fr: 'FENÊTRE', zh: '窗' },
+  'mode.mat_switch': { en: 'SWITCH', fr: 'INTERRUPTEUR', zh: '开关' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -217,6 +218,11 @@ const STRINGS = {
     en: 'Choose a window product for a WINDOW zone. Trigger selects the window under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the window takes the zone\'s width, sill and head; its hinge picks the leaves (both = two leaves). Shown in the 3D view (LEFT X).',
     fr: 'Choisissez un modèle de fenêtre pour une zone FENÊTRE. Gâchette : sélectionner la fenêtre visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la fenêtre prend la largeur, l’allège et la hauteur de la zone ; ses paumelles choisissent les vantaux (des deux côtés = deux vantaux). Visible dans la vue 3D (GAUCHE X).',
     zh: '为窗区域选择窗款。扳机选择准星下的窗；摇杆上/下循环窗款（首项为无）；B/Y 清除。按尺寸定制：窗采用该区域的宽度、窗台和窗头高度；铰链决定扇数（两侧 = 双扇）。在三维视图中显示（左 X）。',
+  },
+  'help.mat_switch': {
+    en: 'Choose a switch product for a switch. Trigger selects the switch under the reticle; where switches overlap (a double switch is two markers), grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
+    fr: 'Choisissez un modèle pour un interrupteur. Gâchette : sélectionner l’interrupteur visé ; s’ils se superposent (un double interrupteur = deux repères), grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
+    zh: '为开关选择型号。扳机选择准星下的开关；开关重叠时（双联开关为两个标记），先用握把循环。摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。在三维视图中显示（左 X）。',
   },
   'help.furnish': {
     en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; B/Y deletes the selection. Models load on the fly.',
@@ -416,6 +422,8 @@ const STRINGS = {
   'mat.pickWall':  { en: 'PICK WALL',   fr: 'CHOISIR MUR',    zh: '选择墙面' },
   'mat.pickDoor':  { en: 'PICK DOOR',   fr: 'CHOISIR PORTE',  zh: '选择门' },
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
+  'mat.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
+  'mat.gripCycles': { en: 'GRIP: NEXT', fr: 'GRIP : SUIVANT', zh: '握把：下一个' },
   'mat.leaves1':   { en: '1 LEAF',      fr: '1 VANTAIL',      zh: '单扇' },
   'mat.leaves2':   { en: '2 LEAVES',    fr: '2 VANTAUX',      zh: '双扇' },
   'mat.toMeasure': { en: 'MADE TO MEASURE', fr: 'SUR MESURE', zh: '定制尺寸' },

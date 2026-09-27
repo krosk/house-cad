@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
-MATERIAL · FLOOR → WALL → DOOR
+MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -278,6 +278,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     the DOOR code path through `APT_KIND`). Readout: product, `width × (head − sill)`, `1 LEAF` /
     `2 LEAVES` (the zone's hinge: both = two), `MADE TO MEASURE`. Design in `docs/materials.md`
     "Windows".
+  - **SWITCH** (`id: mat_switch`): trigger selects the switch marker within the reticle; where
+    switches overlap (a stack at one plan point, or neighbours in the reticle), **grip cycles** them
+    first (owner request, 2026-09-27), and the readout shows `n/N · GRIP: NEXT`. Thumbstick-y cycles
+    switch products (none first), B/Y clears, grip deselects. Hover outlines the marker yellow, the
+    selection amber; switches carrying a product get a teal floor square. The product shows in the AR
+    3D view (LEFT X). Readout: product, height. A double-switch product applies to every switch at
+    that plan point (the double is two markers) and draws once. Design in `docs/materials.md` "Switches".
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,

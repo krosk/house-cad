@@ -1,6 +1,6 @@
 # Materials (surface finishes): design
 
-Status (2026-09-26): **phases 1–3 implemented**: catalog, finishes, takeoff, AR MATERIAL · FLOOR /
+Status (2026-09-26): **phases 1–3 implemented** (plus door, window and switch products): catalog, finishes, takeoff, AR MATERIAL · FLOOR /
 WALL, View 3D textures, and the AR 3D view on LEFT X. Build- and Node-verified on the owner's house;
 **not yet seen in a browser or on device**. Phase 4 is not started. The MATERIAL tints were invisible
 in AR until the `PLAN_OVERLAY_GROUPS` fix (see `docs/ar-survey.md` "Performance notes"). This file records the owner's decisions so later sessions build the same thing.
@@ -346,6 +346,61 @@ the zone (`project.setWindowFinish`, an alias of `setDoorFinish`), authored in A
     - the real desktop View 3D on an injected demo house: two leaves along X, one leaf along Y on
       both sides; handle and hinges face the room; no console errors.
   - Not yet seen in AR.
+
+## Switches (device products)
+
+Owner decisions (2026-09-27): a switch product is **a new material category that applies only to
+switch markers**; outlets will get the same next. Only the visible part is modelled (the plate and the
+rocker), never the mechanism inside the wall box, because it is invisible. Where switches overlap
+(a double switch is two markers at one plan point), grip cycles them before the trigger selects.
+
+- **Stored on the marker** (`marker.product` = a catalog id), not in `floor.finishes`: finish targets
+  are rectangles, and a marker field follows save/load, floor copy/paste and deletion with no extra
+  code. Additive field, no `FILE_VERSION` bump. `project.setMarkerProduct(markerId, id | null)`.
+- Catalog entries: `surface: 'switch'`, `pattern: 'device'`, `design` (the builder in
+  `src/ui/deviceProducts.js`), sizes as `*Mm` fields. `markerProduct(project, marker)` resolves a
+  product only when its surface suits the marker type (`DEVICE_SURFACE`: switch → switch; outlets later),
+  so a stale id on another type is ignored.
+- 3D: View 3D draws the product in place of the standard 8 cm faceplate, at the same placement
+  (`wallMarkerPlacements`: flush on the nearest wall face, facing the room); the AR 3D view (LEFT X)
+  bakes it in the same way. The builder caches one model per entry and hands out clones sharing its
+  geometry.
+- AR: **MATERIAL · SWITCH** (`mat_switch`), see `docs/ar-survey.md`. Plan sheets and exports are
+  unchanged.
+- **Schneider Ovalis two-way switch, white** (`switch_ovalis_white`, Leroy Merlin 85231759, 2026-09-27).
+  - From the page: 87 mm wide, 1 module, polycarbonate, made in Spain. The installation sheet is a
+    wiring diagram only (media 3161952).
+  - Shape (owner corrections, 2026-09-27): the rocker and its collar are **stadiums** (two half-circles
+    joined by straight sides), the rocker has **two flat faces** (the upper one parallel to the wall, the
+    lower one slanted, folded at the middle), and the plate is a **smooth pyramid**. Built as lofted rings between outlines (`deviceProducts.js`), not extrusions.
+  - Measured on the photos (12.4 px/mm, scaled by the 87 mm width): the straight front (media 3162760)
+    for outlines, and the side (3162765) for the profile, read row by row from its silhouette:
+    - plate 4.4 mm at the rim, rising faster toward the middle to 8.1 mm at a 54 × 64 mm collar
+      (the same at top and bottom), then 9.7 mm at the rocker opening;
+    - rocker 43 × 52 mm: the upper face flat at 11 mm, the lower face slanting from the fold to
+      13.8 mm at the bottom edge (the silhouette's slope starts at the middle; its upper half reads
+      9.8–11.2 mm, taken as flat per the owner).
+  - **Estimates:** every depth is a photo reading; the collar outline and the fold height are by eye;
+    the maker's mark is not modelled.
+  - Proven 2026-09-27:
+    - the build passes;
+    - Node: the product survives save/load and floor copy/paste; clearing works; an outlet ignores a
+      switch product;
+    - a scratch render beside the photos (front, side, angled, and a low view showing the fold): the
+      side silhouette matches, bounding box 87 × 87 × 13.7 mm.
+  - Not yet seen in the real View 3D or in AR.
+
+- **Schneider Ovalis double two-way switch, white** (`switch_ovalis_double_white`, Leroy Merlin 85231783,
+  2026-09-27). The same plate and rocker, with the rocker divided into two halves (owner); the split is
+  ~0.5 mm on the straight front photo (media 3162824) and draws as a dark line on the faces
+  (`rockers: 2`, `splitMm`).
+  - **One device, two markers:** a double switch is surveyed as two switch markers at one plan point
+    (one per rocker, so each drives its own light). MATERIAL · SWITCH sets or clears a multi-rocker
+    product on that whole stack; going back to a single product keeps it on the selected marker only.
+    `markerProductDraws` draws such a stack once, at the markers' mean height.
+  - Proven 2026-09-27: build; Node (a two-marker stack draws once at the mean height, a separate single
+    switch still draws); a scratch render beside the front and angled photos. Not yet seen in the real
+    View 3D or in AR.
 
 ## Open questions
 
