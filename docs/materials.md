@@ -221,6 +221,30 @@ between sheets, as on a laid wall) over a 3 × 3 sheet unit, with a bump map lik
     - takeoff (Node): a 2 × 1.5 m floor = 35 sheets (24 whole, 11 cut).
   - Not yet seen in View 3D on a real room or in AR.
 
+## Terrazzo tile products (a design on a grid of tiles)
+
+The same `pattern: 'grid'` + `GRID_DESIGNS` path as the mosaics, with one tile per piece (no
+`mosaic`) and `sheets: 2`: the texture unit is 2 × 2 tiles instead of 3 × 3, so the 2048 px canvas
+gives about 1.7 px/mm and the smaller chips stay visible. Polished flat, so the bump map only lowers
+the joint.
+
+- `terrazzo_marble_cream`: marble-cement terrazzo, 60 × 60 cm tiles (owner, 2026-09-27; no product
+  page). The look comes from the owner's photo of an 8 × 8 cm sample (scratchpad only, not stored):
+  - Measured on a 50 mm crop at about 15 px/mm: angular crushed-marble chips about 6–13 mm (the
+    largest share), 3–6 mm and 1–3 mm, packed close with thin cement between, plus fine grey and
+    white sand specks. The design places them by share of the face (`TERRAZZO_CHIPS`: 34 / 20 / 12%)
+    on a 1 mm occupancy grid, so chips rarely overlap.
+  - Colours: off-white cement (`0xf3f4ee`); greige, white-grey, darker greige and a few pale peach
+    chips (`chips`, weighted). The photo's cement reads slightly cool; the palette follows it.
+  - Estimates: 2 mm joint, grout `0xe4e3da`, 20 mm thick, polished (`roughness: 0.35`), sold per
+    tile (`pack: { pieces: 1 }`).
+  - Proven:
+    - the build passes;
+    - a scratch render of a 50 mm square beside the sample crop, pixel grey (mean / p5 / p50 / p95):
+      render 201 / 173 / 209 / 217, photo 197 / 164 / 204 / 217;
+    - takeoff (Node): a 4 × 3.5 m floor = 42 tiles (30 whole, 12 cut).
+  - Not yet seen in View 3D on a real room or in AR; the owner has not yet judged the render.
+
 ## Octagon + tozzetto products
 
 An `octagon` entry with a `design` draws OCT_CELLS × OCT_CELLS (4 × 4) octagons in `color` with a tozzetto

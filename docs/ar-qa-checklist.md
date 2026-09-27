@@ -70,6 +70,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · WALL: set Vernisse white tile 30×7.5 on a wall; LEFT X shows white brick-bond tiles with faint joints (no gloss/relief in AR by design); PERF usable; takeoff in packs of 40
 - [ ] MATERIAL · FLOOR (and WALL): set Blue stone mosaic 30×30.4 on a floor; LEFT X shows mid-grey stone sticks (3 × 18 per sheet) with light joints; PERF usable; takeoff counts sheets (1 per pack)
 - [ ] MATERIAL · FLOOR: set Etruria HEX octagon Mattone + white tozzetto 15 on the upstairs bathroom; LEFT X shows terracotta octagons with white corner diamonds and thin light joints; the readout shows octagons + tozzetti
+- [ ] MATERIAL · FLOOR: set Terrazzo marble cream 60×60 on a room; LEFT X shows an off-white floor speckled with pale marble chips and faint 60 cm joints; PERF usable; takeoff counts tiles
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
 - [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL tints
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors

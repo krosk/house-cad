@@ -103,6 +103,18 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Blue stone mosaic 30×30.4', fr: 'Mosaïque Blue stone gris clair 30×30,4', zh: 'Blue stone 马赛克 30×30.4' },
   },
   {
+    // Polished marble-cement terrazzo tile 60 × 60 (owner's choice; size from the owner).
+    // Look from the owner's 8 × 8 cm sample photo (2026-09-27): off-white cement with
+    // greige, white-grey and a few peach marble chips up to ~13 mm. Joint, thickness,
+    // grout colour, finish and pack are estimates (no product page).
+    id: 'terrazzo_marble_cream', surface: 'floor', pattern: 'grid', design: 'terrazzo', sheets: 2,
+    w: 0.6, h: 0.6, joint: 0.002, thickness: 0.02,
+    color: 0xf3f4ee, accent: 0xe4e3da, roughness: 0.35, bumpScale: 1,
+    chips: [[0xd0c6b6, 5], [0xdcd8cf, 3], [0xc2b8a7, 2], [0xdbc6b0, 0.6], [0xcecbc3, 1]],
+    pack: { pieces: 1 },
+    name: { en: 'Terrazzo marble cream 60×60', fr: 'Terrazzo marbre ciment crème 60×60', zh: '水磨石 奶白 60×60' },
+  },
+  {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like
     // anthracite with satin triple glazing (product photos, 2026-09-26).
     id: 'door_ange_line', surface: 'door', pattern: 'door', design: 'ange-line',

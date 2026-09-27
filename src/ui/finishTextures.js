@@ -18,8 +18,10 @@ const GROUT = 0xcbd5e1;
 const DESIGN_ROWS = 10, DESIGN_PER_ROW = 3;
 // Brick-bond tile designs: BRICK_COLS tiles per row, BRICK_ROWS rows, rows offset by half.
 const BRICK_COLS = 4, BRICK_ROWS = 8;
-// Mosaic-sheet designs (grid pattern, piece = one sheet): GRID_SHEETS × GRID_SHEETS sheets.
+// Mosaic-sheet designs (grid pattern, piece = one sheet): GRID_SHEETS × GRID_SHEETS sheets
+// (`m.sheets` overrides it: fewer, larger-scale pieces keep small detail sharp).
 const GRID_SHEETS = 3;
+const gridSheets = (m) => m.sheets || GRID_SHEETS;
 // Octagon + tozzetto designs: OCT_CELLS × OCT_CELLS octagons (tone varies per tile).
 const OCT_CELLS = 4;
 const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
@@ -32,7 +34,7 @@ export function patternUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
-  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [GRID_SHEETS * px, GRID_SHEETS * py];
+  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [gridSheets(m) * px, gridSheets(m) * py];
   if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return [OCT_CELLS * px, OCT_CELLS * py];
   if (m.pattern === 'stagger') return [m.w, 3 * py];
   if (m.pattern === 'brick') return [px, 2 * py];
@@ -339,7 +341,112 @@ function stoneStick(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.restore();
 }
 
-const GRID_DESIGNS = { 'stone-sticks': stoneStick };
+// Polished marble-chip terrazzo tile (the owner's 8 × 8 cm sample, 2026-09-27): crushed
+// marble chips in an off-white cement, cut flat and polished. Chip sizes and share of
+// the face were measured on the sample at ~15 px/mm; colours are `m.chips`
+// ([hex, weight] pairs) over the cement `m.color`. Large chips go down first and later
+// ones skip spots already taken, so chips sit apart in cement as in the sample.
+const TERRAZZO_CHIPS = [ // [min, max] size in mm, share of the tile face
+  [6, 13, 0.34],
+  [3, 6, 0.2],
+  [1, 3, 0.12],
+];
+function terrazzoTile(ctx, m, x, y, w, h, ppm, r, bump) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (bump) { // polished flat: only the joint (drawn by the caller) reads as low
+    ctx.fillStyle = '#b4b4b4';
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = css(m.color);
+  ctx.fillRect(x, y, w, h);
+  const mm = ppm / 1000;
+  const palette = m.chips || [[0xcfc3b0, 1]];
+  const total = palette.reduce((a, [, k]) => a + k, 0);
+  const pick = () => {
+    let t = r() * total;
+    for (const [hex, k] of palette) if ((t -= k) <= 0) return hex;
+    return palette[0][0];
+  };
+  // Occupancy grid (1 mm cells) so chips mostly don't overlap.
+  const cell = 1 * mm, gw = Math.ceil(w / cell) + 1, gh = Math.ceil(h / cell) + 1;
+  const taken = new Uint8Array(gw * gh);
+  const free = (cx, cy, rad) => {
+    const i0 = Math.max(0, Math.floor((cx - x - rad) / cell)), i1 = Math.min(gw - 1, Math.floor((cx - x + rad) / cell));
+    const j0 = Math.max(0, Math.floor((cy - y - rad) / cell)), j1 = Math.min(gh - 1, Math.floor((cy - y + rad) / cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (taken[j * gw + i]) return false;
+    return true;
+  };
+  const mark = (cx, cy, rad) => {
+    const i0 = Math.max(0, Math.floor((cx - x - rad) / cell)), i1 = Math.min(gw - 1, Math.floor((cx - x + rad) / cell));
+    const j0 = Math.max(0, Math.floor((cy - y - rad) / cell)), j1 = Math.min(gh - 1, Math.floor((cy - y + rad) / cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) taken[j * gw + i] = 1;
+  };
+  const face = (w / mm) * (h / mm);
+  for (const [lo, hi, share] of TERRAZZO_CHIPS) {
+    let area = 0, tries = 0;
+    const target = face * share;
+    while (area < target && tries++ < target) {
+      const d = lo + (hi - lo) * r() ** 1.6; // more small than large within a class
+      const cx = x + r() * w, cy = y + r() * h, rad = (d / 2) * mm;
+      // Small chips may nestle closer: test a shrunken footprint.
+      if (!free(cx, cy, rad * (lo < 3 ? 0.3 : 0.6))) continue;
+      // Angular crushed chip: 4–7 corners, stretched and turned.
+      const n = 4 + Math.floor(r() * 4), rot = r() * Math.PI, stretch = 1 + r() * 0.8;
+      const pts = [];
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2 + (r() - 0.5) * (Math.PI / n);
+        const rr = rad * (0.55 + r() * 0.45);
+        const px = Math.cos(a) * rr * stretch, py = Math.sin(a) * rr / stretch;
+        pts.push([cx + px * Math.cos(rot) - py * Math.sin(rot), cy + px * Math.sin(rot) + py * Math.cos(rot)]);
+      }
+      let poly = 0; // shoelace area, px²
+      pts.forEach(([ax, ay], k) => { const [bx, by] = pts[(k + 1) % n]; poly += ax * by - bx * ay; });
+      area += Math.abs(poly) / 2 / (mm * mm);
+      mark(cx, cy, rad * 0.75);
+      const base = new THREE.Color(pick()).multiplyScalar(0.92 + r() * 0.14);
+      ctx.beginPath();
+      pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+      ctx.closePath();
+      if (lo >= 7) { // large chips: a soft tone drift across the stone
+        const a = r() * Math.PI * 2;
+        const g = ctx.createLinearGradient(cx - Math.cos(a) * rad, cy - Math.sin(a) * rad, cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+        g.addColorStop(0, `#${base.clone().multiplyScalar(1.06).getHexString()}`);
+        g.addColorStop(1, `#${base.clone().multiplyScalar(0.9).getHexString()}`);
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = `#${base.getHexString()}`;
+      }
+      ctx.fill();
+      if (lo >= 3 && r() < 0.25) { // a faint grey vein through some chips
+        ctx.save(); ctx.clip();
+        ctx.strokeStyle = `#${base.clone().multiplyScalar(0.72).getHexString()}`;
+        ctx.globalAlpha = 0.35 + r() * 0.3;
+        ctx.lineWidth = Math.max(0.6, 0.25 * mm);
+        const a = r() * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(cx - Math.cos(a) * rad, cy - Math.sin(a) * rad);
+        ctx.quadraticCurveTo(cx + (r() - 0.5) * rad, cy + (r() - 0.5) * rad, cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+  // Sand in the cement: fine grey and white specks.
+  const specks = Math.round(face * 0.02);
+  for (let k = 0; k < specks; k++) {
+    ctx.globalAlpha = 0.25 + r() * 0.35;
+    ctx.fillStyle = r() < 0.6 ? '#9c978c' : '#ffffff';
+    const s = Math.max(0.7, (0.2 + r() * 0.3) * mm);
+    ctx.fillRect(x + r() * w, y + r() * h, s, s);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+const GRID_DESIGNS = { 'stone-sticks': stoneStick, terrazzo: terrazzoTile };
 
 // Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets, each `m.mosaic` = [cols, rows] sticks,
 // all on one even pitch: the joint inside a sheet equals the one between sheets, so a laid
@@ -347,7 +454,7 @@ const GRID_DESIGNS = { 'stone-sticks': stoneStick };
 function paintGridDesign(ctx, m, W, H, ppm, bump) {
   const r = rng(m.seed ?? 53);
   const [cols, rows] = m.mosaic || [1, 1];
-  const n = GRID_SHEETS, jp = (m.joint || 0) * ppm;
+  const n = gridSheets(m), jp = (m.joint || 0) * ppm;
   const cw = W / (n * cols), ch = H / (n * rows); // stick pitch
   ctx.fillStyle = bump ? '#5a5a5a' : css(m.accent);
   ctx.fillRect(0, 0, W, H);
