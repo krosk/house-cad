@@ -359,13 +359,14 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   code. Additive field, no `FILE_VERSION` bump. `project.setMarkerProduct(markerId, id | null)`.
 - Catalog entries: `surface: 'switch'`, `pattern: 'device'`, `design` (the builder in
   `src/ui/deviceProducts.js`), sizes as `*Mm` fields. `markerProduct(project, marker)` resolves a
-  product only when its surface suits the marker type (`DEVICE_SURFACE`: switch → switch; outlets later),
+  product only when its surface suits the marker type (`DEVICE_SURFACE`: switch → switch; outlet and
+  outlet_appliance → outlet; ethernet → ethernet),
   so a stale id on another type is ignored.
 - 3D: View 3D draws the product in place of the standard 8 cm faceplate, at the same placement
   (`wallMarkerPlacements`: flush on the nearest wall face, facing the room); the AR 3D view (LEFT X)
   bakes it in the same way. The builder caches one model per entry and hands out clones sharing its
   geometry.
-- AR: **MATERIAL · SWITCH** (`mat_switch`), see `docs/ar-survey.md`. Plan sheets and exports are
+- AR: **MATERIAL · SWITCH**, **OUTLET**, **ETHERNET** (`mat_switch`, `mat_outlet`, `mat_ethernet`), see `docs/ar-survey.md`. Plan sheets and exports are
   unchanged.
 - **Schneider Ovalis two-way switch, white** (`switch_ovalis_white`, Leroy Merlin 85231759, 2026-09-27).
   - From the page: 87 mm wide, 1 module, polycarbonate, made in Spain. The installation sheet is a
@@ -418,6 +419,25 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   - Proven 2026-09-27: build; Node (the product applies to `outlet` and `outlet_appliance`, not to
     `outlet_shutter` or a switch); a scratch render beside the front, side and angled (3163217) photos,
     bounding box 87 × 87 × 10 mm. Not yet seen in the real View 3D or in AR.
+
+- **Schneider Ovalis RJ45 socket, white** (`ethernet_ovalis_white`, `surface: 'ethernet'`, design `rj45`,
+  Leroy Merlin 85231775, 2026-09-27). Ethernet products go on single `ethernet` markers only
+  (`DEVICE_SURFACE`); `ethernet_dual` would need a double-socket product. Authored in AR with
+  **MATERIAL · ETHERNET** (`mat_ethernet`, the same code path as SWITCH and OUTLET). Only the plate and
+  the insert face are modelled (owner, again for this product).
+  - From the page: 87 mm wide, 42.7 mm deep (the mechanism, not modelled), 1 module, "prise multimédia".
+  - Same plate and flat insert as the outlet (`flatInsert()` in `deviceProducts.js`): the side photo
+    (media 3211364) has the outlet's silhouette, and the insert measures 42.7 mm across on the front
+    photo's middle row.
+  - Front photo (media 3211372, 12.4 px/mm), positions from the insert's centre, y up: the fixing screw
+    Ø7.6 mm at (−14.1, 5.6) with its slot at ~30°; the embossed icon disc Ø7.6 mm at (−4.4, 6.3), drawn
+    as a faint ring (the icon itself is not modelled); the jack's dust cover 13.5 × 17.6 mm at
+    (9.2, −8.0), drawn as a groove, with a raised pull tab 9 × 1.2 mm at (9.2, −14.5), 0.8 mm proud.
+  - **Estimates:** the tab's height off the face and the screw slot's angle are by eye.
+  - Proven 2026-09-27: build; Node (the product applies to `ethernet` only, not to `ethernet_dual`,
+    `camera_ethernet`, outlets or switches; an outlet product is ignored on an Ethernet marker); a scratch
+    render beside the front photo (front and angled), bounding box 87 × 87 × 10.7 mm. Not yet seen in the
+    real View 3D or in AR.
 
 ## Open questions
 

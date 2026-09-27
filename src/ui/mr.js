@@ -3133,8 +3133,8 @@ export function setupMR(view, project, getFootprint) {
   // which marker types each takes); grip cycles overlapping ones (a stack at one plan
   // point, or neighbours inside the reticle) before trigger selects.
   let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null;
-  const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet' }; // mode → catalog surface
-  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet']);
+  const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet' }; // mode → catalog surface
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
   // Aperture material modes → the zone kind (and catalog surface) they edit.
   const APT_KIND = { mat_door: 'door', mat_window: 'window' };
   let matHighlightKey = '';
@@ -3349,7 +3349,7 @@ export function setupMR(view, project, getFootprint) {
   function materialReadout(modeId) {
     if (DEVICE_MODE[modeId]) {
       const marker = matSelDevice || matHoverDevice;
-      if (!marker) return [[t(DEVICE_MODE[modeId] === 'outlet' ? 'mat.pickOutlet' : 'mat.pickSwitch'), 0xe2e8f0]];
+      if (!marker) return [[t(`mat.pick${{ switch: 'Switch', outlet: 'Outlet', ethernet: 'Ethernet' }[DEVICE_MODE[modeId]]}`), 0xe2e8f0]];
       const mat = markerProduct(project, marker);
       const near = matDeviceCandidates(marker);
       return [
@@ -6659,6 +6659,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
     },
     {
+      id: 'mat_ethernet', color: 0x2dd4bf,
+      // The same for single Ethernet sockets (DEVICE_SURFACE: ethernet).
+      onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
+    },
+    {
       id: 'circuit_check', color: 0xf97316,
       // Read-only diagnostics: trigger does nothing (see buildCheckOverlay).
       onTouch: () => {},
@@ -6889,7 +6894,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'furnish',
-    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet',
+    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet', 'mat_ethernet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -6897,7 +6902,7 @@ export function setupMR(view, project, getFootprint) {
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
-    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_switch: 'material', mat_outlet: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',

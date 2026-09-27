@@ -1,7 +1,7 @@
 // Device products (docs/materials.md "Switches"): a catalog material with
-// `surface: 'switch'` (or 'outlet') set on a switch (or socket outlet) marker
+// `surface: 'switch'` (or 'outlet', 'ethernet') set on a switch (or socket outlet, Ethernet) marker
 // (`marker.product`) replaces that marker's standard 8 cm faceplate in 3D. Only the
-// visible part is modelled (owner, 2026-09-27): the plate and the rocker or socket, never
+// visible part is modelled (owner, 2026-09-27): the plate and the rocker or insert, never
 // the mechanism inside the wall box.
 //
 // Returns a Group (a shared-geometry clone) in the faceplate convention (view3d
@@ -175,11 +175,11 @@ function stadiumShape(w, h) {
   return s;
 }
 
-// Flush socket outlet ("affleurante"): the same plate and collar; a flat stadium insert
-// in the rocker's place, `insertDepthMm` proud, carrying the French socket as marks on
-// its face: the socket's round edge (`socketMm`), two pin holes `pinSpacingMm` apart and
-// the earth pin `earthMm` = [height above centre, hole diameter].
-function socketOutlet(def, m) {
+// The flat insert shared by the outlet and the RJ45 socket: the same plate and collar,
+// a flat stadium insert in the rocker's place, `insertDepthMm` proud, and the shadow in
+// the gap around it. Returns the group and `mark(geometry, material, x, y, lift)`, which
+// lays a flat mark (y up, metres) on the insert's face.
+function flatInsert(def, m) {
   const g = new THREE.Group();
   const { mm, openZ, rw, rh, gapW } = plate(def, m, g);
   const faceZ = mm(def.insertDepthMm ?? 9.9);
@@ -187,10 +187,21 @@ function socketOutlet(def, m) {
   const rk = stadium(rw, rh), rkIn = stadium(inW, inH);
   g.add(new THREE.Mesh(loft([ring(rk, rk, 0, openZ - mm(2.5)), ring(rk, rk, 0, faceZ - mm(0.9)),
     ring(rkIn, rkIn, 0, faceZ)], () => faceZ), m.rocker));
+  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), 12);
+  floor.translate(0, 0, openZ - mm(2.9));
+  g.add(new THREE.Mesh(floor, m.gap));
   const mark = (geometry, material, x, y, lift = 0.00005) => {
     geometry.translate(x, y, faceZ + lift);
     g.add(new THREE.Mesh(geometry, material));
   };
+  return { g, mm, faceZ, mark };
+}
+
+// Flush socket outlet ("affleurante"): the flat insert carries the French socket as marks
+// on its face: the socket's round edge (`socketMm`), two pin holes `pinSpacingMm` apart and
+// the earth pin `earthMm` = [height above centre, hole diameter].
+function socketOutlet(def, m) {
+  const { g, mm, mark } = flatInsert(def, m);
   const R = mm(def.socketMm ?? 38.7) / 2;
   mark(new THREE.RingGeometry(R - mm(0.25), R + mm(0.25), 64), m.gap, 0, 0); // a grey groove
   // Pin holes read light grey (shallow, lit inside) with a darker rim on the photos.
@@ -202,14 +213,45 @@ function socketOutlet(def, m) {
   const [ey, ed] = (def.earthMm || [10.5, 5.2]).map(mm);
   mark(new THREE.CircleGeometry(ed / 2, 32), m.split, 0, ey);
   mark(new THREE.CircleGeometry(ed * 0.3, 24), m.pin, 0, ey, 0.0001);
-  // The shadow in the gap around the insert.
-  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), 12);
-  floor.translate(0, 0, openZ - mm(2.9));
-  g.add(new THREE.Mesh(floor, m.gap));
   return g;
 }
 
-const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet };
+// A rounded rectangle w × h, corner radius r, centred (for flat outlines).
+function roundedRect(w, h, r) {
+  const s = new THREE.Shape(), x = w / 2, y = h / 2;
+  s.moveTo(-x + r, -y); s.lineTo(x - r, -y); s.absarc(x - r, -y + r, r, -Math.PI / 2, 0, false);
+  s.lineTo(x, y - r); s.absarc(x - r, y - r, r, 0, Math.PI / 2, false);
+  s.lineTo(-x + r, y); s.absarc(-x + r, y - r, r, Math.PI / 2, Math.PI, false);
+  s.lineTo(-x, -y + r); s.absarc(-x + r, -y + r, r, Math.PI, Math.PI * 1.5, false);
+  return s;
+}
+
+// RJ45 data socket: the flat insert carries, as marks (centres in mm from the insert's
+// centre, y up): the fixing screw `screwMm` = [x, y, diameter] with its slot at
+// `screwSlotDeg`; the embossed icon disc `iconMm` = [x, y, diameter] as a faint ring;
+// the jack's dust cover `coverMm` = [x, y, w, h] as a groove, with its raised pull tab
+// `tabMm` = [x, y, w, h] proud of the face.
+function rj45Socket(def, m) {
+  const { g, mm, faceZ, mark } = flatInsert(def, m);
+  const [sx, sy, sd] = (def.screwMm || [-14.1, 5.6, 7.6]).map(mm);
+  mark(new THREE.RingGeometry(sd / 2 - mm(0.35), sd / 2, 40), m.gap, sx, sy);
+  const slot = new THREE.PlaneGeometry(sd * 0.6, mm(0.9)).rotateZ(((def.screwSlotDeg ?? 30) * Math.PI) / 180);
+  mark(slot, m.hole, sx, sy);
+  const [ix, iy, id] = (def.iconMm || [-4.4, 6.3, 7.6]).map(mm);
+  mark(new THREE.RingGeometry(id / 2 - mm(0.3), id / 2, 40), m.hole, ix, iy);
+  const [cx, cy, cw, ch] = (def.coverMm || [9.2, -8, 13.5, 17.6]).map(mm);
+  const outline = roundedRect(cw, ch, mm(1.5));
+  outline.holes.push(new THREE.Path(roundedRect(cw - mm(0.8), ch - mm(0.8), mm(1.1)).getPoints(8).reverse()));
+  mark(new THREE.ShapeGeometry(outline, 8), m.gap, cx, cy);
+  const [tx, ty, tw, th] = (def.tabMm || [9.2, -14.5, 9, 1.2]).map(mm);
+  const tab = new THREE.BoxGeometry(tw, th, mm(0.8));
+  tab.translate(tx, ty, faceZ + mm(0.4));
+  g.add(new THREE.Mesh(tab, m.rocker));
+  mark(new THREE.PlaneGeometry(tw, mm(0.35)), m.gap, tx, ty - th / 2 - mm(0.2)); // its shadow
+  return g;
+}
+
+const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet, 'rj45': rj45Socket };
 
 // Built once per catalog entry and material kind; callers get a clone that shares the
 // geometry and materials, so they must never dispose them (a baked copy clones first).

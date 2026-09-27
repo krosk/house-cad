@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
-MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH → OUTLET
+MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH → OUTLET → ETHERNET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -287,6 +287,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     that plan point (the double is two markers) and draws once. Design in `docs/materials.md` "Switches".
   - **OUTLET** (`id: mat_outlet`): the same for socket outlets (`outlet`, `outlet_appliance` markers) and
     `surface: 'outlet'` products.
+  - **ETHERNET** (`id: mat_ethernet`): the same for single Ethernet sockets (`ethernet` markers) and
+    `surface: 'ethernet'` products.
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,

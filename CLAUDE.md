@@ -94,7 +94,7 @@ Every other marker renders as one standard **8 cm × 8 cm faceplate** (`MARKER_F
 plate to the nearest exposed side of the resolved wall boxes at the marker's height (within 30 cm),
 facing away from that wall, so room-side, exterior, and jamb-mounted fixtures all face open air.
 It is presentation-only: marker data is never changed.
-A switch or socket-outlet marker carrying a product (`marker.product`, `docs/materials.md` "Switches") shows that
+A switch, socket-outlet or Ethernet marker carrying a product (`marker.product`, `docs/materials.md` "Switches") shows that
 product (`src/ui/deviceProducts.js`) at the same placement instead of the standard faceplate.
 
 Production builds emit an un-precached `version.json` beside `index.html`; `src/core/versionCheck.js`

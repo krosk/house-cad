@@ -163,6 +163,19 @@ export const BUILTIN_MATERIALS = [
     color: 0xf2f2f0, roughness: 0.35, pack: null,
     name: { en: 'Schneider Ovalis flush outlet, white', fr: 'Prise affleurante Ovalis Schneider, blanc', zh: '施耐德 Ovalis 平装插座（白）' },
   },
+  {
+    // Schneider Electric Ovalis RJ45 socket, white (Leroy Merlin 85231775): the outlet's
+    // plate and flat insert (same front and side silhouettes on the photos), carrying the
+    // fixing screw, the embossed icon disc and the jack's dust cover with its pull tab.
+    // Measured on the Leroy Merlin front photo (docs/materials.md "Switches").
+    id: 'ethernet_ovalis_white', surface: 'ethernet', pattern: 'device', design: 'rj45',
+    w: 0.087, h: 0.087, joint: 0, plateMm: 87, plateCornerMm: 10, rimDepthMm: 4.4,
+    collarMm: [54, 64], collarDepthMm: 8.1, openingDepthMm: 9.7, rockerMm: [43, 52],
+    insertDepthMm: 9.9, screwMm: [-14.1, 5.6, 7.6], screwSlotDeg: 30, iconMm: [-4.4, 6.3, 7.6],
+    coverMm: [9.2, -8, 13.5, 17.6], tabMm: [9.2, -14.5, 9, 1.2],
+    color: 0xf2f2f0, roughness: 0.35, pack: null,
+    name: { en: 'Schneider Ovalis RJ45 socket, white', fr: 'Prise RJ45 Ovalis Schneider, blanc', zh: '施耐德 Ovalis RJ45 网口（白）' },
+  },
 ];
 
 export function allMaterials(project) {
@@ -181,8 +194,9 @@ export function materialsFor(project, surface) {
 
 // The product a marker carries (`marker.product`), if it suits the marker's type:
 // switch products on switch markers, outlet products on plain socket outlets (the
-// shutter/aircon/cooktop/oven/water-heater variants are usually not sockets).
-export const DEVICE_SURFACE = { switch: 'switch', outlet: 'outlet', outlet_appliance: 'outlet' };
+// shutter/aircon/cooktop/oven/water-heater variants are usually not sockets), Ethernet
+// products on single Ethernet sockets (a dual socket is a different product).
+export const DEVICE_SURFACE = { switch: 'switch', outlet: 'outlet', outlet_appliance: 'outlet', ethernet: 'ethernet' };
 export function markerProduct(project, marker) {
   const surface = DEVICE_SURFACE[marker?.type];
   const def = surface ? materialById(project, marker.product) : null;

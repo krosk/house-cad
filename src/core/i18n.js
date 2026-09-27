@@ -61,6 +61,7 @@ const STRINGS = {
   'mode.mat_window': { en: 'WINDOW', fr: 'FENÊTRE', zh: '窗' },
   'mode.mat_switch': { en: 'SWITCH', fr: 'INTERRUPTEUR', zh: '开关' },
   'mode.mat_outlet': { en: 'OUTLET', fr: 'PRISE', zh: '插座' },
+  'mode.mat_ethernet': { en: 'ETHERNET', fr: 'RÉSEAU', zh: '网口' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -229,6 +230,11 @@ const STRINGS = {
     en: 'Choose an outlet product for an outlet. Trigger selects the outlet under the reticle; where outlets overlap, grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
     fr: 'Choisissez un modèle pour une prise. Gâchette : sélectionner la prise visée ; si elles se superposent, grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
     zh: '为插座选择型号。扳机选择准星下的插座；插座重叠时先用握把循环。摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。在三维视图中显示（左 X）。',
+  },
+  'help.mat_ethernet': {
+    en: 'Choose a socket product for an Ethernet socket. Trigger selects the socket under the reticle; where sockets overlap, grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
+    fr: 'Choisissez un modèle pour une prise réseau. Gâchette : sélectionner la prise visée ; si elles se superposent, grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
+    zh: '为网口选择型号。扳机选择准星下的网口；网口重叠时先用握把循环。摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。在三维视图中显示（左 X）。',
   },
   'help.furnish': {
     en: 'Place real furniture models. Thumbstick up/down cycles the article to drop (or rotates the selected item in 15° steps). Trigger empty floor to drop it; trigger an item to select it; grip-drag an item to move it; B/Y deletes the selection. Models load on the fly.',
@@ -430,6 +436,7 @@ const STRINGS = {
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
   'mat.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
   'mat.pickOutlet': { en: 'PICK OUTLET', fr: 'CHOISIR PRISE', zh: '选择插座' },
+  'mat.pickEthernet': { en: 'PICK ETHERNET', fr: 'CHOISIR PRISE RÉSEAU', zh: '选择网口' },
   'mat.gripCycles': { en: 'GRIP: NEXT', fr: 'GRIP : SUIVANT', zh: '握把：下一个' },
   'mat.leaves1':   { en: '1 LEAF',      fr: '1 VANTAIL',      zh: '单扇' },
   'mat.leaves2':   { en: '2 LEAVES',    fr: '2 VANTAUX',      zh: '双扇' },
