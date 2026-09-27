@@ -10,8 +10,11 @@
 
 import * as THREE from 'three';
 
-const FRAME = 0.05;       // dormant (frame) face width
-const FRAME_DEPTH = 0.08; // dormant depth (Ange-Line: 80 mm)
+// Defaults (the Ange-Line); a catalog entry may override each: `frameFace`, `frameDepth`,
+// `threshold` (false = none), `roseDrop` (the key rose below the handle), `metalness`,
+// `roughness`.
+const FRAME_DEFAULT = 0.05;       // dormant (frame) face width
+const FRAME_DEPTH_DEFAULT = 0.08; // dormant depth (Ange-Line: 80 mm)
 const HANDLE_Z = 1.05;    // handle height above the floor
 
 const css = (hex) => `#${new THREE.Color(hex).getHexString()}`;
@@ -51,7 +54,28 @@ function drawAngeLine(ctx, W, H, def) {
   ctx.restore();
 }
 
-const DESIGNS = { 'ange-line': drawAngeLine };
+// LINE face (Lapeyre LINE * acoustic door block): flat paint, lock edge at canvas x = 0,
+// three thin full-height grooves near the lock edge showing the raw MDF (`accent`).
+// Positions are fractions of the leaf width from the lock edge, measured on Lapeyre's
+// straight front photo (docs/materials.md).
+const LINE_GROOVES = [0.141, 0.232, 0.319];
+function drawLine(ctx, W, H, def) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, shade(def.color, 1.0));
+  g.addColorStop(1, shade(def.color, 0.97));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  const gw = Math.max(1.5, 0.007 * W); // about 5 mm on a 730 mm leaf
+  for (const f of LINE_GROOVES) {
+    const x = f * W;
+    ctx.fillStyle = css(def.accent);
+    ctx.fillRect(x - gw / 2, 0, gw, H);
+    ctx.fillStyle = shade(def.accent, 0.7); // shadowed groove wall
+    ctx.fillRect(x - gw / 2, 0, gw * 0.35, H);
+  }
+}
+
+const DESIGNS = { 'ange-line': drawAngeLine, line: drawLine };
 
 // One leaf texture per catalog entry and orientation (mirrored = hinge at canvas x 0).
 const texCache = new Map();
@@ -74,7 +98,7 @@ function materialsFor(def, lambert) {
   const key = `${JSON.stringify(def)}|${lambert}`;
   if (matCache.has(key)) return matCache.get(key);
   const M = lambert ? THREE.MeshLambertMaterial : THREE.MeshStandardMaterial;
-  const extra = lambert ? {} : { roughness: 0.45, metalness: 0.3 };
+  const extra = lambert ? {} : { roughness: def.roughness ?? 0.45, metalness: def.metalness ?? 0.3 };
   const m = {
     body: new M({ color: def.color, ...extra }),
     face: new M({ map: leafTexture(def, false), ...extra }),
@@ -90,6 +114,7 @@ export function buildDoorProduct(p, { lambert = false } = {}) {
   const m = materialsFor(p.def, lambert);
   // Local frame: X along the wall (−w/2..w/2), Y up, Z across the wall.
   const w = p.width, h = p.head;
+  const FRAME = p.def.frameFace ?? FRAME_DEFAULT, FRAME_DEPTH = p.def.frameDepth ?? FRAME_DEPTH_DEFAULT;
   const hingeX = p.hingeEnd === 'hi' ? 1 : -1; // hinge jamb at local +X or −X
   const parts = [];
   const add = (geometry, material, x, y, z) => {
@@ -100,7 +125,7 @@ export function buildDoorProduct(p, { lambert = false } = {}) {
   add(new THREE.BoxGeometry(FRAME, h, FRAME_DEPTH), m.body, -w / 2 + FRAME / 2, h / 2, 0);
   add(new THREE.BoxGeometry(FRAME, h, FRAME_DEPTH), m.body, w / 2 - FRAME / 2, h / 2, 0);
   add(new THREE.BoxGeometry(w - 2 * FRAME, FRAME, FRAME_DEPTH), m.body, 0, h - FRAME / 2, 0);
-  add(new THREE.BoxGeometry(w - 2 * FRAME, 0.015, FRAME_DEPTH + 0.02), m.steel, 0, 0.0075, 0);
+  if (p.def.threshold !== false) add(new THREE.BoxGeometry(w - 2 * FRAME, 0.015, FRAME_DEPTH + 0.02), m.steel, 0, 0.0075, 0);
   // Leaf: BoxGeometry faces are [+x, −x, +y, −y, +z, −z]. The design's lock edge is at
   // canvas x = 0; +Z's U runs toward +X and −Z's toward −X, so the face whose U starts
   // on the hinge side takes the mirrored texture, and both faces agree in the world.
@@ -118,7 +143,7 @@ export function buildDoorProduct(p, { lambert = false } = {}) {
     add(new THREE.CylinderGeometry(0.009, 0.009, 0.05, 10).rotateX(Math.PI / 2), m.steel, lockX, HANDLE_Z, zFace + side * 0.03);
     // Bar points toward the hinge.
     add(new THREE.CylinderGeometry(0.009, 0.009, 0.16, 10).rotateZ(Math.PI / 2), m.steel, lockX + hingeX * 0.08, HANDLE_Z, zFace + side * 0.055);
-    add(new THREE.CylinderGeometry(0.016, 0.016, 0.01, 16).rotateX(Math.PI / 2), m.steel, lockX, HANDLE_Z - 0.1, zFace + side * 0.005);
+    add(new THREE.CylinderGeometry(0.016, 0.016, 0.01, 16).rotateX(Math.PI / 2), m.steel, lockX, HANDLE_Z - (p.def.roseDrop ?? 0.1), zFace + side * 0.005);
   }
   // Hinge knuckles on the swing face.
   for (const y of [0.25, 1.1, 1.95].map((f) => f * (h / 2.15))) {

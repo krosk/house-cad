@@ -294,6 +294,21 @@ the zone.
   RAL 7016 (a guess from the photos: the product colour is customisable).
 - Proven 2026-09-26: renders in a scratch preview (both faces, hinge either side) and in the real
   desktop View 3D on an injected demo house (door along X and along Y). Not yet seen in AR.
+- **Lapeyre LINE \* acoustic door block, pre-painted white** (`door_line_acoustic_white`; source page ref
+  2650701, the 204 × 73 cm push-left size; sold standard and made to measure, so the size comes from the
+  zone). Spec sheet: 40 mm MDF leaf with a chipboard core, 92 × 44.6 mm frame section ("huisserie 90",
+  no architrave), 3 steel pin hinges, lock for key or privacy, no glazing, 19.4 kg, passage 69 cm,
+  handle sold separately. Design from Lapeyre's two straight front photos (zoom1 ids 202546627 push-left,
+  202546631 push-right): three thin full-height grooves showing the raw MDF, at 14%, 23% and 32% of the
+  leaf width from the lock edge, about 5 mm wide (photo estimates). The two roses sit about 1.06 m and
+  0.98 m up (`roseDrop: 0.075`). No threshold (`threshold: false`), matte paint (`metalness: 0`).
+  The builder still draws a lever handle; the photos show only the roses, since the handle is sold
+  separately. Assumed: the grooves are on both faces (Hypothesis; the photos show one face). Proven
+  2026-09-27 in a scratch preview: both faces, hinge left; the Ange-Line renders unchanged. Not yet
+  seen in View 3D or AR.
+- The door builder's frame face/depth, threshold, key-rose drop and paint finish are catalog fields
+  (`frameFace`, `frameDepth`, `threshold`, `roseDrop`, `metalness`, `roughness`), defaulting to the
+  Ange-Line's values.
 - Limits: `door` zones only (not sliding or garage); the leaf is drawn closed; the texture is
   stretched over the leaf, so the design scales with the opening's proportions.
 

@@ -54,8 +54,9 @@ function extractImages(pageUrl, html, filter = '') {
       add(`https://media.adeo.com/media/${m[1]}/media.jpeg?width=1200`, `adeo ${m[1]}`, m[1]);
     }
   } else if (host.endsWith('lapeyre.fr')) {
-    // statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg (pictos excluded).
-    for (const m of all(/https?:\/\/www\.statics-lapeyre\.fr\/+img\/catalogue\/collMain\/[^"'\s?\\]+?\.(?:jpe?g|png|webp)/g)) {
+    // statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg, or zoom1/…/<id>.jpg on
+    // some product pages (the LINE door block, 2026-09-26); pictos excluded.
+    for (const m of all(/https?:\/\/www\.statics-lapeyre\.fr\/+img\/catalogue\/(?:collMain|zoom1)\/[^"'\s?\\]+?\.(?:jpe?g|png|webp)/g)) {
       add(m[0].replace(/(\.fr)\/+/, '$1/'), 'lapeyre');
     }
   } else if (host.endsWith('ikea.com')) {

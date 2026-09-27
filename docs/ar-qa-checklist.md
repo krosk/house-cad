@@ -60,6 +60,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (tint appears), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; strips sit inside the walls; door/window area deducted in the m² line
 - [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (zone tints anthracite); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
+- [ ] MATERIAL · DOOR: set Lapeyre LINE acoustic (white) on a door: a white leaf with three thin tan grooves by the lock edge on both faces, a white frame, no threshold
 - [ ] MATERIAL · WINDOW: trigger a WINDOW zone, thumbstick-y sets Lapeyre Héméra; readout shows size and 1/2 LEAVES; LEFT X shows the white frame in the opening with the handle and hinges on the room side (hinge both = two leaves); B/Y clears back to the plain pane
 - [ ] MATERIAL · FLOOR: cycle to Beaulieu oak charme 118×16.4 on a room; LEFT X shows light oak planks along the room's long axis with soft grain and a few knots, no visible repeat; PERF stays usable; takeoff lists packs of 8
 - [ ] MATERIAL · WALL: set Vernisse white tile 30×7.5 on a wall; LEFT X shows white brick-bond tiles with faint joints (no gloss/relief in AR by design); PERF usable; takeoff in packs of 40

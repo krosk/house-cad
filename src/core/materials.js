@@ -106,6 +106,16 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Lapeyre Ange-Line door', fr: 'Porte Ange-Line Lapeyre', zh: 'Lapeyre Ange-Line 入户门' },
   },
   {
+    // Lapeyre LINE * acoustic door block, pre-painted white (ref 2650701 is the 204 × 73
+    // left-hand size; standard and made to measure, so the size comes from the zone): 40 mm
+    // leaf, 92 × 44.6 mm frame, three raw-MDF grooves near the lock edge, no threshold.
+    id: 'door_line_acoustic_white', surface: 'door', pattern: 'door', design: 'line',
+    w: 0, h: 0, joint: 0, leafDepth: 0.04, frameFace: 0.0446, frameDepth: 0.092,
+    threshold: false, roseDrop: 0.075, metalness: 0, roughness: 0.7,
+    color: 0xf3f3f1, accent: 0xb49f80, pack: null,
+    name: { en: 'Lapeyre LINE acoustic door, white', fr: 'Bloc-porte LINE acoustique Lapeyre, blanc', zh: 'Lapeyre LINE 隔音门（白）' },
+  },
+  {
     // Lapeyre Héméra PVC window, white, made to measure (FPC5837268, 2026-09-26): hidden
     // sash ("ouvrant caché"), frame 80 mm and sash 84 mm deep, 4/20/4 glazing. Profile
     // faces measured on the product photos (src/ui/windowProducts.js PROFILES.hemera).

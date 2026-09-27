@@ -61,7 +61,7 @@ node tools/product-images.mjs --download --out <dir> <image-url>...   # then dow
 | Site | Pattern the script uses | Access |
 |---|---|---|
 | IKEA | `ikea.com/<cc>/<lang>/images/products/<slug>__<id>_<code>_s5.jpg`, only this product's slug; 1400 px | curl |
-| Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (pictos excluded); 1240 × 900 | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
+| Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (1240 × 900), or `…/zoom1/…/<id>.jpg` on some pages (the LINE door block, 780 × 780); pictos excluded | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
 | Leroy Merlin | `media.adeo.com/media/<id>/media.jpg` ids in the page HTML = the gallery, in order; downloaded as `media.jpeg?width=1200` | **Chrome only** (DataDome, below); images download fine by curl |
 | Castorama | Scene7 `media.castorama.fr/is/image/Castorama/<slug>~<EAN>_<code>`, only this EAN (from `…/<EAN>_CAFR.prd`); `?wid=1400`. Specs and pack are in the page (tile count sits in its embedded data) | curl |
 | leboncoin | `<script id="__NEXT_DATA__">`: objects with `subject` + `images.urls_large`, filtered by title (`--filter`, default the URL's words) | curl (Node's own fetch gets 403) |
