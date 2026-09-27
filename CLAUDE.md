@@ -87,6 +87,8 @@ UV space, and use restrained bump/roughness so they remain mobile-friendly.
 Surface finishes (`floor.finishes`, `docs/materials.md`) draw as 2 mm textured overlays in front of the
 slab/wall (`finishSurfaces` → `finishGeometries` → `src/ui/finishTextures.js`), UVs in plan metres so
 patterns are anchored at the plan origin; they are presentation-only and never reach exports.
+In View 3D a design may add a small, densely repeating detail texture for sub-mm grain up close
+(`applyFinishDetail`, `docs/materials.md` "Detail layer"), because the main texture is capped at 2048 px.
 Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
 puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
 authority; the fixture/light are presentation-only.

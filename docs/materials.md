@@ -259,31 +259,106 @@ anchored at the plan origin like every pattern. `w = h = 1.3` (the module). The 
 2 × 2 modules (`m.modules`), 36 different faces, about 0.78 px/mm; `PINWHEEL_DESIGNS` draws each tile.
 
 - `monastere_beige_pinwheel`: Leroy Merlin Monastère beige, glazed matte porcelain, aged limestone
-  look ([ref 72831325](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-effet-pierre-beige-monastere-l-50-x-l-50-72831325.html), the 50×50).
-  - From the page: irregular edges, 9 mm, 5 mm joint advised, 20 face designs, PEI 4/5, box
-    5 tiles = 1.25 m²; formats 30×30, 30×50, 50×50, 80×80.
+  look. Three articles, each with its own box (the takeoff counts and boxes each size):
+
+  | Size | Ref | Box |
+  |---|---|---|
+  | 50×50 | [72831325](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-effet-pierre-beige-monastere-l-50-x-l-50-72831325.html) | 5 tiles = 1.25 m² |
+  | 30×50 | [72831311](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-effet-pierre-beige-monastere-l-30-x-l-50-72831311.html) | 7 tiles = 1.05 m² |
+  | 30×30 | [72831304](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-effet-pierre-beige-monastere-l-30-x-l-30-72831304.html) | 12 tiles = 1.08 m² |
+
+  - From the pages: irregular edges, 9 mm, 5 mm joint advised, 24 face designs (the 50×50 page
+    says 20). The 30×50 page was found by trying refs next to the 30×30's with the same URL
+    pattern (only 72831311 answered).
   - The owner's showroom photo (2026-09-27, scratchpad only) shows the board: 3 mm joints, 24
     designs, PEI 5/5, R10. The page and the board disagree on the joint; 5 mm is used (it moves
     the module by 6 mm).
-  - Design `aged-stone`: per-tile tone (±4%), a faint tan / cream value-noise cloud, dense fine
-    mottle and pits gathered in the clouds, a wavy slightly chipped outline drawn inward
-    (`edgeWobble`), a darker worn rim; the bump map lowers pits, edges and joint.
-  - Sources: the retailer's top-down tile photo (media 1165024) for the base and spread, then the
-    owner's showroom photo for the greige tone, cream grout and the even surface (the first
-    version's clouds were far too strong beside it). The retailer's room render (944246) is
-    warm-lit and was only a laid-look reference.
+  - Takeoff: per room, each size's pieces and whole pieces (`count.formats`); whole-house totals
+    per size (`totals.formats`) and boxes per size (`packsByFormat`, rounded up once per size),
+    `packs` = their sum. The AR readout shows one line per size, largest first:
+    `50×50 39 pcs (9 cut)`, and on the house line `· 14 packs`. No wastage margin and no offcut
+    reuse (a cut spot = one tile bought); the desktop has no quantity view yet.
+  - Design `aged-stone`:
+    - per-tile tone (±4%), a faint tan / cream value-noise cloud, dense fine mottle and pits
+      gathered in the clouds;
+    - a few rust-orange pits (`rust`, as on the 30×50 photo); white crackle veins on about
+      half the tiles (as on the 30×30 photo);
+    - a wavy outline drawn inward (`edgeWobble` 3 mm, slow waves, the odd chip) with rounded
+      corners (5–11 mm);
+    - a pillowed edge: nested outline strokes make the bump map roll the face down to the joint
+      over about 12 mm (`bumpScale: 3`), which is what makes each tile read as a soft stone in a
+      lit room view, as in the retailer's laid render;
+    - plus the View 3D detail layer below.
+  - Sources:
+    - the straight tile photos of the three formats (50×50 media 1165024, 30×50 989865,
+      30×30 1182128) for colour and spread; they agree (grey mean 214–217);
+    - the owner's showroom photo for the greige tone, cream grout and even surface (the first
+      version's clouds were far too strong beside it);
+    - the laid mixed-format render (4237191) for the edges. Room renders 944246 / 926892 are
+      warm-lit laid-look references only.
   - Proven:
     - the build passes;
-    - Node: the 9 cells cover the module exactly (no overlap; area = pitch²); a 4 × 3.5 m floor =
-      86 tiles (17 cut): 39 × 50×50, 38 × 30×50, 9 × 30×30;
-    - texture grey on a 50×50 face (mean / p5 / p50 / p95): 203 / 191 / 203 / 214 against the
-      top-down photo 217 / 199 / 218 / 233. It is deliberately darker, toward the showroom photo, where
-      the tile reads about 15% darker than the grout (the texture: about 9%).
+    - Node: the 9 cells cover the module exactly (no overlap; area = pitch²);
+    - Node, 4 × 3.5 m floor: 86 tiles (17 cut): 39 × 50×50, 38 × 30×50, 9 × 30×30;
+    - Node, two rooms (4 × 3.5 + 3 × 3 m): 67 × 50×50 = 14 boxes, 63 × 30×50 = 9, 15 × 30×30 = 2,
+      25 boxes;
+    - texture grey on a 50×50 face (mean / p5 / p50 / p95): 204 / 194 / 204 / 214 against the top-down
+      photo 217 / 199 / 218 / 233. It is deliberately darker, toward the showroom photo, where the
+      tile reads about 15% darker than the grout.
   - Hypothesis / unknown:
-    - the 30×30 and 30×50 box contents (the whole-house pack total stays blank until they are
-      known);
     - grout colour `0xe6dfcd` and tile brightness, which the owner accepted for now (2026-09-27);
     - not yet seen in the real app's View 3D or in AR.
+
+## Stone wall tile products (a design on a grid of tiles)
+
+- `lucia_ivory_30x90`: Leroy Merlin Lucia ivoire,
+  [ref 88400736](https://www.leroymerlin.fr/produits/carrelage-mur-interieur-effet-pierre-ivoire-lucia-l-30-x-l-90-cm-x-ep-10-mm-88400736.html).
+  - From the page: glazed white-body faïence, fine limestone look, satin, smooth, rectified, 90 × 30,
+    10 mm, 2 mm joint, 15 designs, interior walls only, box 5 tiles = 1.35 m².
+  - Laid landscape and stacked (`pattern: 'grid'`, `sheets: 3`: 3 × 3 tiles per 2.7 × 0.9 m unit), as
+    in the retailer's bathroom photo (media 3737972). That photo's upper wall is a leaf-pattern tile,
+    taken to be a separate Lucia decor (Hypothesis) and not modelled.
+  - Design `limestone`: per-tile tone; faint grey clouds from a value-noise field kept square on the
+    long tile (`stoneField(…, {aspect: true})`: an N × N field stretched 3:1 smeared the clouds
+    sideways); dense small grey-beige flecks, many elongated, gathered in the clouds; 2% rust
+    flecks; 0–2 hairline veins; a fine per-pixel grain. Smooth: the bump map only lowers the joint.
+  - Colours and fleck density from the straight tile photo (media 3907316); grout `0xe4e0d8` is an
+    estimate.
+  - Proven:
+    - build;
+    - texture grey on one tile (mean / p5 / p50 / p95): 238 / 229 / 238 / 246 against the photo
+      237 / 223 / 238 / 246, at the same scale;
+    - Node: a 2.4 × 2.5 m wall = 27 tiles (11 cut).
+  - Not yet seen in the real app or in AR.
+
+## Detail layer (View 3D close-ups)
+
+- **Why:** a finish's texture is one repeat unit in at most 2048 px (`unitCanvas`). On a 2–3 m unit
+  that is under 1 px/mm: the Monastère unit (2 × 2 modules, 2.63 m) gets 0.78 px/mm and Lucia 0.76, so
+  sub-mm pits and flecks became 1 px dots and blurred to mush up close. Owner noticed, 2026-09-27.
+  The earlier checks hid it: photos were compared after shrinking them to the texture's scale.
+- **How:** a design listed in `DETAIL_DESIGNS` (`finishTextures.js`) draws its fine grain once on a
+  512 px tile covering `size` metres (Monastère 0.16 m, Lucia 0.12 m, 3–4 px/mm).
+  - Channels: R = colour multiplier, G = micro height. The R mean is held at 0.5, so the far look is
+    unchanged.
+  - `applyFinishDetail(material, def)` patches View 3D's finish material (`onBeforeCompile`):
+    colour × 2R, and the bump height + `detailBump` × (G − ½). It reads the map's own UVs scaled by
+    unit ÷ detail size.
+  - One texture per design, cached, about 1 MB.
+- **Monastère detail:** 1–3 mm granular mottle, pits of 0.2–1.2 mm (dark and deep), sand specks,
+  grain. **Lucia:** dense 0.2–0.9 mm grey flecks, pale specks, a light grain.
+- **Trap:** the bump patch first rewrote every `texture2D( bumpMap, … ).x` read, including the one
+  inside the new `finishHeight` function, which then called itself and failed to compile ("Recursive
+  function call"). Replace the reads first, then insert the function.
+- **Proven** (scratch renders about 35 cm away; before/after beside the full-resolution photos):
+  - crisp pits and granular relief on Monastère, sharp flecks on Lucia;
+  - at 3 m the grey mean is unchanged with and without the layer (169.2 vs 169.3; Lucia 168.2 vs
+    168.3).
+- **Not covered:**
+  - other designs have no detail yet;
+  - AR's Lambert materials don't use it;
+  - not yet seen in the real app, on the phone or on the Quest browser (Hypothesis: the patched
+    shader compiles there as it does in desktop Chrome).
 
 ## Octagon + tozzetto products
 

@@ -117,21 +117,38 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Terrazzo marble cream 60×60', fr: 'Terrazzo marbre ciment crème 60×60', zh: '水磨石 奶白 60×60' },
   },
   {
-    // Leroy Merlin Monastère beige (ref 72831325, 50 × 50; leroymerlin.fr/produits/carrelage-mur-
-    // interieur-sol-interieur-effet-pierre-beige-monastere-l-50-x-l-50-72831325.html): matte
-    // glazed porcelain, aged limestone look, irregular edges, 9 mm, 5 mm joint advised (the
-    // showroom board says 3 mm), 20 face designs (board: 24), box 5 tiles = 1.25 m². The
-    // range also comes in 30×30 and 30×50; the owner lays all three as a pinwheel
-    // (src/core/flooring.js PINWHEEL, 2026-09-27), so w/h = the 1.30 m module and the
-    // takeoff counts each format. Only the 50×50 box is known (packs stay unknown until the
-    // 30×30 and 30×50 boxes are). Colours: the retailer's top-down tile photo (media
-    // 1165024) for the base and pixel spread, then the owner's showroom photo (2026-09-27,
-    // not stored) for the greige tone, the cream grout, the even surface and the edges.
+    // Leroy Merlin Lucia ivoire 30 × 90 (ref 88400736; leroymerlin.fr/produits/carrelage-mur-
+    // interieur-effet-pierre-ivoire-lucia-l-30-x-l-90-cm-x-ep-10-mm-88400736.html): glazed
+    // white-body faïence, fine limestone look, satin and smooth, rectified, 10 mm, 2 mm joint
+    // advised, 15 face designs, interior walls only, box 5 tiles = 1.35 m². Laid landscape and
+    // stacked, as in the retailer's bathroom photo (media 3737972). Colours and fleck density
+    // from the straight tile photo (media 3907316); grout colour is an estimate.
+    id: 'lucia_ivory_30x90', surface: 'wall', pattern: 'grid', design: 'limestone', sheets: 3,
+    w: 0.9, h: 0.3, joint: 0.002, thickness: 0.01,
+    color: 0xf5f2ec, accent: 0xe4e0d8, cloud: 0xd9d3c8, fleck: 0xb8b0a3, rust: 0xc39a70,
+    roughness: 0.4, bumpScale: 1,
+    pack: { pieces: 5 },
+    name: { en: 'Lucia ivory stone 30×90', fr: 'Lucia effet pierre ivoire 30×90', zh: 'Lucia 象牙白石纹 30×90' },
+  },
+  {
+    // Leroy Merlin Monastère beige, matte glazed porcelain, aged limestone look, irregular
+    // edges, 9 mm, 5 mm joint advised (the showroom board says 3 mm), 24 face designs. Three
+    // articles, each its own box (leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-
+    // effet-pierre-beige-monastere-l-<w>-x-l-<h>-<ref>.html):
+    //   50×50 ref 72831325: box 5 tiles = 1.25 m²
+    //   30×50 ref 72831311: box 7 tiles = 1.05 m²
+    //   30×30 ref 72831304: box 12 tiles = 1.08 m²
+    // The owner lays all three as a pinwheel (src/core/flooring.js PINWHEEL, 2026-09-27), so
+    // w/h = the 1.30 m module and the takeoff counts each format. Colours: the retailer's
+    // straight tile photos (50×50 media 1165024, 30×50 989865, 30×30 1182128) for the base
+    // and spread, the owner's showroom photo (2026-09-27, not stored) for the greige tone, the
+    // cream grout and the even surface, and the laid mixed-format render (4237191) for the
+    // pillowed, round-cornered edges.
     id: 'monastere_beige_pinwheel', surface: 'floor', pattern: 'pinwheel', design: 'aged-stone',
-    w: 1.3, h: 1.3, joint: 0.005, thickness: 0.009, edgeWobble: 0.002,
-    color: 0xd4cfc3, accent: 0xb3a288, light: 0xe4e0d6, pit: 0x8f7f6c, grout: 0xe6dfcd,
-    roughness: 0.8, bumpScale: 1.5,
-    pack: { formats: { '50×50': 5 } },
+    w: 1.3, h: 1.3, joint: 0.005, thickness: 0.009, edgeWobble: 0.003,
+    color: 0xd4cfc3, accent: 0xb3a288, light: 0xe4e0d6, pit: 0x8f7f6c, rust: 0xa86a3c, grout: 0xe6dfcd,
+    roughness: 0.8, bumpScale: 3,
+    pack: { formats: { '50×50': 5, '30×50': 7, '30×30': 12 } },
     name: { en: 'Monastère beige stone, pinwheel 30/50', fr: 'Monastère effet pierre beige, opus 30/50', zh: 'Monastère 米色石纹 风车铺 30/50' },
   },
   {

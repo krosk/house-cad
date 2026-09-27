@@ -451,7 +451,8 @@ export function materialTakeoff(project) {
     t.area += item.count.area; t.pieces += item.count.pieces || 0; t.cabochons += item.count.cabochons || 0;
     for (const [k, f] of Object.entries(item.count.formats || {})) {
       t.formats ??= {};
-      t.formats[k] = (t.formats[k] || 0) + f.pieces;
+      const tf = t.formats[k] || (t.formats[k] = { pieces: 0, whole: 0 });
+      tf.pieces += f.pieces; tf.whole += f.whole;
     }
     totals.set(item.material, t);
   }
@@ -460,7 +461,7 @@ export function materialTakeoff(project) {
     t.packs = pack.pieces ? Math.ceil(t.pieces / pack.pieces) : pack.area ? Math.ceil(t.area / pack.area) : null;
     if (t.formats) { // mixed formats: each is its own article and box; packs only when all are known
       t.packsByFormat = Object.fromEntries(Object.entries(t.formats)
-        .map(([k, n]) => [k, pack.formats?.[k] ? Math.ceil(n / pack.formats[k]) : null]));
+        .map(([k, f]) => [k, pack.formats?.[k] ? Math.ceil(f.pieces / pack.formats[k]) : null]));
       const known = Object.values(t.packsByFormat);
       t.packs = known.every((n) => n != null) ? known.reduce((a, n) => a + n, 0) : null;
     }

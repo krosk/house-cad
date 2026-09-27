@@ -456,7 +456,64 @@ function terrazzoTile(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.restore();
 }
 
-const GRID_DESIGNS = { 'stone-sticks': stoneStick, terrazzo: terrazzoTile };
+// Fine ivory limestone on a satin glazed wall tile (Leroy Merlin Lucia ivoire 30 × 90,
+// tuned against its straight tile photo, media 3907316): a pale ground (`m.color`, per-tile
+// tone), faint grey clouds (`m.cloud`), dense small grey-beige flecks (`m.fleck`), many
+// elongated, gathered where the cloud is, a few rust flecks (`m.rust`) and the odd hairline
+// vein. Rectified and smooth: the bump map is flat, only the joint reads low.
+function limestoneTile(ctx, m, x, y, w, h, ppm, r, bump) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (bump) {
+    ctx.fillStyle = '#b4b4b4';
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+    return;
+  }
+  const mm = ppm / 1000;
+  ctx.fillStyle = `#${new THREE.Color(m.color).multiplyScalar(0.975 + r() * 0.04).getHexString()}`;
+  ctx.fillRect(x, y, w, h);
+  const cloud = stoneField(r, 2 + Math.floor(r() * 2), 0, x, y, w, h, { aspect: true }), { at } = cloud;
+  drawStoneCloud(ctx, cloud, x, y, w, h, m.cloud ?? 0xd9d3c8, 0xffffff, [0.5, 0.85, 0.09], [0.4, 0.2, 0.25]);
+  const fleck = new THREE.Color(m.fleck ?? 0xb8b0a3), rust = new THREE.Color(m.rust ?? 0xc39a70);
+  const n = Math.round((w / mm) * (h / mm) * (m.flecks ?? 0.06));
+  for (let k = 0; k < n; k++) {
+    const px = x + r() * w, py = y + r() * h;
+    if (r() > 0.35 + 0.65 * smooth(0.3, 0.75, at(px, py))) continue;
+    const len = (0.4 + r() ** 3 * 3.5) * mm, wid = (0.3 + r() * 0.4) * mm, rot = r() * Math.PI;
+    const c = r() < 0.02 ? rust : fleck;
+    ctx.globalAlpha = 0.12 + r() * 0.3;
+    ctx.fillStyle = `#${c.clone().multiplyScalar(0.85 + r() * 0.3).getHexString()}`;
+    ctx.save();
+    ctx.translate(px, py); ctx.rotate(rot);
+    ctx.fillRect(-len / 2, -wid / 2, Math.max(0.8, len), Math.max(0.8, wid));
+    ctx.restore();
+  }
+  // Hairline veins: 0–2 thin curved grey lines.
+  const veins = Math.floor(r() * 3);
+  ctx.strokeStyle = css(m.fleck ?? 0xb8b0a3);
+  ctx.lineWidth = Math.max(0.6, 0.3 * mm);
+  for (let k = 0; k < veins; k++) {
+    const x0 = x + r() * w, y0 = y + r() * h, a = r() * Math.PI, L = (50 + r() * 150) * mm;
+    ctx.globalAlpha = 0.25 + r() * 0.25;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(x0 + Math.cos(a + 0.4) * L / 2, y0 + Math.sin(a + 0.4) * L / 2, x0 + Math.cos(a) * L, y0 + Math.sin(a) * L);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Fine sandy grain over the tile.
+  const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
+  const img = ctx.getImageData(X, Y, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const f = 1 + (r() - 0.5) * 0.05;
+    d[i] *= f; d[i + 1] *= f; d[i + 2] *= f;
+  }
+  ctx.putImageData(img, X, Y);
+  ctx.restore();
+}
+
+const GRID_DESIGNS = { 'stone-sticks': stoneStick, terrazzo: terrazzoTile, limestone: limestoneTile };
 
 // Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets, each `m.mosaic` = [cols, rows] sticks,
 // all on one even pitch: the joint inside a sheet equals the one between sheets, so a laid
@@ -557,31 +614,95 @@ function paintOctDesign(ctx, m, W, H, ppm, bump) {
   grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 67) + 1), bump ? 0.12 : 0.05);
 }
 
-// Aged limestone-look porcelain with tumbled edges (Leroy Merlin Monastère, tuned against
-// its top-down tile photo, media 1165024, then the owner's showroom photo of a laid wall,
-// 2026-09-27: faint clouds, per-tile tone, cream joints): a greige face (`m.color`) with soft darker tan
-// clouds (`m.accent`) and lighter patches (`m.light`), small brown pits (`m.pit`) that
-// gather in the clouds, and a wavy, slightly chipped outline (`m.edgeWobble` m, inward
-// only so the joint never closes). Bump: pits and the rounded edge read low.
+// Stone cloud field over one tile: coarse (g1 cells) + medium (11 cells) smoothstep value
+// noise plus a little per-cell noise, `bias` shifts it (+ = more cloud). N × N samples and
+// cells, stretched over the tile; `aspect` instead keeps them square on a long tile (more
+// samples and cells along its long side). `at(px, py)` samples it at a canvas point inside
+// the tile (x, y, w, h).
+const STONE_N = 48;
+const smooth = (e0, e1, v) => { const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+function stoneField(r, g1, bias, x, y, w, h, { aspect = false } = {}) {
+  const k = aspect ? w / h : 1; // x stretch (< 1 for a tall tile)
+  const nx = Math.round(STONE_N * Math.max(1, k)), ny = Math.round(STONE_N * Math.max(1, 1 / k));
+  const field = new Float32Array(nx * ny);
+  const cells = (g) => [Math.max(1, Math.round(g * Math.max(1, k))), Math.max(1, Math.round(g * Math.max(1, 1 / k)))];
+  const grid = ([gx, gy]) => ({ gx, gy, v: Float32Array.from({ length: (gx + 1) * (gy + 1) }, () => r()) });
+  const n1 = grid(cells(g1)), n2 = grid(cells(11));
+  const lerp2 = ({ gx, gy, v }, u, t) => {
+    const X = u * gx, Y = t * gy, i = Math.min(gx - 1, Math.floor(X)), j = Math.min(gy - 1, Math.floor(Y));
+    const fx = X - i, fy = Y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const at = (a, b) => v[b * (gx + 1) + a];
+    return (at(i, j) * (1 - sx) + at(i + 1, j) * sx) * (1 - sy) + (at(i, j + 1) * (1 - sx) + at(i + 1, j + 1) * sx) * sy;
+  };
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      field[j * nx + i] = 0.62 * lerp2(n1, i / (nx - 1), j / (ny - 1)) + 0.3 * lerp2(n2, i / (nx - 1), j / (ny - 1))
+        + 0.08 * r() + bias;
+    }
+  }
+  const at = (px, py) => field[Math.min(ny - 1, Math.floor((py - y) / h * ny)) * nx + Math.min(nx - 1, Math.floor((px - x) / w * nx))];
+  return { field, at, nx, ny };
+}
+// Paint a field as soft clouds: `darkHex` at alpha up to aD over smoothstep(d0, d1), `lightHex`
+// up to aL over smoothstep(l0, l1) (l0 > l1: low field = light), from a small canvas scaled up.
+function drawStoneCloud(ctx, { field, nx, ny }, x, y, w, h, darkHex, lightHex, [d0, d1, aD], [l0, l1, aL]) {
+  const layer = document.createElement('canvas');
+  layer.width = nx; layer.height = ny;
+  const lx = layer.getContext('2d'), img = lx.createImageData(nx, ny);
+  const tan = new THREE.Color(darkHex), lt = new THREE.Color(lightHex);
+  for (let k = 0; k < nx * ny; k++) {
+    const v = field[k], dark = smooth(d0, d1, v), light = smooth(l0, l1, v);
+    const c = dark > light ? tan : lt, a = Math.max(dark * aD, light * aL);
+    img.data.set([c.r * 255, c.g * 255, c.b * 255, a * 255], k * 4);
+  }
+  lx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(layer, x, y, w, h);
+}
+
+// Aged limestone-look porcelain with tumbled edges (Leroy Merlin Monastère; tuned against
+// the straight photos of its three formats, media 1165024 / 989865 / 1182128, the owner's
+// showroom photo of a laid wall, 2026-09-27, and the laid mixed-format render 4237191): a
+// greige face (`m.color`, per-tile tone) with soft darker tan clouds (`m.accent`) and lighter
+// patches (`m.light`), small brown pits (`m.pit`) gathered in the clouds with a few rust ones
+// (`m.rust`), white crackle veins on some tiles, and a wavy outline with rounded corners and
+// the odd chip (`m.edgeWobble` m, inward only so the joint never closes). Bump: a pillowed
+// edge (the face rolls down over ~12 mm to the joint), pits low.
 function agedStone(ctx, m, x, y, w, h, ppm, r, bump) {
-  const mm = ppm / 1000, wob = (m.edgeWobble ?? 0.002) * ppm;
-  // Outline: walk each side in ~8 mm steps, inset by a smooth wave plus the odd chip.
+  const mm = ppm / 1000, wob = (m.edgeWobble ?? 0.003) * ppm;
+  // Outline, clockwise from the top-left: each corner a quarter arc of its own radius
+  // (5–11 mm), each side walked in ~6 mm steps and inset by two slow waves plus the odd
+  // chip; the wave fades in over 10 mm from each arc so the outline stays continuous.
+  const rad = [0, 1, 2, 3].map(() => (5 + r() * 6) * mm);
   const pts = [];
-  const side = (ax, ay, bx, by, nx, ny) => {
-    const len = Math.hypot(bx - ax, by - ay), steps = Math.max(4, Math.round(len / (8 * mm)));
-    const p1 = r() * 6.28, p2 = r() * 6.28, f1 = 2 + r() * 3, f2 = 7 + r() * 6;
-    let chip = 0;
-    for (let k = 0; k < steps; k++) {
-      const t = k / steps;
-      if (chip <= 0 && r() < 0.02) chip = 2 + Math.floor(r() * 3);
-      const e = wob * (0.5 + 0.3 * Math.sin(t * f1 * 6.28 + p1) + 0.2 * Math.sin(t * f2 * 6.28 + p2))
-        + (chip-- > 0 ? wob * (0.8 + r()) : 0);
-      const ends = Math.min(1, t * steps, (1 - t) * steps); // corners stay put
-      pts.push([ax + (bx - ax) * t + nx * e * ends, ay + (by - ay) * t + ny * e * ends]);
+  const arc = (cx, cy, R, a0) => {
+    for (let k = 0; k <= 4; k++) {
+      const a = a0 + (k / 4) * (Math.PI / 2);
+      pts.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]);
     }
   };
-  side(x, y, x + w, y, 0, 1); side(x + w, y, x + w, y + h, -1, 0);
-  side(x + w, y + h, x, y + h, 0, -1); side(x, y + h, x, y, 1, 0);
+  const side = (ax, ay, bx, by, nx, ny, r0, r1) => {
+    const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len;
+    const run = len - r0 - r1, steps = Math.max(2, Math.round(run / (6 * mm)));
+    const p1 = r() * 6.28, p2 = r() * 6.28, f1 = 1.5 + r() * 2.5, f2 = 5 + r() * 5;
+    let chip = 0;
+    for (let k = 1; k < steps; k++) {
+      const s = r0 + (k / steps) * run, t = s / len;
+      if (chip <= 0 && r() < 0.01) chip = 2 + Math.floor(r() * 3);
+      const e = wob * (0.5 + 0.3 * Math.sin(t * f1 * 6.28 + p1) + 0.2 * Math.sin(t * f2 * 6.28 + p2))
+        + (chip-- > 0 ? wob * (0.8 + r()) : 0);
+      const fade = Math.min(1, (s - r0) / (10 * mm), (len - r1 - s) / (10 * mm));
+      pts.push([ax + ux * s + nx * e * fade, ay + uy * s + ny * e * fade]);
+    }
+  };
+  arc(x + rad[0], y + rad[0], rad[0], Math.PI);
+  side(x, y, x + w, y, 0, 1, rad[0], rad[1]);
+  arc(x + w - rad[1], y + rad[1], rad[1], -Math.PI / 2);
+  side(x + w, y, x + w, y + h, -1, 0, rad[1], rad[2]);
+  arc(x + w - rad[2], y + h - rad[2], rad[2], 0);
+  side(x + w, y + h, x, y + h, 0, -1, rad[2], rad[3]);
+  arc(x + rad[3], y + h - rad[3], rad[3], Math.PI / 2);
+  side(x, y + h, x, y, 1, 0, rad[3], rad[0]);
   const outline = () => {
     ctx.beginPath();
     pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
@@ -593,41 +714,13 @@ function agedStone(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.fillStyle = bump ? '#b4b4b4' : `#${new THREE.Color(m.color).multiplyScalar(tone).getHexString()}`;
   ctx.fill();
   ctx.clip();
-  // Clouds: a smooth noise field over the tile (coarse + medium value noise, drawn from a
-  // small canvas scaled up with smoothing): warm tan (`m.accent`) where it is high,
-  // lighter cream (`m.light`) where it is low; fine mottling everywhere.
-  const N = 48, field = new Float32Array(N * N);
-  const grid = (g) => Float32Array.from({ length: (g + 1) * (g + 1) }, () => r());
-  const g1 = 3 + Math.floor(r() * 3), g2 = 11, v1 = grid(g1), v2 = grid(g2);
-  const lerp2 = (v, g, u, t) => {
-    const X = u * g, Y = t * g, i = Math.min(g - 1, Math.floor(X)), j = Math.min(g - 1, Math.floor(Y));
-    const fx = X - i, fy = Y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-    const at = (a, b) => v[b * (g + 1) + a];
-    return (at(i, j) * (1 - sx) + at(i + 1, j) * sx) * (1 - sy) + (at(i, j + 1) * (1 - sx) + at(i + 1, j + 1) * sx) * sy;
-  };
-  const bias = (m.clouds ?? 0.5) - 0.5; // + = more cloud
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      field[j * N + i] = 0.62 * lerp2(v1, g1, i / (N - 1), j / (N - 1)) + 0.3 * lerp2(v2, g2, i / (N - 1), j / (N - 1))
-        + 0.08 * r() + bias;
-    }
-  }
-  const smooth = (e0, e1, v) => { const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-  const layer = document.createElement('canvas');
-  layer.width = layer.height = N;
-  const lx = layer.getContext('2d'), img = lx.createImageData(N, N);
-  const tan = new THREE.Color(bump ? 0x8a8a8a : m.accent), lt = new THREE.Color(bump ? 0xc8c8c8 : m.light ?? 0xf0ede6);
-  for (let k = 0; k < N * N; k++) {
-    const v = field[k], dark = smooth(0.5, 0.9, v), light = smooth(0.45, 0.2, v);
-    const c = dark > light ? tan : lt, a = Math.max(dark * 0.13, light * 0.2);
-    img.data.set([c.r * 255, c.g * 255, c.b * 255, a * 255], k * 4);
-  }
-  lx.putImageData(img, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(layer, x, y, w, h);
+  // Clouds: warm tan (`m.accent`) where the field is high, lighter cream (`m.light`)
+  // where it is low; fine mottling everywhere.
+  const cloud = stoneField(r, 3 + Math.floor(r() * 3), (m.clouds ?? 0.5) - 0.5, x, y, w, h), { at } = cloud;
+  drawStoneCloud(ctx, cloud, x, y, w, h, bump ? 0x8a8a8a : m.accent, bump ? 0xc8c8c8 : m.light ?? 0xf0ede6,
+    [0.5, 0.9, 0.13], [0.45, 0.2, 0.2]);
   // Mottling: dense small specks, tan (denser where the field is high) and cream, so
   // the clouds read as grainy stone rather than smooth stains.
-  const at = (px, py) => field[Math.min(N - 1, Math.floor((py - y) / h * N)) * N + Math.min(N - 1, Math.floor((px - x) / w * N))];
   const nm = Math.round((w / mm) * (h / mm) * 0.012);
   for (let k = 0; k < nm; k++) {
     const px = x + r() * w, py = y + r() * h, v = at(px, py), rad = (0.5 + r() ** 2 * 2.5) * mm, al = 0.12 + r() * 0.25;
@@ -647,16 +740,50 @@ function agedStone(ctx, m, x, y, w, h, ppm, r, bump) {
     ctx.fillStyle = bump ? '#303030' : `#${pit.clone().multiplyScalar(f).getHexString()}`;
     ctx.fillRect(px, py, s, s * e);
   }
+  // Rust pits: a few larger orange-brown ones anywhere on the face (the 30×50 photo).
+  const nrust = Math.round((w / mm) * (h / mm) * 0.00008 * (r() * 2));
+  const rust = new THREE.Color(m.rust ?? 0xa86a3c);
+  for (let k = 0; k < nrust; k++) {
+    const px = x + r() * w, py = y + r() * h, s = (0.8 + r() * 1.6) * mm, al = 0.45 + r() * 0.4;
+    ctx.globalAlpha = al;
+    ctx.fillStyle = bump ? '#303030' : `#${rust.getHexString()}`;
+    ctx.beginPath(); ctx.ellipse(px, py, s, s * (0.6 + r() * 0.4), r() * 3.14, 0, 6.2832); ctx.fill();
+  }
+  // White crackle veins on some tiles (the 30×30 photo): a few branching hairlines.
+  if (r() < 0.45) {
+    ctx.strokeStyle = bump ? '#c8c8c8' : css(m.light ?? 0xf0ede6);
+    const nv = 2 + Math.floor(r() * 5);
+    for (let k = 0; k < nv; k++) {
+      let px = x + r() * w, py = y + r() * h, a = r() * 6.28;
+      const segs = 4 + Math.floor(r() * 8);
+      ctx.globalAlpha = 0.35 + r() * 0.35;
+      ctx.lineWidth = Math.max(0.7, (0.4 + r() * 0.8) * mm);
+      ctx.beginPath(); ctx.moveTo(px, py);
+      for (let j = 0; j < segs; j++) {
+        a += (r() - 0.5) * 1.2;
+        const L = (6 + r() * 18) * mm;
+        px += Math.cos(a) * L; py += Math.sin(a) * L;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  }
   ctx.globalAlpha = 1;
-  // Tumbled edge: a soft darker rim just inside the outline (rounded in the bump map).
+  // Pillowed, tumbled edge: nested strokes of the outline (clipped to the face, so each
+  // shows half its width inside) build a ramp over ~12 mm: in the bump map the face rolls
+  // down to the joint; in colour a faint darker rim with the worn arris darkest.
   outline();
-  ctx.lineWidth = 6 * mm;
-  ctx.strokeStyle = bump ? 'rgba(40,40,40,0.5)' : `#${new THREE.Color(m.accent).getHexString()}`;
-  ctx.globalAlpha = bump ? 1 : 0.3;
-  ctx.stroke();
-  ctx.lineWidth = 2.5 * mm; // the worn arris itself, darker
-  ctx.globalAlpha = bump ? 1 : 0.3;
-  ctx.stroke();
+  if (bump) {
+    ctx.strokeStyle = '#303030';
+    for (const [wd, al] of [[24, 0.12], [16, 0.14], [10, 0.18], [5, 0.25], [2, 0.3]]) {
+      ctx.lineWidth = wd * mm; ctx.globalAlpha = al; ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = css(m.accent);
+    for (const [wd, al] of [[12, 0.12], [5, 0.2], [2, 0.25]]) {
+      ctx.lineWidth = wd * mm; ctx.globalAlpha = al; ctx.stroke();
+    }
+  }
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -784,4 +911,146 @@ export function finishBumpTexture(m, anisotropy = 1) {
   }
   if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
   return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);
+}
+
+// ---- Detail layer (View 3D) ---------------------------------------------------------
+// The main texture holds one repeat unit in at most 2048 px, so a 2–3 m unit gets under
+// 1 px/mm and sub-mm grain (pits, flecks, sand) blurs when the camera is close. A detail
+// design draws that grain once on a small tile (DETAIL_PX over `size` m, 3–4 px/mm) that
+// repeats densely over the finish: R = albedo multiplier (0.5 = ×1, mean held at 0.5 so
+// the far look is unchanged), G = micro height (0.5 = flat). applyFinishDetail patches a
+// MeshStandardMaterial to multiply R into the colour and add G to the bump height.
+const DETAIL_PX = 512;
+
+// Draws on a DETAIL_PX canvas where 1 m = ppm px. `dot(x, y, s, v, a)` stamps a soft
+// square of albedo/height value v (0–255) wrapped across the tile edges.
+function detailCanvas(size, seed, paint) {
+  const c = document.createElement('canvas');
+  c.width = c.height = DETAIL_PX;
+  const ctx = c.getContext('2d'), ppm = DETAIL_PX / size, r = rng(seed);
+  const albedo = new Float32Array(DETAIL_PX * DETAIL_PX).fill(128), height = new Float32Array(DETAIL_PX * DETAIL_PX).fill(128);
+  // Stamp a round-ish spot into a channel with wrap-around (seamless tile).
+  const spot = (buf, cx, cy, rad, value, alpha) => {
+    const R = Math.max(0.5, rad), x0 = Math.floor(cx - R), x1 = Math.ceil(cx + R), y0 = Math.floor(cy - R), y1 = Math.ceil(cy + R);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        const k = alpha * Math.min(1, Math.max(0, R + 0.5 - d)); // 1 px antialiased edge
+        if (k <= 0) continue;
+        const i = ((y + DETAIL_PX) % DETAIL_PX) * DETAIL_PX + ((x + DETAIL_PX) % DETAIL_PX);
+        buf[i] += (value - buf[i]) * k;
+      }
+    }
+  };
+  paint({ ppm, r, albedo, height, spot });
+  // Hold the albedo mean at 128 so the detail only adds contrast, never a tone shift.
+  let mean = 0;
+  for (const v of albedo) mean += v;
+  mean /= albedo.length;
+  const img = ctx.createImageData(DETAIL_PX, DETAIL_PX);
+  for (let i = 0; i < albedo.length; i++) {
+    img.data[i * 4] = Math.max(0, Math.min(255, albedo[i] - mean + 128));
+    img.data[i * 4 + 1] = Math.max(0, Math.min(255, height[i]));
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+// Per-pixel grain: albedo ± a/2, height ± h/2 (independent).
+function detailGrain(r, albedo, height, a, h) {
+  for (let i = 0; i < albedo.length; i++) {
+    albedo[i] += (r() - 0.5) * a * 255;
+    height[i] += (r() - 0.5) * h * 255;
+  }
+}
+
+const DETAIL_DESIGNS = {
+  // Monastère: a matte pitted stone skin. Sub-mm pits (dark, low), fine light and dark sand
+  // specks, and a soft grain; the main texture keeps the clouds, veins and larger pits.
+  'aged-stone': {
+    size: 0.16,
+    paint({ ppm, r, albedo, height, spot }) {
+      const mm = ppm / 1000, area = (DETAIL_PX / mm) ** 2; // mm² on the tile
+      detailGrain(r, albedo, height, 0.12, 0.3);
+      for (let k = 0; k < area * 0.004; k++) { // granular mottle, 1–3 mm light and dark
+        const x = r() * DETAIL_PX, y = r() * DETAIL_PX, rad = (0.5 + r() * 1) * mm;
+        const up = r() < 0.5;
+        spot(albedo, x, y, rad, up ? 150 : 108, 0.35 + r() * 0.3);
+        spot(height, x, y, rad, up ? 150 : 100, 0.5);
+      }
+      for (let k = 0; k < area * 0.03; k++) { // pits 0.2–1.2 mm
+        const x = r() * DETAIL_PX, y = r() * DETAIL_PX, rad = (0.1 + r() ** 2 * 0.5) * mm;
+        spot(albedo, x, y, rad, 35 + r() * 45, 0.7 + r() * 0.3);
+        spot(height, x, y, rad * 1.2, 0, 1);
+      }
+      for (let k = 0; k < area * 0.05; k++) { // sand specks
+        const x = r() * DETAIL_PX, y = r() * DETAIL_PX, rad = (0.08 + r() * 0.2) * mm;
+        spot(albedo, x, y, rad, r() < 0.5 ? 85 : 175, 0.4 + r() * 0.3);
+      }
+    },
+  },
+  // Lucia: satin limestone, near-flat; dense fine grey flecks and a light grain.
+  limestone: {
+    size: 0.12,
+    paint({ ppm, r, albedo, height, spot }) {
+      const mm = ppm / 1000, area = (DETAIL_PX / mm) ** 2;
+      detailGrain(r, albedo, height, 0.06, 0.08);
+      for (let k = 0; k < area * 0.1; k++) { // flecks 0.2–0.9 mm, grey
+        const x = r() * DETAIL_PX, y = r() * DETAIL_PX, rad = (0.1 + r() ** 2 * 0.35) * mm;
+        spot(albedo, x, y, rad, 55 + r() * 45, 0.5 + r() * 0.4);
+      }
+      for (let k = 0; k < area * 0.03; k++) { // pale specks between them
+        const x = r() * DETAIL_PX, y = r() * DETAIL_PX, rad = (0.1 + r() * 0.3) * mm;
+        spot(albedo, x, y, rad, 170, 0.4 + r() * 0.3);
+      }
+    },
+  },
+};
+
+const detailCache = new Map();
+// → { texture, size } for a design that has a detail layer, else null.
+export function finishDetailTexture(m, anisotropy = 1) {
+  const d = m && DETAIL_DESIGNS[m.design];
+  if (!d || !(m.w > 0 && m.h > 0)) return null;
+  const key = `${m.design}:${m.seed ?? 0}`;
+  let t = detailCache.get(key);
+  if (!t) {
+    t = new THREE.CanvasTexture(detailCanvas(d.size, (m.seed ?? 0) + 97, d.paint));
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; // data, not colour: no sRGB
+    detailCache.set(key, t);
+  }
+  t.anisotropy = Math.max(t.anisotropy, anisotropy);
+  return { texture: t, size: d.size };
+}
+
+// Patch a finish's MeshStandardMaterial (with `map`, and `bumpMap` when the design has one)
+// to use the detail layer: colour ×= 2·R, bump height += detailBump·(G − ½). Both sample
+// the map's own UVs (plan metres / unit) scaled by unit / detail size.
+export function applyFinishDetail(material, m, anisotropy = 1) {
+  const d = finishDetailTexture(m, anisotropy);
+  if (!d || !material.map) return material;
+  const [uw, uh] = patternUnit(m);
+  const uniforms = {
+    detailMap: { value: d.texture },
+    detailScale: { value: new THREE.Vector2(uw / d.size, uh / d.size) },
+    detailBump: { value: m.detailBump ?? 1.2 },
+  };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    // Route the chunk's height reads through finishHeight first, then define it (in that
+    // order, or the replace would rewrite finishHeight's own read into a recursive call).
+    const bumpChunk = THREE.ShaderChunk.bumpmap_pars_fragment
+      .replace(/texture2D\( bumpMap, ([^)]*?) \)\.x/g, 'finishHeight( $1 )')
+      .replace('uniform float bumpScale;', `uniform float bumpScale;
+	float finishHeight( vec2 uv ) {
+		return texture2D( bumpMap, uv ).x + detailBump / bumpScale * ( texture2D( detailMap, uv * detailScale ).g - 0.5 );
+	}`);
+    shader.fragmentShader = 'uniform sampler2D detailMap;\nuniform vec2 detailScale;\nuniform float detailBump;\n'
+      + shader.fragmentShader
+        .replace('#include <bumpmap_pars_fragment>', bumpChunk)
+        .replace('#include <map_fragment>', '#include <map_fragment>\n\tdiffuseColor.rgb *= texture2D( detailMap, vMapUv * detailScale ).r * 2.0;');
+  };
+  material.customProgramCacheKey = () => 'finish-detail';
+  return material;
 }

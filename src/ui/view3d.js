@@ -11,7 +11,7 @@ import { buildDoorProduct } from './doorProducts.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
-import { finishTexture, finishBumpTexture } from './finishTextures.js';
+import { finishTexture, finishBumpTexture, applyFinishDetail } from './finishTextures.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -744,6 +744,7 @@ export class View3D {
       // Pull the 2 mm overlay firmly in front of the slab/wall it covers.
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
+    applyFinishDetail(material, def, anisotropy); // sub-mm grain up close (finishTextures.js)
     this.finishMaterials.set(key, material);
     return material;
   }

@@ -442,6 +442,7 @@ const STRINGS = {
   'mat.leaves2':   { en: '2 LEAVES',    fr: '2 VANTAUX',      zh: '双扇' },
   'mat.toMeasure': { en: 'MADE TO MEASURE', fr: 'SUR MESURE', zh: '定制尺寸' },
   'mat.pcs':       { en: 'pcs',         fr: 'pcs',            zh: '片' },
+  'mat.cut':       { en: 'cut',         fr: 'coupés',         zh: '切割' },
   'mat.packs':     { en: 'packs',       fr: 'paquets',        zh: '包' },
   'mat.house':     { en: 'HOUSE',       fr: 'MAISON',         zh: '全屋' },
   'check.all':        { en: 'ALL ISSUES',  fr: 'TOUS PROBLÈMES',       zh: '全部问题' },

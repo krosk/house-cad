@@ -3385,16 +3385,20 @@ export function setupMR(view, project, getFootprint) {
     const qty = (c) => `${c.area.toFixed(2)} m²`
       + (c.pieces ? ` · ${c.pieces} ${t('mat.pcs')}` : '')
       + (c.cabochons ? ` + ${c.cabochons}` : '');
-    // Mixed formats (pinwheel): pieces per tile size, e.g. "50×50 12 · 30×50 8 · 30×30 2".
-    const perFormat = (f) => Object.entries(f).map(([k, n]) => `${k} ${n.pieces ?? n}`).join(' · ');
+    // Mixed formats (pinwheel): one line per tile size, largest first: pieces, of which cut,
+    // and (house total) boxes, e.g. "50×50 39 pcs (9 cut) · 8 boxes".
+    const formatLines = (formats, packs, color) => Object.entries(formats)
+      .sort(([a], [b]) => parseFloat(b.split('×')[0]) * parseFloat(b.split('×')[1]) - parseFloat(a.split('×')[0]) * parseFloat(a.split('×')[1]))
+      .map(([k, f]) => [`${k} ${f.pieces} ${t('mat.pcs')} (${f.pieces - f.whole} ${t('mat.cut')})`
+        + (packs ? ` · ${packs[k] ?? '–'} ${t('mat.packs')}` : ''), color]);
     if (item) lines.push([qty(item.count), 0xe2e8f0]);
-    if (item?.count.formats) lines.push([perFormat(item.count.formats), 0xe2e8f0]);
+    if (item?.count.formats) lines.push(...formatLines(item.count.formats, null, 0xe2e8f0));
     else if (floorMode) lines.push([`${target.area.toFixed(2)} m²`, 0xe2e8f0]);
     const total = id && matTakeoff?.totals.get(id);
     if (total) {
       lines.push([`${t('mat.house')} ${total.packs ?? '–'} ${t('mat.packs')}`
         + (total.pieces ? ` · ${total.pieces} ${t('mat.pcs')}` : ` · ${total.area.toFixed(1)} m²`), 0xfbbf24]);
-      if (total.formats) lines.push([`${t('mat.house')} ${perFormat(total.formats)}`, 0xfbbf24]);
+      if (total.formats) lines.push(...formatLines(total.formats, total.packsByFormat, 0xfbbf24));
     }
     return lines;
   }
