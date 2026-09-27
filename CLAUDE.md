@@ -76,7 +76,7 @@ Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is lock
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and on a portrait
 screen a house wider than deep is turned 90° so it fills the screen; tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a
-floor walks there (door leaves don't block, so a tap through a doorway enters the next room), and the
+floor walks there (door leaves, drawn swung open in View 3D, don't block, so a tap through a doorway enters the next room), and the
 Overview button returns to the saved overview. POV keeps at least 65° horizontal FOV on narrow screens
 (vertical capped at 100°); the overview stays at 50°. Camera state is session-only and must not
 mutate project or shared-view data. The viewer initially isolates the

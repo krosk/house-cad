@@ -376,8 +376,15 @@ the zone.
 - The door builder's frame face/depth, threshold, key-rose drop and paint finish are catalog fields
   (`frameFace`, `frameDepth`, `threshold`, `roseDrop`, `metalness`, `roughness`), defaulting to the
   Ange-Line's values.
-- Limits: `door` zones only (not sliding or garage); the leaf is drawn closed; the texture is
-  stretched over the leaf, so the design scales with the opening's proportions.
+- Limits: `door` zones only (not sliding or garage); the texture is stretched over the leaf, so
+  the design scales with the opening's proportions.
+- Open in View 3D (owner, 2026-09-27): desktop/mobile View 3D draws every DOOR zone's leaf swung
+  90° open toward its swing side, a door product (`buildDoorProduct(p, {open: true})`, leaf +
+  handles turned about the hinge line) and a plain zone alike (`buildArchitecturalFloor({openDoors})`:
+  a 35 mm leaf per hinge at the jamb, `hinge: 'both'` = two half leaves). Hinge and swing come from
+  `resolveApertureOrient`, as for the plan symbol. AR keeps doors closed (neither option passed);
+  sliding and garage zones stay closed slabs. Proven on a scratch render: each open leaf lies on the
+  plan symbol's leaf line (hinge left/in, right/out, both). Not yet seen in the real app or on device.
 
 ## Windows (window products)
 

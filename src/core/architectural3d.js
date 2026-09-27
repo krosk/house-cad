@@ -354,14 +354,37 @@ function apertureInsertBox(rect, z0, z1, depth = 0.035) {
     : { x0: cx - depth / 2, x1: cx + depth / 2, y0: b.y0, y1: b.y1, z0, z1 };
 }
 
-function apertureInsertGeometries(floor, skip = null) {
+// A plain DOOR zone's leaf swung 90° open (View 3D, `openDoors`): a leaf per hinge
+// (`hinge: 'both'` = two half-width leaves), standing at its hinge jamb and reaching
+// from the opening's centre line to the swing side (`resolveApertureOrient`, the same
+// hinge and swing as the plan symbol).
+const OPEN_LEAF_T = 0.035;
+function openDoorLeafBoxes(rect, z0, z1) {
+  const b = rect.bounds;
+  const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+  const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
+  const ends = hingeEnd === 'both' ? ['lo', 'hi'] : [hingeEnd];
+  const width = (alongX ? b.x1 - b.x0 : b.y1 - b.y0) / ends.length;
+  const c = alongX ? (b.y0 + b.y1) / 2 : (b.x0 + b.x1) / 2;
+  const [a0, a1] = [c, c + perp * width].sort((p, q) => p - q); // across the wall
+  return ends.map((end) => {
+    const lo = alongX ? b.x0 : b.y0, hi = alongX ? b.x1 : b.y1;
+    const [s0, s1] = end === 'hi' ? [hi - OPEN_LEAF_T, hi] : [lo, lo + OPEN_LEAF_T]; // along
+    return alongX ? { x0: s0, x1: s1, y0: a0, y1: a1, z0, z1 } : { x0: a0, x1: a1, y0: s0, y1: s1, z0, z1 };
+  });
+}
+
+function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}) {
   const height = Math.max(0, floor?.height || 0);
   const doors = [];
   const windows = [];
   for (const rect of floor?.rectangles || []) {
     if (!validBounds(rect.bounds) || skip?.has(rect.id)) continue;
     const kind = zoneKind(rect);
-    if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
+    if (kind === 'door' && openDoors) {
+      const head = clipped(rect.head ?? 2.1, 0, height);
+      if (head > EPS) doors.push(...openDoorLeafBoxes(rect, 0.015, Math.max(0.015, head - 0.015)));
+    } else if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
       if (head > EPS) doors.push(apertureInsertBox(rect, 0.015, Math.max(0.015, head - 0.015)));
     } else if (kind === 'window') {
@@ -483,7 +506,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
   const skip = new Set([...(opts.productDoors || []), ...(opts.productWindows || [])]);
-  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip);
+  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip, { openDoors: !!opts.openDoors });
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,

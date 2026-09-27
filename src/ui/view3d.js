@@ -400,9 +400,10 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
-      // Door products on DOOR zones (docs/materials.md "Doors"), in place of the plain slab.
+      // Door products on DOOR zones (docs/materials.md "Doors"), in place of the plain slab,
+      // shown open like the plain leaves (main.js builds with `openDoors`).
       for (const placement of entry.doorProducts || []) {
-        for (const mesh of buildDoorProduct(placement)) {
+        for (const mesh of buildDoorProduct(placement, { open: true })) {
           mesh.castShadow = true;
           mesh.receiveShadow = true;
           mesh.position.y = elevation || 0;

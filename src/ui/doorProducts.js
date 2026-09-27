@@ -110,7 +110,9 @@ function materialsFor(def, lambert) {
 }
 
 // Build the door for one placement. `lambert` selects the cheap AR materials.
-export function buildDoorProduct(p, { lambert = false } = {}) {
+// `open`: the leaf (with its handles and roses) swung 90° to the swing face about the
+// hinge line (View 3D shows doors open; AR keeps them closed).
+export function buildDoorProduct(p, { lambert = false, open = false } = {}) {
   const m = materialsFor(p.def, lambert);
   // Local frame: X along the wall (−w/2..w/2), Y up, Z across the wall.
   const w = p.width, h = p.head;
@@ -132,6 +134,7 @@ export function buildDoorProduct(p, { lambert = false } = {}) {
   const leafW = w - 2 * FRAME - 0.006, leafH = h - FRAME - 0.018, leafT = Math.min(p.leafDepth, 0.1);
   const plusZ = hingeX < 0 ? m.faceMirrored : m.face;
   const minusZ = hingeX < 0 ? m.face : m.faceMirrored;
+  const leafFrom = parts.length; // parts from here to the knuckles move with the leaf
   const leaf = new THREE.BoxGeometry(leafW, leafH, leafT);
   leaf.translate(0, 0.015 + leafH / 2, 0);
   parts.push([leaf, [m.body, m.body, m.body, m.body, plusZ, minusZ]]);
@@ -144,6 +147,15 @@ export function buildDoorProduct(p, { lambert = false } = {}) {
     // Bar points toward the hinge.
     add(new THREE.CylinderGeometry(0.009, 0.009, 0.16, 10).rotateZ(Math.PI / 2), m.steel, lockX + hingeX * 0.08, HANDLE_Z, zFace + side * 0.055);
     add(new THREE.CylinderGeometry(0.016, 0.016, 0.01, 16).rotateX(Math.PI / 2), m.steel, lockX, HANDLE_Z - (p.def.roseDrop ?? 0.1), zFace + side * 0.005);
+  }
+  if (open) {
+    // Turn about the hinge line (hinge edge, swing face) so the lock edge heads to swingZ:
+    // rotating (−hingeX, 0, 0) by θ about Y gives z = hingeX·sin θ.
+    const px = hingeX * (leafW / 2), pz = p.swingZ * (leafT / 2);
+    const R = new THREE.Matrix4().makeTranslation(px, 0, pz)
+      .multiply(new THREE.Matrix4().makeRotationY(hingeX * p.swingZ * Math.PI / 2))
+      .multiply(new THREE.Matrix4().makeTranslation(-px, 0, -pz));
+    for (let i = leafFrom; i < parts.length; i++) parts[i][0].applyMatrix4(R);
   }
   // Hinge knuckles on the swing face.
   for (const y of [0.25, 1.1, 1.95].map((f) => f * (h / 2.15))) {
