@@ -160,6 +160,19 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   estimates, not measurements. Retailer galleries mix generations: enrplus and climaled show a single
   round sensor (Hypothesis: the older FTXM-R body), so they were not used. Proven in a scratch browser preview
   (bounding box 0.997 × 0.298 × 0.293 m); not yet seen in FURNISH or on device.
+- `sensea-neo-120x80`: Sensea NEO extra-flat resin shower tray, 120 × 80 cm, white matt (Leroy Merlin
+  95043721, series "Neo 2"). 800 × 27 × 1200 mm (`sizeMm` = width × height × length), from the Leroy Merlin
+  spec table: 2.7 cm thick, 4 cm rim, grille 21 × 13 cm, 90 mm waste, 36 kg; its manual is Leroy Merlin
+  media 5349234. Builder `shower-tray`: one slab whose top relief (millimetres deep) is drawn on the top
+  face as colour + bump: a stone speckle, the drain cover (rounded top corners) and the step across the
+  width in front of it, thick at the cover and fading out near each side. Layout measured on Leroy
+  Merlin's straight top-down photo (media 5368981, 1.17 mm/px): cover 210 × 136 mm, 37 mm from the short
+  edge; step 171 mm from that edge, fading 41 mm from each side (`params`); the relief is read from the
+  close-ups 5357076 and 5356494. The drain end is the back (−Z); the notch of the plan piece marks the
+  open end. Colour: neutral white (`0xf0f0f0`); the render reads 227 grey against 216 in the photo under
+  different lighting. Proven in a scratch browser preview (bounding box 0.800 × 0.027 × 1.200 m, top-down
+  and perspective views beside the photos); the photo-measured positions are estimates; not yet seen in
+  FURNISH, View 3D or on device.
 
 ## Rendering
 

@@ -105,5 +105,26 @@
     },
     "source": "procedural: Daikin Perfera FTXM60A wall-mounted AC indoor unit (no manufacturer 3D model); size from Daikin's FTXM-A spec table, shape from the CTXM-A/FTXM-A installer reference guide 4P518023-17P + condizionati.fr front photo",
     "registeredAt": "2026-09-26T00:00:00.000Z"
+  },
+  "sensea-neo-120x80": {
+    "name": "sensea-neo-120x80",
+    "article": "95043721",
+    "sizeMm": [
+      800,
+      27,
+      1200
+    ],
+    "procedural": "shower-tray",
+    "params": {
+      "coverMm": [
+        210,
+        136
+      ],
+      "coverFromEdgeMm": 37,
+      "stepFromEdgeMm": 171,
+      "stepInsetMm": 41
+    },
+    "source": "procedural: Sensea NEO extra-flat resin shower tray 120 x 80 cm, white (Leroy Merlin 95043721, no manufacturer 3D model); size, 27 mm thickness and 21 x 13 cm grille from the Leroy Merlin spec table, layout from its top-down photo (media 5368981)",
+    "registeredAt": "2026-09-27T00:00:00.000Z"
   }
 }

@@ -287,7 +287,84 @@ function daikinWallUnit(entry) {
   return g;
 }
 
-const BUILDERS = { 'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit };
+// Flat resin shower tray (Sensea NEO): a thin slab, drain at the back (−Z) short edge.
+// The top relief is only millimetres deep, so it is drawn on the top face (colour +
+// bump) instead of modelled:
+//   - a fine mineral stone texture (the anti-slip finish);
+//   - a straight step across the width in front of the drain, deepest at the cover and
+//     tapering to nothing near each side (the field slopes down to it);
+//   - the flush drain cover, top corners rounded, bottom edge on the step.
+// Positions are measured on Leroy Merlin's straight top-down photo (docs/furniture.md).
+function showerTray(entry) {
+  const [W, H, D] = (entry.sizeMm || [800, 27, 1200]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const color = p.color ?? 0xf0f0f0;
+  const [coverW, coverD] = p.coverMm || [210, 136];      // drain cover, across × along
+  const coverFrom = p.coverFromEdgeMm ?? 37;              // cover's back edge from the tray edge
+  const stepAt = p.stepFromEdgeMm ?? 171;                  // step line from the drain edge
+  const stepInset = p.stepInsetMm ?? 41;                   // where the step fades, from each side
+  // Top face canvas: 1 px ≈ 1.6 mm, canvas top = the drain edge (−Z).
+  const PX = 512 / (W * 1000);
+  const cw = 512, ch = Math.round(D * 1000 * PX);
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d');
+  // Stone speckle: per-pixel noise, blurred once by drawing the canvas back over itself.
+  const img = ctx.createImageData(cw, ch);
+  const base = new THREE.Color(color), r = rng(95043721);
+  const grain = new Float32Array(Math.ceil(cw / 2) * Math.ceil(ch / 2)).map(() => r());
+  for (let i = 0; i < cw * ch; i++) {                   // 2 px grains + fine noise
+    const x = i % cw, y = (i / cw) | 0;
+    const f = 0.93 + grain[(y >> 1) * Math.ceil(cw / 2) + (x >> 1)] * 0.07 + r() * 0.04;
+    img.data[i * 4] = base.r * 255 * f;
+    img.data[i * 4 + 1] = base.g * 255 * f;
+    img.data[i * 4 + 2] = base.b * 255 * f;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.globalAlpha = 0.5;
+  ctx.drawImage(c, 1, 1);
+  ctx.globalAlpha = 1;
+  const mm = (v) => v * PX;
+  const cx = cw / 2, cx0 = cx - mm(coverW) / 2, cx1 = cx + mm(coverW) / 2;
+  const cy0 = mm(coverFrom), cy1 = mm(coverFrom + coverD), cr = mm(17);
+  // Step: a shadowed crescent, thick at the cover and a point at each end.
+  const sy = mm(stepAt), x0 = mm(stepInset), x1 = cw - mm(stepInset), t = Math.max(2.5, mm(5));
+  ctx.fillStyle = shade(color, 0.55);
+  ctx.beginPath();
+  ctx.moveTo(x0, sy);
+  ctx.quadraticCurveTo(cx0, sy - t * 0.1, cx0, sy - t / 2);
+  ctx.lineTo(cx1, sy - t / 2);
+  ctx.quadraticCurveTo(cx1, sy - t * 0.1, x1, sy);
+  ctx.quadraticCurveTo(cx1, sy + t * 0.15, cx1, sy + t / 2);
+  ctx.lineTo(cx0, sy + t / 2);
+  ctx.quadraticCurveTo(cx0, sy + t * 0.15, x0, sy);
+  ctx.fill();
+  // Drain cover: a thin shadow gap all round, top corners rounded.
+  ctx.strokeStyle = shade(color, 0.6);
+  ctx.lineWidth = Math.max(1.5, mm(2.5));
+  ctx.beginPath();
+  ctx.moveTo(cx0, cy1);
+  ctx.lineTo(cx0, cy0 + cr);
+  ctx.arcTo(cx0, cy0, cx0 + cr, cy0, cr);
+  ctx.lineTo(cx1 - cr, cy0);
+  ctx.arcTo(cx1, cy0, cx1, cy0 + cr, cr);
+  ctx.lineTo(cx1, cy1);
+  ctx.stroke();
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const top = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.8, roughness: 0.85 });
+  const side = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'shower-tray';
+  // BoxGeometry's +Y face maps canvas top (v = 1) to −Z: the drain edge.
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [side, side, top, side, side, side]);
+  slab.position.y = H / 2;
+  g.add(slab);
+  return g;
+}
+
+const BUILDERS = { 'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray };
 
 export function isProcedural(entry) {
   return !!(entry && BUILDERS[entry.procedural]);
