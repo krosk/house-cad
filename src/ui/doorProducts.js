@@ -111,7 +111,7 @@ function materialsFor(def, lambert) {
 
 // Build the door for one placement. `lambert` selects the cheap AR materials.
 // `open`: the leaf (with its handles and roses) swung 90° to the swing face about the
-// hinge line (View 3D shows doors open; AR keeps them closed).
+// hinge line (View 3D and the AR 3D view both show doors open).
 export function buildDoorProduct(p, { lambert = false, open = false } = {}) {
   const m = materialsFor(p.def, lambert);
   // Local frame: X along the wall (−w/2..w/2), Y up, Z across the wall.

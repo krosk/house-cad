@@ -218,7 +218,7 @@ function rebuild() {
         ? Math.max(0.2, (f.elevation || 0) - (project.floors[index - 1].elevation || 0))
         : (f.height || 2.8),
       productDoors: new Set(doorProducts.map((d) => d.rectId)),
-      openDoors: true, // View 3D shows every door leaf swung open (AR keeps them closed)
+      openDoors: true, // every door leaf swung open (the AR 3D view does the same)
       productWindows: new Set(windowProducts.map((d) => d.rectId)),
     }),
     doorProducts,

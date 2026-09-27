@@ -63,6 +63,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
   FURNISH as separate items, not on the furniture zones. Fixed the same day by the furniture merge
   (MATERIAL · FURNITURE; items under FURNITURE below). FURNISH was then removed as overlapping.
 - [ ] MATERIAL badges (2026-09-27): a room, wall face, door, window or furniture zone with a material shows only a small swatch disc (white ring) at its centre, no colour fill; the plan stays readable; the yellow hover/selection highlight still shows the whole target
+- [ ] LEFT X: door leaves (plain DOOR zones and door products) are drawn swung 90° open toward their swing side, as in desktop View 3D; sliding/garage stay closed
 - [ ] PLAN · ADD: PASSAGE is in the type cycle after DOOR (pale lime); it draws two jambs and a dashed lintel; two rooms with different floor materials split at its middle, the same material runs through it; LEFT X shows an open doorway with no leaf
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (a swatch badge appears at the room's centre, no colour fill), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; a badge sits just inside the middle of the face; door/window area deducted in the m² line

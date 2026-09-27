@@ -108,8 +108,8 @@ Read `docs/product-intent.md` before planning AR work.
      the tone "for now" (tuned darker toward their showroom photo).
    `docs/materials.md` "Pinwheel products".
 8. **Doors drawn open in View 3D** (`9a82898`): plain DOOR leaves and door products swing 90° to their
-   authored swing side (`buildArchitecturalFloor({openDoors})`, `buildDoorProduct(p, {open})`); AR keeps
-   them closed; sliding/garage stay slabs. `docs/materials.md` "Doors".
+   authored swing side (`buildArchitecturalFloor({openDoors})`, `buildDoorProduct(p, {open})`); the AR 3D
+   view opens them too since session 32; sliding/garage stay slabs. `docs/materials.md` "Doors".
 9. **Lucia ivoire 30×90 wall tile** (`4cad922`): grid design `limestone`, landscape, stacked.
    `docs/materials.md` "Stone wall tile products".
 10. **View 3D detail layer** (`4cad922`): the finish texture is capped at 2048 px per repeat unit (under
@@ -174,8 +174,8 @@ Read `docs/product-intent.md` before planning AR work.
   `localStorage`, never in project/share data, and **cleared for AR sessions** (Quest cost). AR
   reflections were asked about, not built: `docs/materials.md` lists what they would need.
 - **AR furniture models show only with the AR 3D view on**; otherwise flat plan pieces (owner, 2026-09-27).
-- **View 3D shows doors open; AR shows them closed** (owner asked for View 3D only). Only `main.js` passes
-  `openDoors` / `open`.
+- **Doors are drawn open in both View 3D and the AR 3D view** (owner, 2026-09-27; AR was closed
+  until then). `main.js` and `mr.js` both pass `openDoors` / `open`.
 - **A mixed-format product counts and boxes each size separately** (each is its own article): `pack:
   { formats: { '50×50': 5, … } }`; the house box total appears only when every size's box is known.
   No wastage margin and no offcut reuse (the owner was asked; unanswered). The desktop has no

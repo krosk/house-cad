@@ -3817,6 +3817,7 @@ export function setupMR(view, project, getFootprint) {
           ? Math.max(0.2, (floor.elevation || 0) - (project.floors[index - 1].elevation || 0))
           : (floor.height || 2.8),
         productDoors: new Set(doorProducts.map((d) => d.rectId)),
+        openDoors: true, // door leaves swung open, as in View 3D (owner, 2026-09-27)
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
       });
       a.floorGeometry?.dispose(); a.ceilingGeometry?.dispose(); // real floor stays visible
@@ -3827,7 +3828,7 @@ export function setupMR(view, project, getFootprint) {
         ...finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
         // Door products (cached Lambert materials; only the geometry is disposed).
-        ...doorProducts.flatMap((d) => buildDoorProduct(d, { lambert: true }))
+        ...doorProducts.flatMap((d) => buildDoorProduct(d, { lambert: true, open: true }))
           .map((mesh) => [mesh.geometry, mesh.material]),
         ...windowProducts.flatMap((d) => buildWindowProduct(d, { lambert: true }))
           .map((mesh) => [mesh.geometry, mesh.material]),
