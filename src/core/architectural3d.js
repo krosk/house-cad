@@ -254,11 +254,17 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
     explicit.push({ ...rect.bounds, source: kind === 'wall' || kind === 'insulation' ? 'interior' : `aperture:${kind}` });
   }
   const sources = unionRectSources([...clippedInferred, ...explicit]);
+  // A half wall standing inside a room is a free-standing low wall: it cuts only its
+  // own footprint. Piercing would also open the full-height wall behind it (owner's
+  // Ground r139 against the 7 cm gap wall to r106). A half wall authored in the wall
+  // line (outside the room area) still pierces, like any other opening.
+  const insideRoom = (b) => pointInFootprint((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, circulationFootprint);
   const openings = rectangles.flatMap((rect) => {
     const band = openingBand(rect, height);
-    return band && validBounds(rect.bounds)
-      ? [{ rect, bounds: piercedBounds(rect.bounds, sources), z0: band[0], z1: band[1] }]
-      : [];
+    if (!band || !validBounds(rect.bounds)) return [];
+    const bounds = zoneKind(rect) === 'halfwall' && insideRoom(rect.bounds)
+      ? rect.bounds : piercedBounds(rect.bounds, sources);
+    return [{ rect, bounds, z0: band[0], z1: band[1] }];
   });
   return sources.flatMap((source) => splitWallByOpenings(source, height, openings));
 }

@@ -341,9 +341,17 @@ export function wallFaceBoxes(floor, rect, edge) {
   const H = floor.height || 2.8;
   const include = face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: H }));
   const exclude = [];
+  // A half wall standing inside a room is a free-standing low wall, not a gap in the
+  // wall mass: it opens no face (as in architecturalWallBoxes).
+  const rooms = (floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.bounds);
+  const inRoom = (b) => {
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    return rooms.some((q) => cx > q.x0 && cx < q.x1 && cy > q.y0 && cy < q.y1);
+  };
   for (const r of floor.rectangles || []) {
     if (!OPENING_KINDS.has(zoneKind(r))) continue;
     const rb = r.bounds;
+    if (zoneKind(r) === 'halfwall' && inRoom(rb)) continue;
     const [n0, n1] = face.vertical ? [rb.x0, rb.x1] : [rb.y0, rb.y1];
     // The opening sits in the wall mass just behind the face (outside the room).
     const behind0 = face.inward > 0 ? face.at - FACE_DEPTH : face.at - TOUCH;

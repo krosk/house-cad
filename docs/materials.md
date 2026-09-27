@@ -94,9 +94,11 @@ later `herringbone`. `pack` is pieces per box or m² per box.
     - a lining that reaches deeper than it runs along the edge is the corner end of the neighbouring
       wall's lining, so that stretch is hidden and dropped;
     - an edge onto a stairwell is open (no wall), as in `architecturalWallBoxes`;
-    - a half wall cuts the face above its sill;
-    - known gap: the part below a half wall standing *inside* the room stays on the room edge, hidden
-      inside the half wall;
+    - a half wall in the wall line (outside the room area) cuts the face above its sill;
+    - a half wall standing *inside* a room is a free-standing low wall: it cuts no face, and the 3D
+      wall behind it stays full height (owner, 2026-09-27: Ground r139 against the 7 cm gap wall to
+      r106 had been opened above 1.1 m); known gap: the part of the face below it stays counted,
+      hidden inside the half wall;
   - a doorway belongs to a room within 5 cm, and an opening pierces a face when it sits within
     45 cm behind it.
 - Always show the naive `area ÷ piece + waste%` beside the laid-out count. Round packs up **once per
@@ -132,7 +134,8 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
      comes from the simulation, the picture only shows the product.
    - Paint is a flat colour.
    - Checked in Node: with every room on Ground and Upper finished, 133 of 134 wall overlay quads sit
-     on a solid 3D wall, just in front of it. The 1 exception is the half-wall gap above.
+     on a solid 3D wall, just in front of it. The 1 exception was the half-wall gap above, fixed since
+     (Proven, Node, 2026-09-27: r106's top face is back to 3.30 m², the gap wall solid at 2 m).
    The same geometry and textures are meant to feed the **AR 3D view** below.
 3. **AR 3D view** (implemented): **LEFT X** toggles it (owner choice). It shows the same
    `architectural3d.js` walls/openings/stairs/outlines plus the finish overlays and textures, for the
