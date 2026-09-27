@@ -48,7 +48,7 @@ import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRoute
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -134,9 +134,11 @@ export function setupMR(view, project, getFootprint) {
       const key = `${colorHex}|${text}`;
       if (key === shown) return;
       shown = key;
-      const lines = String(text).split('\n').slice(0, Math.max(1, Math.floor((height - 16) / 26)));
+      // Up to 4 lines at the full 26 px pitch; more lines (up to what an 18 px pitch fits,
+      // 6 in the 128 px readout) tighten the pitch and font instead of being cut off.
+      const lines = String(text).split('\n').slice(0, Math.max(1, Math.floor((height - 12) / 18)));
       const multi = lines.length > 1;
-      const pitch = multi ? 26 : 40;
+      const pitch = multi ? Math.min(26, (height - 12) / lines.length) : 40;
       const boxH = multi ? lines.length * pitch + 12 : 48;
       const top = (height - boxH) / 2;
       ctx.clearRect(0, 0, 256, height);
@@ -147,12 +149,12 @@ export function setupMR(view, project, getFootprint) {
       ctx.fill();
       // Breadcrumbs are longer than the old flat labels. Fit them within the pill
       // while keeping short tool names at the original, highly legible size.
-      const maxFont = multi ? 24 : 40;
+      const maxFont = multi ? Math.min(24, Math.floor(pitch) - 2) : 40;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       lines.forEach((line, i) => {
         ctx.font = `bold ${maxFont}px sans-serif`;
-        const fontSize = Math.max(multi ? 16 : 24, Math.min(maxFont,
+        const fontSize = Math.max(multi ? Math.min(16, maxFont) : 24, Math.min(maxFont,
           Math.floor(maxFont * 216 / Math.max(216, ctx.measureText(line).width))));
         ctx.font = `bold ${fontSize}px sans-serif`;
         const hex = Array.isArray(colorHex) ? (colorHex[i] ?? colorHex[0]) : colorHex;
@@ -778,7 +780,7 @@ export function setupMR(view, project, getFootprint) {
     // A larger pill above the mode label that shows the value of whichever
     // constraint the ray is pointing at — a legible "close-up" of small in-world
     // dimension text. Hidden until the ray hovers a dimension.
-    const readout = makeLabel(128); // up to 4 lines (WIRE lengths, CHECK counts)
+    const readout = makeLabel(128); // 4 lines at full size, up to 6 tighter (MATERIAL takeoff)
     // Raised by half the extra height so taller pills grow upward, away from the mode label.
     readout.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.readout + 0.0125, TIP_OFFSET.z);
     readout.sprite.scale.set(0.2, 0.1, 1); // 256×128 aspect; a single line keeps its old size
@@ -1666,6 +1668,7 @@ export function setupMR(view, project, getFootprint) {
         const stair = isStairs(k) && resolveStairOrient(r, b.x0, b.x1, b.y0, b.y1);
         const segs = stair ? Object.values(stairSegments(bw, bh, stair.axis, stair.dir, k === 'stairs_up')).flat()
           : k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
+          : k === 'passage' ? passageSegments(bw, bh)
           : k === 'garage' ? garageDoorSegments(bw, bh, { depth: 2.10, side: 0.15, perp })
           : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
             : k === 'window' ? windowCasementSegments(bw, bh, hingeEnd)
@@ -3449,18 +3452,23 @@ export function setupMR(view, project, getFootprint) {
       + (c.cabochons ? ` + ${c.cabochons}` : '');
     // Mixed formats (pinwheel): one line per tile size, largest first: pieces, of which cut,
     // and (house total) boxes, e.g. "50×50 39 pcs (9 cut) · 8 boxes".
-    const formatLines = (formats, packs, color) => Object.entries(formats)
-      .sort(([a], [b]) => parseFloat(b.split('×')[0]) * parseFloat(b.split('×')[1]) - parseFloat(a.split('×')[0]) * parseFloat(a.split('×')[1]))
-      .map(([k, f]) => [`${k} ${f.pieces} ${t('mat.pcs')} (${f.pieces - f.whole} ${t('mat.cut')})`
-        + (packs ? ` · ${packs[k] ?? '–'} ${t('mat.packs')}` : ''), color]);
+    const bySize = (formats) => Object.keys(formats)
+      .sort((a, b) => parseFloat(b.split('×')[0]) * parseFloat(b.split('×')[1]) - parseFloat(a.split('×')[0]) * parseFloat(a.split('×')[1]));
+    const formatLines = (formats, color) => bySize(formats)
+      .map((k) => [`${k} ${formats[k].pieces} ${t('mat.pcs')} (${formats[k].pieces - formats[k].whole} ${t('mat.cut')})`, color]);
     if (item) lines.push([qty(item.count), 0xe2e8f0]);
-    if (item?.count.formats) lines.push(...formatLines(item.count.formats, null, 0xe2e8f0));
+    if (item?.count.formats) lines.push(...formatLines(item.count.formats, 0xe2e8f0));
     else if (floorMode) lines.push([`${target.area.toFixed(2)} m²`, 0xe2e8f0]);
     const total = id && matTakeoff?.totals.get(id);
     if (total) {
-      lines.push([`${t('mat.house')} ${total.packs ?? '–'} ${t('mat.packs')}`
-        + (total.pieces ? ` · ${total.pieces} ${t('mat.pcs')}` : ` · ${total.area.toFixed(1)} m²`), 0xfbbf24]);
-      if (total.formats) lines.push(...formatLines(total.formats, total.packsByFormat, 0xfbbf24));
+      // Mixed formats (pinwheel): the house boxes per size on ONE line, in the size order of
+      // the room lines above (e.g. "HOUSE 8 · 4 · 2 packs"), so the pill stays within 6 lines.
+      if (total.formats) {
+        lines.push([`${t('mat.house')} ${bySize(total.formats).map((k) => total.packsByFormat?.[k] ?? '–').join(' · ')} ${t('mat.packs')}`, 0xfbbf24]);
+      } else {
+        lines.push([`${t('mat.house')} ${total.packs ?? '–'} ${t('mat.packs')}`
+          + (total.pieces ? ` · ${total.pieces} ${t('mat.pcs')}` : ` · ${total.area.toFixed(1)} m²`), 0xfbbf24]);
+      }
     }
     return lines;
   }

@@ -67,7 +67,7 @@ rectangles (add/subtract, ordered)
 The desktop **View 3D** presentation no longer uses that legacy massing mesh directly. Its shared
 `src/core/architectural3d.js` interpretation treats ROOM unions as thin floor slabs, derives an
 exterior wall shell from exposed room boundaries, renders explicit WALL and INSULATION (interior
-lining) zones as solids, and cuts DOOR/WINDOW/SLIDING/HALFWALL vertical bands into overlapping wall segments. This module is
+lining) zones as solids, and cuts DOOR/PASSAGE/WINDOW/SLIDING/HALFWALL vertical bands into overlapping wall segments. This module is
 deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains on the legacy
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.

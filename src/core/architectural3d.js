@@ -17,7 +17,7 @@ const EPS = 1e-7;
 // Solid wall material in 3D. INSULATION is an interior lining authored over the room
 // edge (markers are pinned to its inner face), so it renders as wall too; without it
 // the room read 18–21 cm too deep and lining-mounted outlets had no surface.
-const WALL_ZONE_KINDS = new Set(['wall', 'insulation', 'door', 'garage', 'window', 'halfwall', 'sliding']);
+const WALL_ZONE_KINDS = new Set(['wall', 'insulation', 'door', 'passage', 'garage', 'window', 'halfwall', 'sliding']);
 
 const validBounds = (b) => b && b.x1 - b.x0 > EPS && b.y1 - b.y0 > EPS;
 const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -31,7 +31,7 @@ const PIERCE_MAX = 0.6;
 
 function openingBand(rect, storeyHeight) {
   const kind = zoneKind(rect);
-  if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
+  if (kind === 'door' || kind === 'passage' || kind === 'garage' || kind === 'sliding') {
     return [0, clipped(rect.head ?? 2.1, 0, storeyHeight)];
   }
   if (kind === 'window') {

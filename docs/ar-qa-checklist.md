@@ -63,6 +63,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
   FURNISH as separate items, not on the furniture zones. Fixed the same day by the furniture merge
   (MATERIAL · FURNITURE; items under FURNITURE below). FURNISH was then removed as overlapping.
 - [ ] MATERIAL badges (2026-09-27): a room, wall face, door, window or furniture zone with a material shows only a small swatch disc (white ring) at its centre, no colour fill; the plan stays readable; the yellow hover/selection highlight still shows the whole target
+- [ ] PLAN · ADD: PASSAGE is in the type cycle after DOOR (pale lime); it draws two jambs and a dashed lintel; two rooms with different floor materials split at its middle, the same material runs through it; LEFT X shows an open doorway with no leaf
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (a swatch badge appears at the room's centre, no colour fill), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; a badge sits just inside the middle of the face; door/window area deducted in the m² line
 - [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (an anthracite badge at the zone centre); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
@@ -77,7 +78,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · FLOOR (and WALL): set Blue stone mosaic 30×30.4 on a floor; LEFT X shows mid-grey stone sticks (3 × 18 per sheet) with light joints; PERF usable; takeoff counts sheets (1 per pack)
 - [ ] MATERIAL · FLOOR: set Etruria HEX octagon Mattone + white tozzetto 15 on the upstairs bathroom; LEFT X shows terracotta octagons with white corner diamonds and thin light joints; the readout shows octagons + tozzetti
 - [ ] MATERIAL · FLOOR: set Terrazzo marble cream 60×60 on a room; LEFT X shows an off-white floor speckled with pale marble chips and faint 60 cm joints; PERF usable; takeoff counts tiles
-- [ ] MATERIAL · FLOOR: set Monastère beige stone, pinwheel 30/50 on a room; LEFT X shows greige stone tiles in the 130 cm pinwheel (a 30×30 centre, 50×50 arms, 30×50 corners) with cream joints and rounded edges; the readout has one line per size (e.g. `50×50 39 pcs (9 cut)`) and the HOUSE lines add boxes per size
+- [ ] MATERIAL · FLOOR: set Monastère beige stone, pinwheel 30/50 on a room; LEFT X shows greige stone tiles in the 130 cm pinwheel (a 30×30 centre, 50×50 arms, 30×50 corners) with cream joints and rounded edges; the readout has one line per size including 30×30 (e.g. `50×50 39 pcs (9 cut)`), then one HOUSE line with boxes per size in the same order (`HOUSE 8 · 4 · 2 packs`); all 6 lines fit the pill (owner saw no 30×30 before the fix)
 - [ ] MATERIAL · WALL: set Lucia ivory stone 30×90 on a wall; LEFT X shows pale ivory landscape tiles stacked with thin joints; takeoff counts tiles and packs of 5
 - [ ] MATERIAL · FURNITURE: set the W. Hoffmann V120 piano on a furniture zone against a wall; black case 1.51 × 1.20 m with the keys facing the room, brass pedals and castors; true size against the real piano
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
@@ -367,8 +368,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 
 ## Furniture: MATERIAL · FURNITURE  ⬜ furniture merge (2026-09-27) build/Node-verified only
 
-- [ ] FURNISH is gone from the mode cycle (MATERIAL follows MARKER · PIPE)
-- [ ] LEFT X on: only the 3D model shows (no zone fills, dims, labels, marker glyphs, badges, origin gizmo); reticle, HUD and panels still work; LEFT X off: every overlay the mode shows comes back
+- [x] FURNISH is gone from the mode cycle (MATERIAL follows MARKER · PIPE) — owner, 2026-09-27
+- [x] LEFT X on: only the 3D model shows (no zone fills, dims, labels, marker glyphs, badges, origin gizmo); reticle, HUD and panels still work; LEFT X off: every overlay the mode shows comes back — owner "that works", 2026-09-27
 - [ ] A FURNITURE zone with a product behaves like any PLAN zone: EDGE/DIMS dimension it to a wall, PLAN · EDIT moves or deletes it, A/X in PLAN · EDIT turns it 90° (the zone swaps width/depth about its centre)
 - [ ] MATERIAL · FURNITURE: trigger a FURNITURE zone drawn in PLAN; thumbstick up/down cycles the catalog (none first); the zone resizes to the product; readout shows name and w × d × h; a violet badge sits at the zone centre
 - [ ] MATERIAL · FURNITURE: A/X turns the selected product 90°; B/Y clears it (the zone keeps its size, the violet badge goes)

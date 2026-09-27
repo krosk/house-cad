@@ -66,6 +66,8 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   Not adopted yet; the owner is fine with the global origin.
 - **Quantities merge adjacent same-material rooms into one laying region.** Two rooms joined through
   a door/opening zone that touches both are one region, and **the doorway strip is included**.
+  Doorway kinds: DOOR, **PASSAGE** (an open doorway with no leaf, added 2026-09-27 as a separator
+  between two rooms), SLIDING and GARAGE.
   Offcuts and edge cuts are counted once for the whole region.
 - **Where the materials differ**, each side runs to the middle of the doorway (owner-confirmed): the
   door zone is split along its long axis, and each half joins the room it touches.
@@ -276,8 +278,11 @@ anchored at the plan origin like every pattern. `w = h = 1.3` (the module). The 
     the module by 6 mm).
   - Takeoff: per room, each size's pieces and whole pieces (`count.formats`); whole-house totals
     per size (`totals.formats`) and boxes per size (`packsByFormat`, rounded up once per size),
-    `packs` = their sum. The AR readout shows one line per size, largest first:
-    `50×50 39 pcs (9 cut)`, and on the house line `· 14 packs`. No wastage margin and no offcut
+    `packs` = their sum. The AR readout shows this room's pieces per size, one line each, largest
+    first (`50×50 39 pcs (9 cut)`), then ONE house line with the boxes per size in the same order
+    (`HOUSE 8 · 4 · 2 packs`): 6 lines in all. The controller pill used to keep only 4 lines, so the
+    30×30 line and the house lines were cut off (owner report, 2026-09-27); it now fits up to 6 by
+    tightening the pitch. No wastage margin and no offcut
     reuse (a cut spot = one tile bought); the desktop has no quantity view yet.
   - Design `aged-stone`:
     - per-tile tone (±4%), a faint tan / cream value-noise cloud, dense fine mottle and pits

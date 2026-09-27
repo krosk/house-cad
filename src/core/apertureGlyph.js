@@ -171,6 +171,21 @@ export function halfWallHatchSegments(w, h, count = 5) {
   return out;
 }
 
+// Passage (an open doorway, no leaf): the two jambs across the wall, plus a dashed
+// line along the opening for the lintel overhead. Nothing sweeps, so it reads as a
+// plain separator between two rooms. No hinge.
+export function passageSegments(w, h, dashes = 5) {
+  const horizontal = w >= h;
+  const len = horizontal ? w : h, mid = horizontal ? h / 2 : w / 2;
+  const out = horizontal ? [[0, 0, 0, h], [w, 0, w, h]] : [[0, 0, w, 0], [0, h, w, h]];
+  const pitch = len / (2 * dashes + 1); // dash, gap, …, dash with a gap at each end
+  for (let i = 0; i < dashes; i++) {
+    const a = pitch * (2 * i + 1), b = a + pitch;
+    out.push(horizontal ? [a, mid, b, mid] : [mid, a, mid, b]);
+  }
+  return out;
+}
+
 // Heater (wall-mounted radiator): the box outline plus evenly spaced fins across
 // the long axis — the conventional radiator symbol. Distinct from the half-wall's
 // diagonal poché and insulation's zigzag, so a heater reads as its own thing even

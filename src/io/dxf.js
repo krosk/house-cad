@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -25,6 +25,7 @@ const LAYERS = [
   ['WALL', 1, 'CONTINUOUS'],
   ['INSULATION', 6, 'CONTINUOUS'],
   ['DOOR', 3, 'CONTINUOUS'],
+  ['PASSAGE', 3, 'CONTINUOUS'],
   ['GARAGE', 3, 'CONTINUOUS'],
   ['HALFWALL', 8, 'CONTINUOUS'],
   ['HEATER', 40, 'CONTINUOUS'],
@@ -174,6 +175,8 @@ function writeZoneSymbol(w, rect, kind) {
   const segs = (layer, list) => { for (const [ax, ay, bx, by] of list) w.line(layer, b.x0 + ax, b.y0 + ay, b.x0 + bx, b.y0 + by); };
   if (kind === 'door') {
     segs('DOOR', doorSwingSegments(width, height, hingeEnd, { perp }));
+  } else if (kind === 'passage') {
+    segs('PASSAGE', passageSegments(width, height));
   } else if (kind === 'garage') {
     segs('GARAGE', garageDoorSegments(width, height, { depth: 2.10, side: 0.15, perp }));
   } else if (kind === 'halfwall') {
@@ -666,7 +669,7 @@ export function floorToCoohomDxf(floor) {
   // their opposite faces remain present in the resulting free-space boundary.
   const structural = (floor.rectangles || [])
     .filter((rect) => ['room', 'wall', 'insulation'].includes(zoneKind(rect)));
-  const doors = (floor.rectangles || []).filter((rect) => ['door', 'garage'].includes(zoneKind(rect)));
+  const doors = (floor.rectangles || []).filter((rect) => ['door', 'passage', 'garage'].includes(zoneKind(rect)));
   const footprint = computeFootprint(structural);
   for (const polygon of footprint) {
     for (const ring of polygon) {

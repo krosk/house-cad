@@ -21,10 +21,10 @@ import { materialById } from './materials.js';
 
 const EPS = 1e-6;
 // Door-family zones a floor runs through (full-height openings).
-const DOORWAY_KINDS = new Set(['door', 'sliding', 'garage']);
+const DOORWAY_KINDS = new Set(['door', 'passage', 'sliding', 'garage']);
 // Openings cut out of a wall face's area. A half wall is open ABOVE its sill (its
 // `head` is null → the band runs to the ceiling), so it cuts the face there too.
-const OPENING_KINDS = new Set(['door', 'sliding', 'garage', 'window', 'halfwall']);
+const OPENING_KINDS = new Set(['door', 'passage', 'sliding', 'garage', 'window', 'halfwall']);
 // A doorway/opening belongs to a room or face within this gap (AR-authored plans are
 // rarely exact to the millimetre; a real wall is thicker than this is loose).
 const TOUCH = 0.05;

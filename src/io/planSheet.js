@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind, isStairs } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -422,9 +422,12 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
   // Draw a shared box-space segment list at the glyph's page origin.
   const segs = (list, width) => { for (const [ax, ay, bx, by] of list) line(x + ax, y + ay, x + bx, y + by, width); };
 
-  be.rect(x, y, w, h, { fill: '#fff', stroke: C_ZONE, width: 0.25 });
+  // A passage is open: no outline along the wall faces, only its jambs (below).
+  be.rect(x, y, w, h, { fill: '#fff', stroke: kind === 'passage' ? 'none' : C_ZONE, width: 0.25 });
 
-  if (kind === 'door') {
+  if (kind === 'passage') {
+    segs(passageSegments(w, h), 0.18);
+  } else if (kind === 'door') {
     // Real architectural door: hinge-side leaf + swing arc (sampled — no arc primitive).
     // In the compact legend, cap the arc reach to the sample height so it can't
     // overflow into the row above.
