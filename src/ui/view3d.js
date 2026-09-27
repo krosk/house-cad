@@ -13,6 +13,16 @@ import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture, finishBumpTexture } from './finishTextures.js';
 
+// Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
+// narrowest horizontal FOV POV allows on a portrait screen.
+const OVERVIEW_FOV = 50;
+const POV_MIN_HFOV = 65;
+// DeviceOrientationControls constants: -90° about X (camera looks out the back of the
+// screen, not up), and the axes for the screen-angle and yaw-offset turns.
+const TILT_Q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+const TILT_Z = new THREE.Vector3(0, 0, 1);
+const TILT_Y = new THREE.Vector3(0, 1, 0);
+
 function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -94,7 +104,7 @@ export class View3D {
     this.scene.background = new THREE.Color(0x1a1d23);
 
     const { clientWidth: w, clientHeight: h } = container;
-    this.camera = new THREE.PerspectiveCamera(50, w / Math.max(1, h), 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(OVERVIEW_FOV, w / Math.max(1, h), 0.1, 1000);
     this.camera.position.set(10, 10, 14);
 
     // alpha:true so an immersive-ar session can show the real world through the
@@ -119,9 +129,11 @@ export class View3D {
     this.controls.enabled = false;
     this.controls.target.set(0, 1, 0);
 
-    // OVERVIEW: fixed top-down camera; dragging pans on the plan X/Y plane.
-    // POV: fixed position at eye height; dragging changes viewing direction.
-    // A tap animates between them. Nothing here enters project/share data.
+    // OVERVIEW: fixed top-down camera; dragging pans on the plan X/Y plane, two fingers
+    // (or the wheel) zoom, and a tap on a floor enters POV there.
+    // POV: eye height; dragging (or phone tilt) looks around, a tap on a floor walks
+    // there, and the Overview button (exitPov) goes back. Nothing here enters
+    // project/share data.
     this.navigationMode = 'overview';
     this.eyeHeight = 1.65;
     this.viewYaw = 0;
@@ -132,7 +144,23 @@ export class View3D {
     this._viewDirection = new THREE.Vector3();
     this.overviewPose = null;
     this.overviewDistance = 10;
+    this.overviewFitDistance = 10; // the framed distance; pinch/wheel zoom is clamped around it
+    this.overviewPlaneY = 0; // the plan plane the overview looks at (top of the visible house)
+    this.overviewPortrait = null; // aspect < 1 when last framed; flipping it re-frames
     this.cameraTransition = null;
+    this.viewPointers = new Map(); // active pointers, for the two-finger overview gesture
+    this.viewGesture = null; // { dist, midX, midY } while two fingers pinch/pan the overview
+    // Phone tilt look (POV only, opt-in; iOS asks permission on the button tap).
+    this.tiltEnabled = false;
+    this.tiltYawOffset = 0;
+    this.tiltRecalibrate = true;
+    this._deviceOrientation = null;
+    this._onDeviceOrientation = (event) => {
+      if (event.alpha == null) return;
+      this._deviceOrientation = { alpha: event.alpha, beta: event.beta, gamma: event.gamma };
+    };
+    // Called with the new mode ('overview' | 'pov') when a camera transition ends.
+    this.onNavigationChange = null;
 
     // Lighting.
     const hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 0.9);
@@ -305,6 +333,7 @@ export class View3D {
     this.renderer.domElement.addEventListener('pointermove', this._viewPointerMove.bind(this));
     this.renderer.domElement.addEventListener('pointerup', this._viewPointerUp.bind(this));
     this.renderer.domElement.addEventListener('pointercancel', this._viewPointerUp.bind(this));
+    this.renderer.domElement.addEventListener('wheel', this._viewWheel.bind(this), { passive: false });
   }
 
   // The renderer is shared with WebXR, but the desktop plan does not need its
@@ -727,13 +756,38 @@ export class View3D {
 
   _viewPointerDown(event) {
     if (event.button !== 0 || this.cameraTransition) return;
-    this.renderer.domElement.setPointerCapture(event.pointerId);
+    try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+    this.viewPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (this.viewPointers.size === 2 && this.navigationMode === 'overview') {
+      // A second finger turns the drag into a pinch-zoom + pan; no tap follows it.
+      this.viewGesture = this._pointerPair();
+      if (this.viewPointer) this.viewPointer.moved = true;
+      return;
+    }
+    if (this.viewPointers.size > 1) return;
     this.viewPointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, moved: false };
   }
 
+  _pointerPair() {
+    const [a, b] = [...this.viewPointers.values()];
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2 };
+  }
+
   _viewPointerMove(event) {
+    const tracked = this.viewPointers.get(event.pointerId);
+    if (tracked) { tracked.x = event.clientX; tracked.y = event.clientY; }
+    if (this.cameraTransition) return;
+    if (this.viewGesture && this.viewPointers.size >= 2 && this.navigationMode === 'overview') {
+      const next = this._pointerPair();
+      this._panOverview(next.midX - this.viewGesture.midX, next.midY - this.viewGesture.midY);
+      if (this.viewGesture.dist > 0 && next.dist > 0) {
+        this._zoomOverview(this.viewGesture.dist / next.dist, next.midX, next.midY);
+      }
+      this.viewGesture = next;
+      return;
+    }
     const p = this.viewPointer;
-    if (!p || p.id !== event.pointerId || this.cameraTransition) return;
+    if (!p || p.id !== event.pointerId) return;
     const dx = event.clientX - p.x;
     const dy = event.clientY - p.y;
     p.x = event.clientX;
@@ -741,26 +795,68 @@ export class View3D {
     if (Math.hypot(event.clientX - p.startX, event.clientY - p.startY) > 6) p.moved = true;
     if (!p.moved) return;
     if (this.navigationMode === 'overview') {
-      const visibleHeight = 2 * this.overviewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-      const metresPerPixel = visibleHeight / Math.max(1, this.renderer.domElement.clientHeight);
-      this.camera.position.x -= dx * metresPerPixel;
-      this.camera.position.z -= dy * metresPerPixel;
-      this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+      this._panOverview(dx, dy);
     } else if (this.navigationMode === 'pov') {
-      this.viewYaw -= dx * 0.005;
-      this.viewPitch = THREE.MathUtils.clamp(this.viewPitch - dy * 0.005, -Math.PI * 0.48, Math.PI * 0.48);
-      this._applyPovLook();
+      if (this.tiltEnabled && this._deviceOrientation) {
+        this.tiltYawOffset -= dx * 0.005; // tilt owns pitch; a drag still turns
+      } else {
+        this.viewYaw -= dx * 0.005;
+        this.viewPitch = THREE.MathUtils.clamp(this.viewPitch - dy * 0.005, -Math.PI * 0.48, Math.PI * 0.48);
+        this._applyPovLook();
+      }
     }
   }
 
   _viewPointerUp(event) {
+    this.viewPointers.delete(event.pointerId);
+    if (this.viewPointers.size < 2) this.viewGesture = null;
     const p = this.viewPointer;
     if (!p || p.id !== event.pointerId) return;
-    if (!p.moved && !this.cameraTransition) {
+    if (!p.moved && !this.cameraTransition && event.type === 'pointerup') {
       if (this.navigationMode === 'overview') this._enterPovFromPointer(event.clientX, event.clientY);
-      else if (this.navigationMode === 'pov') this._returnToOverview();
+      else if (this.navigationMode === 'pov') this._walkToPointer(event.clientX, event.clientY);
     }
     this.viewPointer = null;
+  }
+
+  _viewWheel(event) {
+    if (this.navigationMode !== 'overview' || this.cameraTransition) return;
+    event.preventDefault();
+    this._zoomOverview(Math.exp(event.deltaY * 0.0015), event.clientX, event.clientY);
+  }
+
+  // Overview pan in screen terms: the camera's own right/up axes, so it stays a
+  // "grab the plan" drag whichever way the overview is turned.
+  _panOverview(dx, dy) {
+    const visibleHeight = 2 * this.overviewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const metresPerPixel = visibleHeight / Math.max(1, this.renderer.domElement.clientHeight);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this.camera.position.addScaledVector(right, -dx * metresPerPixel).addScaledVector(up, dy * metresPerPixel);
+    this.camera.updateMatrixWorld();
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+  }
+
+  // Zoom the top-down overview by `factor` (<1 = closer), keeping the plan point
+  // under (clientX, clientY) fixed on screen.
+  _zoomOverview(factor, clientX, clientY) {
+    const next = THREE.MathUtils.clamp(this.overviewDistance * factor,
+      Math.min(1.5, this.overviewFitDistance), this.overviewFitDistance * 3);
+    if (Math.abs(next - this.overviewDistance) < 1e-6) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.viewNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.viewRaycaster.setFromCamera(this.viewNdc, this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.overviewPlaneY);
+    const anchor = this.viewRaycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    const k = next / this.overviewDistance;
+    if (anchor) {
+      this.camera.position.x = anchor.x + (this.camera.position.x - anchor.x) * k;
+      this.camera.position.z = anchor.z + (this.camera.position.z - anchor.z) * k;
+    }
+    this.camera.position.y = this.overviewPlaneY + next;
+    this.overviewDistance = next;
+    this.camera.updateMatrixWorld();
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
   }
 
   _enterPovFromPointer(clientX, clientY) {
@@ -770,7 +866,7 @@ export class View3D {
     const floors = this.house.children.filter((mesh) => mesh.visible && mesh.userData.architecturalRole === 'floor');
     const hit = this.viewRaycaster.intersectObjects(floors, false)[0];
     if (!hit) return;
-    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(), distance: this.overviewDistance };
     const endPosition = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
     const box = this._visibleBox();
     const center = box?.getCenter(new THREE.Vector3()) || new THREE.Vector3(endPosition.x, endPosition.y, endPosition.z - 1);
@@ -781,19 +877,57 @@ export class View3D {
     this._startTransition(endPosition, endQuaternion, 'pov');
   }
 
+  // POV tap: walk to the tapped floor spot (through a doorway into the next room too),
+  // facing the way you walked. Walls in front block the tap; it does nothing then.
+  _walkToPointer(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.viewNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.viewRaycaster.setFromCamera(this.viewNdc, this.camera);
+    // Door leaves don't block: tapping through a doorway walks into the next room.
+    const targets = this.house.children.filter((mesh) => mesh.visible && mesh.isMesh
+      && mesh.userData.architecturalRole !== 'doors');
+    const hit = this.viewRaycaster.intersectObjects(targets, false)[0];
+    if (!hit || hit.object.userData.architecturalRole !== 'floor') return;
+    const end = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
+    const travel = end.clone().sub(this.camera.position);
+    travel.y = 0;
+    const endQuaternion = travel.lengthSq() > 1e-4
+      ? new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(end, end.clone().add(travel), new THREE.Vector3(0, 1, 0)))
+      : this.camera.quaternion.clone();
+    const duration = THREE.MathUtils.clamp(350 + 180 * Math.sqrt(travel.length()), 450, 1100);
+    this._startTransition(end, endQuaternion, 'pov', duration);
+  }
+
+  // Leave POV for the saved overview (the Overview button; no longer a stray tap).
+  exitPov() {
+    if (this.navigationMode !== 'pov' || this.cameraTransition) return;
+    this._returnToOverview();
+  }
+
+  // Vertical FOV: the overview keeps 50°. POV keeps at least ~65° across on a narrow
+  // (portrait) screen, capped at 100° vertical so the top and bottom don't stretch.
+  _fovFor(destination) {
+    if (destination !== 'pov') return OVERVIEW_FOV;
+    const aspect = Math.max(0.1, this.camera.aspect);
+    const vertical = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV_MIN_HFOV / 2)) / aspect);
+    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(vertical), OVERVIEW_FOV, 100);
+  }
+
   _returnToOverview() {
     if (!this.overviewPose) return;
+    if (this.overviewPose.distance) this.overviewDistance = this.overviewPose.distance;
     for (const mesh of this.house.children) {
       if (mesh.userData.architecturalRole === 'ceiling') mesh.visible = false;
     }
     this._startTransition(this.overviewPose.position, this.overviewPose.quaternion, 'overview');
   }
 
-  _startTransition(position, quaternion, destination) {
+  _startTransition(position, quaternion, destination, duration = 700) {
     this.cameraTransition = {
-      start: performance.now(), duration: 700, destination,
+      start: performance.now(), duration, destination,
       fromPosition: this.camera.position.clone(), fromQuaternion: this.camera.quaternion.clone(),
       toPosition: position.clone(), toQuaternion: quaternion.clone(),
+      fromFov: this.camera.fov, toFov: this._fovFor(destination),
     };
     this.navigationMode = `transition-${destination}`;
   }
@@ -801,6 +935,7 @@ export class View3D {
   _finishTransition(destination) {
     this.navigationMode = destination;
     this.cameraTransition = null;
+    this.tiltRecalibrate = true; // tilt resumes from the heading the transition ended on
     this.camera.up.set(0, destination === 'pov' ? 1 : 0, destination === 'pov' ? 0 : -1);
     if (destination === 'pov') {
       const direction = this.camera.getWorldDirection(new THREE.Vector3());
@@ -809,6 +944,52 @@ export class View3D {
     }
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
+    this.onNavigationChange?.(destination);
+  }
+
+  // Phone tilt look. Must be called from a user gesture: iOS 13+ only grants
+  // DeviceOrientationEvent permission from a tap. Resolves to the new state.
+  async setTiltEnabled(enabled) {
+    if (enabled && typeof DeviceOrientationEvent === 'undefined') return false;
+    if (enabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        if (await DeviceOrientationEvent.requestPermission() !== 'granted') return false;
+      } catch { return false; }
+    }
+    this.tiltEnabled = !!enabled;
+    this.tiltRecalibrate = true;
+    this._deviceOrientation = null;
+    if (this.tiltEnabled) window.addEventListener('deviceorientation', this._onDeviceOrientation);
+    else {
+      window.removeEventListener('deviceorientation', this._onDeviceOrientation);
+      if (this.navigationMode === 'pov') {
+        // Hand the tilt heading back to drag look, level, without a jump in yaw.
+        const direction = this.camera.getWorldDirection(new THREE.Vector3());
+        this.viewYaw = Math.atan2(-direction.x, -direction.z);
+        this.viewPitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
+        this._applyPovLook();
+      }
+    }
+    return this.tiltEnabled;
+  }
+
+  // Device angles → camera quaternion (the three.js DeviceOrientationControls
+  // formula), turned about world Y by the yaw offset that keeps the heading the
+  // user had when tilt took over.
+  _applyTiltLook() {
+    const o = this._deviceOrientation;
+    if (!o) return;
+    const deg = THREE.MathUtils.degToRad;
+    const screenAngle = deg(screen.orientation?.angle ?? window.orientation ?? 0);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(deg(o.beta), deg(o.alpha), -deg(o.gamma), 'YXZ'));
+    q.multiply(TILT_Q1).multiply(new THREE.Quaternion().setFromAxisAngle(TILT_Z, -screenAngle));
+    if (this.tiltRecalibrate) {
+      const now = this.camera.getWorldDirection(new THREE.Vector3());
+      const device = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+      this.tiltYawOffset = Math.atan2(-now.x, -now.z) - Math.atan2(-device.x, -device.z);
+      this.tiltRecalibrate = false;
+    }
+    this.camera.quaternion.setFromAxisAngle(TILT_Y, this.tiltYawOffset).multiply(q);
   }
 
   _updateLightShadows() {
@@ -850,28 +1031,46 @@ export class View3D {
     if (!box) return;
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
+    // On a portrait screen a house wider than it is deep is turned 90° so its long
+    // side runs down the long side of the screen (view-only; the plan is unchanged).
+    this.overviewPortrait = this.camera.aspect < 1;
+    const turned = this.overviewPortrait && size.x > size.z;
+    const [across, down] = turned ? [size.z, size.x] : [size.x, size.z];
+    this.camera.fov = OVERVIEW_FOV;
+    this.camera.updateProjectionMatrix();
     const vFov = THREE.MathUtils.degToRad(this.camera.fov);
-    const distanceForHeight = size.z / (2 * Math.tan(vFov / 2));
+    const distanceForHeight = down / (2 * Math.tan(vFov / 2));
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const distanceForWidth = size.x / (2 * Math.tan(hFov / 2));
+    const distanceForWidth = across / (2 * Math.tan(hFov / 2));
     const distance = Math.max(2, distanceForHeight, distanceForWidth) * 1.12;
     this.overviewDistance = distance;
+    this.overviewFitDistance = distance;
+    this.overviewPlaneY = box.max.y;
     this.navigationMode = 'overview';
     this.cameraTransition = null;
-    this.camera.up.set(0, 0, -1);
+    if (turned) this.camera.up.set(-1, 0, 0);
+    else this.camera.up.set(0, 0, -1);
     this.camera.position.set(center.x, box.max.y + distance, center.z);
     this.camera.lookAt(center.x, center.y, center.z);
+    this.camera.updateMatrixWorld();
     this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
+    this.onNavigationChange?.('overview');
   }
 
   _resize() {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (w === 0 || h === 0) return;
     this.camera.aspect = w / h;
+    if (!this.renderer.xr.isPresenting && this.navigationMode === 'pov') this.camera.fov = this._fovFor('pov');
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    // Phone rotated while in the overview: re-frame so the turn rule re-applies.
+    if (!this.renderer.xr.isPresenting && this.desktopActive && this.navigationMode === 'overview'
+        && this.overviewPortrait != null && this.overviewPortrait !== (this.camera.aspect < 1)) {
+      this.frameModel();
+    }
   }
 
   _animate(time, frame) {
@@ -880,7 +1079,11 @@ export class View3D {
       const eased = a * a * (3 - 2 * a);
       this.camera.position.lerpVectors(this.cameraTransition.fromPosition, this.cameraTransition.toPosition, eased);
       this.camera.quaternion.slerpQuaternions(this.cameraTransition.fromQuaternion, this.cameraTransition.toQuaternion, eased);
+      this.camera.fov = THREE.MathUtils.lerp(this.cameraTransition.fromFov, this.cameraTransition.toFov, eased);
+      this.camera.updateProjectionMatrix();
       if (a >= 1) this._finishTransition(this.cameraTransition.destination);
+    } else if (!this.renderer.xr.isPresenting && this.tiltEnabled && this.navigationMode === 'pov') {
+      this._applyTiltLook();
     }
     if (frame && this.onXRFrame) {
       // CPU cost split for the AR debug HUD: frame logic vs. three's render submission.

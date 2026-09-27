@@ -72,10 +72,14 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
 
-Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is locked top-down and a
-drag pans only on the plan plane; tapping a room animates the camera to a stationary 1.65 m POV.
-In POV, dragging only looks around and a simple tap animates back to the saved overview. Camera state
-is session-only and must not mutate project or shared-view data. The viewer initially isolates the
+Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is locked top-down: a
+drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and on a portrait
+screen a house wider than deep is turned 90° so it fills the screen; tapping a room animates the camera
+to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a
+floor walks there (door leaves don't block, so a tap through a doorway enters the next room), and the
+Overview button returns to the saved overview. POV keeps at least 65° horizontal FOV on narrow screens
+(vertical capped at 100°); the overview stays at 50°. Camera state is session-only and must not
+mutate project or shared-view data. The viewer initially isolates the
 project's active floor; POV reveals that floor's ceiling, which stays hidden in overview.
 Floor slabs use a lightweight procedural wood-plank material; walls and POV ceilings use neutral
 white procedural plaster. These CanvasTextures are generated locally (no network/assets), repeat in

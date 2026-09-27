@@ -128,6 +128,22 @@ view3dReflections.addEventListener('click', () => setDesktopReflections(!view.re
   setDesktopReflections(saved, false);
 }
 
+// POV controls: the Overview button (a tap in POV walks instead of leaving) and the
+// opt-in phone tilt look, offered on touch devices that report orientation.
+const view3dNav = document.getElementById('view3d-nav');
+const view3dTilt = document.getElementById('view3d-tilt');
+document.getElementById('view3d-overview').addEventListener('click', () => view.exitPov());
+view3dTilt.hidden = !(typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer: coarse)').matches);
+function showTiltState(on) {
+  view3dTilt.setAttribute('aria-pressed', String(on));
+  view3dTilt.textContent = on ? '◉ Tilt look' : '◎ Tilt look';
+}
+view3dTilt.addEventListener('click', async () => {
+  // The permission request must run inside this tap (iOS).
+  showTiltState(await view.setTiltEnabled(!view.tiltEnabled));
+});
+view.onNavigationChange = (mode) => { view3dNav.hidden = mode !== 'pov'; };
+
 function render3DFloorList() {
   if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
     selected3DFloorId = null;

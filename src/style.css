@@ -294,6 +294,37 @@ body {
   #view3d-floor-ctl { width: 145px; }
 }
 
+/* POV controls, bottom centre (clear of the floor panel on a narrow screen). */
+#view3d-nav {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+#view3d-nav[hidden], #view3d-nav button[hidden] { display: none; }
+#view3d-nav button {
+  min-height: 44px;
+  padding: 0 16px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  touch-action: manipulation;
+}
+#view3d-nav button[aria-pressed="true"] {
+  color: #0b1220;
+  background: #ffd166;
+  border-color: #ffd166;
+  font-weight: 600;
+}
+
 /* ---- on-screen zoom buttons (touch / Quest controller) ---- */
 #zoom-ctl {
   position: absolute;
