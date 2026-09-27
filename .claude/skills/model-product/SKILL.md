@@ -1,6 +1,6 @@
 ---
 name: model-product
-description: Model a real product (furniture, door, flooring or other surface finish, fixture) that has no manufacturer 3D model, from its specs, assembly drawings and photos, as code in house-cad. Use when the owner gives a product link or article number and wants it in AR FURNISH, View 3D, or as a door/floor/wall material.
+description: Model a real product (furniture, door, flooring or other surface finish, fixture) that has no manufacturer 3D model, from its specs, assembly drawings and photos, as code in house-cad. Use when the owner gives a product link or article number and wants it in AR (MATERIAL · FURNITURE), View 3D, or as a door/floor/wall material.
 ---
 
 Follow `docs/product-modelling.md` step by step. It is the canonical workflow; this skill only
@@ -12,7 +12,7 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
    model exists, register it with `tools/fetch-ikea-model.mjs` and stop. Other retailers (Lapeyre,
    Leroy Merlin…) publish none, so go straight to step 2.
 2. **Decide where it goes**; ask only if unclear:
-   - furniture (a product on a FURNITURE zone, picked in MATERIAL · FURNITURE or dropped by FURNISH) → a builder in `src/ui/proceduralFurniture.js`;
+   - furniture (a product on a FURNITURE zone, picked in MATERIAL · FURNITURE) → a builder in `src/ui/proceduralFurniture.js`;
    - a product that fills a plan zone: a door → a `surface: 'door'` material + `src/ui/doorProducts.js`;
      a window → a `surface: 'window'` material + a profile in `src/ui/windowProducts.js`;
    - a switch or outlet → a `surface: 'switch'`/`'outlet'` material + a `design` in `src/ui/deviceProducts.js`,

@@ -11,7 +11,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/ar-qa-checklist.md` | What has actually been walked on the Quest (mostly stale — see Open questions) |
 | `docs/electrical-workflow.md` | Conduit / wire / control-link lanes, derived circuits, owner decisions |
 | `docs/plumbing-workflow.md` | The pipe lane (first slice) and what's deferred |
-| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, FURNISH, procedural furniture (products with no IKEA model) |
+| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, furniture zones + products (the merge), procedural furniture (products with no IKEA model) |
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
@@ -63,11 +63,17 @@ Read `docs/product-intent.md` before planning AR work.
 - **Owner walk:** applied materials on the Quest; the MATERIAL flow was clear. No per-item pass/fail was
   given (`docs/ar-qa-checklist.md`). They looked for a furniture material and found none.
 - **Furniture merge built** (Next step B), with one owner change: the product is picked in
-  **MATERIAL · FURNITURE**; FURNISH only drops a zone already sized to a product. Details and all
+  **MATERIAL · FURNITURE**. Pushed as `e9ace98`. Details and all
   evidence are in `docs/furniture.md` "One furniture zone" and "The merge". Proven by build, Node
   (the real solver on the owner's house: 0 of 57 furniture dims removed, rects within 0.1 mm, sheets
   byte-identical) and a desktop Chrome check (an old item migrated, sized and drawn in View 3D).
-  **AR is unwalked** (Hypothesis): FURNISH drop, MATERIAL · FURNITURE, the `DIM REMOVED` flash.
+  **AR is unwalked** (Hypothesis): MATERIAL · FURNITURE, the `DIM REMOVED` flash.
+- **Material badges** (`63e640a`, owner request): an applied material shows one small swatch badge at
+  the centre of its target on the AR plan, never a colour fill or strip.
+- **FURNISH removed** (owner: "it overlaps" MATERIAL · FURNITURE): draw a FURNITURE zone in PLAN · ADD,
+  pick its product in MATERIAL · FURNITURE.
+- **AR 3D view = 3D only** (owner request): with LEFT X on, every plan overlay and the origin gizmo
+  are hidden for the render (reticle, HUD, panels stay). `docs/ar-survey.md` "LEFT X".
 - Not built: a desktop product picker, a desktop "dimension removed" message, and the notch in the
   desktop 2D sketch.
 
@@ -176,7 +182,7 @@ Read `docs/product-intent.md` before planning AR work.
   quantity view yet.
 - **Furniture merge** (owner, 2026-09-26/27, `docs/furniture.md`):
   - four facing directions only;
-  - the product is picked in MATERIAL · FURNITURE (owner, 2026-09-27); FURNISH only drops a pre-sized zone;
+  - the product is picked in MATERIAL · FURNITURE (owner, 2026-09-27); FURNISH was removed as overlapping;
   - sheets/DXF print the rectangle plus a front notch;
   - furniture solves one-way after the structure;
   - an over-specified furniture dimension is **deleted, never shown as a conflict**.
@@ -299,7 +305,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
 | `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s per pattern (`DESIGNS` stagger, `BRICK_DESIGNS`, `GRID_DESIGNS` mosaic/terrazzo/limestone, `OCT_DESIGNS`, `PINWHEEL_DESIGNS`), their bump maps, the shared stone cloud helpers (`stoneField`, `drawStoneCloud`) and the View 3D detail layer (`DETAIL_DESIGNS`, `applyFinishDetail`) |
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano); used by FURNISH and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE; hardware) from `doorProductPlacements` |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware) from `windowProductPlacements` |
@@ -315,7 +321,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     windows, checking which side the handle faces; Beaulieu oak, Etruria octagons in the upstairs
     bathroom, Blue stone mosaic and Vernisse tile; watch PERF: each design texture is 2048 px);
   - View 3D ✦ Reflections on a phone (does it hold frame rate?);
-  - FURNISH: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on the APK?) and
+  - MATERIAL · FURNITURE: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on the APK?) and
     both Daikin units (drop at 2.0 m); the violet floor plan pieces, and the models with LEFT X;
   - the LINE door on an interior door zone; junction height labels only in the conduit modes;
   - session 31, later: Monastère pinwheel on a real room (the per-size readout lines, the pillowed edges,
@@ -324,7 +330,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     where a door opens into a corner);
   - session 31: View 3D on an iPhone (Tilt look direction, rotation re-frame, pinch, walking; the new
     Overview button also changed desktop POV), a WhatsApp-sent `link` with products, the Ground gap wall
-    behind half wall r139 full height, the terrazzo floor, the V120 piano in FURNISH, the RJ45 on an
+    behind half wall r139 full height, the terrazzo floor, the V120 piano via MATERIAL · FURNITURE, the RJ45 on an
     `ethernet` marker;
   - MATERIAL · SWITCH / OUTLET / ETHERNET on real devices: grip cycling on a double switch, the double drawn once,
     the Ovalis models flush on the wall at the right height with LEFT X (and in desktop View 3D POV);
@@ -334,13 +340,13 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the stacked readout;
   - stair rotation;
   - then session 29's list: ALL FLOORS reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T.
-- **B — Furniture merge: BUILT in session 32** (walk it: `docs/ar-qa-checklist.md` FURNISH section).
+- **B — Furniture merge: BUILT in session 32** (walk it: `docs/ar-qa-checklist.md` "Furniture" section).
   The original plan, kept for reference:
   1. the model: an optional `article` + `facing` on furniture zones;
   2. the one-way furniture solve (walls never move for furniture), with over-specified dims deleted
      plus a readout;
   3. load-time migration of `floor.furniture[]`: saved files, `_demo` seed, and share links (`shareView.js`);
-  4. MATERIAL · FURNITURE assigns the product; FURNISH drops a pre-sized zone;
+  4. MATERIAL · FURNITURE assigns the product (FURNISH later removed);
   5. View 3D and the AR 3D view draw the product in the zone;
   6. the sheet/DXF front notch.
   Verify the solver change in Node against the owner's house (14 furniture zones, read-only).
@@ -376,7 +382,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - the bed and the door in AR (both rendered only in a desktop browser);
   - the oak floor, Vernisse tile, Blue stone mosaic and Etruria octagons on real rooms (seen only in
     scratch previews), and Reflections on any device other than a desktop Chrome;
-  - the Daikin units, the LINE door and the FURNISH plan pieces in AR (the plan-piece outline is a
+  - the Daikin units, the LINE door and the furniture plan pieces in AR (the plan-piece outline is a
     1 px line; a ribbon is the fix if it reads faint). The FTXM60A and the LINE door were only seen in a
     scratch preview, not in View 3D;
   - the Ovalis switch, double switch and outlet in the real View 3D and in AR (seen only in scratch

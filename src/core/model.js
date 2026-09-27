@@ -9,7 +9,7 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, furnitureFootprint } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
@@ -967,17 +967,6 @@ export class Project {
     if (key == null || !entry) { delete rect.article; delete rect.productMm; }
     else applyProduct(rect, key, entry, { seedFoot: true });
     if (emit) this._emit();
-    return rect;
-  }
-
-  // FURNISH drop: a new FURNITURE zone already sized to `entry`, centred at (x, y).
-  addFurnitureZone(key, entry, x, y, { facing = 0 } = {}) {
-    const rect = new Rectangle({ x: x - 0.3, y: y - 0.3, w: 0.6, h: 0.6, kind: 'furniture', facing });
-    applyProduct(rect, key, entry, { seedFoot: true });
-    const size = furnitureFootprint(rect);
-    if (size) { rect.x = x - size.x / 2; rect.y = y - size.y / 2; rect.w = size.x; rect.h = size.y; }
-    this.rectangles.push(rect);
-    this._emit();
     return rect;
   }
 

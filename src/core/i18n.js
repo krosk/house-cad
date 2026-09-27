@@ -19,7 +19,6 @@ const STRINGS = {
   'group.setup':   { en: 'SETUP',   fr: 'CONFIG', zh: '设置' },
   'group.plan':    { en: 'PLAN',    fr: 'PLAN',   zh: '平面' },
   'group.marker':  { en: 'MARKER', fr: 'MARQUEUR', zh: '标记' },
-  'group.furnish': { en: 'FURNISH', fr: 'MEUBLER', zh: '布置' },
   'group.material': { en: 'MATERIAL', fr: 'MATÉRIAU', zh: '材料' },
   'group.project': { en: 'PROJECT', fr: 'PROJET', zh: '项目' },
 
@@ -54,7 +53,6 @@ const STRINGS = {
   'mode.marker_conduit': { en: 'CONDUIT', fr: 'GAINE', zh: '管路' },
   'mode.conduit_dims': { en: 'CONDUIT DIMS', fr: 'COTES GAINE', zh: '管路尺寸' },
   'mode.conduit_edit': { en: 'CONDUIT EDIT', fr: 'MODIF. GAINE', zh: '编辑管路' },
-  'mode.furnish':  { en: 'PLACE',  fr: 'PLACER',   zh: '放置' },
   'mode.mat_floor': { en: 'FLOOR', fr: 'SOL', zh: '地面' },
   'mode.mat_wall':  { en: 'WALL',  fr: 'MUR', zh: '墙面' },
   'mode.mat_door':  { en: 'DOOR',  fr: 'PORTE', zh: '门' },
@@ -237,12 +235,6 @@ const STRINGS = {
     fr: 'Choisissez un modèle pour une prise réseau. Gâchette : sélectionner la prise visée ; si elles se superposent, grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
     zh: '为网口选择型号。扳机选择准星下的网口；网口重叠时先用握把循环。摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。在三维视图中显示（左 X）。',
   },
-  'help.furnish': {
-    en: 'Drop a furniture zone already sized to a real product. Thumbstick up/down cycles the product; trigger drops it centred on the reticle. Then dimension it to the walls, turn (A/X), move or delete it in PLAN, and change its product in MATERIAL · FURNITURE. Models show in the 3D view (LEFT X).',
-    fr: 'Posez une zone mobilier déjà à la taille d’un produit réel. Joystick haut/bas : faire défiler le produit ; gâchette : le poser centré sur le réticule. Ensuite cotez-le par rapport aux murs, tournez-le (A/X), déplacez-le ou supprimez-le dans PLAN, et changez son produit dans MATÉRIAU · MOBILIER. Les modèles s’affichent dans la vue 3D (GAUCHE X).',
-    zh: '放置一个已按真实产品尺寸设定的家具区域。摇杆上/下循环产品；扳机将其放在准星中心。然后在平面中标注其与墙的尺寸、旋转（A/X）、移动或删除，并在材料 · 家具中更换产品。模型在三维视图中显示（左 X）。',
-  },
-  'furnish.none':     { en: 'No furniture in catalog', fr: 'Aucun meuble au catalogue', zh: '目录中无家具' },
   'help.mat_furniture': {
     en: 'Choose the product for a FURNITURE zone. Trigger selects the zone under the reticle; thumbstick up/down cycles the product (none first); A/X turns it 90°; B/Y clears it. The zone takes the product\'s size; a dimension that no longer fits is removed. Shown in the 3D view (LEFT X).',
     fr: 'Choisissez le produit d’une zone MOBILIER. Gâchette : sélectionner la zone visée ; joystick haut/bas : faire défiler le produit (aucun d’abord) ; A/X le tourne de 90° ; B/Y l’efface. La zone prend la taille du produit ; une cote qui ne tient plus est supprimée. Visible dans la vue 3D (GAUCHE X).',

@@ -1,7 +1,7 @@
 # Furniture: IKEA models in AR and 3D
 
 Design reference for real-product furniture. Goal: a **realistic furniture preview** in the
-passthrough scene (and the desktop/shared 3D view) at true scale. Mechanics of the AR FURNISH mode
+passthrough scene (and the desktop/shared 3D view) at true scale. Mechanics of the AR MATERIAL · FURNITURE mode
 are in `docs/ar-survey.md`; live state in `.claude/handoff.md`.
 
 ## One furniture zone (the merge, built 2026-09-27)
@@ -32,7 +32,7 @@ every `buildPlan`). `floor.furniture` no longer exists and nothing writes it.
 ## The merge: design and owner decisions
 
 Status: design agreed 2026-09-26, product picking moved to MATERIAL 2026-09-27; **built
-2026-09-27** (model, one-way solve, migration, MATERIAL · FURNITURE, FURNISH drop, View 3D / AR 3D
+2026-09-27** (model, one-way solve, migration, MATERIAL · FURNITURE, View 3D / AR 3D
 models, sheet/DXF notch). Proven by build and Node checks only; not yet walked on the Quest.
 
 **Why.** Before the merge, each lane has what the other lacks. The zone can be dimensioned to walls and prints on
@@ -87,8 +87,10 @@ moved 5 cm. So a furniture dimension could silently move a wall. The merge fixed
 - **The product is picked in MATERIAL · FURNITURE** (owner, 2026-09-27, replacing "FURNISH = drop +
   assign in one mode" from 2026-09-26). Like doors and windows, the product is a material of its zone:
   trigger a `furniture` zone drawn in PLAN, thumbstick-y cycles the catalog, B/Y clears. Why: walking
-  MATERIAL on the Quest, the owner looked there for furniture and didn't find it. FURNISH stays as the
-  quick way to drop a new zone already sized to the chosen product.
+  MATERIAL on the Quest, the owner looked there for furniture and didn't find it.
+- **FURNISH is removed** (owner, 2026-09-27: "it overlaps" MATERIAL · FURNITURE). It briefly dropped
+  a zone pre-sized to a product; now draw the zone in PLAN · ADD (kind FURNITURE) and pick the
+  product in MATERIAL · FURNITURE, which resizes it. `addFurnitureZone` went with it.
 - **Sheets and DXF print the zone's rectangle plus a front notch** (owner, 2026-09-26): the plain
   footprint as today, and a small V on the front edge so facing reads on paper. No product silhouette.
   As built: `furnitureNotchSegments` (`apertureGlyph.js`), 2 mm on paper, 10 cm in DXF model space,
@@ -155,7 +157,7 @@ S090.142.05, S490.142.08, S090.142.10 all 404 on fr/fr, gb/en and us/en). For th
 carries `procedural: <kind>` (plus optional `params`) and a non-numeric key, and
 `src/ui/proceduralFurniture.js` builds it from simple solids at `sizeMm`, with canvas textures
 (stained wood grain, quilted leather, mattress fabric). It follows the GLB convention (metres, Y up,
-floor at 0, centred, front +Z), so FURNISH and View 3D treat it like a downloaded model; both loaders
+floor at 0, centred, front +Z), so the AR 3D view and View 3D treat it like a downloaded model; both loaders
 await the catalog first so a procedural key never reaches the proxy. Entries are added to
 `index.json` by hand (the fetch tool only registers rotera models).
 
@@ -171,19 +173,19 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   back about 8° with two slats, two channel-seamed leather cushions filling the width between the posts, slatted base; mattress optional
   (`params.mattress`), 25 cm thick (`params.mattressHeightMm`, owner choice). The rail height, lean and cushion size are estimates from photos, not
   measurements. Proven in a scratch browser preview (bounding box 1.72 × 0.93 × 2.23 m); not yet
-  seen in FURNISH or on device.
+  seen in AR or on device.
 - `daikin-ctxm15a`: Daikin Perfera CTXM15A wall-mounted AC indoor unit (multi-split, 1.5 kW),
   804 × 298 × 252 mm, 11.5 kg (Daikin's CTXM-A spec table). Builder `daikin-wall-unit`: a flat glossy
   front panel, a slanted lower face with the outlet flap and two sensor windows at the right end, and
   an underside curving up to the wall (side profile from Daikin's CTXM-A installer reference guide
   4P518023-17P, pages 23–24; front layout from the clim-split and climamania retailer photos, scaled
   by the 804 mm width). Panel lower edge 73 mm up, flap 65–674 mm from the left, logo 206 mm below the top
-  (`params`): photo estimates, not measurements. The catalog's **`mountZMm: 2000`** makes a FURNISH drop
-  start with the unit's bottom 2.0 m off the floor (any entry may carry it; default 0). Installation
+  (`params`): photo estimates, not measurements. The catalog's **`mountZMm: 2000`** makes assigning the
+  product in MATERIAL · FURNITURE set the zone's foot, so the unit's bottom starts 2.0 m off the floor (any entry may carry it; default 0). Installation
   rules from the same guide: bottom **≥ 1.8 m** above the floor, **≥ 30 mm** to the ceiling, **≥ 50 mm**
   to a side wall on each side. The builder doesn't check them. Proven in a scratch browser preview (bounding box 0.804 × 0.298 ×
   0.253 m, the extra 1 mm is the logo) and in the real View 3D overview on a wall of the demo house;
-  not yet seen in FURNISH or on device.
+  not yet seen in AR or on device.
 - `daikin-ftxm60a`: Daikin Perfera FTXM60A wall-mounted AC indoor unit (6 kW), 997 × 298 × 292 mm,
   14.5 kg (Daikin's FTXM-A spec table; the FTXM71A shares the body). Same `daikin-wall-unit` builder
   and installation rules as the CTXM15A. Front layout measured on condizionati.fr's straight front photo
@@ -191,7 +193,7 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   left, sensors centred at 894 and 946 mm (`params.sensorsMm`), logo 216 mm below the top; photo
   estimates, not measurements. Retailer galleries mix generations: enrplus and climaled show a single
   round sensor (Hypothesis: the older FTXM-R body), so they were not used. Proven in a scratch browser preview
-  (bounding box 0.997 × 0.298 × 0.293 m); not yet seen in FURNISH or on device.
+  (bounding box 0.997 × 0.298 × 0.293 m); not yet seen in AR or on device.
 - `sensea-neo-120x80`: Sensea NEO extra-flat resin shower tray, 120 × 80 cm, white matt (Leroy Merlin
   95043721, series "Neo 2"). 800 × 27 × 1200 mm (`sizeMm` = width × height × length), from the Leroy Merlin
   spec table: 2.7 cm thick, 4 cm rim, grille 21 × 13 cm, 90 mm waste, 36 kg; its manual is Leroy Merlin
@@ -204,7 +206,7 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   open end. Colour: neutral white (`0xf0f0f0`); the render reads 227 grey against 216 in the photo under
   different lighting. Proven in a scratch browser preview (bounding box 0.800 × 0.027 × 1.200 m, top-down
   and perspective views beside the photos); the photo-measured positions are estimates; not yet seen in
-  FURNISH, View 3D or on device.
+  AR, View 3D or on device.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives
@@ -218,7 +220,7 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   front, legs 60 deep. Keys: 52 white at 23.55 mm (1.225 m) and 36 black keys merged into one mesh;
   27 meshes in all. The polished look needs View 3D's Reflections toggle. Proven in a scratch browser
   preview (bounding box 1.518 × 1.200 × 0.624 m: the lid overhang and castors add a few mm; ¾, front
-  and side views beside the Park Pianos photo); not yet seen in FURNISH, View 3D or on device.
+  and side views beside the Park Pianos photo); not yet seen in AR, View 3D or on device.
 
 ## Rendering
 
@@ -246,7 +248,7 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 
 ## Open
 
-- The merge is AR-unwalked: FURNISH drop, MATERIAL · FURNITURE (cycle, A/X turn, clear), the
+- The merge is AR-unwalked: MATERIAL · FURNITURE (cycle, A/X turn, clear), the
   `DIM REMOVED` flash, migrated zones in View 3D and AR.
 - Not built: a desktop way to pick a product (only the Rotate button); a desktop message when a
   dimension is removed; the notch in the desktop 2D sketch.

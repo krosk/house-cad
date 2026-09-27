@@ -16,7 +16,6 @@ editor (`docs/product-intent.md`).
 SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
-FURNISH  · FURNISH
 MATERIAL · FLOOR → WALL → DOOR → WINDOW → FURNITURE → SWITCH → OUTLET → ETHERNET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
@@ -27,12 +26,14 @@ presentation adds hierarchy without remapping any contextual buttons or thumbsti
 The single source of truth for order is `MODE_ORDER` (which sorts the `modes` array) and `MODE_GROUP`;
 IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport`, `drop`, `edge`,
 `plan_dims`, `edit`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
-`conduit_edit`, `marker_wire`, `marker_pipe`, `furnish`, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
+`conduit_edit`, `marker_wire`, `marker_pipe`, the MATERIAL modes, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
 `translate`, `save`, `load`, `export`, `unit`, `lang`. **`MODE_HIDDEN`** = `{copy_floor, paste_floor,
 move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
 are removed from the thumbstick-x cycle to keep the list short, so they do **not** appear in the
 diagram above. Un-hide by deleting an id from that set. **TRANSLATE now lives in the PROJECT group**
-(not PLAN), and **FURNISH is its own group** (drops a FURNITURE zone sized to a product).
+(not PLAN). **FURNISH was removed** (owner, 2026-09-27: it overlapped MATERIAL · FURNITURE); a
+furniture product is now a FURNITURE zone drawn in PLAN · ADD, given its product in MATERIAL ·
+FURNITURE.
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -303,20 +304,16 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     `surface: 'ethernet'` products.
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
-- **FURNISH** (`id: furnish`, its own mode group) — **drop a FURNITURE zone already sized to a
-  product** (`project.addFurnitureZone`; docs/furniture.md "merge"). **Thumbstick up/down**
-  (`cycleFurnish`) cycles the furniture catalog; trigger drops the zone centred on the reticle, its
-  foot at the catalog's `mountZMm` (wall-hung units) else 0. That's all FURNISH does: the zone is then
-  a normal PLAN zone (dimension it to the walls, move it, turn it with A/X or delete it in PLAN ·
-  EDIT; edit foot/top on the band pad) and its product is changed in MATERIAL · FURNITURE. The
-  models (IKEA through the Cloudflare Worker proxy, or procedural) draw in `furnitureGroup` at each
-  product zone's centre, lifted by its foot, turned by its facing, **only while the AR 3D view is on
+- **Furniture** (no mode of its own; FURNISH was removed 2026-09-27 as overlapping): draw a FURNITURE
+  zone in PLAN · ADD, give it a product in MATERIAL · FURNITURE (docs/furniture.md "merge"), then
+  dimension, move, turn (A/X) or delete it in PLAN like any zone; foot/top on the band pad. The models
+  (IKEA through the Cloudflare Worker proxy, or procedural) draw in `furnitureGroup` at each product
+  zone's centre, lifted by its foot, turned by its facing, **only while the AR 3D view is on
   (LEFT X)**; otherwise as flat plan pieces with the front notch (`furniturePlanGroup`).
   `buildFurniture` runs from every `buildArch3d` (so every `buildPlan`) and returns early when the
-  placements haven't changed. The old free-placed items (`floor.furniture[]`, 15° rotation, foot pad,
-  grip-drag) are gone; saved files, slots, clipboards and share links holding them migrate to zones
-  on load. **Furniture dimensions are solved one-way after the structure**; one that no longer fits
-  is removed and the mode label flashes `DIM REMOVED · <miss>` (`checkRemovedDims`, polled per frame).
+  placements haven't changed. The old free-placed items (`floor.furniture[]`) migrate to zones on load.
+  **Furniture dimensions are solved one-way after the structure**; one that no longer fits is removed
+  and the mode label flashes `DIM REMOVED · <miss>` (`checkRemovedDims`, polled per frame).
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as wall 1; W1 is cyan, W2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
@@ -441,6 +438,13 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   materials under the shared scene lights, with no shadows. It rebuilds with every `buildPlan` and
   after a MATERIAL edit, only while on. Off by default; it is not a mode, so it works in any mode.
   Its frame cost is unmeasured: check PROJECT · PERF with it on.
+  **While it is on, only the 3D model shows** (owner, 2026-09-27): every other `planGroup` child
+  (zone fills, plan/constraint dims and labels, marker glyphs, Z-dims, electrical/pipe/material/check
+  layers, furniture plan pieces) and the origin gizmo are hidden **for the render only**
+  (`hideForArch3d` after `onXRFrame`, `restoreAfterArch3d` from `view.onXRAfterRender`), so every
+  mode's own visibility logic is untouched. The reticle, pointing highlights, HUD, numpad and menus
+  stay, so aiming and editing still work, but target feedback that lives in the plan layer (e.g. the
+  MATERIAL yellow highlight, material badges) is hidden too; the readout still names the target.
   **LEFT thumbstick-x** rotates the placed plan **about the headset position** in **±20° steps**
   by updating `planYaw` plus `navOffset` (never `planPos`, which the spatial anchor restores each frame),
   one per flick (`PLAN_YAW_STEP`), so the point under you stays put and the room swings around you —
@@ -481,8 +485,7 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
-  **FURNISH** = the product to drop (`cycleFurnish`); **MATERIAL · FURNITURE** = the selected zone's
-  product; **PLAN · ADD** = the kind to add over `ZONE_KINDS`
+  **MATERIAL · FURNITURE** = the selected zone's product; **PLAN · ADD** = the kind to add over `ZONE_KINDS`
   (room/wall/insulation/door/garage/halfwall/heater/sliding/window/stairs up/stairs down/cabinet/furniture, `cycleZoneKind`);
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map

@@ -122,6 +122,7 @@ export class View3D {
 
     // Optional per-frame hook, set by the MR module; receives (time, XRFrame).
     this.onXRFrame = null;
+    this.onXRAfterRender = null; // runs right after each XR frame's render (mr.js restores what it hid)
     this.xrTiming = { js: 0, gl: 0, frames: 0 }; // summed ms per XR frame; see _animate
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -1093,6 +1094,7 @@ export class View3D {
       this.onXRFrame(time, frame);
       const t1 = performance.now();
       this.renderer.render(this.scene, this.camera);
+      this.onXRAfterRender?.();
       const t = this.xrTiming;
       t.js += t1 - t0; t.gl += performance.now() - t1; t.frames++;
       return;

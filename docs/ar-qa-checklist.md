@@ -61,7 +61,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
   windows etc. was understood. No per-item pass/fail was given, so the boxes below stay open. The owner
   looked for the same material option for **furniture** and found none: furniture products live in
   FURNISH as separate items, not on the furniture zones. Fixed the same day by the furniture merge
-  (MATERIAL · FURNITURE; items under FURNISH below).
+  (MATERIAL · FURNITURE; items under FURNITURE below). FURNISH was then removed as overlapping.
 - [ ] MATERIAL badges (2026-09-27): a room, wall face, door, window or furniture zone with a material shows only a small swatch disc (white ring) at its centre, no colour fill; the plan stays readable; the yellow hover/selection highlight still shows the whole target
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (a swatch badge appears at the room's centre, no colour fill), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; a badge sits just inside the middle of the face; door/window area deducted in the m² line
@@ -79,7 +79,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · FLOOR: set Terrazzo marble cream 60×60 on a room; LEFT X shows an off-white floor speckled with pale marble chips and faint 60 cm joints; PERF usable; takeoff counts tiles
 - [ ] MATERIAL · FLOOR: set Monastère beige stone, pinwheel 30/50 on a room; LEFT X shows greige stone tiles in the 130 cm pinwheel (a 30×30 centre, 50×50 arms, 30×50 corners) with cream joints and rounded edges; the readout has one line per size (e.g. `50×50 39 pcs (9 cut)`) and the HOUSE lines add boxes per size
 - [ ] MATERIAL · WALL: set Lucia ivory stone 30×90 on a wall; LEFT X shows pale ivory landscape tiles stacked with thin joints; takeoff counts tiles and packs of 5
-- [ ] FURNISH: drop the W. Hoffmann V120 piano against a wall; black case 1.51 × 1.20 m with the keys facing the room, brass pedals and castors; true size against the real piano
+- [ ] MATERIAL · FURNITURE: set the W. Hoffmann V120 piano on a furniture zone against a wall; black case 1.51 × 1.20 m with the keys facing the room, brass pedals and castors; true size against the real piano
 - [ ] LEFT X toggles the AR 3D view: walls/doors/windows/stairs and textured finishes appear over the real room at the right height, real floor still visible; toggles off again; works in ALL FLOORS; PERF with it on
 - [ ] Overlays that never rendered before the PLAN_OVERLAY_GROUPS fix now show: Z-dims, adjacent-floor target dots (CONDUIT/WIRE/PIPE), CHECK rings, MATERIAL badges
 - [ ] ALL FLOORS LEFT stick up/down teleports one storey (target floor under your feet), keeps the mode and a pending wire endpoint; leaving ALL FLOORS restores the physical registration; inert on single floors
@@ -365,17 +365,18 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Choice persists across an APK relaunch
 - [x] ZH help text wraps (CJK-aware) without overflowing the box
 
-## FURNISH (`furnish`) + MATERIAL · FURNITURE  ⬜ furniture merge (2026-09-27) build/Node-verified only
+## Furniture: MATERIAL · FURNITURE  ⬜ furniture merge (2026-09-27) build/Node-verified only
 
-- [ ] FURNISH: thumbstick up/down cycles the product (readout shows its name); trigger drops an orange FURNITURE zone sized to it, centred on the reticle, with a violet plan piece and a V notch on the front edge
-- [ ] The dropped zone behaves like any PLAN zone: EDGE/DIMS dimension it to a wall, PLAN · EDIT moves or deletes it, A/X in PLAN · EDIT turns it 90° (the zone swaps width/depth about its centre)
+- [ ] FURNISH is gone from the mode cycle (MATERIAL follows MARKER · PIPE)
+- [ ] LEFT X on: only the 3D model shows (no zone fills, dims, labels, marker glyphs, badges, origin gizmo); reticle, HUD and panels still work; LEFT X off: every overlay the mode shows comes back
+- [ ] A FURNITURE zone with a product behaves like any PLAN zone: EDGE/DIMS dimension it to a wall, PLAN · EDIT moves or deletes it, A/X in PLAN · EDIT turns it 90° (the zone swaps width/depth about its centre)
 - [ ] MATERIAL · FURNITURE: trigger a FURNITURE zone drawn in PLAN; thumbstick up/down cycles the catalog (none first); the zone resizes to the product; readout shows name and w × d × h; a violet badge sits at the zone centre
 - [ ] MATERIAL · FURNITURE: A/X turns the selected product 90°; B/Y clears it (the zone keeps its size, the violet badge goes)
 - [ ] A furniture zone dimensioned to both walls, then given a product too wide for the gap: the second dimension disappears and the label flashes `DIM REMOVED · <miss>`; the walls don't move
-- [ ] A slot saved before this build with FURNISH items loads with each item as a furniture zone carrying its product, at the same place and height, turned to the nearest 90°
+- [ ] A slot saved before this build with FURNISH items (the old mode) loads with each item as a furniture zone carrying its product, at the same place and height, turned to the nearest 90°
 - [ ] With the 3D view off, product zones show flat violet footprints on the floor (V notch on the front edge, dashed for a wall-hung unit)
 - [ ] LEFT X on: the 3D models appear and the footprints disappear; LEFT X off: back to footprints
-- [ ] Cycle to `daikin-ctxm15a` and drop it on a wall: it starts with its bottom at 2.0 m (the band pad's foot shows 2.00), back flat to the wall once turned, flap and sensors facing the room at the bottom right; its size looks right against the real wall
+- [ ] Set `daikin-ctxm15a` on a furniture zone drawn on a wall: it starts with its bottom at 2.0 m (the band pad's foot shows 2.00), back flat to the wall once turned, flap and sensors facing the room at the bottom right; its size looks right against the real wall
 - [ ] Same for `daikin-ftxm60a`: visibly wider (997 mm) and deeper than the CTXM15A
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
 

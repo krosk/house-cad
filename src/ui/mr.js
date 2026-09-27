@@ -3600,10 +3600,7 @@ export function setupMR(view, project, getFootprint) {
   // is routed to the proxy.
   let furnitureCatalogLoaded = false;
   const furnitureCatalogReady = loadFurnitureCatalog()
-    .then((c) => {
-      furnitureCatalog = c; furnitureCatalogLoaded = true;
-      if (!currentFurnitureArticle) currentFurnitureArticle = Object.keys(furnitureCatalog)[0] || null;
-    });
+    .then((c) => { furnitureCatalog = c; furnitureCatalogLoaded = true; });
 
   // A lit box at the model's real footprint, sitting on the floor (min.y = 0). Shown
   // when no proxy is configured, a fetch fails, or the model isn't decoded yet — so the
@@ -3657,7 +3654,6 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // --- FURNISH authoring state (M3) ---------------------------------------------
-  let currentFurnitureArticle = null;  // the product FURNISH drops; cycled by thumbstick-y
   const furnitureArticleList = () => Object.keys(furnitureCatalog);
   const furnitureLabel = (article) => furnitureCatalog[article]?.name || article;
 
@@ -3745,16 +3741,6 @@ export function setupMR(view, project, getFootprint) {
     g.userData.furnitureId = item.id;
     g.userData.fill = fill.material;
     return g;
-  }
-
-  // Thumbstick-y in FURNISH: cycle the product the trigger will drop.
-  function cycleFurnish(dir = 1) {
-    const list = furnitureArticleList();
-    if (!list.length) return;
-    const i = Math.max(0, list.indexOf(currentFurnitureArticle));
-    currentFurnitureArticle = list[(i + (dir > 0 ? 1 : -1) + list.length) % list.length];
-    setModeInfo();
-    rlog('furniture article', { article: currentFurnitureArticle });
   }
 
   // All existing model-changing call sites rebuild through this dispatcher, so a
@@ -3863,6 +3849,25 @@ export function setupMR(view, project, getFootprint) {
     const parts = [];
     g.traverse((o) => { if (o.isMesh) parts.push([o.geometry.clone().applyMatrix4(o.matrixWorld), o.material]); });
     return parts;
+  }
+  // With the AR 3D view on, only the 3D model shows (owner, 2026-09-27): every plan overlay
+  // (zone fills, dims and their labels, marker glyphs, electrical/pipe/material/check
+  // layers, plan pieces) and the origin gizmo are hidden for the render, then restored
+  // right after, so no mode's own visibility logic is disturbed. The reticle, the
+  // pointing highlights, the HUD and the panels stay, so aiming and editing still work.
+  const arch3dHidden = [];
+  function hideForArch3d() {
+    if (!arch3dOn) return;
+    for (const child of planGroup.children) {
+      if (child === arch3dGroup || child === furnitureGroup || !child.visible) continue;
+      child.visible = false;
+      arch3dHidden.push(child);
+    }
+    if (originGizmo.visible) { originGizmo.visible = false; arch3dHidden.push(originGizmo); }
+  }
+  function restoreAfterArch3d() {
+    for (const o of arch3dHidden) o.visible = true;
+    arch3dHidden.length = 0;
   }
   function toggleArch3d() {
     arch3dOn = !arch3dOn;
@@ -6715,21 +6720,6 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'furnish', color: 0xa78bfa, // drop a FURNITURE zone already sized to a product
-      // Thumbstick-y cycles the product; trigger drops a FURNITURE zone sized to it,
-      // centred on the reticle (docs/furniture.md "merge"). Dimension, turn (A/X), move or
-      // delete it in PLAN; change its product in MATERIAL · FURNITURE.
-      onTouch: (pos) => {
-        if (!placed) return;
-        if (!currentFurnitureArticle) { rlog('furniture drop skipped: empty catalog'); return; }
-        const { px, py } = worldToPlan(pos);
-        const rect = project.addFurnitureZone(currentFurnitureArticle, furnitureCatalog[currentFurnitureArticle], px, py);
-        buildPlan();
-        applyPlanMatrix();
-        rlog('furniture drop', { id: rect.id, article: rect.article, px: +px.toFixed(3), py: +py.toFixed(3) });
-      },
-    },
-    {
       id: 'recal', color: C_RECAL, // label/help via i18n: mode.recal / help.recal
       // Correct drift: re-zero the plan against a KNOWN corner, REGISTER-style so the
       // corner apex needn't be reachable. First SELECT a corner — point so the reticle
@@ -6874,7 +6864,6 @@ export function setupMR(view, project, getFootprint) {
     'register', 'floor', 'level', 'recal', 'teleport',
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
-    'furnish',
     'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
@@ -6882,7 +6871,6 @@ export function setupMR(view, project, getFootprint) {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
-    furnish: 'furnish',
     mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
@@ -7005,7 +6993,7 @@ export function setupMR(view, project, getFootprint) {
     const group = MODE_GROUP[id];
     // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
     // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
-    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'furnish' || group === 'material' || id === 'translate')
+    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'material' || id === 'translate')
         && !ALL_FLOORS_TOPOLOGY.has(id)) return false;
     return true;
   };
@@ -7213,12 +7201,15 @@ export function setupMR(view, project, getFootprint) {
     renderer.xr.setReferenceSpace(localSpace);
     startupPlacementPending = true;
     startupPoseFrames = 0;
-    view.onXRFrame = onXRFrame;
+    view.onXRFrame = (time, frame) => { onXRFrame(time, frame); hideForArch3d(); };
+    view.onXRAfterRender = restoreAfterArch3d;
   });
 
   renderer.xr.addEventListener('sessionend', () => {
     if (perfEnabled) perfStop();
     view.onXRFrame = null;
+    view.onXRAfterRender = null;
+    restoreAfterArch3d();
     exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
     fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; timeText = '—'; // fresh fps probe per session
     Object.assign(view.xrTiming, { js: 0, gl: 0, frames: 0 });
@@ -7892,7 +7883,6 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
       else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
-      else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // cycle the product to drop
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'export') { // point at Compare/Language → cycle that; else format
@@ -8118,13 +8108,9 @@ export function setupMR(view, project, getFootprint) {
         : getOutputSettings().format === 'link' ? 'LINK · 3D VIEW'
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     checkRemovedDims();
-    const furnishStatus = modes[currentMode].id === 'furnish'
-      ? (currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
-      : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
-      : furnishStatus ? 0xa78bfa
       : checkStatus ? checkColors
       : matStatus ? matColors
       : pipeStatus ? pipeColor(selectedPipe || { service: currentPipeService })
@@ -8957,13 +8943,6 @@ export function setupMR(view, project, getFootprint) {
       outlineMarker(selectedMarker, 'floor', 0xfbbf24);
       outlineMarker(selectedMarker, 'wall', 0xfbbf24);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
-    } else if (modeId === 'furnish') {
-      // FURNISH: aim a floor reticle; trigger drops the current product there.
-      hoverKey = null;
-      numpadCursor.visible = false;
-      const hit = rayFloorHit(editCtl);
-      reticle.visible = !!hit;
-      if (hit) reticle.position.set(hit.x, hit.y + 0.002, hit.z);
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim at a slot, or at the separate confirm/cancel buttons once
       // an occupied SAVE slot has armed the overwrite screen.

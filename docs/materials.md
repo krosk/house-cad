@@ -19,7 +19,7 @@ many octagons and how many cabochons.
 
 | Decision | Choice | Why |
 |---|---|---|
-| Where it is authored | **AR, a new MATERIAL group** (separate from PLAN, MARKER and FURNISH) | The owner surveys and decides on site |
+| Where it is authored | **AR, a new MATERIAL group** (separate from PLAN and MARKER) | The owner surveys and decides on site |
 | Wall granularity | **Each wall face, one at a time**; no "whole room" shortcut (owner removed it, 2026-09-26) | e.g. only the shower wall is tiled |
 | Catalog | **Built-in starter list + the owner's own products** (exact size, joint, pack) | Real counts need the real product |
 | Adjacent rooms, same material | **Continuous** (owner note, 2026-09-26) | One floor running through a doorway has no seam and is laid as one |
@@ -414,7 +414,7 @@ get. Hypothesis: WebXR light estimation could supply a real-room reflection map 
 
 ## Doors (door products)
 
-Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a FURNISH item),
+Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a free-placed furniture item),
 authored in the MATERIAL group as **MATERIAL · DOOR**. Made-to-measure products take their size from
 the zone.
 
