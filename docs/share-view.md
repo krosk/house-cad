@@ -71,3 +71,32 @@ markers ride along.
   "here is my house", not "keep designing it".
 - mm rounding can drop **sub-mm slivers** in the boolean (one real floor's footprint went from 108
   to 100 vertices, max shift 0.5 mm; visually identical).
+
+## Parked: mirroring the Quest to a TV (owner, 2026-09-27)
+
+The owner wants to edit in AR on the Quest 3 while a TV (the Steam Deck, docked) shows the same
+house live. Parked, not built. What was worked out, so it need not be re-derived:
+
+- **Quest system cast** (Cast → Computer at meta.com/casting in the Deck's Chrome, or a
+  Chromecast): no code; shows the headset's own view. Hypothesis, untested: passthrough may or may
+  not appear in a WebXR session's cast, and whether the video stays on the LAN.
+- **scrcpy over Wi-Fi adb**: fully local; shows the raw side-by-side stereo frame (crop one eye);
+  passthrough may be black (Hypothesis). adb/scrcpy are not installed on the Deck. Same adb access as
+  the `pm clear` rule: never clear the app.
+- **Live model mirror** (the preferred design if built): the Quest sends the serialized project on
+  each change (rate-limited), plus optionally its head pose; the TV renders it read-only in View 3D,
+  like a share link, never touching its own autosave.
+  - Transport, recommended: **the Deck serves the app** (the HTTPS dev/preview server, whose
+    self-signed cert the Quest already accepts) with a same-origin WebSocket endpoint beside
+    `/__log`; the Quest opens `https://<deck-ip>:5174/?pair=<token>` from a QR on the TV. No
+    WebRTC needed, nothing leaves the LAN. Cost: the Quest uses the Quest Browser, not the APK
+    (the TWA is locked to the Pages origin), with its own storage; the Deck server must be running.
+  - From the published HTTPS site instead, a LAN socket needs `wss://` with a cert the Quest trusts
+    and may hit Chrome's local-network-access prompt; WebRTC through a public signalling server
+    (e.g. PeerJS) avoids that but depends on the Quest resolving Chrome's mDNS-obfuscated host
+    candidates (Hypothesis; the first thing to test) and on router client isolation being off.
+  - First step if resumed: a ping-only page pair, two tabs on the Deck, then the Quest.
+- **Steam Deck as a big-screen viewer** (also parked): View 3D has no gamepad input and no
+  fullscreen/presentation mode (Proven, code search). Proposed: Gamepad API controls (sticks
+  pan/walk/look, A enter POV at a centre crosshair, B overview, bumpers floors) and a `?present`
+  mode hiding the plan UI.
