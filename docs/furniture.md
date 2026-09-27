@@ -4,46 +4,62 @@ Design reference for real-product furniture. Goal: a **realistic furniture previ
 passthrough scene (and the desktop/shared 3D view) at true scale. Mechanics of the AR FURNISH mode
 are in `docs/ar-survey.md`; live state in `.claude/handoff.md`.
 
-## Two different things called "furniture" (keep them distinct)
+## One furniture zone (the merge, built 2026-09-27)
 
-1. The **`furniture` zone kind**: a placeholder rectangle authored in PLAN with a `[foot, top]`
-   body band. `computeFootprint` skips it, and it doesn't reduce room area.
-2. **GLB furniture**: real product models in `floor.furniture[]`
-   (`{id, article, x, y, z, rotationY, name}`), placed with the AR **FURNISH** mode (id `furnish`,
-   deliberately not `furniture`, which is the zone kind).
+Furniture is a **`furniture` zone** in the floor's `rectangles`: a rectangle authored in PLAN with a
+`[foot, top]` body band. `computeFootprint` skips it, and it doesn't reduce room area. It can carry
+an optional **product** (fields on the rect, all optional and additive, no `FILE_VERSION` bump):
 
-Neither is massing. GLB furniture is a **parallel lane like markers**: it never touches the
-footprint, boolean, extrude, or solver pipeline. `z` is the **foot elevation** above the floor
-(0 = on the floor; raise it for a wall-hung unit). The mesh supplies the height.
+- `article`: the furniture catalog **key** (`public/furniture/index.json`; an IKEA article number or
+  a procedural id; not the entry's own `article` field, which can be a retailer number);
+- `productMm`: a snapshot of the entry's `sizeMm` `[width, height, depth]` taken at assignment, so
+  the solver can size the zone without the fetched catalog (absent for a `madeToMeasure` entry);
+- `facing`: 0 / 90 / 180 / 270 degrees, the model's turn. 0 = the product's front toward plan −y,
+  90 → +x, 180 → +y, 270 → −x.
 
-## Planned: merge the two into one furniture zone (design, not built)
+The zone is the placement: its centre is the model's plan position, its `foot` the height off the
+floor, its `facing` the turn (`furnitureProductPlacements` in `model.js`, shared by View 3D and the AR
+3D view). The model is never stored; only the article is.
 
-Status: design agreed 2026-09-26 (all three owner decisions below); nothing implemented. Until it lands, the two lanes
-above stay distinct.
+**Migration.** Before the merge, placed products were a separate `floor.furniture[]`
+(`{id, article, x, y, z, rotationY}`), dropped with the old FURNISH. On load, from saved files, AR
+slots, the autosave, floor clipboards and share links, each item becomes a zone centred on the item,
+foot = its `z`, facing = its rotation snapped to the nearest 90° (`furnitureItemsToZones`). The
+catalog isn't available synchronously, so a migrated zone starts 60 cm square without `productMm`;
+`Project.applyFurnitureCatalog` sizes it once the catalog is known (`main.js` listener; `mr.js` at
+every `buildPlan`). `floor.furniture` no longer exists and nothing writes it.
 
-**Why.** Each lane has what the other lacks. The zone can be dimensioned to walls and prints on
+## The merge: design and owner decisions
+
+Status: design agreed 2026-09-26, product picking moved to MATERIAL 2026-09-27; **built
+2026-09-27** (model, one-way solve, migration, MATERIAL · FURNITURE, FURNISH drop, View 3D / AR 3D
+models, sheet/DXF notch). Proven by build and Node checks only; not yet walked on the Quest.
+
+**Why.** Before the merge, each lane has what the other lacks. The zone can be dimensioned to walls and prints on
 sheets/DXF, but has no 3D. The FURNISH item has the real product in 3D, but no constraints and no
 sheet/DXF output. Since FURNISH items draw as flat plan pieces in AR ("Rendering"), the two also
 look alike. Proven 2026-09-26 from the owner's house file: 14 furniture zones (9 ground, 5 upper)
 and 0 FURNISH items. So the zone is the lane in real use.
 
-**Shape of the merge.** Follow the door/window product pattern: the zone owns placement, and an
+**Shape of the merge** (as built; fields above). Follow the door/window product pattern: the zone owns placement, and an
 optional product draws the 3D.
 - A `furniture` zone gains an optional `article` (a catalog key, IKEA or procedural). The zone keeps
   position, constraints, sheets and DXF; the product supplies the 3D model; the zone's `foot` is the
   mounting height (the catalog `mountZMm` seeds it).
 - Assigning a product sizes the zone to its footprint (w × d, swapped when turned 90°). Sizing stays
   constraint-first; the owner dimensions its position.
-- A `facing` field picks the front side, like a door's hinge field.
-- `floor.furniture[]` is retired. On load, existing items migrate to zones, rotation snapped to the
-  nearest 90°. Sources that can hold items: saved files, `_demo` seed items, and share links, whose
-  compact form carries furniture (`shareView.js`). The owner's house has none (Proven, above).
+- A `facing` field picks the front side, like a door's hinge field. A/X turns it (PLAN · EDIT and
+  MATERIAL · FURNITURE), and the desktop properties panel's Rotate button.
+- `floor.furniture[]` is retired and migrates on load (above). No `_demo` seed items existed. Share
+  links now carry the product and facing on the zone's compact rect (`shareView.js`: `facing`
+  after `climb`, then an index into `a`); old links' floor slot 4 still decodes and migrates.
 
 **Constraints: furniture is solved one-way, after the structure.** Proven 2026-09-26 with a Node run
 of the real solver: a 3 m room, and a `furniture` zone 2.0 m wide dimensioned 0.5 m and 0.3 m from
 the two walls (2.8 m total). The zone pulled the room's right wall from 3.0 to 2.8 m with no conflict
 flag. With the room width also dimensioned, all four dimensions were flagged and the room's left wall
-moved 5 cm. So today a furniture dimension can silently move a wall. The merge fixes that:
+moved 5 cm. So a furniture dimension could silently move a wall. The merge fixed that (`solve()` in
+`constraints.js`):
 1. Walls and rooms solve first, from their own dimensions only. Furniture never moves them.
 2. Each furniture zone is then placed one-way, like a marker pin. Its position comes from its
    dimensions to walls. Its size comes from the product; with no product, or a `madeToMeasure`
@@ -53,14 +69,30 @@ moved 5 cm. So today a furniture dimension can silently move a wall. The merge f
    one that no longer fits is removed, so no conflicted dimension is ever shown. The deletion should
    say so in the readout, with the miss, so it isn't silent (e.g. "dimension removed: 20 cm short").
    The same rule applies when a product change or a 90° turn makes an existing pair over-specify.
+   As built: each axis is a union-find over difference equations (structural edges and the origin
+   are constants); the product size is joined first, then the dimensions in stored order, and one
+   that contradicts its group by more than 1 mm is deleted and logged on `project.removedDims`
+   (`{seq, items:[{id, miss, floorId}]}`). The AR mode label flashes `DIM REMOVED · <miss>`; the
+   desktop has no message yet. Nothing is deleted while a rect is being dragged (`_dragging`) or in
+   `solveSilently`, so a drag passing through a tight spot doesn't lose a dimension; the final
+   settle does. A floating group (no path to a wall) keeps its weighted current position.
+   Proven 2026-09-27 (Node, real solver): the example above now keeps the wall at 3.0 m (zone 2.2 m
+   without a product; with a 2.0 m product the second dimension is removed, 0.2 m miss). On the
+   owner's house (57 furniture dimensions on 14 zones) nothing is removed, no rect moves more than
+   0.1 mm, and all three sheets are byte-identical to the pre-merge output.
 
 **Owner decisions**
 - **Four facing directions only** (owner, 2026-09-26). Zones are axis-aligned, so free rotation is
   dropped; diagonal placement is accepted as lost.
-- **FURNISH = drop + assign in one mode** (owner, 2026-09-26). Trigger on a furniture zone assigns
-  or cycles its product. Trigger on empty floor drops a new zone already sized to the chosen product.
+- **The product is picked in MATERIAL · FURNITURE** (owner, 2026-09-27, replacing "FURNISH = drop +
+  assign in one mode" from 2026-09-26). Like doors and windows, the product is a material of its zone:
+  trigger a `furniture` zone drawn in PLAN, thumbstick-y cycles the catalog, B/Y clears. Why: walking
+  MATERIAL on the Quest, the owner looked there for furniture and didn't find it. FURNISH stays as the
+  quick way to drop a new zone already sized to the chosen product.
 - **Sheets and DXF print the zone's rectangle plus a front notch** (owner, 2026-09-26): the plain
   footprint as today, and a small V on the front edge so facing reads on paper. No product silhouette.
+  As built: `furnitureNotchSegments` (`apertureGlyph.js`), 2 mm on paper, 10 cm in DXF model space,
+  drawn only for a zone with a product or a facing. Proven by SVG/DXF output in Node.
 
 ## Where the models come from: IKEA "rotera"
 
@@ -191,16 +223,16 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 ## Rendering
 
 - **AR** (`mr.js`): `furnitureGroup` under `planGroup` (rides plan yaw and floor elevation). Plan
-  `(x, y)` → group-local `(x, z, -y)`. Emissive hover (yellow) and select (amber) use per-instance
-  material clones. Grip-drag is floor-planar; the foot elevation is set on the FURNISH pad.
-  **The models show only with the AR 3D view on (LEFT X)** (owner decision, 2026-09-26: at full
-  size they occluded the plan while furnishing). Otherwise each item draws as a flat **plan piece**
-  on the floor (`furniturePlanGroup`): its catalog footprint (width × depth) as a violet fill and
-  outline, a V notch on the front edge, and a dashed outline when the item is raised (wall-hung,
-  like an overhead line on a plan); hover turns it yellow, selection amber. `buildArch3d` swaps the
-  two groups' visibility.
-- **Desktop and shared 3D** (`view3d.js`): renders `floor.furniture` through the same proxy and
-  catalog. Shared view links include furniture placements by default (`docs/share-view.md`).
+  `(x, y)` → group-local `(x, z, -y)`. **The models show only with the AR 3D view on (LEFT X)**
+  (owner decision, 2026-09-26: at full size they occluded the plan while furnishing). Otherwise each
+  product zone also draws a flat **plan piece** (`furniturePlanGroup`): its catalog footprint as a
+  violet fill and outline with a V notch on the front edge, dashed when raised (wall-hung, like an
+  overhead line on a plan). `buildArch3d` swaps the two groups' visibility and calls
+  `buildFurniture`, which skips when the placements haven't changed.
+- **Desktop and shared 3D** (`view3d.js`): `main.js` passes `furnitureProductPlacements(floor)`;
+  models load through the same proxy and catalog (`src/ui/furnitureCatalog.js`, fetched once).
+  Shared view links include the products by default (`docs/share-view.md`).
+- The desktop 2D sketch doesn't draw the front notch yet.
 
 ## Traps
 
@@ -214,6 +246,9 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
 
 ## Open
 
-- FURNISH authoring (drop/select/move/rotate/delete, foot pad) is AR-unwalked.
+- The merge is AR-unwalked: FURNISH drop, MATERIAL · FURNITURE (cycle, A/X turn, clear), the
+  `DIM REMOVED` flash, migrated zones in View 3D and AR.
+- Not built: a desktop way to pick a product (only the Rotate button); a desktop message when a
+  dimension is removed; the notch in the desktop 2D sketch.
 - Offline Cache API reuse across a real no-wifi session is unverified.
 - Deferred: env-map lighting, snap-to-wall/grid on drop, multi-select.

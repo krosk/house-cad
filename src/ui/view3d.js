@@ -12,6 +12,7 @@ import { buildDeviceProduct } from './deviceProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture, finishBumpTexture, applyFinishDetail } from './finishTextures.js';
+import { loadFurnitureCatalog } from './furnitureCatalog.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -292,10 +293,8 @@ export class View3D {
     this.ikeaProxy = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
     const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
     this.furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
-    this.furnitureCatalogReady = fetch(import.meta.env.BASE_URL + 'furniture/index.json')
-      .then((response) => (response.ok ? response.json() : {}))
-      .then((catalog) => { this.furnitureCatalog = catalog || {}; })
-      .catch(() => { this.furnitureCatalog = {}; });
+    this.furnitureCatalogReady = loadFurnitureCatalog()
+      .then((catalog) => { this.furnitureCatalog = catalog; });
     // While MR is active the extruded walls must stay hidden (the flat plan is
     // shown instead). setGeometry rebuilds on every model change, so it honors
     // this flag rather than a one-time visibility toggle.

@@ -9,7 +9,7 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, furnitureFootprint } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 
@@ -93,13 +93,28 @@ export function syncPipeIdCounter(ids) {
 export function syncPipeNodeIdCounter(ids) {
   for (const id of ids) { const m = /^pn(\d+)$/.exec(id); if (m) _pnid = Math.max(_pnid, Number(m[1])); }
 }
-// Furniture instances (real-scale product models, e.g. IKEA "rotera" GLBs). A parallel
-// lane like markers — never part of the footprint/extrude/solver pipeline. The GLB is
-// loaded on the fly (not stored); only the placement is persisted.
-let _fnid = 0;
-export const nextFurnitureId = () => `fn${++_fnid}`;
-export function syncFurnitureIdCounter(ids) {
-  for (const id of ids) { const m = /^fn(\d+)$/.exec(id); if (m) _fnid = Math.max(_fnid, Number(m[1])); }
+// Facing of a furniture zone: degrees about vertical, a multiple of 90 (owner decision:
+// four directions only). 0 = the product's front toward plan −y; 90 → +x; 180 → +y;
+// 270 → −x (the same angle the 3D model is turned by).
+export const FURNITURE_FACINGS = [0, 90, 180, 270];
+export const snapFacing = (deg) => ((Math.round((Number(deg) || 0) / 90) % 4 + 4) % 4) * 90;
+
+// Old placed furniture items (`floor.furniture[]`: {article, x, y, z, rotationY}, from
+// saved files and share links before the merge) → furniture ZONES carrying the product
+// (docs/furniture.md "merge"). The item's point becomes the zone's centre and its
+// rotation snaps to the nearest 90°. The catalog isn't known here (it is fetched), so the
+// zone starts 60 cm square with no `productMm`; Project.applyFurnitureCatalog sizes it
+// once the catalog arrives.
+export function furnitureItemsToZones(items) {
+  return (Array.isArray(items) ? items : []).flatMap((item) => {
+    if (item == null || item.article == null || !Number.isFinite(item.x) || !Number.isFinite(item.y)) return [];
+    const foot = Number.isFinite(item.z) ? item.z : 0;
+    return [new Rectangle({
+      x: item.x - 0.3, y: item.y - 0.3, w: 0.6, h: 0.6, kind: 'furniture',
+      foot, top: foot + FURNITURE_BAND.top,
+      article: String(item.article), facing: snapFacing(item.rotationY),
+    })];
+  });
 }
 
 let _fid = 0;
@@ -112,8 +127,30 @@ export function syncFloorIdCounter(ids) {
   }
 }
 
+// Furniture zones that carry a product → where to draw its model (docs/furniture.md):
+// the zone's centre, the band's foot as the height off the floor, and the facing as the
+// model's turn (degrees). Shared by the desktop View 3D and the AR 3D view.
+export function furnitureProductPlacements(floor) {
+  return (floor?.rectangles || []).filter((r) => r.kind === 'furniture' && r.article).map((r) => {
+    const b = r.bounds;
+    return { id: r.id, article: r.article, x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2,
+      z: Number(r.foot) || 0, rotationY: r.facing || 0 };
+  });
+}
+
+// Write a catalog product onto a furniture zone (see Project.setFurnitureProduct).
+// `key` is the catalog KEY (not the entry's retailer `article` number, which can differ).
+function applyProduct(rect, key, entry, { seedFoot }) {
+  rect.article = String(key);
+  const mm = entry.sizeMm;
+  if (!entry.madeToMeasure && Array.isArray(mm) && mm.length === 3 && mm.every((v) => v > 0)) rect.productMm = [...mm];
+  else delete rect.productMm;
+  if (seedFoot) rect.foot = (Number(entry.mountZMm) || 0) / 1000;
+  if (rect.productMm) rect.top = rect.foot + rect.productMm[1] / 1000;
+}
+
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -139,6 +176,13 @@ export class Rectangle {
       // an aperture opening). Explicit values win on deserialize/clone.
       this.foot = foot !== undefined ? foot : FURNITURE_BAND.foot;
       this.top  = top  !== undefined ? top  : FURNITURE_BAND.top;
+      // Optional product (docs/furniture.md "merge"): `article` keys the furniture
+      // catalog; `productMm` snapshots its [width, height, depth] so the solver can size
+      // the zone without the (fetched) catalog; absent for a made-to-measure product.
+      // `facing` turns the product in 90° steps (FURNITURE_FACINGS).
+      if (article != null && article !== '') this.article = String(article);
+      if (Array.isArray(productMm) && productMm.length === 3 && productMm.every((v) => v > 0)) this.productMm = [...productMm];
+      if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
     } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
@@ -157,6 +201,7 @@ export class Rectangle {
     const d = APERTURE_DEFAULTS[this.kind];
     // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.
     if (!isStairs(this.kind)) delete this.climb;
+    if (this.kind !== 'furniture') { delete this.article; delete this.productMm; delete this.facing; }
     if (d) {
       this.sill = d.sill; this.head = d.head; this.hinge = d.hinge;
       if (d.swing !== undefined) this.swing = d.swing; else delete this.swing;
@@ -194,6 +239,13 @@ export class Rectangle {
       this.hinge = h; this.swing = s;
       return true;
     }
+    // A furniture zone turns its product's front 90° counter-clockwise (seen from above) per
+    // step; with a product, the solver swaps the zone's footprint to match.
+    if (this.kind === 'furniture') {
+      this.facing = snapFacing((this.facing || 0) + 90 * dir);
+      if (!this.facing) delete this.facing;
+      return true;
+    }
     if (this.kind === 'window') {
       const states = ['left', 'right', 'both'];
       const i = states.indexOf(this.hinge);
@@ -216,7 +268,7 @@ export class Rectangle {
   }
 
   clone() {
-    return new Rectangle({ ...this });
+    return new Rectangle({ ...this, productMm: this.productMm && [...this.productMm] });
   }
 }
 
@@ -226,7 +278,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], furniture = [], finishes = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, elevation = 0 } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -244,11 +296,9 @@ export class Floor {
     // WHOLE-HOUSE and live on Project, not here — a conduit run (a "riser") may pierce a
     // slab to join nodes on two storeys, and a wire may connect device markers on
     // different floors. electricalLinks (switch→light controls) remain per-floor.
-    // Furniture placements: {id, article, x, y, rotationY, name?}. plan (x,y) in meters;
-    // rotationY in degrees about vertical. The GLB (real-scale, floor at Y=0) is fetched
-    // on the fly by article via the CORS proxy — never stored here. Parallel lane; never
-    // touches the footprint/boolean/extrude/solver pipeline.
-    this.furniture = furniture;
+    // Furniture is a `furniture` ZONE in `rectangles`, optionally carrying a product
+    // (`article`); the old separate `furniture[]` placements migrate to zones on load
+    // (furnitureItemsToZones). docs/furniture.md.
     // Surface finishes (docs/materials.md): { target: {rect} | {rect, edge}, material }.
     // {rect} = the floor of that rect's connected ROOM component; {rect, edge} = that
     // room edge's wall face. Never solved; quantities derive in src/core/flooring.js.
@@ -322,8 +372,6 @@ export class Project {
   set electricalLinks(v) { this.activeFloor.electricalLinks = v; }
   // conduitNodes / conduitSegments / wires are real Project fields (whole-house), NOT
   // facades — see the constructor. Do not re-add active-floor facades for them.
-  get furniture() { return this.activeFloor.furniture; }
-  set furniture(v) { this.activeFloor.furniture = v; }
   get height() { return this.activeFloor.height; }
   set height(v) { this.activeFloor.height = v; }
 
@@ -352,10 +400,14 @@ export class Project {
   // but never move them — see solveMarkers).
   _emit({ solveRectangles = true } = {}) {
     this._recomputeElevations();
+    const removed = [];
     for (const f of this.floors) {
-      if (solveRectangles) solve(f);
+      if (solveRectangles) for (const r of solve(f)) removed.push({ id: r.constraint.id, miss: r.miss, floorId: f.id });
       solveMarkers(f);
     }
+    // Over-specified furniture dimensions the solver just removed (docs/furniture.md):
+    // a sequence number lets a view that polls (the AR HUD) say so once.
+    if (removed.length) this.removedDims = { seq: (this.removedDims?.seq || 0) + 1, items: removed };
     solveConduitNodes(this); // whole-house node pins follow the walls, one-way
     for (const fn of this._listeners) fn(this);
   }
@@ -406,7 +458,7 @@ export class Project {
   }
 
   // Move one floor's complete authored plan into another EMPTY floor. Rectangle,
-  // constraint, marker, electrical-link, and furniture objects move together so every
+  // constraint, marker, and electrical-link objects move together so every
   // reference remains valid; storey metadata (name, height, elevation, ground
   // designation) stays with its floor. The whole-house conduit/wire network is NOT
   // per-floor: marker-bound nodes follow their markers automatically, and bare junctions
@@ -417,7 +469,7 @@ export class Project {
     const target = this.floors.find((f) => f.id === targetId);
     if (!source || !target || source === target) return { ok: false, reason: 'invalid' };
     const hasContent = (f) => f.rectangles.length || f.constraints.length || f.markers.length
-      || f.electricalLinks.length || f.furniture.length;
+      || f.electricalLinks.length;
     if (!hasContent(source)) return { ok: false, reason: 'empty' };
     if (hasContent(target)) return { ok: false, reason: 'occupied' };
 
@@ -425,12 +477,10 @@ export class Project {
     target.constraints = source.constraints;
     target.markers = source.markers;
     target.electricalLinks = source.electricalLinks;
-    target.furniture = source.furniture;
     source.rectangles = [];
     source.constraints = [];
     source.markers = [];
     source.electricalLinks = [];
-    source.furniture = [];
     // Follow the relocated plan: bare junctions on the source floor move to the target.
     for (const n of this.conduitNodes) {
       if (!n.markerId && n.floorId === sourceId) n.floorId = targetId;
@@ -495,7 +545,6 @@ export class Project {
     this.constraints = [];
     this.markers = [];
     this.electricalLinks = [];
-    this.furniture = [];
     this.activeFloor.finishes = [];
     this._emit();
   }
@@ -906,59 +955,48 @@ export class Project {
     return this.setPipeComponentService(pipe.a, service);
   }
 
-  // --- furniture (real-scale product-model placements) --------------------
-  // Add a furniture instance to the active floor. `article` keys the GLB (fetched on
-  // the fly via the proxy); x,y are plan meters, rotationY degrees about vertical.
-  addFurniture({ article, x = 0, y = 0, z = 0, rotationY = 0, name = null } = {}) {
-    // z = foot elevation: how high the model's base sits off the floor (0 = on the
-    // floor; raise it for a wall-hung unit). The GLB's own mesh supplies the height.
-    const item = { id: nextFurnitureId(), article: String(article), x, y, z, rotationY, name };
-    this.furniture.push(item);
-    this._emit();
-    return item;
-  }
-
-  // Set a furniture item's foot elevation (meters off the floor). Discrete edit, so
-  // it emits by default; kept separate from moveFurniture (which owns plan x/y).
-  setFurnitureElevation(id, z, { emit = true } = {}) {
-    const f = this.furniture.find((f) => f.id === id);
-    if (!f) return;
-    f.z = z;
+  // --- furniture products (docs/furniture.md "merge") ----------------------
+  // A product is a material of its FURNITURE zone, like a door product on a DOOR zone.
+  // `key` names the catalog entry `entry` (public/furniture/index.json); null clears. Assigning
+  // snapshots the product size (the solver then sizes the zone, keeping its centre when
+  // nothing pins it) and seeds the body band: foot = the catalog mount height, top =
+  // foot + the product height. Clearing keeps the zone's current size.
+  setFurnitureProduct(rectId, key, entry, { emit = true } = {}) {
+    const rect = this.activeFloor.rectangles.find((r) => r.id === rectId && r.kind === 'furniture');
+    if (!rect) return null;
+    if (key == null || !entry) { delete rect.article; delete rect.productMm; }
+    else applyProduct(rect, key, entry, { seedFoot: true });
     if (emit) this._emit();
+    return rect;
   }
 
-  // Set a furniture item's foot elevation (see setMarkerVertical): 'floor' → absolute
-  // foot height above the floor; 'free' → un-defines it.
-  setFurnitureVertical(id, datum, value) {
-    const f = this.furniture.find((f) => f.id === id);
-    if (!f) return;
-    setVertical(f, datum, value);
+  // FURNISH drop: a new FURNITURE zone already sized to `entry`, centred at (x, y).
+  addFurnitureZone(key, entry, x, y, { facing = 0 } = {}) {
+    const rect = new Rectangle({ x: x - 0.3, y: y - 0.3, w: 0.6, h: 0.6, kind: 'furniture', facing });
+    applyProduct(rect, key, entry, { seedFoot: true });
+    const size = furnitureFootprint(rect);
+    if (size) { rect.x = x - size.x / 2; rect.y = y - size.y / 2; rect.w = size.x; rect.h = size.y; }
+    this.rectangles.push(rect);
     this._emit();
+    return rect;
   }
 
-  // Move a furniture item in plan. Continuous XR drags pass { emit:false } and commit
-  // once via touch() on release (mirrors moveMarker) to avoid a per-frame solve cascade.
-  moveFurniture(id, { x, y }, { emit = true } = {}) {
-    const f = this.furniture.find((f) => f.id === id);
-    if (!f) return;
-    if (x != null) f.x = x;
-    if (y != null) f.y = y;
-    if (emit) this._emit();
-  }
-
-  // Rotate a furniture item about vertical (absolute degrees).
-  rotateFurniture(id, rotationY, { emit = true } = {}) {
-    const f = this.furniture.find((f) => f.id === id);
-    if (!f) return;
-    f.rotationY = rotationY;
-    if (emit) this._emit();
-  }
-
-  removeFurniture(id) {
-    const i = this.furniture.findIndex((f) => f.id === id);
-    if (i < 0) return;
-    this.furniture.splice(i, 1);
-    this._emit();
+  // Size zones that name a product but hold no size snapshot (migrated from the old
+  // furniture items, or a share link) once the catalog is loaded. Emits only if one
+  // changed. The migrated foot is kept (it was the item's authored height).
+  applyFurnitureCatalog(catalog) {
+    let changed = false;
+    for (const f of this.floors) {
+      for (const r of f.rectangles) {
+        if (r.kind !== 'furniture' || !r.article || r.productMm) continue;
+        const entry = catalog?.[r.article];
+        if (!entry || entry.madeToMeasure) continue;
+        applyProduct(r, r.article, entry, { seedFoot: false });
+        changed = changed || !!r.productMm;
+      }
+    }
+    if (changed) this._emit();
+    return changed;
   }
 
   // Move a marker while preserving its pin relationships. A pin's signed value
@@ -1052,7 +1090,7 @@ export class Project {
   // caller updates its own view directly and commits once with touch() on release.
   solveSilently() {
     this._recomputeElevations();
-    for (const f of this.floors) { solve(f); solveMarkers(f); }
+    for (const f of this.floors) { solve(f, { prune: false }); solveMarkers(f); }
     solveConduitNodes(this); // keep node pins tracking the wall live during AR edge drags
   }
 }

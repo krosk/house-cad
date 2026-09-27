@@ -26,11 +26,16 @@ const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3)
 
 // Aperture band + orientation fields only exist on door/garage/window/half-wall/heater/sliding; a
 // plain zone carries none, so they are emitted only when present.
-// `climb` (stairs) is appended last so older links, which stop at `top`, still decode.
-const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top', 'climb'];
+// `climb` (stairs) and then a furniture zone's `facing` are appended last so older links,
+// which stop earlier, still decode. The slot after them is the zone's product, an index
+// into `a`.
+const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top', 'climb', 'facing'];
+const ARTICLE_SLOT = 6 + APERTURE_KEYS.length;
 
-// Project → compact view object. Furniture placements are compact enough to include by
+// Project → compact view object. Furniture products are compact enough to include by
 // default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
+// Links made before the furniture merge carried placed items in floor slot 4; they still
+// decode (and migrate to zones in deserializeInto). New links leave that slot empty.
 export function serializeView(project, { markers = false, furniture = true } = {}) {
   const kinds = [...new Set(project.floors.flatMap((f) => f.rectangles.map((r) => r.kind || 'room')))];
   const markerTypes = markers
@@ -41,7 +46,7 @@ export function serializeView(project, { markers = false, furniture = true } = {
     ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.product).filter(Boolean)))]
     : [];
   const furnitureArticles = furniture
-    ? [...new Set(project.floors.flatMap((f) => (f.furniture || []).map((item) => String(item.article))))]
+    ? [...new Set(project.floors.flatMap((f) => f.rectangles.filter((r) => r.article).map((r) => r.article)))]
     : [];
   return {
     app: VIEW_APP,
@@ -60,6 +65,7 @@ export function serializeView(project, { markers = false, furniture = true } = {
       const rects = f.rectangles.map((r) => {
         const rc = [mm(r.x), mm(r.y), mm(r.w), mm(r.h), r.op === 'subtract' ? 1 : 0, kinds.indexOf(r.kind || 'room')];
         for (const key of APERTURE_KEYS) rc.push(r[key] == null ? null : mm(r[key]));
+        rc.push(furniture && r.article ? furnitureArticles.indexOf(r.article) : null);
         while (rc.length > 6 && rc.at(-1) == null) rc.pop();
         return rc;
       });
@@ -73,18 +79,8 @@ export function serializeView(project, { markers = false, furniture = true } = {
           return mk;
         })
         : [];
-      const floorFurniture = furniture
-        ? (f.furniture || []).map((item) => {
-          const placed = [
-            furnitureArticles.indexOf(String(item.article)),
-            mm(item.x), mm(item.y), mm(item.z || 0), mm(item.rotationY || 0),
-          ];
-          if (item.name) placed.push(item.name);
-          return placed;
-        })
-        : [];
-      // v2 fixes both optional lanes at stable indices: markers=3, furniture=4.
-      return [f.name, mm(f.height), rects, floorMarkers, floorFurniture];
+      // v2 fixes both optional lanes at stable indices: markers=3, (old) furniture=4.
+      return [f.name, mm(f.height), rects, floorMarkers];
     }),
   };
 }
@@ -96,13 +92,14 @@ export function loadView(project, view) {
       || view.v !== VIEW_SCHEMA || !Array.isArray(view.f)) {
     throw new Error('Not a house-cad view link.');
   }
-  let rid = 0, mid = 0, fnid = 0; // fresh local ids; compact payload carries no ids
+  let rid = 0, mid = 0; // fresh local ids; compact payload carries no ids
   const sourceFloors = view.f.map((f) => ({
     name: f[0], height: f[1],
     rects: (f[2] || []).map((r) => ({
       x: r[0], y: r[1], w: r[2], h: r[3], op: r[4] === 1 ? 'subtract' : 'add',
       kind: view.k?.[r[5]] || 'room',
       ...Object.fromEntries(APERTURE_KEYS.flatMap((key, index) => r[index + 6] == null ? [] : [[key, r[index + 6]]])),
+      ...(typeof view.a?.[r[ARTICLE_SLOT]] === 'string' ? { article: view.a[r[ARTICLE_SLOT]] } : {}),
     })),
     markers: (f[3] || []).map((m) => ({
       t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
@@ -122,6 +119,7 @@ export function loadView(project, view) {
       id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
       op: rc.op || 'add', kind: rc.kind || 'room',
       sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
+      article: rc.article, facing: rc.facing,
     })),
     constraints: [], // a view carries no parametric relationships (solver is a no-op)
     markers: (f.markers || []).map((m) => ({
@@ -130,11 +128,7 @@ export function loadView(project, view) {
       ...(m.product ? { product: m.product } : {}),
     })),
     electricalLinks: [],
-    furniture: (f.furniture || []).map((item) => ({
-      id: `fn${++fnid}`, article: String(item.article),
-      x: item.x, y: item.y, z: item.z || 0, rotationY: item.rotationY || 0,
-      name: item.name || null,
-    })),
+    furniture: f.furniture, // a pre-merge link's items; deserializeInto turns them into zones
   }));
   if (!floors.length) throw new Error('View link has no floors.');
   const groundIndex = view.g;

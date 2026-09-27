@@ -1,5 +1,6 @@
 import './style.css';
-import { Project, Rectangle } from './core/model.js';
+import { Project, Rectangle, furnitureProductPlacements } from './core/model.js';
+import { loadFurnitureCatalog } from './ui/furnitureCatalog.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from './core/architectural3d.js';
@@ -232,7 +233,8 @@ function rebuild() {
     markers: f.markers,
     // Switch products replace the standard faceplate (docs/materials.md "Switches").
     markerProducts: markerProductDraws(project, f.markers),
-    furniture: f.furniture,
+    // Products on FURNITURE zones (docs/furniture.md): the model drawn at the zone.
+    furniture: furnitureProductPlacements(f),
     constraints: f.constraints,
     rectangles: f.rectangles,
     };
@@ -265,6 +267,16 @@ function scheduleRebuild() {
     console.error('Model rebuild failed:', error);
   });
 }
+// Furniture zones migrated from the old placed items (or from a share link) name a
+// product but hold no size; size them once the catalog is known (docs/furniture.md
+// "merge"). Deferred so the resulting emit doesn't nest inside this one.
+let furnitureCatalog = null;
+const sizeFurnitureZones = () => {
+  if (furnitureCatalog) queueMicrotask(() => project.applyFurnitureCatalog(furnitureCatalog));
+};
+loadFurnitureCatalog().then((catalog) => { furnitureCatalog = catalog; sizeFurnitureZones(); });
+project.onChange(sizeFurnitureZones);
+
 project.onChange(() => {
   // MR owns its flat plan/marker rebuilds explicitly. Rebuilding the hidden
   // architectural model and legacy export mesh on every on-headset edit causes
@@ -447,14 +459,16 @@ function updateProps() {
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
-  // Rotate control: only apertures and stairs have an orientation. Show the current state so
+  // Rotate control: only apertures, stairs and furniture products have an orientation. Show the current state so
   // it's clear what each click changes (door: hinge·swing, window: hinge side).
   const stairs = isStairs(r.kind);
-  const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage' || stairs;
+  const furnished = r.kind === 'furniture' && !!r.article; // a product has a front to turn
+  const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage' || stairs || furnished;
   pApertureRow.hidden = !aperture;
   if (aperture) {
     // Stairs show their ascent as a screen arrow (the sketch draws plan +y up).
     const state = stairs ? `climbs ${{ '+x': '→', '-x': '←', '+y': '↑', '-y': '↓' }[stairClimb(r)]}`
+      : furnished ? `faces ${{ 0: '↓', 90: '→', 180: '↑', 270: '←' }[r.facing || 0]}`
       : r.kind === 'garage' ? r.swing
       : (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;

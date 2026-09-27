@@ -12,7 +12,7 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
    model exists, register it with `tools/fetch-ikea-model.mjs` and stop. Other retailers (Lapeyre,
    Leroy Merlin…) publish none, so go straight to step 2.
 2. **Decide where it goes**; ask only if unclear:
-   - a FURNISH item (free-placed furniture) → a builder in `src/ui/proceduralFurniture.js`;
+   - furniture (a product on a FURNITURE zone, picked in MATERIAL · FURNITURE or dropped by FURNISH) → a builder in `src/ui/proceduralFurniture.js`;
    - a product that fills a plan zone: a door → a `surface: 'door'` material + `src/ui/doorProducts.js`;
      a window → a `surface: 'window'` material + a profile in `src/ui/windowProducts.js`;
    - a switch or outlet → a `surface: 'switch'`/`'outlet'` material + a `design` in `src/ui/deviceProducts.js`,

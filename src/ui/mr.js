@@ -19,7 +19,8 @@ import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { buildDeviceProduct } from './deviceProducts.js';
-import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
+import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from '../core/model.js';
+import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces } from '../core/flooring.js';
@@ -3127,16 +3128,18 @@ export function setupMR(view, project, getFootprint) {
   let matFaces = [];       // [{ rect, edge, face, comp }] with a non-empty boundary
   let matHoverRoom = null, matSelRoom = null;
   let matHoverFace = null, matSelFace = null;
-  let matDoors = [];       // DOOR + WINDOW zones of the active floor (MATERIAL · DOOR / WINDOW targets)
+  let matDoors = [];       // DOOR + WINDOW + FURNITURE zones of the active floor (their MATERIAL targets)
   let matHoverDoor = null, matSelDoor = null;
   // MATERIAL · SWITCH / OUTLET: device markers of the active floor (DEVICE_SURFACE picks
   // which marker types each takes); grip cycles overlapping ones (a stack at one plan
   // point, or neighbours inside the reticle) before trigger selects.
   let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null;
   const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet' }; // mode → catalog surface
-  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
-  // Aperture material modes → the zone kind (and catalog surface) they edit.
-  const APT_KIND = { mat_door: 'door', mat_window: 'window' };
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
+  // Zone material modes → the zone kind they edit (door/window: that materials surface;
+  // furniture: the furniture catalog, stored as the zone's `article`).
+  const APT_KIND = { mat_door: 'door', mat_window: 'window', mat_furniture: 'furniture' };
+  const FURN_TINT = 0xa78bfa; // a FURNITURE zone with a product (the FURNISH colour)
   let matHighlightKey = '';
   const MAT_NONE_COLOR = 0x94a3b8;
   const roomMaterialId = (comp) => (project.activeFloor.finishes || [])
@@ -3187,9 +3190,13 @@ export function setupMR(view, project, getFootprint) {
         }
       }
     }
-    matDoors = floor.rectangles.filter((r) => ['door', 'window'].includes(zoneKindOf(r)));
+    matDoors = floor.rectangles.filter((r) => ['door', 'window', 'furniture'].includes(zoneKindOf(r)));
     const arr = [], colors = [];
     for (const rect of matDoors) {
+      if (zoneKindOf(rect) === 'furniture') {
+        if (rect.article) matCellQuads(arr, colors, [rect.bounds], 0.0035, FURN_TINT, 0.5);
+        continue;
+      }
       const id = doorMaterialId(rect);
       if (id) matCellQuads(arr, colors, [rect.bounds], 0.0035, materialById(project, id)?.color ?? MAT_NONE_COLOR, 0.85);
     }
@@ -3305,6 +3312,15 @@ export function setupMR(view, project, getFootprint) {
       project.setMarkerProduct(m.id, toMulti || m === marker || !id ? id : null);
     }
   }
+  // A product on a FURNITURE zone (null clears) resizes it, so the plan and its dims
+  // rebuild too (a dimension it over-specifies is removed; the frame loop says so).
+  function setFurnitureProduct(rect, article) {
+    project.setFurnitureProduct(rect.id, article, article ? furnitureCatalog[article] : null);
+    rlog('material set', { mode: 'mat_furniture', rect: rect.id, article });
+    buildPlan();
+    applyPlanMatrix();
+    buildMaterials();
+  }
   function cycleMaterial(modeId, dir) {
     if (DEVICE_MODE[modeId]) {
       if (!matSelDevice) matSelDevice = matHoverDevice;
@@ -3316,6 +3332,15 @@ export function setupMR(view, project, getFootprint) {
       rlog('material set', { mode: modeId, marker: matSelDevice.id, material: next });
       buildMaterials();
       buildArch3d();
+      return;
+    }
+    if (modeId === 'mat_furniture') {
+      if (!matSelDoor) matSelDoor = matHoverDoor;
+      if (!matSelDoor) return;
+      const ids = [null, ...furnitureArticleList()];
+      const cur = ids.indexOf(matSelDoor.article ?? null);
+      const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
+      setFurnitureProduct(matSelDoor, next);
       return;
     }
     if (APT_KIND[modeId]) {
@@ -3356,6 +3381,17 @@ export function setupMR(view, project, getFootprint) {
         [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
         [`h ${fmt(marker.z ?? 1.1)} ${unitLabel()}`, 0xe2e8f0],
         ...(near.length > 1 && !matSelDevice ? [[`${near.indexOf(marker) + 1}/${near.length} · ${t('mat.gripCycles')}`, 0xfbbf24]] : []),
+      ];
+    }
+    if (modeId === 'mat_furniture') {
+      const rect = matSelDoor || matHoverDoor;
+      if (!rect) return [[t('mat.pickFurniture'), 0xe2e8f0]];
+      const mm = rect.productMm;
+      const size = mm ? `${fmt(mm[0] / 1000)} × ${fmt(mm[2] / 1000)} × ${fmt(mm[1] / 1000)} ${unitLabel()}` : null;
+      return [
+        [rect.article ? furnitureLabel(rect.article) : t('mat.none'), rect.article ? 0xe2e8f0 : MAT_NONE_COLOR],
+        ...(size ? [[size, 0xe2e8f0]] : []),
+        ...(rect.article ? [[t('mat.furnitureTurn'), 0xfbbf24]] : []),
       ];
     }
     if (APT_KIND[modeId]) {
@@ -3536,10 +3572,12 @@ export function setupMR(view, project, getFootprint) {
   // Load the catalog (bundled, tiny) so box fallbacks + labels know real dimensions.
   // Awaited by loadFurnitureSource: a procedural entry must be known before an item
   // is routed to the proxy.
-  const furnitureCatalogReady = fetch(import.meta.env.BASE_URL + 'furniture/index.json')
-    .then((r) => (r.ok ? r.json() : {}))
-    .then((c) => { furnitureCatalog = c || {}; if (!currentFurnitureArticle) currentFurnitureArticle = Object.keys(furnitureCatalog)[0] || null; })
-    .catch(() => { furnitureCatalog = {}; });
+  let furnitureCatalogLoaded = false;
+  const furnitureCatalogReady = loadFurnitureCatalog()
+    .then((c) => {
+      furnitureCatalog = c; furnitureCatalogLoaded = true;
+      if (!currentFurnitureArticle) currentFurnitureArticle = Object.keys(furnitureCatalog)[0] || null;
+    });
 
   // A lit box at the model's real footprint, sitting on the floor (min.y = 0). Shown
   // when no proxy is configured, a fetch fails, or the model isn't decoded yet — so the
@@ -3593,12 +3631,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // --- FURNISH authoring state (M3) ---------------------------------------------
-  let selectedFurnitureId = null;      // the placed item under edit (rotate/move/delete)
-  let hoverFurnitureId = null;         // item under the reticle this frame
-  let furnitureBuffer = '';            // FURNISH foot-elevation pad: typed digits (prefilled with z)
-  let furniturePristine = false;       // buffer holds a prefilled value; first key replaces it
-  let currentFurnitureArticle = null;  // the article the trigger drops; cycled by thumbstick-y
-  const FURN_ROT_STEP = 15;            // degrees per thumbstick tick when an item is selected
+  let currentFurnitureArticle = null;  // the product FURNISH drops; cycled by thumbstick-y
   const furnitureArticleList = () => Object.keys(furnitureCatalog);
   const furnitureLabel = (article) => furnitureCatalog[article]?.name || article;
 
@@ -3613,21 +3646,24 @@ export function setupMR(view, project, getFootprint) {
     return inst;
   }
 
-  // Rebuild furnitureGroup from the active floor's `furniture` array. Each item is placed
-  // at plan (x,y) -> local (x, 0, -y), rotationY degrees about vertical. Models load async;
-  // a build token guards against a floor switch landing an item from a stale rebuild.
+  // Rebuild furnitureGroup (the models) and furniturePlanGroup (the plan pieces) from the
+  // floor's FURNITURE zones that carry a product (docs/furniture.md "merge"): each model
+  // sits at its zone's centre, lifted by the zone's foot, turned by its facing. Models load
+  // async; a build token drops a stale rebuild's late arrivals. buildArch3d calls this on
+  // every buildPlan, so it returns early when nothing it draws changed.
+  let furnitureKey = '';
   function buildFurniture(floor = project.activeFloor) {
-    const token = ++furnitureBuildToken;
-    // Remove previous instances. Instance materials are cloned per item (see
-    // instantiateFurniture); dispose them so repeated rebuilds don't leak. Geometry +
-    // textures belong to the cached source and are left intact.
+    const items = allFloorsView ? [] : furnitureProductPlacements(floor);
+    const key = JSON.stringify(items);
+    if (key === furnitureKey) return;
     clearFurniture();
+    furnitureKey = key;
+    const token = ++furnitureBuildToken;
     // Plan pieces need the catalog footprint; it is usually loaded by now.
-    const items = [...(floor.furniture || [])];
     furnitureCatalogReady.then(() => {
       if (token === furnitureBuildToken) for (const item of items) furniturePlanGroup.add(furniturePlanPiece(item));
     });
-    for (const item of floor.furniture || []) {
+    for (const item of items) {
       const place = (obj) => {
         if (token !== furnitureBuildToken) return; // a newer rebuild superseded this one
         obj.position.set(item.x, item.z || 0, -item.y); // z = foot elevation off the floor
@@ -3642,6 +3678,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function clearFurniture() {
+    furnitureKey = '';
     for (const child of [...furnitureGroup.children]) {
       furnitureGroup.remove(child);
       child.traverse?.((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
@@ -3652,7 +3689,7 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // A furniture item's plan piece: its catalog footprint (w × d) as a translucent fill
+  // A furniture product's plan piece: its catalog footprint (w × d) as a translucent fill
   // plus outline, a notch on the front edge (+Z, the model's front), dashed when the
   // item is raised off the floor (a wall-hung unit, drawn like an overhead line on a
   // plan). Sits 4 mm above the floor so it doesn't z-fight the real one.
@@ -3684,27 +3721,8 @@ export function setupMR(view, project, getFootprint) {
     return g;
   }
 
-  // Nearest placed furniture item under the reticle (by plan distance), for hover/pick.
-  function furnitureAtFloorPoint(px, py) {
-    let best = null, bestD = RETICLE_OUTER;
-    for (const f of project.furniture) {
-      const d = Math.hypot(px - f.x, py - f.y);
-      if (d < bestD) { bestD = d; best = f; }
-    }
-    return best;
-  }
-
-  // Thumbstick-y in FURNISH: rotate the selected item in FURN_ROT_STEP steps, or (nothing
-  // selected) cycle the article the trigger will drop.
+  // Thumbstick-y in FURNISH: cycle the product the trigger will drop.
   function cycleFurnish(dir = 1) {
-    if (selectedFurnitureId) {
-      const f = project.furniture.find((x) => x.id === selectedFurnitureId);
-      if (!f) return;
-      project.rotateFurniture(f.id, (((f.rotationY || 0) + dir * FURN_ROT_STEP) % 360 + 360) % 360);
-      buildFurniture();
-      rlog('furniture rotate', { id: f.id, deg: f.rotationY });
-      return;
-    }
     const list = furnitureArticleList();
     if (!list.length) return;
     const i = Math.max(0, list.indexOf(currentFurnitureArticle));
@@ -3713,97 +3731,15 @@ export function setupMR(view, project, getFootprint) {
     rlog('furniture article', { article: currentFurnitureArticle });
   }
 
-  // ---- FURNISH foot elevation: a selected GLB item's z (how high its base sits off
-  // the floor) is typed on the reused numpad — a single value, like MARKER height. The
-  // GLB's own mesh supplies the height; z only lifts it (wall-hung units, shelves).
-  const selectedFurnitureObj = () =>
-    selectedFurnitureId ? project.furniture.find((f) => f.id === selectedFurnitureId) : null;
-  const furnitureTitle = () => {
-    const f = selectedFurnitureObj();
-    return `${(f?.name || f?.article || t('mode.furnish'))}  ·  ${t('furniture.foot')} ${datumWord('floor')}`;
-  };
-  // Foot elevation is floor-referenced only (furniture drags in-plane, never in Z), so
-  // there is no datum toggle — the SWAP cell is inert (blank).
-  const redrawFurniturePad = () => numpad.draw(furnitureTitle(), furnitureBuffer, hoverKey, ' ');
-
-  function refreshFurniturePad() {
-    const f = selectedFurnitureObj();
-    furnitureBuffer = f ? fmt(f.z || 0) : '';
-    furniturePristine = true;
-    redrawFurniturePad();
-  }
-
-  function activateFurniturePad() {
-    placePanel(numpad.group);
-    numpad.group.visible = true;
-    refreshFurniturePad();
-  }
-
-  function commitFurnitureFoot() {
-    const f = selectedFurnitureObj();
-    if (!f) return;
-    const val = parseFloat(furnitureBuffer);
-    if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
-    project.setFurnitureVertical(f.id, 'floor', toMeters(val));
-    rlog('furniture foot', { id: f.id, m: +toMeters(val).toFixed(3) });
-    buildFurniture(); // z changed → the model re-seats at the new elevation
-    refreshFurniturePad(); // keep it selected so it can be raised again
-  }
-
-  function pressFurnitureKey(k) {
-    if (k === 'enter') { commitFurnitureFoot(); return; }
-    if (k === 'swap') return; // foot is floor-referenced only — no datum toggle
-    if (k === 'del') { deleteInMode(); deactivateNumpad(); return; } // remove the item
-    if (furniturePristine && k !== 'back') furnitureBuffer = '';
-    furniturePristine = false;
-    if (k === 'back') furnitureBuffer = furnitureBuffer.slice(0, -1);
-    else if (k === '.') { if (!furnitureBuffer.includes('.')) furnitureBuffer += '.'; }
-    else if (furnitureBuffer.replace('.', '').length < 6) furnitureBuffer += k;
-    redrawFurniturePad();
-  }
-
-  // Live furniture drag over the floor reticle (no ray-distance — furniture sits on the
-  // floor). moveFurniture with {emit:false}; release commits once via touch().
-  function applyFurnitureGripDrag(source) {
-    if (gripDrag?.kind !== 'furniture') return;
-    const hit = rayFloorHit(source);
-    if (!hit) return;
-    const { px, py } = worldToPlan(hit);
-    project.moveFurniture(gripDrag.furnitureId, { x: px, y: py }, { emit: false });
-    const clone = furnitureGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
-    if (clone) clone.position.set(px, clone.position.y, -py); // preserve foot elevation (y)
-    const piece = furniturePlanGroup.children.find((c) => c.userData.furnitureId === gripDrag.furnitureId);
-    if (piece) piece.position.set(px, piece.position.y, -py);
-  }
-
-  // Emissive highlight (per-instance materials): reset all, then hover=yellow, selected=amber.
-  function paintFurnitureHighlight() {
-    const tint = (id, hex) => {
-      if (!id) return;
-      const obj = furnitureGroup.children.find((c) => c.userData.furnitureId === id);
-      obj?.traverse((o) => { if (o.isMesh && o.material?.emissive) o.material.emissive.setHex(hex); });
-    };
-    for (const child of furnitureGroup.children) {
-      child.traverse?.((o) => { if (o.isMesh && o.material?.emissive) o.material.emissive.setHex(0x000000); });
-    }
-    tint(hoverFurnitureId, 0x4a4416);   // dim yellow
-    tint(selectedFurnitureId, 0x5a3d0a); // dim amber (wins if it coincides)
-    // Plan pieces: hover yellow, selected amber, stronger fill.
-    for (const piece of furniturePlanGroup.children) {
-      const id = piece.userData.furnitureId;
-      const hex = id === selectedFurnitureId ? 0xf59e0b : id === hoverFurnitureId ? 0xfacc15 : FURN_PLAN_COLOR;
-      piece.userData.fill.color.setHex(hex);
-      piece.userData.fill.opacity = hex === FURN_PLAN_COLOR ? 0.22 : 0.4;
-      piece.children[1].material.color.setHex(hex);
-    }
-  }
-
   // All existing model-changing call sites rebuild through this dispatcher, so a
   // LOAD/unit change made while overviewing cannot silently fall back to one floor.
   // It also dirties the optional left-hand sheet; the frame loop throttles the
   // expensive 2048px raster refresh during continuous grip drags.
   function buildPlan(withDims = true) {
     sheetDirty = true;
+    // A loaded slot or file may hold furniture zones migrated from the old placed items
+    // (no size yet): size them from the catalog before drawing. Emits only if one changed.
+    if (furnitureCatalogLoaded) project.applyFurnitureCatalog(furnitureCatalog);
     if (withDims) resetDimLabelAtlas(); // every label batch is rebuilt below (plan dims + Z-dims)
     const built = allFloorsView ? buildAllFloors(withDims) : buildActivePlan(withDims);
     if (pipeGroup.visible) buildPipes();
@@ -3849,6 +3785,7 @@ export function setupMR(view, project, getFootprint) {
     arch3dGroup.visible = arch3dOn;
     furnitureGroup.visible = arch3dOn;        // models only in the 3D view…
     furniturePlanGroup.visible = !arch3dOn;   // …plan pieces otherwise
+    buildFurniture(); // products on FURNITURE zones follow every plan edit (no-op if unchanged)
     if (!arch3dOn) return;
     const floors = allFloorsView ? project.floors : [project.activeFloor];
     for (const floor of floors) {
@@ -5494,6 +5431,22 @@ export function setupMR(view, project, getFootprint) {
     toggleOutputLayer(hoverExportAction);
   }
 
+  // The solver removes a furniture dimension that no longer fits (docs/furniture.md
+  // "merge"): whatever edit caused it, the mode label says so for a few seconds, with the
+  // miss, so the removal is never silent. Polled once per frame (mr.js doesn't subscribe).
+  let removedDimsSeen = 0, removedDimsTimer = null;
+  function checkRemovedDims() {
+    const log = project.removedDims;
+    if (!log || log.seq === removedDimsSeen) return;
+    removedDimsSeen = log.seq;
+    const miss = Math.max(...log.items.map((i) => Math.abs(i.miss)));
+    const msg = `${t('dims.removed')}${log.items.length > 1 ? ` ×${log.items.length}` : ''} · ${fmt(miss)} ${unitLabel()}`;
+    rlog('furniture dims removed', log.items);
+    for (const l of labels) l.setText(msg, 0xfbbf24);
+    clearTimeout(removedDimsTimer);
+    removedDimsTimer = setTimeout(() => setModeInfo(), 3000);
+  }
+
   // ---- PROJECT one-shot actions: floor clipboard + whole-plan movement ----
   let projectFlashTimer = null;
   function projectFlash(msg, sticky = false) {
@@ -6656,6 +6609,12 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => { matSelDoor = matHoverDoor; },
     },
     {
+      id: 'mat_furniture', color: 0x2dd4bf,
+      // Trigger selects the FURNITURE zone under the reticle (none deselects); thumbstick-y
+      // cycles its product, A/X turns it, B/Y clears it (docs/furniture.md "merge").
+      onTouch: () => { matSelDoor = matHoverDoor; },
+    },
+    {
       id: 'mat_switch', color: 0x2dd4bf,
       // Trigger selects the switch under the reticle (none deselects); grip cycles
       // overlapping switches first (onReset).
@@ -6730,30 +6689,18 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
-      id: 'furnish', color: 0xa78bfa, // place real furniture GLB models (loaded on the fly)
-      // Thumbstick-y cycles the article to drop (or rotates the selected item 15°/tick).
-      // Trigger an item to select it; trigger empty floor to drop the current article;
-      // grip-drag an item to move it; grip away from an item to delete the selection.
+      id: 'furnish', color: 0xa78bfa, // drop a FURNITURE zone already sized to a product
+      // Thumbstick-y cycles the product; trigger drops a FURNITURE zone sized to it,
+      // centred on the reticle (docs/furniture.md "merge"). Dimension, turn (A/X), move or
+      // delete it in PLAN; change its product in MATERIAL · FURNITURE.
       onTouch: (pos) => {
         if (!placed) return;
-        // With the foot-elevation pad open and the ray on a key, the trigger drives the
-        // pad (mirrors MARKER); aiming at the floor falls through to select/drop.
-        if (selectedFurnitureId && numpad.group.visible && hoverKey) { pressFurnitureKey(hoverKey); return; }
-        if (hoverFurnitureId) { // select the aimed item (opens the foot pad; also rotate/move/delete)
-          selectedFurnitureId = hoverFurnitureId;
-          activateFurniturePad();
-          setModeInfo();
-          rlog('furniture select', { id: selectedFurnitureId });
-          return;
-        }
-        if (selectedFurnitureId) { selectedFurnitureId = null; deactivateNumpad(); setModeInfo(); return; } // first empty trigger deselects
         if (!currentFurnitureArticle) { rlog('furniture drop skipped: empty catalog'); return; }
         const { px, py } = worldToPlan(pos);
-        // A wall-hung product's catalog `mountZMm` sets its starting foot elevation.
-        const z = (furnitureCatalog[currentFurnitureArticle]?.mountZMm ?? 0) / 1000;
-        const item = project.addFurniture({ article: currentFurnitureArticle, x: px, y: py, z, rotationY: 0 });
-        buildFurniture();
-        rlog('furniture drop', { id: item.id, article: item.article, px: +px.toFixed(3), py: +py.toFixed(3) });
+        const rect = project.addFurnitureZone(currentFurnitureArticle, furnitureCatalog[currentFurnitureArticle], px, py);
+        buildPlan();
+        applyPlanMatrix();
+        rlog('furniture drop', { id: rect.id, article: rect.article, px: +px.toFixed(3), py: +py.toFixed(3) });
       },
     },
     {
@@ -6902,7 +6849,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'furnish',
-    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet', 'mat_ethernet',
+    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -6910,7 +6857,7 @@ export function setupMR(view, project, getFootprint) {
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
-    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',
@@ -6976,7 +6923,6 @@ export function setupMR(view, project, getFootprint) {
     penNodeId = null; conduitPickAfterKey = null; conduitPenHistory = []; hoverPenSplit = null; // ...and lift/reset the conduit pen picker + its undo
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
-    selectedFurnitureId = null; furnitureBuffer = ''; // ...and any FURNISH selection + its foot pad
     selectedEdge = null; edgePickKey = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
     clearTimeout(projectFlashTimer);
@@ -7124,9 +7070,7 @@ export function setupMR(view, project, getFootprint) {
   function afterFloorChange() {
     navLift = 0; // the vertical teleport belongs to ALL FLOORS only
     refreshFloorEditState();
-    buildPlan();
-    if (!allFloorsView) buildFurniture(); // per-floor furniture; hide in ALL FLOORS
-    else clearFurniture();
+    buildPlan(); // furniture models follow (none in ALL FLOORS)
     applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
     sheetDirty = true;
     if (exportMenu.group.visible) redrawExportMenu();
@@ -7211,8 +7155,8 @@ export function setupMR(view, project, getFootprint) {
 
     ensureFloors(); // seed Basement + Upper around Ground on first AR entry
     allFloorsView = false; // every new session starts on the persisted active floor
+    furnitureKey = ''; // a new session re-adds the models (async, once decoded)
     buildPlan();
-    buildFurniture();     // async — furniture appears in furnitureGroup once decoded
     scene.add(planGroup);
     planGroup.visible = false;
     placed = false;
@@ -7347,11 +7291,6 @@ export function setupMR(view, project, getFootprint) {
       gripDrag = { kind: 'marker', markerId: hoverMarker.id, distance };
       rlog('grip-drag marker', { id: hoverMarker.id });
     }
-    if (id === 'furnish' && hoverFurnitureId) {
-      gripDrag = { kind: 'furniture', furnitureId: hoverFurnitureId };
-      rlog('grip-drag furniture', { id: hoverFurnitureId });
-      return;
-    }
     if (id === 'conduit_edit' && selectedConduitNodeId
         && hoverConduitNode?.id === selectedConduitNodeId && !hoverConduitNode.markerId) {
       if (!conduitNodeWorldPos(hoverConduitNode.id, _dp)) return;
@@ -7378,7 +7317,6 @@ export function setupMR(view, project, getFootprint) {
       // A conduit-node drag rewrote the network geometry: rebuild it once and, for a
       // direct 3D carry (which also changed z), refresh the height pad.
       if (gripDrag.kind === 'conduitNode') { buildConduits(); if (numpad.group.visible) refreshNodePad(); }
-      if (gripDrag.kind === 'furniture') buildFurniture(); // reseat canonically after the live drag
     }
     gripDrag = null;
   }
@@ -7387,7 +7325,7 @@ export function setupMR(view, project, getFootprint) {
   // was moved off grip so grip means only grab-drag / cancel. Returns true if it removed
   // something.
   //  - PLAN EDIT: the selected zone.  - MARKER EDIT: the selected marker.
-  //  - FURNISH: the selected furniture.  - CONDUIT EDIT: the hovered segment (keeps its
+  //  - MATERIAL: the selected target's product.  - CONDUIT EDIT: the hovered segment (keeps its
   //    nodes) else the selected node + its segments.  - WIRE: the selected wire.
   // MARKER · CONDUIT B/Y: undo the newest pen step — remove the segment it created,
   // then the node it created if nothing else now uses it, and move the pen back to
@@ -7431,6 +7369,11 @@ export function setupMR(view, project, getFootprint) {
       buildArch3d();
       return true;
     }
+    if (mode.id === 'mat_furniture') {
+      if (!matSelDoor?.article) return false;
+      setFurnitureProduct(matSelDoor, null);
+      return true;
+    }
     if (APT_KIND[mode.id]) {
       if (!matSelDoor || !doorMaterialId(matSelDoor)) return false;
       project.setDoorFinish(matSelDoor.id, null);
@@ -7464,15 +7407,6 @@ export function setupMR(view, project, getFootprint) {
       return true;
     }
     if (mode.id === 'marker' && selectedMarker) { deleteSelectedMarker(); return true; }
-    if (mode.id === 'furnish' && selectedFurnitureId) {
-      const id = selectedFurnitureId;
-      project.removeFurniture(id);
-      selectedFurnitureId = null;
-      buildFurniture();
-      setModeInfo();
-      rlog('furniture delete', { id });
-      return true;
-    }
     if (mode.id === 'marker_conduit') return undoConduitPenStep();
     if (mode.id === 'conduit_edit') {
       if (selectedConduitSegmentId) { // one leg of a branch, leaving its end nodes
@@ -7896,6 +7830,12 @@ export function setupMR(view, project, getFootprint) {
       else if (modes[currentMode].id === 'edit' && selectedRect?.rotateAperture(1)) {
         project.touch(); buildPlan(); applyPlanMatrix();
       }
+      // MATERIAL · FURNITURE: A/X turns the selected zone's product 90° (its footprint
+      // swaps; the solver may then drop a dimension that no longer fits).
+      else if (modes[currentMode].id === 'mat_furniture' && matSelDoor?.article && matSelDoor.rotateAperture(1)) {
+        project.touch();
+        buildPlan(); applyPlanMatrix(); buildMaterials();
+      }
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();
@@ -7926,7 +7866,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
       else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
-      else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // rotate selected / cycle drop article
+      else if (modeId === 'furnish') cycleFurnish(stickY < 0 ? 1 : -1); // cycle the product to drop
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'export') { // point at Compare/Language → cycle that; else format
@@ -8151,9 +8091,9 @@ export function setupMR(view, project, getFootprint) {
       ? `${t('export.format')} · ${getOutputSettings().format === 'coohom' ? 'COOHOM DXF'
         : getOutputSettings().format === 'link' ? 'LINK · 3D VIEW'
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
+    checkRemovedDims();
     const furnishStatus = modes[currentMode].id === 'furnish'
-      ? (selectedFurnitureId ? t('furnish.selected')
-        : currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
+      ? (currentFurnitureArticle ? furnitureLabel(currentFurnitureArticle) : t('furnish.none'))
       : null;
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : furnishStatus || translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || hovDim;
@@ -8992,43 +8932,12 @@ export function setupMR(view, project, getFootprint) {
       outlineMarker(selectedMarker, 'wall', 0xfbbf24);
       if (selectedMarker && hoverKey !== prevHoverKey) { redrawMarkerPad(); prevHoverKey = hoverKey; }
     } else if (modeId === 'furnish') {
-      // FURNISH: aim a floor reticle; the placed item under it is the hover target
-      // (select / grip-drag / grip-away delete). Empty-floor trigger drops the current
-      // article. A live grip drag is applied here so the model follows the reticle.
+      // FURNISH: aim a floor reticle; trigger drops the current product there.
       hoverKey = null;
       numpadCursor.visible = false;
-      const source = editCtl;
-      if (gripDrag?.kind === 'furniture') applyFurnitureGripDrag(source);
-      // With the foot pad open, the ray drives the numpad (like MARKER); otherwise it
-      // rays the floor to hover/select/drop.
-      const padOpen = selectedFurnitureId && numpad.group.visible;
-      if (padOpen) {
-        const panelHit = rayPanelHit(source);
-        if (panelHit) {
-          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
-          numpadCursor.position.copy(panelHit.point);
-          numpadCursor.visible = true;
-        }
-      }
-      hoverFurnitureId = null;
-      if (hoverKey) {
-        reticle.visible = false; // the pad owns the ray this frame
-      } else {
-        const hit = rayFloorHit(source);
-        if (hit) {
-          reticle.visible = true;
-          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
-          const { px, py } = worldToPlan(hit);
-          hoverFurnitureId = furnitureAtFloorPoint(px, py)?.id || null;
-        } else {
-          reticle.visible = false;
-        }
-      }
-      if (selectedFurnitureId && !project.furniture.some((f) => f.id === selectedFurnitureId)) selectedFurnitureId = null;
-      // No live selection ⇒ the foot pad has no subject: tear it down (covers B/Y delete).
-      if (numpad.group.visible && !selectedFurnitureId) deactivateNumpad();
-      if (padOpen && hoverKey !== prevHoverKey) { redrawFurniturePad(); prevHoverKey = hoverKey; }
-      paintFurnitureHighlight();
+      const hit = rayFloorHit(editCtl);
+      reticle.visible = !!hit;
+      if (hit) reticle.position.set(hit.x, hit.y + 0.002, hit.z);
     } else if (modeId === 'save' || modeId === 'load') {
       // SAVE/LOAD: aim at a slot, or at the separate confirm/cancel buttons once
       // an occupied SAVE slot has armed the overwrite screen.

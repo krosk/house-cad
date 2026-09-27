@@ -1,6 +1,6 @@
 // Serialize / deserialize a Project to plain JSON. This is the persistent,
 // parametric definition of the house: floors (each = rectangles + constraints +
-// markers + electrical links + furniture + height) plus which floor is ground/active,
+// markers + electrical links + surface finishes + height) plus which floor is ground/active,
 // plus the WHOLE-HOUSE conduit network (nodes + segments) and wires that span floors.
 // The downstream footprint/extrusion and each floor's derived elevation are always
 // recomputed, never stored.
@@ -12,9 +12,9 @@
 
 import {
   Floor, Rectangle, WIRE_TYPES, PIPE_SERVICES, nextMarkerId, nextElectricalLinkId,
-  nextConduitNodeId, nextConduitSegmentId, nextWireId, nextPipeNodeId, nextPipeId, nextFurnitureId,
+  nextConduitNodeId, nextConduitSegmentId, nextWireId, nextPipeNodeId, nextPipeId, furnitureItemsToZones,
   syncRectIdCounter, syncFloorIdCounter, syncMarkerIdCounter, syncElectricalLinkIdCounter,
-  syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter, syncPipeNodeIdCounter, syncPipeIdCounter, syncFurnitureIdCounter,
+  syncConduitNodeIdCounter, syncConduitSegmentIdCounter, syncWireIdCounter, syncPipeNodeIdCounter, syncPipeIdCounter,
 } from '../core/model.js';
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
@@ -36,8 +36,18 @@ function serializeRect(r) {
   // Furniture placeholders carry a solid body band [foot, top]; omit elsewhere.
   if (r.foot !== undefined) out.foot = r.foot;
   if (r.top !== undefined) out.top = r.top;
+  // A furniture zone's product (docs/furniture.md "merge"): additive, no FILE_VERSION bump.
+  if (r.article !== undefined) out.article = r.article;
+  if (r.productMm !== undefined) out.productMm = [...r.productMm];
+  if (r.facing !== undefined) out.facing = r.facing;
   return out;
 }
+// Every stored Rectangle field (the constructor validates), for load and paste.
+const rectFields = (r) => ({
+  x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
+  hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
+  article: r.article, productMm: r.productMm, facing: r.facing,
+});
 function serializeConstraint(c) {
   return {
     id: c.id, type: c.type, axis: c.axis,
@@ -105,9 +115,6 @@ function serializePipeNode(node) {
   return { id: node.id, x: node.x, y: node.y, z: node.z || 0, floorId: node.floorId || null,
     markerId: node.markerId || null, role: node.role || null };
 }
-function serializeFurniture(f) {
-  return { id: f.id, article: f.article, x: f.x, y: f.y, z: f.z || 0, ...verticalFields(f), rotationY: f.rotationY || 0, name: f.name || null };
-}
 
 export function serializeFloor(f) {
   return {
@@ -119,8 +126,7 @@ export function serializeFloor(f) {
     markers: f.markers.map(serializeMarker),
     electricalLinks: (f.electricalLinks || []).map(serializeElectricalLink),
     // conduitNodes/conduitSegments/wires/pipes are whole-house (top level), not per-floor.
-    // `_demo`-flagged items (if any transient ones exist) never persist.
-    furniture: (f.furniture || []).filter((x) => !x._demo).map(serializeFurniture),
+    // Furniture is a zone kind in `rectangles` (the old `furniture[]` migrates on load).
     finishes: (f.finishes || []).map(serializeFinish),
   };
 }
@@ -220,10 +226,12 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
 
   const rectIds = new Map();
   const rectangles = (source.rectangles || []).map((r) => {
-    const copy = new Rectangle({ x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb });
+    const copy = new Rectangle(rectFields(r));
     rectIds.set(r.id, copy.id);
     return copy;
   });
+  // A clipboard copied before the merge may still carry placed furniture items.
+  rectangles.push(...furnitureItemsToZones(source.furniture));
   const markerIds = new Map();
   const markers = (source.markers || []).map((m) => {
     const copy = {
@@ -328,12 +336,6 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       a, b,
     }];
   });
-  // Furniture has no cross-references — just mint fresh ids.
-  const furniture = (source.furniture || []).map((x) => ({
-    id: nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
-    ...verticalFields(x),
-    rotationY: x.rotationY || 0, name: x.name || null,
-  }));
 
   // Drop the destination floor's OLD network slice before its plan is replaced (mirror
   // Project.clear): nodes bound to its outgoing markers or bare on its floor, plus the
@@ -354,7 +356,6 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
   target.constraints = constraints;
   target.markers = markers;
   target.electricalLinks = electricalLinks;
-  target.furniture = furniture;
   target.finishes = loadFinishes(source.finishes, rectIds);
   // Append the remapped intra-floor network subset to the whole-house arrays.
   project.conduitNodes.push(...conduitNodes);
@@ -441,9 +442,7 @@ export function deserializeInto(project, data) {
     id: f.id, // undefined for legacy → Floor mints one
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
-    rectangles: (f.rectangles || []).map(
-      (r) => new Rectangle({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head, hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb }),
-    ),
+    rectangles: (f.rectangles || []).map((r) => new Rectangle({ id: r.id, ...rectFields(r) })),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({
       id: m.id, type: m.type || 'outlet', x: m.x, y: m.y, z: m.z,
@@ -459,13 +458,13 @@ export function deserializeInto(project, data) {
       toMarkerId: link.toMarkerId,
       route: serializeRoute(link.route),
     })),
-    furniture: (f.furniture || []).map((x) => ({
-      id: x.id || nextFurnitureId(), article: String(x.article), x: x.x, y: x.y, z: x.z || 0,
-      ...verticalFields(x),
-      rotationY: x.rotationY || 0, name: x.name || null,
-    })),
     finishes: loadFinishes(f.finishes),
   }));
+  // Before the merge, placed furniture was a separate `furniture[]` per floor (saved
+  // files, share links): each item becomes a furniture zone carrying its product. Fresh
+  // rect ids are minted AFTER the counter passes the loaded ones, so they can't collide.
+  syncRectIdCounter(floors.flatMap((f) => f.rectangles.map((r) => r.id)));
+  descriptors.forEach((f, i) => floors[i].rectangles.push(...furnitureItemsToZones(f.furniture)));
 
   project.floors = floors;
   project.materials = loadMaterials(data.materials);
@@ -533,7 +532,6 @@ export function deserializeInto(project, data) {
   syncWireIdCounter(project.wires.map((w) => w.id));
   syncPipeNodeIdCounter(project.pipeNodes.map((node) => node.id));
   syncPipeIdCounter(project.pipes.map((pipe) => pipe.id));
-  syncFurnitureIdCounter(floors.flatMap((f) => f.furniture.map((x) => x.id)));
 
   project._emit();
 }

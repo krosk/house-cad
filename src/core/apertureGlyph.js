@@ -245,3 +245,23 @@ export function resolveStairOrient(rect, sx0, sx1, sy0, sy1) {
   const flip = axis === 'x' ? (sx1 >= sx0 ? 1 : -1) : (sy1 >= sy0 ? 1 : -1);
   return { axis, dir: (climb[0] === '+' ? 1 : -1) * flip };
 }
+
+// A furniture zone's front notch (docs/furniture.md "merge"): a small V pointing into
+// the zone from the middle of its front edge, so the facing reads on paper. Plan-space
+// segments [ax, ay, bx, by] in metres; `size` is the V's half-width and depth (m).
+// Facing 0 = front toward plan −y, 90 → +x, 180 → +y, 270 → −x. Null for a zone that
+// has neither a product nor a facing (a plain placeholder has no front).
+export function furnitureNotchSegments(rect, size) {
+  if (!rect?.article && !rect?.facing) return null;
+  const b = rect.bounds;
+  const w = b.x1 - b.x0, h = b.y1 - b.y0;
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  const f = ((Math.round((Number(rect.facing) || 0) / 90) % 4) + 4) % 4;
+  // Front-edge midpoint and the inward unit direction for each facing.
+  const [mx, my, ux, uy] = [[cx, b.y0, 0, 1], [b.x1, cy, -1, 0], [cx, b.y1, 0, -1], [b.x0, cy, 1, 0]][f];
+  const n = Math.min(size, (f % 2 ? h : w) / 4, (f % 2 ? w : h) / 3);
+  if (!(n > 0)) return null;
+  const tx = -uy, ty = ux;
+  const ax = mx + tx * n, ay = my + ty * n, px = mx + ux * n, py = my + uy * n, bx = mx - tx * n, by = my - ty * n;
+  return [[ax, ay, px, py], [px, py, bx, by]];
+}

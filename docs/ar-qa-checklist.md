@@ -57,6 +57,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] PLAN · EDIT: select a STAIRS zone, A/X turns its floor arrow 90° clockwise per press; the printed sheet, DXF and View 3D treads follow; STAIRS DOWN on the storey above points the opposite way for the same `climb`
 - [ ] MARKER · CHECK: rings are red (cross-tie), orange (no breaker) and white (unwired outlet/switch/light), with pins up to each glyph; thumbstick up/down filters one issue; aiming at a ring names the device and issue; readout counts match the house (rev 9: 0 / 5 / 93); Ethernet-only runs are not flagged; frame rate holds with ~100 rings
 - [ ] Stacked devices (double switch = two switch markers at one point): hovering one in EDIT/WIRE/CHECK shows `switch i/n → k× light` and outlines its lights cyan; grip advances i/n
+- Owner walk 2026-09-27 (build `4cad922`): applied materials on the Quest; the MATERIAL flow for floors,
+  windows etc. was understood. No per-item pass/fail was given, so the boxes below stay open. The owner
+  looked for the same material option for **furniture** and found none: furniture products live in
+  FURNISH as separate items, not on the furniture zones. Fixed the same day by the furniture merge
+  (MATERIAL · FURNITURE; items under FURNISH below).
 - [ ] MATERIAL · FLOOR: trigger a room, thumbstick-y cycles its material (tint appears), B/Y clears; same material on rooms joined by a door reads as one region in the readout; HOUSE packs line updates
 - [ ] MATERIAL · WALL: aiming near a wall highlights that face; thumbstick-y cycles; strips sit inside the walls; door/window area deducted in the m² line
 - [ ] MATERIAL · DOOR: trigger a DOOR zone, thumbstick-y sets Lapeyre Ange-Line (zone tints anthracite); LEFT X shows the leaf in the opening, handle on the lock side, glass arc toward the hinge, knuckles on the swing face; B/Y clears back to the plain slab
@@ -359,11 +364,17 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [x] Choice persists across an APK relaunch
 - [x] ZH help text wraps (CJK-aware) without overflowing the box
 
-## FURNISH (`furnish`)  ⬜ procedural items build-verified only
+## FURNISH (`furnish`) + MATERIAL · FURNITURE  ⬜ furniture merge (2026-09-27) build/Node-verified only
 
-- [ ] With the 3D view off, placed items show only as flat violet footprints on the floor (V notch on the front edge, dashed for a wall-hung unit); hover yellow, selected amber; grip-drag moves the footprint; rotate turns it
+- [ ] FURNISH: thumbstick up/down cycles the product (readout shows its name); trigger drops an orange FURNITURE zone sized to it, centred on the reticle, with a violet plan piece and a V notch on the front edge
+- [ ] The dropped zone behaves like any PLAN zone: EDGE/DIMS dimension it to a wall, PLAN · EDIT moves or deletes it, A/X in PLAN · EDIT turns it 90° (the zone swaps width/depth about its centre)
+- [ ] MATERIAL · FURNITURE: trigger a FURNITURE zone drawn in PLAN; thumbstick up/down cycles the catalog (none first); the zone resizes to the product; readout shows name and w × d × h; the zone tints violet
+- [ ] MATERIAL · FURNITURE: A/X turns the selected product 90°; B/Y clears it (the zone keeps its size, the violet tint goes)
+- [ ] A furniture zone dimensioned to both walls, then given a product too wide for the gap: the second dimension disappears and the label flashes `DIM REMOVED · <miss>`; the walls don't move
+- [ ] A slot saved before this build with FURNISH items loads with each item as a furniture zone carrying its product, at the same place and height, turned to the nearest 90°
+- [ ] With the 3D view off, product zones show flat violet footprints on the floor (V notch on the front edge, dashed for a wall-hung unit)
 - [ ] LEFT X on: the 3D models appear and the footprints disappear; LEFT X off: back to footprints
-- [ ] Cycle to `daikin-ctxm15a` and drop it on a wall: it starts with its bottom at 2.0 m (foot pad shows 2.00), back flat to the wall once rotated, flap and sensors facing the room at the bottom right; its size looks right against the real wall
+- [ ] Cycle to `daikin-ctxm15a` and drop it on a wall: it starts with its bottom at 2.0 m (the band pad's foot shows 2.00), back flat to the wall once turned, flap and sensors facing the room at the bottom right; its size looks right against the real wall
 - [ ] Same for `daikin-ftxm60a`: visibly wider (997 mm) and deeper than the CTXM15A
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
 

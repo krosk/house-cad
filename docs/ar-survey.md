@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
-MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH → OUTLET → ETHERNET
+MATERIAL · FLOOR → WALL → DOOR → WINDOW → FURNITURE → SWITCH → OUTLET → ETHERNET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -32,7 +32,7 @@ IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport
 move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
 are removed from the thumbstick-x cycle to keep the list short, so they do **not** appear in the
 diagram above. Un-hide by deleting an id from that set. **TRANSLATE now lives in the PROJECT group**
-(not PLAN), and **FURNISH is its own group** (real GLB furniture placement).
+(not PLAN), and **FURNISH is its own group** (drops a FURNITURE zone sized to a product).
 
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
@@ -278,6 +278,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     the DOOR code path through `APT_KIND`). Readout: product, `width × (head − sill)`, `1 LEAF` /
     `2 LEAVES` (the zone's hinge: both = two), `MADE TO MEASURE`. Design in `docs/materials.md`
     "Windows".
+  - **FURNITURE** (`id: mat_furniture`): the product of a FURNITURE zone (owner, 2026-09-27;
+    `docs/furniture.md` "merge"). Trigger selects the zone; **thumbstick up/down** cycles the
+    furniture catalog (none first; stored as the zone's `article` + a `productMm` size snapshot);
+    **A/X turns it 90°** (`facing`; the footprint swaps about the zone's centre); B/Y clears it (the
+    zone keeps its size). Shares the DOOR code path (`APT_KIND`), with its own branches in
+    `cycleMaterial`/`materialReadout`/`deleteInMode` because the choices come from the furniture
+    catalog, not `materialsFor`. Readout: product name, `w × d × h`, `A/X: TURN 90°`. A product
+    zone is tinted violet in every MATERIAL mode.
   - **SWITCH** (`id: mat_switch`): trigger selects the switch marker within the reticle; where
     switches overlap (a stack at one plan point, or neighbours in the reticle), **grip cycles** them
     first (owner request, 2026-09-27), and the readout shows `n/N · GRIP: NEXT`. Thumbstick-y cycles
@@ -291,21 +299,20 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     `surface: 'ethernet'` products.
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
-- **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,
-  IKEA models loaded on the fly through the Cloudflare Worker proxy; see `docs/furniture.md`),
-  drawn in `furnitureGroup` at plan `(x,0,-y)` + `rotationY`, **only while the AR 3D view is on
-  (LEFT X)**; otherwise as flat plan pieces on the floor (`furniturePlanGroup`, docs/furniture.md
-  "Rendering"). These are **NOT massing** — they never
-  enter the footprint/boolean/extrude pipeline (distinct from the `furniture` *zone* kind, a
-  `[foot,top]` placeholder rect authored in PLAN). Trigger empty space to **drop** the current article
-  at the tip (at the catalog's `mountZMm` foot height for a wall-hung product, else on the floor); trigger a hovered item to **select** it, which opens its **foot-elevation pad** — a
-  single value = how high the model's base sits off the floor (for wall-hung units/shelves). That pad
-  is **floor-only** (its SWAP cell is inert; there is **no** free-Z and **DEL
-  deletes the item**, because furniture grip-drag is floor-planar so the foot is pad-only). **Thumbstick
-  up/down** (`cycleFurnish`) rotates the selected item, or cycles the drop article when none selected.
-  **Grip-drag** moves the hovered item over the floor reticle (`applyFurnitureGripDrag`, x/y only,
-  `emit:false`, committed once via `touch()`; the foot elevation `y` is preserved). **B/Y deletes** the
-  selected item. Detail: `docs/furniture.md`.
+- **FURNISH** (`id: furnish`, its own mode group) — **drop a FURNITURE zone already sized to a
+  product** (`project.addFurnitureZone`; docs/furniture.md "merge"). **Thumbstick up/down**
+  (`cycleFurnish`) cycles the furniture catalog; trigger drops the zone centred on the reticle, its
+  foot at the catalog's `mountZMm` (wall-hung units) else 0. That's all FURNISH does: the zone is then
+  a normal PLAN zone (dimension it to the walls, move it, turn it with A/X or delete it in PLAN ·
+  EDIT; edit foot/top on the band pad) and its product is changed in MATERIAL · FURNITURE. The
+  models (IKEA through the Cloudflare Worker proxy, or procedural) draw in `furnitureGroup` at each
+  product zone's centre, lifted by its foot, turned by its facing, **only while the AR 3D view is on
+  (LEFT X)**; otherwise as flat plan pieces with the front notch (`furniturePlanGroup`).
+  `buildFurniture` runs from every `buildArch3d` (so every `buildPlan`) and returns early when the
+  placements haven't changed. The old free-placed items (`floor.furniture[]`, 15° rotation, foot pad,
+  grip-drag) are gone; saved files, slots, clipboards and share links holding them migrate to zones
+  on load. **Furniture dimensions are solved one-way after the structure**; one that no longer fits
+  is removed and the mode label flashes `DIM REMOVED · <miss>` (`checkRemovedDims`, polled per frame).
 - **RECAL** — re-zero against a known corner, REGISTER-style. First SELECT a corner with the
   pointer reticle (aim so it hugs the wall you want as wall 1; W1 is cyan, W2 purple;
   the active wall receives the standard edge highlight; trigger to lock)
@@ -458,8 +465,7 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   reticle is over a drag target → **grip-drag** (either DIMS over its own dim panel = place the line
   perpendicularly and slide the value box along it; EDGE
   over an edge = move it; MARKER with the floor reticle over a marker's floor icon = grab it and move
-  in 3D at its initial pointer depth; CONDUIT EDIT over a bare node = move it; FURNISH over an item =
-  move it).
+  in 3D at its initial pointer depth; CONDUIT EDIT over a bare node = move it).
   Marker drag **locks any axis with a defined dim** — X/Y from `marker._locked` (its pins) AND **Z when
   a `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`) — so a measured position/height isn't dragged
   off; only free axes follow (a fully-pinned, height-defined marker doesn't move). See "Vertical
@@ -471,8 +477,8 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   display/input unit (`cycleUnit`, wraps); **LANG** =
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
-  **FURNISH** = rotate the selected GLB item, or cycle the drop article if none selected
-  (`cycleFurnish`); **PLAN · ADD** = the kind to add over `ZONE_KINDS`
+  **FURNISH** = the product to drop (`cycleFurnish`); **MATERIAL · FURNITURE** = the selected zone's
+  product; **PLAN · ADD** = the kind to add over `ZONE_KINDS`
   (room/wall/insulation/door/garage/halfwall/heater/sliding/window/stairs up/stairs down/cabinet/furniture, `cycleZoneKind`);
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
@@ -483,10 +489,11 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   removed as an asymmetric one-off). **A/X = FLIP or ROTATE**: in either DIMS mode with a completed
   pair it flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`); in TRANSLATE it flips
   the pending coordinate side; **in PLAN · EDIT with a selected aperture it rotates that aperture**
-  (`rotateAperture`, gated on `edit` mode so it does not collide with the DIMS/TRANSLATE flip); inert
+  (`rotateAperture`, gated on `edit` mode so it does not collide with the DIMS/TRANSLATE flip), and a
+  FURNITURE zone turns its product 90°; in MATERIAL · FURNITURE it turns the selected product; inert
   otherwise. **B/Y = DELETE** the mode's selected/hovered item where applicable:
   in DIMS it removes the dimension constraint (`deleteDimContext` — a completed pair, else a hovered
-  existing dim label); elsewhere `deleteInMode` (PLAN EDIT zone, MARKER, FURNISH item, CONDUIT EDIT
+  existing dim label); elsewhere `deleteInMode` (PLAN EDIT zone, MARKER, a MATERIAL product, CONDUIT EDIT
   hovered segment else selected node + its segments, WIRE selected wire). TRANSLATE has nothing to
   delete, so B/Y is inert there. All contextual cycling lives on thumbstick-y (above).
 - Both tracked controllers remain visible. The RIGHT HUD and LEFT sheet/teleport target are displayed
@@ -596,7 +603,6 @@ on a pad** (`nextDatum`/`datumWord`/`datumSwapLabel`, shared by the marker and n
   value defines it; **DEL frees Z** (standard DEL caption) — it clears the height dim and does NOT
   delete the object (object-delete is B/Y). A z edit that moves geometry needs a hand `buildPlan()` /
   `buildConduits()` (`mr.js` doesn't subscribe to `onChange`).
-- **GLB foot pad is floor-only**: SWAP inert, DEL deletes the item (see FURNISH).
 - **The 3D grip-drag holds any axis with a defined dim.** X/Y come from `marker._locked` (distance
   pins); **Z is held whenever `zDatum` is set** (`nz = obj.zDatum ? obj.z : tipZ`, in
   `applyMarkerGripDrag` / `applyConduitNodeGripDrag`). Applies to markers, bare nodes, and
@@ -883,7 +889,7 @@ teleport reticle; no last-active routing remains.
 
 | Path | Role |
 |---|---|
-| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad (DIMS + band pad + free/floor height pads + floor-only GLB foot pad), Z-dim visual (`zDimGroup`/`buildZDims`), slot menu, grip-drag (X/Y/Z dim-lock), multi-floor/LEVEL, RECAL, FURNISH, conduit ribbons/nodes, `planYaw`, `?ar=1` auto-AR, thumbstick-hold exit |
+| `src/ui/mr.js` | The whole MR session: modes, HUD, numpad (DIMS + band pad + free/floor height pads), Z-dim visual (`zDimGroup`/`buildZDims`), slot menu, grip-drag (X/Y/Z dim-lock), multi-floor/LEVEL, RECAL, FURNISH, conduit ribbons/nodes, `planYaw`, `?ar=1` auto-AR, thumbstick-hold exit |
 | `src/core/model.js` | `Floor` + `Project` (floors[], active/ground); facade to active floor; `_emit` recomputes elevations + solves each floor; constraint ops |
 | `src/core/constraints.js` | per-axis weighted least-squares `solve(floor)` (normalizes w/h in write-back); `makeDistance`/`makeOriginDistance`/`ORIGIN_ID`/`edgeCoord`; `c.conflict`; `solveMarkers`/`solveConduitNodes` (one-way pins) (Z is not solved) |
 | `src/core/apertureGlyph.js` | **Sole** source of door/window/half-wall/heater/sliding plan glyphs (`doorSwingSegments` etc.) + `resolveApertureOrient`; consumed by planSheet, dxf, AND mr (`addApertureGlyphs`) so they can't diverge |

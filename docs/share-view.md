@@ -21,8 +21,10 @@ ground index, never shipped. The bytes are `deflate-raw` via `CompressionStream`
 A one-letter codec tag (`z` deflate, `u` identity) falls back to identity where compression
 streams are missing. Decoding a `z` link needs `DecompressionStream` in the viewer's browser.
 
-What a view carries: massing, aperture bands and orientation, **furniture placements (default
-on)**, and **markers (opt-in)**, because large marker sets eat the QR capacity margin. Markers
+What a view carries: massing, aperture bands and orientation, **furniture products (default
+on)**: a FURNITURE zone's `facing` rides after `climb` in its compact rect, then an index into the
+`a` article list (`docs/furniture.md` "merge"); links made before the merge carried free-placed
+items in floor slot 4, which still decode and migrate to zones. And **markers (opt-in)**, because large marker sets eat the QR capacity margin. Markers
 keep their device product (`marker.product`, `docs/materials.md` "Switches"): the ids are listed
 once in `p` and a marker's optional slot 5 indexes it (slot 4 is the height flag, written as 0 when
 only a product needs the slot), so links made before products still decode. Not

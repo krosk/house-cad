@@ -20,7 +20,7 @@ import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind, isStairs } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
@@ -499,6 +499,13 @@ function drawZones(be, L, floor, layers) {
       kind, hingeEnd, false, perp, over, Math.abs(L.X(1) - L.X(0)),
       isStairs(kind) ? resolveStairOrient(rect, sx0, sx1, sy0, sy1) : null,
     );
+    // A furniture product's front: a 2 mm (paper) V on its front edge.
+    if (kind === 'furniture') {
+      const perMetre = Math.abs(L.X(1) - L.X(0));
+      for (const [ax, ay, bx, by] of furnitureNotchSegments(rect, 2 / perMetre) || []) {
+        be.line(L.X(ax), L.Y(ay), L.X(bx), L.Y(by), { stroke: C_ZONE, width: 0.16 });
+      }
+    }
   }
 }
 

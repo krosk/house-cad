@@ -233,17 +233,136 @@ function addRow(M, rhs, terms, target, w) {
  * Solve all constraints of one floor (or any {rectangles, constraints} scope)
  * and write resolved coordinates back into its rectangles. Safe to call on
  * every change. No-op when there are no constraints (geometry is then whatever
- * the user drew/dragged). Project._emit() calls this once per floor.
+ * the user drew/dragged). Project._emit() calls this once per floor. Returns the
+ * furniture dimensions it removed as over-specified: [{constraint, miss}] (m); with
+ * `prune: false`, or while a rect is being dragged, they are skipped but kept.
  */
-export function solve(floor) {
-  const constraints = floor.constraints;
-  const rects = floor.rectangles;
+export function solve(floor, { prune = true } = {}) {
+  const furniture = floor.rectangles.filter((r) => r.kind === 'furniture');
+  if (!furniture.length) { solveRects(floor.rectangles, floor.constraints); return []; }
+  // Furniture is solved ONE-WAY, after the structure (docs/furniture.md "Constraints"):
+  // walls and rooms settle from their own dimensions only, then each furniture zone is
+  // placed against that settled geometry. A furniture dimension can never move a wall.
+  const furnIds = new Set(furniture.map((r) => r.id));
+  const touchesFurniture = (c) => furnIds.has(c.a?.rect) || furnIds.has(c.b?.rect);
+  solveRects(floor.rectangles.filter((r) => !furnIds.has(r.id)),
+    floor.constraints.filter((c) => !touchesFurniture(c)));
+  const removed = solveFurniture(floor.rectangles, furniture,
+    floor.constraints.filter((c) => touchesFurniture(c) && !c.measurement
+      && !isMarkerConstraint(c) && !isNodeConstraint(c)));
+  // Never delete mid-drag (a drag passing through a tight spot would lose the dimension
+  // for good); the over-specified one is just skipped until the drag's final settle.
+  if (!prune || floor.rectangles.some((r) => r._dragging)) return [];
+  if (removed.length) {
+    const gone = new Set(removed.map((r) => r.constraint));
+    floor.constraints = floor.constraints.filter((c) => !gone.has(c));
+  }
+  return removed;
+}
+
+// A furniture zone's plan footprint from its product: `productMm` = the catalog's
+// [width, height, depth]; facing 90/270 turns it, so width runs along plan y.
+export function furnitureFootprint(rect) {
+  const mm = rect.productMm;
+  if (!Array.isArray(mm) || !(mm[0] > 0) || !(mm[2] > 0)) return null;
+  const turned = ((Number(rect.facing) || 0) / 90) % 2 !== 0;
+  const w = mm[0] / 1000, d = mm[2] / 1000;
+  return turned ? { x: d, y: w } : { x: w, y: d };
+}
+
+// Place furniture zones one-way. Every dimension is a difference equation
+// coord(b) − coord(a) = value, and structural edges (and the origin) are constants, so
+// each axis is a union-find with offsets: equations join edges into rigid groups, a
+// group holding a constant is fully placed, and a floating group keeps its weighted
+// current position (the same stay/anchor/drag weights as the rectangle solve). A
+// product fixes its zone's size first. A later equation that contradicts its group by
+// more than CONFLICT_TOL is over-specified: it is REMOVED (owner decision), never
+// flagged, and returned with its miss so the UI can say so.
+function solveFurniture(allRects, furniture, constraints) {
+  const rectById = new Map(allRects.map((r) => [r.id, r]));
+  const furnIds = new Set(furniture.map((r) => r.id));
+  const removed = [];
+  for (const axis of ['x', 'y']) {
+    const edges = axis === 'x' ? ['left', 'right'] : ['bottom', 'top'];
+    const parent = new Map(); // key -> parent key; 'G' is the fixed ground
+    const off = new Map();    // key -> value(key) − value(parent)
+    const find = (k) => {
+      if (!parent.has(k)) { parent.set(k, k); off.set(k, 0); }
+      let root = k, sum = 0;
+      while (parent.get(root) !== root) { sum += off.get(root); root = parent.get(root); }
+      // Path compression: point k straight at the root.
+      if (k !== root) { parent.set(k, root); off.set(k, sum); }
+      return [root, sum];
+    };
+    // Join b to a with value(b) − value(a) = v; false when already joined inconsistently
+    // (the returned miss is the signed amount it fails by).
+    const join = (a, b, v) => {
+      const [ra, oa] = find(a), [rb, ob] = find(b);
+      if (ra === rb) return { ok: Math.abs(ob - oa - v) <= CONFLICT_TOL, miss: ob - oa - v };
+      // Keep the ground as a root so a placed group is recognised by its root.
+      if (rb === 'G') { parent.set(ra, rb); off.set(ra, ob - v - oa); }
+      else { parent.set(rb, ra); off.set(rb, oa + v - ob); }
+      return { ok: true };
+    };
+    find('G');
+    // An endpoint → its union-find key (a structural edge is joined to the ground at its
+    // settled coordinate), or null when it references nothing on this floor.
+    const keyOf = (end) => {
+      if (end.rect === ORIGIN_ID) return 'G';
+      const r = rectById.get(end.rect);
+      if (!r || EDGE_AXIS[end.edge] !== axis) return null;
+      const key = `${r.id}:${end.edge}`;
+      if (!furnIds.has(r.id) && !parent.has(key)) join('G', key, edgeCoord(r, end.edge));
+      return key;
+    };
+    for (const r of furniture) {
+      const size = furnitureFootprint(r);
+      find(`${r.id}:${edges[0]}`); find(`${r.id}:${edges[1]}`);
+      if (size) join(`${r.id}:${edges[0]}`, `${r.id}:${edges[1]}`, size[axis]);
+    }
+    const anchors = new Set();
+    for (const c of constraints) {
+      if (c.axis !== axis) continue;
+      c.conflict = false; // one-way placement never shows a conflict
+      const a = keyOf(c.a), b = keyOf(c.b);
+      if (!a || !b || a === b) continue;
+      const res = join(a, b, c.value);
+      if (!res.ok) removed.push({ constraint: c, miss: res.miss });
+      else anchors.add(a);
+    }
+    // Floating groups settle at the weighted mean of their members' current positions.
+    const current = new Map();
+    for (const r of furniture) for (const e of edges) current.set(`${r.id}:${e}`, { v: edgeCoord(r, e), r });
+    const acc = new Map(); // root -> [Σw·(v − off), Σw]
+    for (const [k, { v, r }] of current) {
+      const [root, o] = find(k);
+      if (root === 'G') continue;
+      const w = r._dragging ? W_DRAG : anchors.has(k) ? W_ANCHOR : W_STAY;
+      const s = acc.get(root) || [0, 0];
+      s[0] += w * (v - o); s[1] += w;
+      acc.set(root, s);
+    }
+    const value = (k) => {
+      const [root, o] = find(k);
+      if (root === 'G') return o;
+      const [sw, w] = acc.get(root);
+      return sw / w + o;
+    };
+    for (const r of furniture) {
+      const lo = value(`${r.id}:${edges[0]}`), hi = value(`${r.id}:${edges[1]}`);
+      if (axis === 'x') { r.x = Math.min(lo, hi); r.w = Math.abs(hi - lo); }
+      else { r.y = Math.min(lo, hi); r.h = Math.abs(hi - lo); }
+    }
+  }
+  return removed;
+}
+
+// The weighted least-squares rectangle solve (see the header) over one set of rects.
+function solveRects(rects, constraints) {
   if (!constraints.length || !rects.length) {
     for (const c of constraints) c.conflict = false;
     return;
   }
-
-  const rectById = new Map(rects.map((r) => [r.id, r]));
 
   for (const axis of ['x', 'y']) {
     const edges = axis === 'x' ? ['left', 'right'] : ['bottom', 'top'];

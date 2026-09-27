@@ -102,7 +102,7 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
 ## 4. Build from shapes in code
 
 - Follow the IKEA GLB convention: metres, Y up, floor at Y = 0, centred in plan, front toward +Z.
-  Then FURNISH/View 3D place, rotate, highlight and clone it like a downloaded model.
+  Then FURNISH / MATERIAL · FURNITURE / View 3D place, turn and clone it like a downloaded model.
 - Overall size from the catalog (`sizeMm`); every other dimension is a named constant or a
   `params` field (`footHeightMm`, `mattressHeightMm`…), so owner corrections are one-line edits.
 - Primitives that were enough: `BoxGeometry`; a 4-sided `CylinderGeometry` turned 45° for a tapered

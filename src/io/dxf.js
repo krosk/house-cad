@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -213,6 +213,8 @@ function writeZoneSymbol(w, rect, kind) {
         [b.x1 - ix, b.y1 - iy], [b.x0 + ix, b.y1 - iy],
       ]);
     }
+    // A product's front: a 10 cm V on the zone's front edge (the sheet's notch, in model space).
+    for (const [ax, ay, bx, by] of furnitureNotchSegments(rect, 0.10) || []) w.line('FURNITURE', ax, ay, bx, by);
   }
 }
 
