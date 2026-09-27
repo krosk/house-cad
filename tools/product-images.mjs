@@ -1,21 +1,25 @@
 #!/usr/bin/env node
-// Product photo extractor for the retailers used in product modelling
-// (docs/product-modelling.md step 3). One function, `extractImages(pageUrl, html)`,
-// knows each site's pattern; it is self-contained so it also runs inside Chrome for
-// sites that refuse scripted fetches.
+// Product source extractor for the retailers used in product modelling
+// (docs/product-modelling.md step 3): gallery photos, attached documents (installation
+// manual, spec sheet: PDFs) and the spec table. One function, `extractProduct(pageUrl,
+// html)`, knows each site's pattern; it is self-contained so it also runs inside Chrome
+// for sites that refuse scripted fetches.
 //
-//   node tools/product-images.mjs <product-url> [--out <dir>] [--filter <text>] [--list]
-//       fetch the page (IKEA, Lapeyre, Castorama, leboncoin), list the product images, download them
+//   node tools/product-images.mjs <product-url> [--out <dir>] [--filter <text>] [--list] [--sheet]
+//       fetch the page (IKEA, Lapeyre, Castorama, leboncoin), print the specs and the
+//       image/document URLs, download them
 //   node tools/product-images.mjs --snippet
 //       print a JS snippet; run it in Chrome on the product page (javascript_tool):
-//       it returns the image URLs, which you then download with --download
-//   node tools/product-images.mjs --download --out <dir> <image-url>...
+//       it returns the same report, whose URLs you then download with --download
+//   node tools/product-images.mjs --download [--sheet] --out <dir> <url>...
 //
 // --out defaults to ./product-images (use the session scratchpad; never the repo).
+// Files are named <n>-<source id>.<ext> so a doc can cite the retailer's image id.
+// --sheet also writes <out>/sheet-<k>.png: labelled contact sheets of 16 photos (ffmpeg).
 // --filter keeps leboncoin listings whose title contains <text> (default: words of the URL).
 
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 // Fetch with curl, not Node's fetch: leboncoin 403s Node's fetch but serves curl with the
@@ -35,23 +39,50 @@ function curl(url, outFile) {
 // DataDome (a JS challenge; x-datadome header): a real Chrome passes it, curl never does.
 const BROWSER_ONLY = [/(^|\.)leroymerlin\.fr$/];
 
-// → [{ url, note }] full-size product image URLs in page order, deduplicated.
+// → { images: [{ url, note }], docs: [{ url, name }], specs: [[name, value]], variants: [text] }
+// Images are full-size product photos in page order, deduplicated.
 // Must stay self-contained (no outer references): --snippet serialises it for Chrome.
-function extractImages(pageUrl, html, filter = '') {
+function extractProduct(pageUrl, html, filter = '') {
   const host = new URL(pageUrl).hostname.replace(/^www\./, '');
-  const out = [], seen = new Set();
+  const out = [], seen = new Set(), docs = [], variants = [], specs = [];
   const add = (url, note = '', key = url) => {
     if (seen.has(key)) return;
     seen.add(key); out.push({ url, note });
   };
+  const addDoc = (url, name = '') => {
+    if (!docs.some((d) => d.url === url)) docs.push({ url, name });
+  };
   const all = (re) => [...html.matchAll(re)];
+  const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"').replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  const spec = (k, v) => {
+    const row = [text(k), text(v)];
+    if (row[0] && row[1] && !specs.some((r) => r[0] === row[0])) specs.push(row);
+  };
+  // Spec table on any site: <th>name</th><td>value</td> rows (Leroy Merlin's
+  // "Tableau de caractéristiques").
+  for (const m of all(/<th[^>]*>([\s\S]{1,200}?)<\/th>\s*<td[^>]*>([\s\S]{1,300}?)<\/td>/g)) spec(m[1], m[2]);
+  // Documents on any site: links to PDFs, named by their link text.
+  for (const m of all(/<a[^>]*href="(https?:\/\/[^"]+?\.pdf)"[^>]*>([\s\S]{0,300}?)<\/a>/g)) addDoc(m[1], text(m[2]));
 
   if (host.endsWith('leroymerlin.fr')) {
-    // media.adeo.com/media/<id>/media.jpg: the gallery photos are the .jpg ids (the
-    // page lists them before the recommendations); .png/.jpeg ids are icons and ads.
-    // The first few ids are this product; later .jpg ids can be other products: look.
-    for (const m of all(/media\.adeo\.com\/media\/(\d+)\/media\.jpg/g)) {
-      add(`https://media.adeo.com/media/${m[1]}/media.jpeg?width=1200`, `adeo ${m[1]}`, m[1]);
+    // media.adeo.com/media/<id>/media.<ext>: the gallery is the thumbnail strip
+    // (`m-nav-thumbnails__image`, in order; the last may be a video's poster). Its ids
+    // can be .png or .jpg (the NEO tray, 2026-09-27: 9 of 10 were .png), and the page's
+    // other ids are menu icons, ads and recommendations. Sibling variants
+    // (`product-variants__item__picture`, alt = the variant) are listed as notes.
+    // No query string: the Chrome tool blocks output containing one; --download adds it.
+    for (const m of all(/<img[^>]*m-nav-thumbnails__image[^>]*>/g)) {
+      const id = m[0].match(/media\.adeo\.com\/media\/(\d+)\/media\.(\w+)/);
+      if (id) add(`https://media.adeo.com/media/${id[1]}/media.${id[2]}`, `adeo ${id[1]}`, id[1]);
+    }
+    for (const m of all(/<img[^>]*product-variants__item__picture[^>]*>/g)) {
+      const id = m[0].match(/media\.adeo\.com\/media\/(\d+)/), alt = m[0].match(/alt="([^"]*)"/);
+      if (id) variants.push(`${alt ? alt[1] : '?'}: media ${id[1]}`);
+    }
+    for (const m of all(/<a[^>]*data-file-name="([^"]*)"[^>]*href="(https:\/\/media\.adeo\.com\/media\/\d+\/media\.pdf)"/g)) {
+      addDoc(m[2], m[1].trim());
     }
   } else if (host.endsWith('lapeyre.fr')) {
     // statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg, or zoom1/…/<id>.jpg on
@@ -59,6 +90,8 @@ function extractImages(pageUrl, html, filter = '') {
     for (const m of all(/https?:\/\/www\.statics-lapeyre\.fr\/+img\/catalogue\/(?:collMain|zoom1)\/[^"'\s?\\]+?\.(?:jpe?g|png|webp)/g)) {
       add(m[0].replace(/(\.fr)\/+/, '$1/'), 'lapeyre');
     }
+    // Specs: MUI paragraph pairs, a body1 name then a body2 value (2026-09-27).
+    for (const m of all(/<p class="MuiTypography-root MuiTypography-body1[^"]*">([^<]{1,120})<\/p><\/div><div[^>]*><p class="MuiTypography-root MuiTypography-body2[^"]*">([\s\S]{1,300}?)<\/p>/g)) spec(m[1], m[2]);
   } else if (host.endsWith('ikea.com')) {
     // images/products/<slug>__<id>_<code>_<size>.jpg. Keep only this product's slug
     // (the page also shows accessories).
@@ -99,7 +132,20 @@ function extractImages(pageUrl, html, filter = '') {
       if (!/logo|icon|picto|sprite|favicon|avatar/i.test(m[0])) add(m[0], 'generic');
     }
   }
-  return out;
+  return { images: out, docs, specs, variants };
+}
+
+// The report printed by the CLI and returned by the snippet: plain lines, URLs first so
+// they can be pasted into --download.
+function report(r) {
+  return [
+    ...r.images.map((x) => `${x.url}  ${x.note}`),
+    `${r.images.length} image(s)`,
+    ...r.docs.map((d) => `${d.url}  ${d.name}`),
+    `${r.docs.length} document(s)`,
+    ...(r.specs.length ? ['specs:', ...r.specs.map(([k, v]) => `  ${k}: ${v}`)] : []),
+    ...(r.variants.length ? ['variants:', ...r.variants.map((v) => `  ${v}`)] : []),
+  ].join('\n');
 }
 
 function parseArgs(argv) {
@@ -114,14 +160,43 @@ function parseArgs(argv) {
   return a;
 }
 
+// Download to <n>-<source id>.<ext>; the id is the adeo media id, else the file's basename.
 async function download(urls, dir) {
   await mkdir(dir, { recursive: true });
+  const photos = [];
   let n = 0;
-  for (const url of urls) {
-    const ext = url.match(/\.(png|webp|avif)(?:\?|$)/)?.[1] || 'jpg';
-    const file = join(dir, `${String(++n).padStart(2, '0')}.${ext}`);
+  for (let url of urls) {
+    const adeo = url.match(/media\.adeo\.com\/media\/(\d+)\/media\.(\w+)/);
+    if (adeo && adeo[2] !== 'pdf' && !url.includes('?')) url += '?width=1200'; // full size
+    const ext = (url.match(/\.(png|webp|avif|pdf)(?:\?|$)/)?.[1]) || 'jpg';
+    const id = (adeo ? adeo[1] : new URL(url).pathname.split('/').pop().replace(/\.\w+$/, ''))
+      .replace(/[^\w.-]+/g, '_').slice(-40);
+    const file = join(dir, `${String(++n).padStart(2, '0')}-${id}.${ext}`);
     const r = curl(url, file);
     console.log(r.status === 200 ? `${file}  ${url}` : `${r.status}  ${url}`);
+    if (r.status === 200 && ext !== 'pdf') photos.push(file);
+  }
+  return photos;
+}
+
+// Labelled contact sheets, 4 × 4 tiles of 300 px, so every photo is looked at (step 3).
+function contactSheets(files, dir) {
+  for (let k = 0; k * 16 < files.length; k++) {
+    const batch = files.slice(k * 16, k * 16 + 16);
+    const tiles = batch.map((f, i) => `[${i}:v]scale=300:300:force_original_aspect_ratio=decrease,` +
+      `pad=300:300:(ow-iw)/2:(oh-ih)/2:white,drawtext=text='${basename(f)}':x=5:y=5:fontsize=16:fontcolor=red[v${i}]`);
+    const layout = batch.map((_, i) => `${(i % 4) * 300}_${Math.floor(i / 4) * 300}`).join('|');
+    const out = join(dir, `sheet-${k + 1}.png`);
+    const graph = batch.length > 1
+      ? `${tiles.join(';')};${batch.map((_, i) => `[v${i}]`).join('')}xstack=inputs=${batch.length}:layout=${layout}:fill=white`
+      : tiles[0].replace(/\[v0\]$/, '');
+    try {
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...batch.flatMap((f) => ['-i', f]),
+        '-filter_complex', graph, '-frames:v', '1', out]);
+      console.log(`sheet ${out}`);
+    } catch (e) {
+      console.log(`contact sheet failed (ffmpeg): ${String(e.message).split('\n')[0]}`);
+    }
   }
 }
 
@@ -130,27 +205,38 @@ async function main() {
   if (a.snippet) {
     // Run on the product page in Chrome; it re-fetches its own HTML (same origin,
     // so the site's bot check is already passed) and applies the same extractor.
-    console.log(`(async () => { const extractImages = ${extractImages.toString()};
+    // `await` first: the Chrome tool returns a bare async IIFE as {} (2026-09-27). The
+    // tool also truncates long output: the result stays in window.__product (read
+    // __product.specs in a second call).
+    console.log(`await (async () => { const extractProduct = ${extractProduct.toString()};
+  const report = ${report.toString()};
   const html = await (await fetch(location.href)).text();
-  return extractImages(location.href, html).map((x) => x.url).join(' '); })()`);
+  window.__product = extractProduct(location.href, html);
+  return report(window.__product); })()`);
     return;
   }
-  if (a.download) return download(a.urls, a.out);
+  if (a.download) {
+    const photos = await download(a.urls, a.out);
+    if (a.sheet && photos.length) contactSheets(photos, a.out);
+    return;
+  }
   const [page] = a.urls;
   if (!page) { console.log('usage: see the header of tools/product-images.mjs'); process.exit(1); }
   const host = new URL(page).hostname.replace(/^www\./, '');
   if (BROWSER_ONLY.some((re) => re.test(host))) {
     console.log(`${host} refuses scripted fetches: open the page in Chrome, run the output of\n` +
-      '  node tools/product-images.mjs --snippet\nwith javascript_tool, then pass the URLs to --download.');
+      '  node tools/product-images.mjs --snippet\nwith javascript_tool, then pass the URLs to --download [--sheet].');
     process.exit(2);
   }
   const r = curl(page);
   if (r.status !== 200) { console.log(`${r.status} fetching ${page}: try the Chrome route (--snippet).`); process.exit(2); }
   const filter = a.filter ?? decodeURIComponent(new URL(r.url).pathname.split('/').pop() || '').replace(/[-_]/g, ' ').replace(/\.\w+$/, '');
-  const images = extractImages(r.url, r.body, host.endsWith('leboncoin.fr') ? filter : '');
-  for (const x of images) console.log(`${x.url}  ${x.note}`);
-  console.log(`${images.length} image(s)`);
-  if (!a.list && images.length) await download(images.map((x) => x.url), a.out);
+  const found = extractProduct(r.url, r.body, host.endsWith('leboncoin.fr') ? filter : '');
+  console.log(report(found));
+  const urls = [...found.images, ...found.docs].map((x) => x.url);
+  if (a.list || !urls.length) return;
+  const photos = await download(urls, a.out);
+  if (a.sheet && photos.length) contactSheets(photos, a.out);
 }
 
 main();

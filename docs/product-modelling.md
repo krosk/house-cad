@@ -46,23 +46,35 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
   Read the pages with the Read tool (`pages: "1-6"`); page 1 is usually a clean isometric.
 - Record every source (URL) and every number's origin in the doc entry.
 
-## 3. Getting photos: `tools/product-images.mjs`
+## 3. Getting photos, documents and specs: `tools/product-images.mjs`
 
-The script knows each retailer's image pattern and downloads full-size photos; send them to the
-scratchpad with `--out`, never the repo. Proven 2026-09-26 on every site below.
+The script knows each retailer's image pattern and downloads full-size photos, plus the page's
+documents (PDF links: installation manual, spec sheet, declaration of performance) and its spec table
+(`<th>`/`<td>` rows on any site; Lapeyre's own layout). Send them to the scratchpad with `--out`, never
+the repo. Files are named `<n>-<source id>.<ext>` (e.g. `05-5368981.png`) so a doc entry can cite the
+retailer's image id. `--sheet` also writes labelled 4 × 4 contact sheets (`sheet-<k>.png`, ffmpeg), so
+every photo gets a look. Images Proven 2026-09-26 on every site below; documents, specs, ids and sheets
+Proven 2026-09-27 on Leroy Merlin (NEO tray) and Lapeyre (LINE door).
 
 ```bash
-node tools/product-images.mjs --out <scratchpad>/imgs <product-url>   # IKEA, Lapeyre, leboncoin
-node tools/product-images.mjs --list <url>                            # list only
+node tools/product-images.mjs --sheet --out <scratchpad>/imgs <product-url>   # IKEA, Lapeyre, leboncoin
+node tools/product-images.mjs --list <url>                            # report only: images, docs, specs
 node tools/product-images.mjs --snippet    # Leroy Merlin: JS to run in Chrome on the product page
-node tools/product-images.mjs --download --out <dir> <image-url>...   # then download what it returned
+node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then download what it returned
 ```
+
+- The snippet starts with `await`: the Chrome tool returns a bare async IIFE as `{}`. The tool truncates
+  long output and blocks any output containing a query string, so the report lists URLs without one
+  (`--download` adds `?width=1200` for Leroy Merlin) and the full result stays in `window.__product`
+  (read `__product.specs` in a second call).
+- The generic PDF scan also picks up site-wide PDFs (warranty notices, a Lapeyre kitchen buying
+  guide): the link text names each one; download only the relevant ones.
 
 | Site | Pattern the script uses | Access |
 |---|---|---|
 | IKEA | `ikea.com/<cc>/<lang>/images/products/<slug>__<id>_<code>_s5.jpg`, only this product's slug; 1400 px | curl |
 | Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (1240 × 900), or `…/zoom1/…/<id>.jpg` on some pages (the LINE door block, 780 × 780); pictos excluded | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
-| Leroy Merlin | `media.adeo.com/media/<id>/media.jpg` ids in the page HTML = the gallery, in order; downloaded as `media.jpeg?width=1200` | **Chrome only** (DataDome, below); images download fine by curl |
+| Leroy Merlin | the thumbnail strip (`m-nav-thumbnails__image`) = the gallery, in order: `media.adeo.com/media/<id>/media.<png\|jpg>` (ids come in both formats; the last can be a video poster), downloaded with `?width=1200`; the page's other media ids are menu icons, ads and recommendations. Documents from `data-file-name` links; sibling variants listed from `product-variants__item__picture` | **Chrome only** (DataDome, below); images download fine by curl |
 | Castorama | Scene7 `media.castorama.fr/is/image/Castorama/<slug>~<EAN>_<code>`, only this EAN (from `…/<EAN>_CAFR.prd`); `?wid=1400`. Specs and pack are in the page (tile count sits in its embedded data) | curl |
 | leboncoin | `<script id="__NEXT_DATA__">`: objects with `subject` + `images.urls_large`, filtered by title (`--filter`, default the URL's words) | curl (Node's own fetch gets 403) |
 | other | every absolute image URL minus logos/icons: review by eye | curl |
@@ -75,8 +87,9 @@ node tools/product-images.mjs --download --out <dir> <image-url>...   # then dow
   (ikeaddict.com), AptDeco, ikea-club.org, manuall. Design Plus Gallery and lot-art worked with curl
   (generic pattern).
 - Look at **every** gallery image, and at sibling variants (other widths/colours of the same range).
-  The first pass on the Beaulieu floor stopped at the main photo and missed the top-down shot. On
-  Leroy Merlin, later `.jpg` ids can belong to other products: check before using.
+  The first pass on the Beaulieu floor stopped at the main photo and missed the top-down shot. Before
+  2026-09-27 the Leroy Merlin pattern kept only `.jpg` ids and found 1 of the NEO tray's 10 photos
+  (the rest were `.png`); it now reads the thumbnail strip instead.
 - Listings on leboncoin sometimes repost the manufacturer's own studio shots, the best side views.
 - For a surface, a straight top-down photo is the best reference: render at the same scale beside it
   and compare pixel statistics, not just by eye.

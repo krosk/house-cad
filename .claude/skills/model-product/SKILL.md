@@ -21,9 +21,10 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
 
    Name it from the product; ask the owner for their own measurements if they have any.
 3. **Sources** (steps 2–3): the numbers first, then drawings, then photos.
-   - Photos: `node tools/product-images.mjs --out <scratchpad>/imgs <url>` (IKEA, Lapeyre, leboncoin).
+   - Photos, documents (manual PDFs) and the spec table:
+     `node tools/product-images.mjs --sheet --out <scratchpad>/imgs <url>` (IKEA, Lapeyre, leboncoin).
      Leroy Merlin blocks scripts (DataDome): open the page in Chrome, run the output of
-     `node tools/product-images.mjs --snippet` with javascript_tool, then `--download` the URLs.
+     `node tools/product-images.mjs --snippet` with javascript_tool, then `--download --sheet` the URLs.
      A new site: try the generic mode, then add its pattern to the script.
    - Look at every gallery image and at sibling variants (other widths/colours of the range).
    - If a page 403s to curl/WebFetch, read its specs in the Chrome tools.
