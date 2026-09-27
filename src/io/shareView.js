@@ -36,6 +36,10 @@ export function serializeView(project, { markers = false, furniture = true } = {
   const markerTypes = markers
     ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.type || 'outlet')))]
     : [];
+  // Device products (docs/materials.md "Switches"), stored once; markers index into it.
+  const productIds = markers
+    ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.product).filter(Boolean)))]
+    : [];
   const furnitureArticles = furniture
     ? [...new Set(project.floors.flatMap((f) => (f.furniture || []).map((item) => String(item.article))))]
     : [];
@@ -48,6 +52,7 @@ export function serializeView(project, { markers = false, furniture = true } = {
     i: Math.max(0, project.floors.findIndex((f) => f.id === project.activeFloorId)),
     k: kinds,
     t: markerTypes,
+    ...(productIds.length ? { p: productIds } : {}),
     a: furnitureArticles,
     // Positional arrays keep a large marker set within QR version 40 after deflate.
     // version 40 even after deflate. Trailing defaults are removed before encoding.
@@ -61,7 +66,10 @@ export function serializeView(project, { markers = false, furniture = true } = {
       const floorMarkers = markers
         ? f.markers.map((m) => {
           const mk = [markerTypes.indexOf(m.type || 'outlet'), mm(m.x), mm(m.y), mm(m.z)];
-          if (m.zDatum) mk.push(1); // a defined (grab-locking / dimensioned) height
+          // [4] a defined (grab-locking / dimensioned) height; [5] a product index. Both are
+          // optional trailing slots, so links made before products still decode.
+          if (m.zDatum || m.product) mk.push(m.zDatum ? 1 : 0);
+          if (m.product) mk.push(productIds.indexOf(m.product));
           return mk;
         })
         : [];
@@ -98,6 +106,7 @@ export function loadView(project, view) {
     })),
     markers: (f[3] || []).map((m) => ({
       t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
+      ...(typeof view.p?.[m[5]] === 'string' ? { product: view.p[m[5]] } : {}),
     })),
     furniture: (f[4] || []).map((item) => ({
       article: view.a?.[item[0]] || String(item[0]),
@@ -118,6 +127,7 @@ export function loadView(project, view) {
     markers: (f.markers || []).map((m) => ({
       id: `m${++mid}`, type: m.t || 'outlet', x: m.x, y: m.y, z: m.z,
       ...(m.d ? { zDatum: 'floor' } : {}),
+      ...(m.product ? { product: m.product } : {}),
     })),
     electricalLinks: [],
     furniture: (f.furniture || []).map((item) => ({

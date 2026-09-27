@@ -22,7 +22,10 @@ A one-letter codec tag (`z` deflate, `u` identity) falls back to identity where 
 streams are missing. Decoding a `z` link needs `DecompressionStream` in the viewer's browser.
 
 What a view carries: massing, aperture bands and orientation, **furniture placements (default
-on)**, and **markers (opt-in)**, because large marker sets eat the QR capacity margin. Not
+on)**, and **markers (opt-in)**, because large marker sets eat the QR capacity margin. Markers
+keep their device product (`marker.product`, `docs/materials.md` "Switches"): the ids are listed
+once in `p` and a marker's optional slot 5 indexes it (slot 4 is the height flag, written as 0 when
+only a product needs the slot), so links made before products still decode. Not
 carried: constraints, the conduit/wire network, control links, circuits. Any of these could be
 added as an opt-in layer.
 
@@ -30,6 +33,9 @@ added as an opt-in layer.
 mantissas dominate; repeated keys are nearly free (short keys saved about 3%, not worth it).
 Precision is the lever: rounding a full file to mm alone cut it 16.3 → 10.1 KB gzip. Measured on a
 real 3-storey house: massing about 0.9 KB (about 1.2k base64url chars), plus markers about 1.7 KB.
+Proven (Node, 2026-09-27, the owner's 176-marker house): the hash is 1494 chars without markers (QR
+fits) and 3026 with them, which already overflows the QR; giving 111 markers a product adds about
+120 chars (3145).
 
 ## Opening a link (the viewer)
 
