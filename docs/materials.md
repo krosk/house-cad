@@ -64,6 +64,17 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   one phase per **connected same-material region**, not per house. A possible improvement: anchor
   each region at its own offset, chosen to minimize pieces and avoid slivers under ⅓ of a piece.
   Not adopted as an automatic optimiser.
+- **Grout weight (owner, 2026-09-27):** the takeoff gives kg of grout per region / wall face
+  (`count.grout`) and per product for the house (`totals.grout`), from `groutKg` (flooring.js): joint
+  length per m² × joint width × depth × 1.6 kg/dm³. That is the usual manufacturer formula
+  `(A + B) / (A × B) × C × D × 1.6` for a rectangular tile (a 30×30 tile, 3 mm joint, 10 mm deep =
+  0.32 kg/m², matching it), generalised per pattern: pinwheel = Σ (w + h) of the 9 cells per 1.69 m²
+  (4.62 m/m²), octagon + cabochon = 6 sides per lattice cell, a mosaic sheet = its sticks. Depth = the
+  tile thickness (full-depth joint), 10 mm for products with none. ρ = 1.6 is a typical cement grout,
+  not a chosen product: the bag's own coverage wins. No waste margin; plank (click) floors, paint and
+  joint-free products have none. AR shows it only for the room being looked at, on its quantity line
+  (`… · 4.5 kg grout`; owner: the house total isn't needed for now, though `totals.grout` has it); for mixed formats the room line drops its total pieces (the per-size lines
+  carry them) to leave room.
 - **Pattern start corner (owner, 2026-09-27):** a laying region may instead start its pattern at one
   of its corners. The owner chose a corner (not a wall line, not a numeric offset) and one start
   point per **laying region**, so joints still run continuously through a doorway between rooms of

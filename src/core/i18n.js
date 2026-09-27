@@ -432,6 +432,7 @@ const STRINGS = {
   'mat.pickDoor':  { en: 'PICK DOOR',   fr: 'CHOISIR PORTE',  zh: '选择门' },
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
   'mat.pickFurniture': { en: 'PICK FURNITURE', fr: 'CHOISIR MOBILIER', zh: '选择家具' },
+  'mat.groutKg':   { en: 'kg grout', fr: 'kg joint', zh: 'kg 填缝剂' },
   'mat.fromCorner': { en: '⌞ CORNER', fr: '⌞ ANGLE', zh: '⌞ 墙角起铺' },
   'mat.furnitureTurn': { en: 'A/X: TURN 90°', fr: 'A/X : TOURNER 90°', zh: 'A/X：旋转 90°' },
   'dims.removed':  { en: 'DIM REMOVED', fr: 'COTE SUPPRIMÉE', zh: '已删除尺寸' },

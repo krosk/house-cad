@@ -3472,9 +3472,13 @@ export function setupMR(view, project, getFootprint) {
     const item = floorMode
       ? matTakeoff?.regions.find((r) => r.rectIds.has(target.rectangles[0].id))
       : matTakeoff?.walls.find((w) => w.rectId === target.rect.id && w.edge === target.edge);
+    // Grout weight (flooring.js groutKg): kg to 0.1 under 10 kg, whole kg above.
+    const kg = (v) => (v == null ? '' : ` · ${v < 10 ? v.toFixed(1) : Math.round(v)} ${t('mat.groutKg')}`);
+    // Mixed formats list their pieces per size below, so the total is left off here.
     const qty = (c) => `${c.area.toFixed(2)} m²`
-      + (c.pieces ? ` · ${c.pieces} ${t('mat.pcs')}` : '')
-      + (c.cabochons ? ` + ${c.cabochons}` : '');
+      + (c.pieces && !c.formats ? ` · ${c.pieces} ${t('mat.pcs')}` : '')
+      + (c.cabochons ? ` + ${c.cabochons}` : '')
+      + kg(c.grout);
     // Mixed formats (pinwheel): one line per tile size, largest first: pieces, of which cut,
     // and (house total) boxes, e.g. "50×50 39 pcs (9 cut) · 8 boxes".
     const bySize = (formats) => Object.keys(formats)

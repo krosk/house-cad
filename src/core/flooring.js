@@ -224,6 +224,41 @@ function staggerCount(material, boxes) {
   return { pieces: bought, alongX };
 }
 
+// Grout (owner, 2026-09-27): kg = joint length × joint width × depth × density, the
+// usual manufacturer formula kg/m² = (A + B) / (A × B) × C × D × ρ generalised to the
+// pattern's joint length per m². Depth D = the tile thickness (a full-depth joint;
+// 10 mm when the product has none); ρ = 1.6 kg/dm³, a typical cement grout (not a chosen
+// product: check the bag). No waste margin. Plank patterns (click floors), paint and
+// joint-free products have none (null).
+export const GROUT_DENSITY = 1600; // kg/m³
+const GROUT_DEFAULT_DEPTH = 0.01;
+export function jointLengthPerM2(material) {
+  const { pattern, w, h } = material;
+  if (pattern === 'pinwheel') {
+    // Each tile owns half its perimeter: Σ (w + h) over the 9 cells per 1.30 m module.
+    const len = PINWHEEL.reduce((sum, [, , cw, ch]) => sum + (cw + ch) / 100, 0);
+    return len / (1.3 * 1.3);
+  }
+  if (pattern === 'octagon') {
+    // Per lattice cell: half an octagon (8 sides) + half a cabochon (4 equal sides).
+    const side = w / (1 + Math.SQRT2);
+    return (6 * side) / (w * w);
+  }
+  if (pattern === 'grid' || pattern === 'brick') {
+    // A mosaic sheet is sticks: its joints are the sticks' (the sheet's own edges included).
+    const [cols, rows] = material.mosaic || [1, 1];
+    const a = w / cols, b = h / rows;
+    return (a + b) / (a * b);
+  }
+  return 0;
+}
+export function groutKg(material, area) {
+  if (!material || !(material.joint > 0) || !(area > 0)) return null;
+  const perM2 = jointLengthPerM2(material);
+  if (!perM2) return null;
+  return area * perM2 * material.joint * (material.thickness || GROUT_DEFAULT_DEPTH) * GROUT_DENSITY;
+}
+
 export function countPieces(material, boxes) {
   const area = boxesArea(boxes);
   if (!material || !boxes.length) return { area, pieces: 0 };
@@ -233,7 +268,7 @@ export function countPieces(material, boxes) {
   // Naive estimate beside it: area ÷ piece area + 10 % waste (pinwheel: the mean piece).
   const piece = material.pattern === 'pinwheel' ? 1.69 / PINWHEEL.length : material.w * material.h;
   const naive = Math.ceil(area / piece * 1.1);
-  return { area, ...counted, naive };
+  return { area, ...counted, naive, grout: groutKg(material, area) };
 }
 
 // ---- floor regions -------------------------------------------------------------
@@ -502,6 +537,7 @@ export function materialTakeoff(project) {
   for (const item of [...regions, ...walls]) {
     const t = totals.get(item.material) || { area: 0, pieces: 0, cabochons: 0 };
     t.area += item.count.area; t.pieces += item.count.pieces || 0; t.cabochons += item.count.cabochons || 0;
+    if (item.count.grout != null) t.grout = (t.grout || 0) + item.count.grout;
     for (const [k, f] of Object.entries(item.count.formats || {})) {
       t.formats ??= {};
       const tf = t.formats[k] || (t.formats[k] = { pieces: 0, whole: 0 });
