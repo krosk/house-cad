@@ -29,7 +29,7 @@
 // Switch products (`surface: 'switch'`, `pattern: 'device'`) go on a switch MARKER
 // (`marker.product`, not a finish): `design` picks the builder in src/ui/deviceProducts.js,
 // which draws only the visible plate and rocker; sizes are `*Mm` fields. Outlet products
-// will follow the same way (`surface: 'outlet'`). No takeoff.
+// (`surface: 'outlet'`) go on socket outlet markers the same way. No takeoff.
 
 export const BUILTIN_MATERIALS = [
   {
@@ -151,6 +151,18 @@ export const BUILTIN_MATERIALS = [
     color: 0xf2f2f0, roughness: 0.35, pack: null,
     name: { en: 'Schneider Ovalis double switch, white', fr: 'Double interrupteur Ovalis Schneider, blanc', zh: '施耐德 Ovalis 双联开关（白）' },
   },
+  {
+    // Schneider Electric Ovalis flush outlet with earth, white (Leroy Merlin 85231773): the
+    // same plate and collar as the switches; a flat stadium insert in the rocker's place
+    // carries the French socket (two pin holes 19 mm apart, earth pin above). Measured on
+    // the Leroy Merlin photos (docs/materials.md "Switches").
+    id: 'outlet_ovalis_white', surface: 'outlet', pattern: 'device', design: 'socket',
+    w: 0.087, h: 0.087, joint: 0, plateMm: 87, plateCornerMm: 10, rimDepthMm: 4.4,
+    collarMm: [54, 64], collarDepthMm: 8.1, openingDepthMm: 9.7, rockerMm: [43, 52],
+    insertDepthMm: 9.9, socketMm: 38.7, pinHoleMm: 5, pinSpacingMm: 19, earthMm: [10.5, 5.2],
+    color: 0xf2f2f0, roughness: 0.35, pack: null,
+    name: { en: 'Schneider Ovalis flush outlet, white', fr: 'Prise affleurante Ovalis Schneider, blanc', zh: '施耐德 Ovalis 平装插座（白）' },
+  },
 ];
 
 export function allMaterials(project) {
@@ -168,8 +180,9 @@ export function materialsFor(project, surface) {
 }
 
 // The product a marker carries (`marker.product`), if it suits the marker's type:
-// switch products on switch markers only (outlet products will match outlets).
-export const DEVICE_SURFACE = { switch: 'switch' };
+// switch products on switch markers, outlet products on plain socket outlets (the
+// shutter/aircon/cooktop/oven/water-heater variants are usually not sockets).
+export const DEVICE_SURFACE = { switch: 'switch', outlet: 'outlet', outlet_appliance: 'outlet' };
 export function markerProduct(project, marker) {
   const surface = DEVICE_SURFACE[marker?.type];
   const def = surface ? materialById(project, marker.product) : null;

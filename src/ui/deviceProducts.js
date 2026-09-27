@@ -1,7 +1,8 @@
 // Device products (docs/materials.md "Switches"): a catalog material with
-// `surface: 'switch'` set on a switch marker (`marker.product`) replaces that marker's
-// standard 8 cm faceplate in 3D. Only the visible part is modelled (owner, 2026-09-27):
-// the plate and the rocker, never the mechanism inside the wall box.
+// `surface: 'switch'` (or 'outlet') set on a switch (or socket outlet) marker
+// (`marker.product`) replaces that marker's standard 8 cm faceplate in 3D. Only the
+// visible part is modelled (owner, 2026-09-27): the plate and the rocker or socket, never
+// the mechanism inside the wall box.
 //
 // Returns a Group (a shared-geometry clone) in the faceplate convention (view3d
 // `_wallMarkerFixture`): metres, back on the wall at z = 0, room-facing front toward +Z,
@@ -73,22 +74,17 @@ function materialsFor(def, lambert) {
     rocker: new M({ color: def.accent ?? def.color ?? 0xf2f2f0, ...std((def.roughness ?? 0.35) * 0.8) }),
     gap: new M({ color: 0x9a9a98, ...std(0.6) }),
     split: new M({ color: 0x2a2a2a, ...std(0.8) }),
+    hole: new M({ color: 0xc9c9c7, ...std(0.6) }),
+    pin: new M({ color: 0xc8c8c8, ...(lambert ? {} : { roughness: 0.25, metalness: 0.8 }) }),
   };
   matCache.set(key, m);
   return m;
 }
 
-// Ovalis-style rocker switch, profile read on Leroy Merlin's side photo (docs/materials.md):
-//   - the plate is a smooth pyramid: rim `rimDepthMm` at the square edge, rising (faster
-//     toward the middle) to `collarDepthMm` at a stadium-shaped collar `collarMm`;
-//   - the collar band keeps rising gently to `openingDepthMm` at the rocker opening;
-//   - the rocker is a stadium `rockerMm` (two half-circles joined by straight sides) with
-//     two flat faces folded at `rockerFoldMm` above its centre: the upper one parallel to
-//     the wall at `rockerTopMm`, the lower one slanting out to `rockerBottomMm`;
-//   - `rockers: 2` (double switch) splits that rocker into two halves (`splitMm` gap).
-function rockerSwitch(def, m) {
+// The shared plate: smooth pyramid, stadium collar, and the opening the rocker or the
+// socket insert sits in. Returns the sizes the insert needs.
+function plate(def, m, g) {
   const mm = (v) => v / 1000;
-  const g = new THREE.Group();
   const P = mm(def.plateMm ?? 87), pr = mm(def.plateCornerMm ?? 10);
   const rim = mm(def.rimDepthMm ?? 4.4), collarZ = mm(def.collarDepthMm ?? 8.1);
   const openZ = mm(def.openingDepthMm ?? 9.7);
@@ -108,6 +104,20 @@ function rockerSwitch(def, m) {
   }
   rings.push(ring(opening, opening, 0, openZ - mm(3))); // the opening's wall, into the shadow
   g.add(new THREE.Mesh(loft(rings, () => openZ - mm(3)), m.plate));
+  return { mm, openZ, rw, rh, gapW };
+}
+
+// Ovalis-style rocker switch, profile read on Leroy Merlin's side photo (docs/materials.md):
+//   - the plate (plate()) is a smooth pyramid: rim `rimDepthMm` at the square edge, rising (faster
+//     toward the middle) to `collarDepthMm` at a stadium-shaped collar `collarMm`;
+//   - the collar band keeps rising gently to `openingDepthMm` at the rocker opening;
+//   - the rocker is a stadium `rockerMm` (two half-circles joined by straight sides) with
+//     two flat faces folded at `rockerFoldMm` above its centre: the upper one parallel to
+//     the wall at `rockerTopMm`, the lower one slanting out to `rockerBottomMm`;
+//   - `rockers: 2` (double switch) splits that rocker into two halves (`splitMm` gap).
+function rockerSwitch(def, m) {
+  const g = new THREE.Group();
+  const { mm, openZ, rw, rh, gapW } = plate(def, m, g);
   // The rocker: a stadium prism with two flat faces meeting at a crisp fold: the upper
   // one parallel to the wall, the lower one slanting out to the bottom edge (owner).
   const top = mm(def.rockerTopMm ?? 11), bottom = mm(def.rockerBottomMm ?? 13.8);
@@ -165,7 +175,41 @@ function stadiumShape(w, h) {
   return s;
 }
 
-const DESIGNS = { 'rocker': rockerSwitch };
+// Flush socket outlet ("affleurante"): the same plate and collar; a flat stadium insert
+// in the rocker's place, `insertDepthMm` proud, carrying the French socket as marks on
+// its face: the socket's round edge (`socketMm`), two pin holes `pinSpacingMm` apart and
+// the earth pin `earthMm` = [height above centre, hole diameter].
+function socketOutlet(def, m) {
+  const g = new THREE.Group();
+  const { mm, openZ, rw, rh, gapW } = plate(def, m, g);
+  const faceZ = mm(def.insertDepthMm ?? 9.9);
+  const inW = rw - mm(2.4), inH = rh - mm(2.4);
+  const rk = stadium(rw, rh), rkIn = stadium(inW, inH);
+  g.add(new THREE.Mesh(loft([ring(rk, rk, 0, openZ - mm(2.5)), ring(rk, rk, 0, faceZ - mm(0.9)),
+    ring(rkIn, rkIn, 0, faceZ)], () => faceZ), m.rocker));
+  const mark = (geometry, material, x, y, lift = 0.00005) => {
+    geometry.translate(x, y, faceZ + lift);
+    g.add(new THREE.Mesh(geometry, material));
+  };
+  const R = mm(def.socketMm ?? 38.7) / 2;
+  mark(new THREE.RingGeometry(R - mm(0.25), R + mm(0.25), 64), m.gap, 0, 0); // a grey groove
+  // Pin holes read light grey (shallow, lit inside) with a darker rim on the photos.
+  const hole = mm(def.pinHoleMm ?? 5) / 2, dx = mm(def.pinSpacingMm ?? 19) / 2;
+  for (const x of [-dx, dx]) {
+    mark(new THREE.RingGeometry(hole - mm(0.5), hole, 32), m.gap, x, 0);
+    mark(new THREE.CircleGeometry(hole - mm(0.5), 32), m.hole, x, 0);
+  }
+  const [ey, ed] = (def.earthMm || [10.5, 5.2]).map(mm);
+  mark(new THREE.CircleGeometry(ed / 2, 32), m.split, 0, ey);
+  mark(new THREE.CircleGeometry(ed * 0.3, 24), m.pin, 0, ey, 0.0001);
+  // The shadow in the gap around the insert.
+  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), 12);
+  floor.translate(0, 0, openZ - mm(2.9));
+  g.add(new THREE.Mesh(floor, m.gap));
+  return g;
+}
+
+const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet };
 
 // Built once per catalog entry and material kind; callers get a clone that shares the
 // geometry and materials, so they must never dispose them (a baked copy clones first).

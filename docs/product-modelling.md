@@ -15,9 +15,9 @@ Where the result goes:
   toggle to look right (`docs/materials.md` "Wall tile products");
 - **door (or other product that fills a zone)** → a `surface: 'door'` material in
   `src/core/materials.js` and a `design` drawing in `doorProducts.js` (`docs/materials.md` "Doors").
-- **switch (later outlet)** → a `surface: 'switch'` material in `src/core/materials.js` and a `design` in
-  `src/ui/deviceProducts.js`, set on a switch marker (`docs/materials.md` "Switches"). Model only the
-  visible plate and rocker (owner, 2026-09-27).
+- **switch or outlet** → a `surface: 'switch'` / `'outlet'` material in `src/core/materials.js` and a `design` in
+  `src/ui/deviceProducts.js` (switches and outlets share `plate()`), set on the marker (`docs/materials.md`
+  "Switches"). Model only the visible parts (owner, 2026-09-27).
 - **window** → a `surface: 'window'` material and a profile set in `windowProducts.js` (`docs/materials.md`
   "Windows"). Measure the profile faces on straight-on photos, inside and outside, scaled by a known
   part (the handle, about 160 mm).

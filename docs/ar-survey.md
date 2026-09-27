@@ -17,7 +17,7 @@ SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 FURNISH  · FURNISH
-MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH
+MATERIAL · FLOOR → WALL → DOOR → WINDOW → SWITCH → OUTLET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
 
@@ -285,6 +285,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     selection amber; switches carrying a product get a teal floor square. The product shows in the AR
     3D view (LEFT X). Readout: product, height. A double-switch product applies to every switch at
     that plan point (the double is two markers) and draws once. Design in `docs/materials.md` "Switches".
+  - **OUTLET** (`id: mat_outlet`): the same for socket outlets (`outlet`, `outlet_appliance` markers) and
+    `surface: 'outlet'` products.
   - **Takeoff timing:** `materialTakeoff` reruns only on mode entry and after each edit (no `onChange`
     subscription in mr.js).
 - **FURNISH** (`id: furnish`, its own mode group) — place **real GLB furniture** (`floor.furniture[]`,

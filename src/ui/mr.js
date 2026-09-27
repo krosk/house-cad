@@ -21,7 +21,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES } from '../core/model.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
-import { materialsFor, materialById, materialName, markerProduct, markerProductDraws } from '../core/materials.js';
+import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
@@ -3129,10 +3129,12 @@ export function setupMR(view, project, getFootprint) {
   let matHoverFace = null, matSelFace = null;
   let matDoors = [];       // DOOR + WINDOW zones of the active floor (MATERIAL · DOOR / WINDOW targets)
   let matHoverDoor = null, matSelDoor = null;
-  // MATERIAL · SWITCH: switch markers of the active floor; grip cycles overlapping ones
-  // (a stack at one plan point, or neighbours inside the reticle) before trigger selects.
-  let matHoverSwitch = null, matSelSwitch = null, matSwitchPickAfterId = null;
-  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch']);
+  // MATERIAL · SWITCH / OUTLET: device markers of the active floor (DEVICE_SURFACE picks
+  // which marker types each takes); grip cycles overlapping ones (a stack at one plan
+  // point, or neighbours inside the reticle) before trigger selects.
+  let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null;
+  const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet' }; // mode → catalog surface
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet']);
   // Aperture material modes → the zone kind (and catalog surface) they edit.
   const APT_KIND = { mat_door: 'door', mat_window: 'window' };
   let matHighlightKey = '';
@@ -3199,7 +3201,7 @@ export function setupMR(view, project, getFootprint) {
       const id = faceMaterialId(f);
       if (id) matCellQuads(arr, colors, faceStrip(f, 0.02, 0.09), 0.0035, materialById(project, id)?.color ?? MAT_NONE_COLOR, 0.9);
     }
-    if (modes[currentMode]?.id === 'mat_switch') { // a small floor square under each switch with a product
+    if (DEVICE_MODE[modes[currentMode]?.id]) { // a small floor square under each switch with a product
       for (const m of floor.markers) {
         const def = markerProduct(project, m);
         if (def) matCellQuads(arr, colors, [{ x0: m.x - 0.05, x1: m.x + 0.05, y0: m.y - 0.05, y1: m.y + 0.05 }], 0.0035, 0x2dd4bf, 0.9);
@@ -3214,7 +3216,7 @@ export function setupMR(view, project, getFootprint) {
   // when the target changes.
   function styleMaterialHighlight(modeId) {
     const hi = materialGroup.children.find((c) => c.userData.matHighlight);
-    if (!hi || modeId === 'mat_switch') return; // switches: marker outlines (frame loop)
+    if (!hi || DEVICE_MODE[modeId]) return; // devices: marker outlines (frame loop)
     const floorMode = modeId === 'mat_floor', doorMode = !!APT_KIND[modeId];
     const sel = floorMode ? matSelRoom : doorMode ? matSelDoor : matSelFace;
     const hov = floorMode ? matHoverRoom : doorMode ? matHoverDoor : matHoverFace;
@@ -3272,45 +3274,46 @@ export function setupMR(view, project, getFootprint) {
     }
     return best;
   }
-  // Switch markers within the reticle, nearest first, then top to bottom and authoring
-  // order; `afterId` (a grip) advances to the next candidate so an overlapped switch
-  // (a double switch is two markers at one plan point) can be reached.
-  function matSwitchAt(px, py, afterId = null) {
+  // Device markers (of `surface`) within the reticle, nearest first, then top to bottom
+  // and authoring order; `afterId` (a grip) advances to the next candidate so an
+  // overlapped device (a double switch is two markers at one plan point) can be reached.
+  function matDeviceAt(px, py, surface, afterId = null) {
     const candidates = project.markers
       .map((marker, order) => ({ marker, order, d: Math.hypot(px - marker.x, py - marker.y) }))
-      .filter(({ marker, d }) => marker.type === 'switch' && d <= RETICLE_OUTER)
+      .filter(({ marker, d }) => DEVICE_SURFACE[marker.type] === surface && d <= RETICLE_OUTER)
       .sort((a, b) => a.d - b.d || (b.marker.z || 0) - (a.marker.z || 0) || a.order - b.order)
       .map(({ marker }) => marker);
     if (!candidates.length) return null;
     const i = candidates.findIndex((m) => m.id === afterId);
     return candidates[i < 0 ? 0 : (i + 1) % candidates.length];
   }
-  function matSwitchCandidates(marker) {
-    return marker ? project.markers.filter((m) => m.type === 'switch'
+  function matDeviceCandidates(marker) {
+    return marker ? project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
       && Math.hypot(m.x - marker.x, m.y - marker.y) <= RETICLE_OUTER * 2) : [];
   }
   // A double switch is two switch markers at one plan point (one per rocker): a
   // multi-rocker product is set on (or cleared from) that whole stack together. Going
   // from a multi-rocker product to a single one keeps it on the selected marker only,
   // so two single plates never draw on top of each other.
-  function setSwitchProduct(marker, id) {
+  function setDeviceProduct(marker, id) {
     const rockers = (def) => def?.rockers ?? 1;
     const toMulti = rockers(materialById(project, id)) > 1;
     const fromMulti = rockers(markerProduct(project, marker)) > 1;
-    const stack = project.markers.filter((m) => m.type === 'switch' && m.x === marker.x && m.y === marker.y);
+    const stack = project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
+      && m.x === marker.x && m.y === marker.y);
     for (const m of toMulti || fromMulti ? stack : [marker]) {
       project.setMarkerProduct(m.id, toMulti || m === marker || !id ? id : null);
     }
   }
   function cycleMaterial(modeId, dir) {
-    if (modeId === 'mat_switch') {
-      if (!matSelSwitch) matSelSwitch = matHoverSwitch;
-      if (!matSelSwitch) return;
-      const ids = [null, ...materialsFor(project, 'switch').map((m) => m.id)];
-      const cur = ids.indexOf(markerProduct(project, matSelSwitch)?.id ?? null);
+    if (DEVICE_MODE[modeId]) {
+      if (!matSelDevice) matSelDevice = matHoverDevice;
+      if (!matSelDevice) return;
+      const ids = [null, ...materialsFor(project, DEVICE_MODE[modeId]).map((m) => m.id)];
+      const cur = ids.indexOf(markerProduct(project, matSelDevice)?.id ?? null);
       const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
-      setSwitchProduct(matSelSwitch, next);
-      rlog('material set', { mode: modeId, marker: matSelSwitch.id, material: next });
+      setDeviceProduct(matSelDevice, next);
+      rlog('material set', { mode: modeId, marker: matSelDevice.id, material: next });
       buildMaterials();
       buildArch3d();
       return;
@@ -3344,15 +3347,15 @@ export function setupMR(view, project, getFootprint) {
   // Readout lines [text, color]: the target's material, its own quantity, then the
   // whole-house total for that product (packs rounded once for the house).
   function materialReadout(modeId) {
-    if (modeId === 'mat_switch') {
-      const marker = matSelSwitch || matHoverSwitch;
-      if (!marker) return [[t('mat.pickSwitch'), 0xe2e8f0]];
+    if (DEVICE_MODE[modeId]) {
+      const marker = matSelDevice || matHoverDevice;
+      if (!marker) return [[t(DEVICE_MODE[modeId] === 'outlet' ? 'mat.pickOutlet' : 'mat.pickSwitch'), 0xe2e8f0]];
       const mat = markerProduct(project, marker);
-      const near = matSwitchCandidates(marker);
+      const near = matDeviceCandidates(marker);
       return [
         [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
         [`h ${fmt(marker.z ?? 1.1)} ${unitLabel()}`, 0xe2e8f0],
-        ...(near.length > 1 && !matSelSwitch ? [[`${near.indexOf(marker) + 1}/${near.length} · ${t('mat.gripCycles')}`, 0xfbbf24]] : []),
+        ...(near.length > 1 && !matSelDevice ? [[`${near.indexOf(marker) + 1}/${near.length} · ${t('mat.gripCycles')}`, 0xfbbf24]] : []),
       ];
     }
     if (APT_KIND[modeId]) {
@@ -6648,7 +6651,12 @@ export function setupMR(view, project, getFootprint) {
       id: 'mat_switch', color: 0x2dd4bf,
       // Trigger selects the switch under the reticle (none deselects); grip cycles
       // overlapping switches first (onReset).
-      onTouch: () => { matSelSwitch = matHoverSwitch; matSwitchPickAfterId = null; },
+      onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
+    },
+    {
+      id: 'mat_outlet', color: 0x2dd4bf,
+      // The same for outlets (DEVICE_SURFACE: outlet, outlet_appliance).
+      onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
     },
     {
       id: 'circuit_check', color: 0xf97316,
@@ -6881,7 +6889,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'furnish',
-    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch',
+    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_switch', 'mat_outlet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -6889,7 +6897,7 @@ export function setupMR(view, project, getFootprint) {
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     furnish: 'furnish',
-    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_switch: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_switch: 'material', mat_outlet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',
@@ -6989,7 +6997,7 @@ export function setupMR(view, project, getFootprint) {
     routedWireGroup.visible = m.id === 'marker_wire' || m.id === 'circuit_check';
     checkHover = null;
     matHoverRoom = matSelRoom = matHoverFace = matSelFace = matHoverDoor = matSelDoor = null;
-    matHoverSwitch = matSelSwitch = null; matSwitchPickAfterId = null;
+    matHoverDevice = matSelDevice = null; matDevicePickAfterId = null;
     if (MAT_MODES.has(m.id)) buildMaterials();
     materialGroup.visible = MAT_MODES.has(m.id);
     if (m.id === 'circuit_check') buildCheckOverlay();
@@ -7402,10 +7410,10 @@ export function setupMR(view, project, getFootprint) {
 
   function deleteInMode() {
     const mode = modes[currentMode];
-    if (mode.id === 'mat_switch') {
-      if (!matSelSwitch || !matSelSwitch.product) return false;
-      setSwitchProduct(matSelSwitch, null);
-      rlog('material clear', { mode: mode.id, marker: matSelSwitch.id });
+    if (DEVICE_MODE[mode.id]) {
+      if (!matSelDevice || !matSelDevice.product) return false;
+      setDeviceProduct(matSelDevice, null);
+      rlog('material clear', { mode: mode.id, marker: matSelDevice.id });
       buildMaterials();
       buildArch3d();
       return true;
@@ -7551,9 +7559,9 @@ export function setupMR(view, project, getFootprint) {
       rlog('plan edit target cycle', { after: planEditPickAfterId });
       return;
     }
-    if (mode.id === 'mat_switch') { // cycle overlapping switches; with one selected, deselect first
-      if (matSelSwitch) { matSelSwitch = null; rlog('switch deselected'); return; }
-      if (matHoverSwitch) { matSwitchPickAfterId = matHoverSwitch.id; rlog('switch target cycle', { after: matSwitchPickAfterId }); }
+    if (DEVICE_MODE[mode.id]) { // cycle overlapping switches; with one selected, deselect first
+      if (matSelDevice) { matSelDevice = null; rlog('device deselected'); return; }
+      if (matHoverDevice) { matDevicePickAfterId = matHoverDevice.id; rlog('device target cycle', { after: matDevicePickAfterId }); }
       return;
     }
     if (mode.id === 'marker' && !selectedMarker && hoverMarker) {
@@ -8691,16 +8699,16 @@ export function setupMR(view, project, getFootprint) {
       hoverKey = null;
       numpadCursor.visible = false;
       matHoverRoom = null; matHoverFace = null; matHoverDoor = null;
-      matHoverSwitch = null;
+      matHoverDevice = null;
       const hit = rayFloorHit(editCtl);
       if (hit) {
         reticle.visible = true;
         reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        if (modeId === 'mat_switch') {
+        if (DEVICE_MODE[modeId]) {
           // The grip's pick holds while the reticle stays on the group (as MARKER · EDIT).
-          matHoverSwitch = matSwitchAt(px, py, matSwitchPickAfterId);
-          if (!matHoverSwitch) matSwitchPickAfterId = null;
+          matHoverDevice = matDeviceAt(px, py, DEVICE_MODE[modeId], matDevicePickAfterId);
+          if (!matHoverDevice) matDevicePickAfterId = null;
         } else if (modeId === 'mat_floor') matHoverRoom = matRoomAt(px, py);
         else if (APT_KIND[modeId]) matHoverDoor = matDoorAt(px, py, APT_KIND[modeId]);
         else matHoverFace = matFaceAt(px, py);
@@ -8708,9 +8716,9 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       styleMaterialHighlight(modeId);
-      if (modeId === 'mat_switch') {
-        if (matHoverSwitch && matHoverSwitch !== matSelSwitch) { outlineMarker(matHoverSwitch, 'floor'); outlineMarker(matHoverSwitch, 'wall'); }
-        if (matSelSwitch) { outlineMarker(matSelSwitch, 'floor', 0xfbbf24); outlineMarker(matSelSwitch, 'wall', 0xfbbf24); }
+      if (DEVICE_MODE[modeId]) {
+        if (matHoverDevice && matHoverDevice !== matSelDevice) { outlineMarker(matHoverDevice, 'floor'); outlineMarker(matHoverDevice, 'wall'); }
+        if (matSelDevice) { outlineMarker(matSelDevice, 'floor', 0xfbbf24); outlineMarker(matSelDevice, 'wall', 0xfbbf24); }
       }
     } else if (modeId === 'circuit_check') {
       // Read-only: the reticle names the flagged device under it (readout).

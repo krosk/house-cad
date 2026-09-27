@@ -347,7 +347,7 @@ the zone (`project.setWindowFinish`, an alias of `setDoorFinish`), authored in A
       both sides; handle and hinges face the room; no console errors.
   - Not yet seen in AR.
 
-## Switches (device products)
+## Switches and outlets (device products)
 
 Owner decisions (2026-09-27): a switch product is **a new material category that applies only to
 switch markers**; outlets will get the same next. Only the visible part is modelled (the plate and the
@@ -401,6 +401,23 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   - Proven 2026-09-27: build; Node (a two-marker stack draws once at the mean height, a separate single
     switch still draws); a scratch render beside the front and angled photos. Not yet seen in the real
     View 3D or in AR.
+
+- **Schneider Ovalis flush outlet with earth, white** (`outlet_ovalis_white`, `surface: 'outlet'`,
+  Leroy Merlin 85231773, 2026-09-27). Outlet products go on `outlet` and `outlet_appliance` markers
+  (`DEVICE_SURFACE`); the shutter, aircon, cooktop, oven and water-heater variants are usually not
+  sockets and keep the standard faceplate. Authored in AR with **MATERIAL · OUTLET** (`mat_outlet`,
+  the same code path as SWITCH).
+  - From the page: 87 mm wide, 44 mm deep (the mechanism, not modelled), 1 module.
+  - Same plate and collar as the switches (`plate()` in `deviceProducts.js`, design `socket`). The side
+    photo (media 3163218) repeats the switch's plate profile (4.4 mm rim, ~6 mm 7 mm in) and shows the
+    insert nearly flat at ~9.9 mm, level with the collar opening ("affleurante" = flush).
+  - Front photo (media 3163214, 12.4 px/mm): a stadium insert 42 × 53 mm in the rocker's place; the
+    socket's round edge 38.7 mm across (a grey groove); two pin holes 19 mm apart (the French standard),
+    ~5 mm, light grey with a darker rim; the earth pin 10.5 mm above the centre in a ~5.2 mm dark ring,
+    metal tip. The socket details are flat marks on the insert, not holes.
+  - Proven 2026-09-27: build; Node (the product applies to `outlet` and `outlet_appliance`, not to
+    `outlet_shutter` or a switch); a scratch render beside the front, side and angled (3163217) photos,
+    bounding box 87 × 87 × 10 mm. Not yet seen in the real View 3D or in AR.
 
 ## Open questions
 
