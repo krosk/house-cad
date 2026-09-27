@@ -15,15 +15,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon/terrazzo/**pinwheel (Monastère)**/**stone wall tile (Lucia)** products, the View 3D **detail layer**, reflections, door (**drawn open in View 3D**), window, switch, outlet and Ethernet products: owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon/terrazzo/**pinwheel (Monastère)**/**stone wall tile (Lucia)** products, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**), window, switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-27 (session 31)
-**Status:** Proven (git, curl): `origin/main` = `4cad922` plus this handoff's commit; the live
-`version.json` served `4cad922`. The tree is clean apart from the owner's untracked
-`Document from Alexis He.json`. AR performance (session 29) is **owner-confirmed on the Quest**;
-everything from sessions 30–31 is verified by build, Node or a desktop browser only, and **parked for
-the owner to walk** (Next step A).
+**Date:** 2026-09-27 (session 32)
+**Status:** Proven (git): `origin/main` = `8948472` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl): the live
+`version.json` served `ac60665` while `8948472` was still deploying. Owner-confirmed on the Quest: AR
+performance (session 29), the MATERIAL flow, the 3D-only AR view and FURNISH's removal (session 32).
+Everything else from sessions 30–32 is verified by build, Node or a desktop browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -32,8 +32,8 @@ the owner to walk** (Next step A).
 boots straight into passthrough AR):
 
 1. **Desktop/mobile 2D plan editor.** Draw axis-aligned rectangles tagged **add** (room space) or
-   **subtract** (wall, door, window, garage door, half wall, heater, sliding door, insulation,
-   stairs up/down, cabinet, furniture placeholder). Exact sizes come only from **dimension
+   **subtract** (wall, door, **passage** (open doorway), window, garage door, half wall, heater,
+   sliding door, insulation, stairs up/down, cabinet, **furniture** (can carry a real product)). Exact sizes come only from **dimension
    constraints** (a 2× 1-D least-squares solver). Multi-storey: independent plans stacked on a shared
    origin. Outputs: to-scale print/SVG/PNG sheets per floor (monochrome, optional change-map revision
    clouds vs a saved slot), DXF + a simplified Coohom DXF, STL/OBJ/GLB mesh, JSON save.
@@ -47,10 +47,10 @@ boots straight into passthrough AR):
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
-   with circuit diagnostics, a plumbing pipe network, furniture, **surface materials, door, window,
-   switch, outlet and Ethernet products**, save/load in 6
-   slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X**. Mode list:
-   `docs/ar-survey.md`.
+   with circuit diagnostics, a plumbing pipe network, **surface materials and door, window,
+   furniture, switch, outlet and Ethernet products** (all in the MATERIAL group), save/load in 6
+   slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X** that hides every
+   plan overlay while on. Mode list: `docs/ar-survey.md`.
 
 **Sharing:** `🔗 Share view` (desktop) or the AR `link`/`qr` export opens a **read-only** session.
 Detail: `docs/share-view.md`.
@@ -58,67 +58,27 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 32 (2026-09-27, uncommitted at time of writing)
-
-- **Owner walk:** applied materials on the Quest; the MATERIAL flow was clear. No per-item pass/fail was
-  given (`docs/ar-qa-checklist.md`). They looked for a furniture material and found none.
-- **Furniture merge built** (Next step B), with one owner change: the product is picked in
-  **MATERIAL · FURNITURE**. Pushed as `e9ace98`. Details and all
-  evidence are in `docs/furniture.md` "One furniture zone" and "The merge". Proven by build, Node
-  (the real solver on the owner's house: 0 of 57 furniture dims removed, rects within 0.1 mm, sheets
-  byte-identical) and a desktop Chrome check (an old item migrated, sized and drawn in View 3D).
-  **AR is unwalked** (Hypothesis): MATERIAL · FURNITURE, the `DIM REMOVED` flash.
-- **Material badges** (`63e640a`, owner request): an applied material shows one small swatch badge at
-  the centre of its target on the AR plan, never a colour fill or strip.
-- **FURNISH removed** (owner: "it overlaps" MATERIAL · FURNITURE): draw a FURNITURE zone in PLAN · ADD,
-  pick its product in MATERIAL · FURNITURE.
-- **AR 3D view = 3D only** (owner request): with LEFT X on, every plan overlay and the origin gizmo
-  are hidden for the render (reticle, HUD, panels stay). `docs/ar-survey.md` "LEFT X".
-- Not built: a desktop product picker, a desktop "dimension removed" message, and the notch in the
-  desktop 2D sketch.
-
-## What changed in session 31
+## What changed in session 32
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Detail for every item is in the named doc.
-> Session 30 (electrical CHECK, materials phases 1–3, the AR 3D view, door/window/switch/outlet
-> products, procedural furniture) is folded into the sections below and the docs.
+> decisions" or "Findings" and delete this list. Detail for every item is in the named doc. Sessions
+> 30–31 are folded into the sections below and the docs.
 
-1. **Ethernet product** (`3362251`): Schneider Ovalis RJ45 (`design: 'rj45'`, shares `flatInsert()` with
-   the outlet), AR **MATERIAL · ETHERNET**; `DEVICE_SURFACE.ethernet` covers `ethernet` markers only.
-   `docs/materials.md` "Switches and outlets".
-2. **View links carry products** (`c44fd5c`): optional `p` list + marker slot 5; old links still decode.
-   With markers on, the owner's house link (~3.1k chars) doesn't fit a QR, which was already true
-   before products; the text `link` is the way to share it. `docs/share-view.md`.
-3. **View 3D on phones** (`38d42c5`): ≥ 65° horizontal POV FOV, portrait turn + pinch/wheel zoom in the
-   overview, POV tap-to-walk (door leaves don't block) + Overview button, opt-in Tilt look. `CLAUDE.md`.
-4. **In-room half wall fix** (`899d72d`): a half wall whose centre lies inside a room no longer opens
-   the wall behind it (3D) or any wall-finish face. It was an agent call in `f457bd5`, reported wrong by
-   the owner (Ground r139 vs the 7 cm gap wall to r106). `docs/materials.md`.
-5. **Terrazzo floor tile** (`00b4612`): 60 × 60 marble-cement, `GRID_DESIGNS.terrazzo`, `sheets: 2`
-   (new optional repeat-unit field), from the owner's 8 × 8 cm sample photo. `docs/materials.md`.
-6. **The owner's piano** (`977a29d`): W. Hoffmann Vision V120, procedural `upright-piano`,
-   catalog `hoffmann-v120`; owner accepted the render. `docs/furniture.md`.
-7. **Monastère floor in the owner's pinwheel** (`46cd6a8`, `4cad922`):
-   - new `pattern: 'pinwheel'`: a 130 cm module of nine 50×50 / 30×50 / 30×30 tiles (owner spec),
-     `PINWHEEL` in `flooring.js`, shared by the takeoff and the texture;
-   - the takeoff counts pieces, whole/cut and boxes **per size** (`count.formats`, `totals.formats`,
-     `packsByFormat`; the three articles' boxes are 5 / 7 / 12); the AR readout shows one line per size;
-   - design `aged-stone` (rounded, pillowed edges, clouds, crackle veins, rust pits). The owner accepted
-     the tone "for now" (tuned darker toward their showroom photo).
-   `docs/materials.md` "Pinwheel products".
-8. **Doors drawn open in View 3D** (`9a82898`): plain DOOR leaves and door products swing 90° to their
-   authored swing side (`buildArchitecturalFloor({openDoors})`, `buildDoorProduct(p, {open})`); the AR 3D
-   view opens them too since session 32; sliding/garage stay slabs. `docs/materials.md` "Doors".
-9. **Lucia ivoire 30×90 wall tile** (`4cad922`): grid design `limestone`, landscape, stacked.
-   `docs/materials.md` "Stone wall tile products".
-10. **View 3D detail layer** (`4cad922`): the finish texture is capped at 2048 px per repeat unit (under
-    1 px/mm on 2–3 m units), so close-ups were mush. A design in `DETAIL_DESIGNS` adds a 512 px grain
-    tile repeating every 12–16 cm, patched into the material by `applyFinishDetail`. Monastère and Lucia
-    only. `docs/materials.md` "Detail layer".
-11. **Parked, not built** (`a364ded`, docs only): mirroring the Quest to a TV, and the Steam Deck as a
-    big-screen viewer. The recommended design and its traps are in `docs/share-view.md`; the owner said
-    to park it.
+1. **Owner walk:** applied materials on the Quest; the MATERIAL flow was clear (no per-item
+   pass/fail). They looked for a furniture material and found none, which led to (2).
+2. **Furniture merge built** (`e9ace98`): a FURNITURE zone carries an optional product (`article`,
+   `productMm`, `facing`); product picked in **MATERIAL · FURNITURE**; furniture solved one-way after
+   the structure; old `floor.furniture[]` items migrate to zones on load. `docs/furniture.md` "One
+   furniture zone" + "The merge" hold the design and the evidence (Node on the owner's house: 0 of 57
+   furniture dims removed, sheets byte-identical; desktop Chrome: a migrated item drawn in View 3D).
+3. **Material badges** (`63e640a`): an applied material shows one swatch badge at its target's centre
+   on the AR plan, never a colour fill or strip (owner: overlays made the plan hard to read).
+4. **FURNISH removed + AR 3D view shows only the model** (`912be58`), both owner-confirmed on the Quest.
+5. **PASSAGE zone kind + Monastère readout** (`ac60665`): PASSAGE = open doorway, door-family for
+   flooring/3D, no leaf. The 30×30 line was cut off by the 4-line readout pill; the pill now fits 6.
+6. **Doors open in the AR 3D view too** (`8948472`): the owner expected it; asked, chose open in AR.
+7. Not built: a desktop product picker for furniture, a desktop "dimension removed" message, the
+   furniture front notch in the desktop 2D sketch.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -174,6 +134,14 @@ Read `docs/product-intent.md` before planning AR work.
   `localStorage`, never in project/share data, and **cleared for AR sessions** (Quest cost). AR
   reflections were asked about, not built: `docs/materials.md` lists what they would need.
 - **AR furniture models show only with the AR 3D view on**; otherwise flat plan pieces (owner, 2026-09-27).
+- **The AR 3D view (LEFT X) shows only the 3D model** (owner, 2026-09-27): plan overlays are hidden
+  for the render only (`hideForArch3d` / `view.onXRAfterRender`), so modes' visibility logic is
+  untouched; reticle, HUD and panels stay.
+- **An applied material is a centre badge on the AR plan, never a coloured fill/strip** (owner, 2026-09-27).
+- **PASSAGE** (owner, 2026-09-27): an open doorway between two rooms; floors meet at its middle like
+  a door; no leaf, nothing to rotate.
+- **The controller readout holds up to 6 lines** (tighter pitch past 4); a mode that needs more must
+  condense, as the pinwheel house line does (`HOUSE 8 · 4 · 2 packs`).
 - **Doors are drawn open in both View 3D and the AR 3D view** (owner, 2026-09-27; AR was closed
   until then). `main.js` and `mr.js` both pass `openDoors` / `open`.
 - **A mixed-format product counts and boxes each size separately** (each is its own article): `pack:
@@ -182,7 +150,8 @@ Read `docs/product-intent.md` before planning AR work.
   quantity view yet.
 - **Furniture merge** (owner, 2026-09-26/27, `docs/furniture.md`):
   - four facing directions only;
-  - the product is picked in MATERIAL · FURNITURE (owner, 2026-09-27); FURNISH was removed as overlapping;
+  - the product is picked in MATERIAL · FURNITURE (owner, 2026-09-27); a furniture zone is drawn in
+    PLAN · ADD. ~~FURNISH (drop a pre-sized zone)~~ was removed: the owner said it overlaps;
   - sheets/DXF print the rectangle plus a front notch;
   - furniture solves one-way after the structure;
   - an over-specified furniture dimension is **deleted, never shown as a conflict**.
@@ -237,6 +206,8 @@ Read `docs/product-intent.md` before planning AR work.
 - **Leroy Merlin sibling articles** (other sizes of a range) aren't linked from the page. Their refs sit
   near each other: `HEAD` the same URL slug with neighbouring refs from inside the Chrome tab (found the
   Monastère 30×50, 72831311, that way).
+- **The owner's house view link with markers on (~3.1k chars) doesn't fit a QR**; share the text `link`
+  instead (`docs/share-view.md`).
 - **Deploy check:** `curl -s https://krosk.github.io/house-cad/version.json` (the commit it serves).
   The unauthenticated Actions API rate-limits quickly, and there is no `gh` CLI here.
 - **Splitting mixed hunks into separate commits:** `git apply --cached --unidiff-zero` misplaces pure
@@ -246,6 +217,11 @@ Read `docs/product-intent.md` before planning AR work.
 - **Injecting a test house into `localStorage` right after the page's first load gets overwritten** by
   the pending autosave of the seeded demo house. Wait a few seconds after the first load, then write
   the key, then reload.
+- **A furniture zone's `article` is the catalog KEY**, not the entry's `article` field (the NEO tray's
+  key is `sensea-neo-120x80`, its `article` a Leroy Merlin number).
+- **The furniture catalog is fetched** (`src/ui/furnitureCatalog.js`), so core code can't size a zone
+  from it synchronously: `productMm` snapshots the size, and `applyFurnitureCatalog` sizes migrated
+  zones later (main.js listener; mr.js on every `buildPlan`).
 - **Solved coordinates carry float noise**; grids built from edges must snap (`snap()` in
   `architectural3d.js`).
 - **`addConduitSegment` / `ensureConduitNodeAtMarker` return EXISTING items**; `addWire` returns
@@ -260,18 +236,14 @@ Read `docs/product-intent.md` before planning AR work.
 
 ## Commits
 
-All pushed (`origin/main` = `4cad922` before the handoff commit), all with descriptive bodies.
-Doc-only commits are omitted.
-- **Session 31:** `3362251` Ethernet product + MATERIAL · ETHERNET · `c44fd5c` products in view
-  links · `38d42c5` View 3D on phones · `899d72d` in-room half wall · `00b4612` terrazzo tile ·
-  `977a29d` V120 piano · `46cd6a8` Monastère pinwheel · `9a82898` open doors in View 3D ·
-  `4cad922` Monastère boxes per size + texture v2, Lucia wall tile, detail layer.
-- **Session 30:** stairs `47c08de`; CHECK `0ad552d`; stacked readout `9bce6e7`; materials `72ca05a`
-  `92975bf` `f0f6bf1`; products `4abecef` (procedural furniture) `cc55640` `2972e7a` `ac10962` `efca116`
-  `c0e135d` `38dc935` `f9a75c6` `a9a30fd` `23dd7c7` `3519eb2` `3899fe3` `6018048` `06e7cfc` `c6d2664`
-  `a2e7038`; furniture merge design `cc9165e`.
-- **Session 29:** 3D walls `f457bd5`; performance batching `54d1b15` `4369ac2` `4af1d20` `4d3610b`;
-  ALL FLOORS `2f7d7df`; WIRE `5698fb7`.
+All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 32:** `e9ace98` furniture merge + MATERIAL · FURNITURE · `63e640a` material badges ·
+  `912be58` 3D-only AR view, FURNISH removed · `ac60665` PASSAGE, Monastère readout fits ·
+  `8948472` doors open in the AR 3D view.
+- **Session 31:** `3362251` Ethernet product · `c44fd5c` products in view links · `38d42c5` View 3D on
+  phones · `899d72d` in-room half wall · `00b4612` terrazzo · `977a29d` V120 piano · `46cd6a8`
+  `4cad922` Monastère, Lucia, detail layer · `9a82898` open doors in View 3D.
+- Earlier sessions: see `git log`.
 
 **Never stage** `Document from Alexis He.json` (untracked): it is the owner's real 3-storey house (rev 9,
 47 wires) and the read-only Node fixture for almost every check.
@@ -305,6 +277,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
 | `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s per pattern (`DESIGNS` stagger, `BRICK_DESIGNS`, `GRID_DESIGNS` mosaic/terrazzo/limestone, `OCT_DESIGNS`, `PINWHEEL_DESIGNS`), their bump maps, the shared stone cloud helpers (`stoneField`, `drawStoneCloud`) and the View 3D detail layer (`DETAIL_DESIGNS`, `applyFinishDetail`) |
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
+| `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
+| `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE; hardware) from `doorProductPlacements` |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
@@ -315,41 +289,26 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 ## Next step
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
-  for each). The owner said they would verify later. First, check that the four overlays that never
-  rendered before `f0f6bf1` now show: Z-dims, adjacent-floor dots, CHECK rings, MATERIAL tints. Then:
-  - MATERIAL · FLOOR/WALL/DOOR/WINDOW (the Ange-Line on the real entrance door zone; Héméra on the
-    windows, checking which side the handle faces; Beaulieu oak, Etruria octagons in the upstairs
-    bathroom, Blue stone mosaic and Vernisse tile; watch PERF: each design texture is 2048 px);
-  - View 3D ✦ Reflections on a phone (does it hold frame rate?);
-  - MATERIAL · FURNITURE: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on the APK?) and
-    both Daikin units (drop at 2.0 m); the violet floor plan pieces, and the models with LEFT X;
-  - the LINE door on an interior door zone; junction height labels only in the conduit modes;
-  - session 31, later: Monastère pinwheel on a real room (the per-size readout lines, the pillowed edges,
-    the detail layer up close in View 3D POV, and whether the patched shader compiles on the phone and
-    the Quest browser), Lucia on a real wall, doors open in View 3D (a leaf may clip a wall or furniture
-    where a door opens into a corner);
-  - session 31: View 3D on an iPhone (Tilt look direction, rotation re-frame, pinch, walking; the new
-    Overview button also changed desktop POV), a WhatsApp-sent `link` with products, the Ground gap wall
-    behind half wall r139 full height, the terrazzo floor, the V120 piano via MATERIAL · FURNITURE, the RJ45 on an
-    `ethernet` marker;
-  - MATERIAL · SWITCH / OUTLET / ETHERNET on real devices: grip cycling on a double switch, the double drawn once,
-    the Ovalis models flush on the wall at the right height with LEFT X (and in desktop View 3D POV);
-  - the LEFT X AR 3D view, with **PROJECT · PERF** on;
-  - View 3D textures (desktop);
-  - MARKER · CHECK;
-  - the stacked readout;
-  - stair rotation;
-  - then session 29's list: ALL FLOORS reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T.
-- **B — Furniture merge: BUILT in session 32** (walk it: `docs/ar-qa-checklist.md` "Furniture" section).
-  The original plan, kept for reference:
-  1. the model: an optional `article` + `facing` on furniture zones;
-  2. the one-way furniture solve (walls never move for furniture), with over-specified dims deleted
-     plus a readout;
-  3. load-time migration of `floor.furniture[]`: saved files, `_demo` seed, and share links (`shareView.js`);
-  4. MATERIAL · FURNITURE assigns the product (FURNISH later removed);
-  5. View 3D and the AR 3D view draw the product in the zone;
-  6. the sheet/DXF front notch.
-  Verify the solver change in Node against the owner's house (14 furniture zones, read-only).
+  for each). Newest first:
+  - session 32: MATERIAL · FURNITURE on a real zone (cycle, A/X turn, B/Y clear, `DIM REMOVED`
+    flash), a slot saved with old FURNISH items migrating, the material badges, a PASSAGE between two
+    rooms of different floors, the Monastère 6-line readout, doors open with LEFT X;
+  - Z-dims, adjacent-floor dots, CHECK rings (never rendered before `f0f6bf1`);
+  - MATERIAL · FLOOR/WALL/DOOR/WINDOW products (the Ange-Line on the entrance door; Héméra's handle
+    side; Beaulieu oak, Etruria in the upstairs bathroom, Blue stone mosaic, Vernisse, terrazzo, Lucia;
+    watch PERF: each design texture is 2048 px);
+  - furniture products: the STOCKHOLM bed, the TV bench (does a real IKEA model replace the box on
+    the APK?), both Daikin units (foot at 2.0 m), the V120 piano;
+  - MATERIAL · SWITCH / OUTLET / ETHERNET: grip cycling on a double switch, Ovalis models flush;
+  - the LEFT X AR 3D view with **PROJECT · PERF** on;
+  - View 3D on a phone and an iPhone (Tilt look, pinch, walking, Reflections frame rate), a
+    WhatsApp-sent `link` with products, the Ground gap wall behind half wall r139, the detail layer
+    shader on the phone and the Quest browser;
+  - MARKER · CHECK, the stacked readout, stair rotation, then session 29's list (ALL FLOORS
+    reticle/teleport, WIRE cycle + lengths, breaker glyph, pen undo/T).
+- ~~**B — Build the furniture merge**~~ — done in session 32 (`e9ace98`), plus FURNISH removed at the
+  owner's request. Remaining small gaps (not asked for): desktop product picker, desktop
+  "dimension removed" message, the notch in the desktop 2D sketch.
 - **B′ — More products** as the owner names them: run `/model-product <link>`; a real manufacturer
   model is always checked first. Offered, not asked for: detail designs for terrazzo, the mosaic and
   the oak; a desktop quantity table (per room and size: tiles, cut, m², boxes); a wastage margin; the
@@ -373,11 +332,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Session 30:
+- **Unwalked, Hypothesis only.** Session 32: everything in Next step A's first bullet. Session 30:
   - everything in Next step A;
   - frame cost of the AR 3D view (Lambert walls + textures; opaque walls may hide the real room);
   - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
-  - the readout pill, which grew to 4 lines and sits 1.25 cm higher in every mode;
+  - the readout pill (4 lines, 6 at a tighter pitch since session 32) and its legibility;
   - how the textures look in a browser;
   - the bed and the door in AR (both rendered only in a desktop browser);
   - the oak floor, Vernisse tile, Blue stone mosaic and Etruria octagons on real rooms (seen only in
