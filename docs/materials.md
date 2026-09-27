@@ -75,6 +75,15 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   joint-free products have none. AR shows it only for the room being looked at, on its quantity line
   (`… · 4.5 kg grout`; owner: the house total isn't needed for now, though `totals.grout` has it); for mixed formats the room line drops its total pieces (the per-size lines
   carry them) to leave room.
+- **Pattern turn (owner, 2026-09-27):** a laying region may turn its pattern 90° (`turn: true` on
+  its floor finishes, set on all of them by `setFloorTurn`), for patterns with a direction such as the
+  mosaic sticks and the planks. Planks swap to the other axis (they otherwise follow the region's long
+  axis). Any other pattern turns about the start point: its frame is `(u, v) = (y, −x)` of the plan
+  shifted to the start, in the takeoff (`turnBoxes`) and the 3D UVs alike. The pinwheel and the octagon
+  look identical after a 90° turn, so turning them changes nothing. Kept on a material change, dropped
+  with the material; additive save field.
+  - Fixed on the way: the 3D UVs used to swap x/y for **every** pattern in a region deeper than wide
+    (meant for planks only), mirroring the tiles against the takeoff. Only planks swap now.
 - **Pattern start corner (owner, 2026-09-27):** a laying region may instead start its pattern at one
   of its corners. The owner chose a corner (not a wall line, not a numeric offset) and one start
   point per **laying region**, so joints still run continuously through a doorway between rooms of
@@ -392,7 +401,19 @@ anchored at the plan origin (or the region's start corner) like every pattern. `
 ## Octagon + tozzetto products
 
 An `octagon` entry with a `design` draws OCT_CELLS × OCT_CELLS (4 × 4) octagons in `color` with a tozzetto
-diamond in `accent` at every lattice corner, on `grout`, plus a bump map. The tozzetto's half-diagonal
+diamond in `accent` at every lattice corner, on `grout`, plus a bump map.
+
+**`diagonal: true`** (owner, 2026-09-27; set on the Etruria entry) lays the pattern turned 45° so the
+tozzetti are **squares, square to the walls**. A regular octagon is unchanged by a 45° turn, so the
+laid pattern is a square grid of pitch `(w + joint)/√2`: a cabochon on each vertex with m + n even (one
+on the plan origin / start corner) and an octagon on each with m + n odd. The takeoff
+(`diagonalOctagonCount`) clips the real tile shapes against the region, so a piece counts only if the
+region reaches the tile itself. The texture paints the straight 4 × 4 unit and fills the canvas with it
+as a pattern turned 45°, scaled so one period is exactly the canvas (unit √2 × wider, no seam).
+Proven 2026-09-27: counts in Node (whole + ½ cut = area ÷ pitch² within 0.5 % on 100 and 400 m²);
+texture pixel samples in Chrome (white tozzetti on even vertices, terracotta octagons on odd ones, a
+point 2.8 cm from a tozzetto centre on both axes is still white, so square; exact wrap at 2048 px).
+Not yet seen on the Quest. The tozzetto's half-diagonal
 is the chamfer leg minus the joint's share, so the chamfer-to-tozzetto gap equals the joint. The
 geometry already fits a real regular octagon: a 150 mm octagon's side is 150 / (1 + √2) = 62.1 mm,
 the published 6.2 cm tozzetto.
@@ -525,6 +546,31 @@ the zone (`project.setWindowFinish`, an alias of `setDoorFinish`), authored in A
     - the real desktop View 3D on an injected demo house: two leaves along X, one leaf along Y on
       both sides; handle and hinges face the room; no console errors.
   - Not yet seen in AR.
+- **Product leaf count:** an entry with `leaves` always has that many (the zone's hinge only picks one
+  or two leaves for products without it); `hinges` = hinges per side, evenly spaced. The AR readout
+  uses the product's count.
+- **Lapeyre Héméra porte-fenêtre, 2 leaves, white** (`window_hemera_pf2_white`; page
+  [FPC8051131](https://www.lapeyre.fr/produits/porte-fenetre-pvc-blanc-hemera-sur-mesure-FPC8051131),
+  plaxé variant [FPC8051135](https://www.lapeyre.fr/produits/porte-fenetre-pvc-plaxee-hemera-sur-mesure-FPC8051135),
+  2026-09-27). The page's spec table is the window's (frame 80 mm, sash 84 mm, 4/20/4), and the
+  straight photos (`202443671_3` white two-leaf, `202445455` plaxé two-leaf) show the same profile
+  faces as the window. So it reuses the `hemera` profile with `leaves: 2, hinges: 5` (five per side
+  in both photos). Drawn on a WINDOW zone with sill 0 (owner). Estimate: the handle at mid-height.
+- **Lapeyre Néva aluminium sliding bay, 2 leaves, white** (`window_neva_white`, design `neva`; page
+  [FPC804460](https://www.lapeyre.fr/produits/baie-coulissante-neva-aluminium-FPC804460), 2026-09-27). The owner first said "triple baie Héméra"; there is no sliding Héméra, and
+  the owner corrected it to the 2-leaf Néva.
+  - From the page: aluminium, standard 215 × 180 cm or made to measure, frame 100 mm, sash 36 mm,
+    4/20/4, 2 leaves, handle supplied, colour "Blanc / Gris" (white modelled).
+  - Faces measured on the straight photo `202600034_5` at about 2.55 mm/px, taking its frame as
+    the 180 cm width (Hypothesis: the photo's size is not stated): frame 30 mm, sash stiles and top
+    rail 45 mm, bottom rail 38 mm, 41 mm between the two glasses at the meeting stiles.
+  - Model (`buildSliding`): the frame ring over the full depth; two sashes on two tracks 25 mm
+    either side of the centre, the room-side one toward the zone's hinge end, overlapping the outer
+    one at the meeting stiles; dark gaskets on both glass faces; a flat lever on the room sash's
+    outer stile, a small dark pull on the outer sash. Drawn closed. Rails, rollers and the drainage
+    sill are not modelled.
+  - Proven 2026-09-27: build; front and three-quarter renders in a scratch preview beside the
+    photos (both products). Not yet seen in View 3D or AR.
 
 ## Switches and outlets (device products)
 

@@ -8,6 +8,7 @@
 //            offset half a piece) | octagon (octagon + cabochon at each lattice corner)
 //            | pinwheel (30/50 cm opus module of 9 tiles, w = h = the module) | paint (area only)
 //   w, h     piece size in metres (octagon: w = octagon width); joint in metres
+//   diagonal octagon only: the pattern turned 45°, cabochons square to the walls
 //   surface  floor | wall | both
 //   pack     { pieces } per box, or { area } m² per pack (paint), or { formats: { '50×50': n } }
 //            pieces per box for each format of a pinwheel
@@ -88,7 +89,9 @@ export const BUILTIN_MATERIALS = [
     // in MATTONE (terracotta) with the 6.2×6.2 Tozzetto in BIANCO at each corner (owner's
     // choice of product and colours). Colours from Etruria's swatch photos; the joint,
     // grout colour and pack size are estimates (the retailer sells per m² / per piece).
-    id: 'etruria_hex_octagon_mattone', surface: 'floor', pattern: 'octagon', design: 'porcelain-matte',
+    // Laid turned 45° (`diagonal`, owner 2026-09-27) so the tozzetti are squares, square to
+    // the walls.
+    id: 'etruria_hex_octagon_mattone', surface: 'floor', pattern: 'octagon', design: 'porcelain-matte', diagonal: true,
     w: 0.15, h: 0.15, joint: 0.002, thickness: 0.01,
     color: 0x7a4534, accent: 0xd4cfc4, grout: 0xcfc8bc, roughness: 0.85, bumpScale: 1.5, pack: { pieces: 1 },
     name: { en: 'Etruria HEX octagon Mattone + white tozzetto 15', fr: 'Etruria HEX octogone Mattone + cabochon blanc 15', zh: 'Etruria HEX 八角砖 砖红 + 白色小方砖 15' },
@@ -177,6 +180,24 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, frameDepth: 0.08, sashDepth: 0.084,
     color: 0xf5f5f3, accent: 0xcfe0e6, pack: null,
     name: { en: 'Lapeyre Héméra PVC window, white', fr: 'Fenêtre PVC Héméra Lapeyre, blanc', zh: 'Lapeyre Héméra 白色 PVC 窗' },
+  },
+  {
+    // Lapeyre Héméra PVC porte-fenêtre, white, made to measure (FPC8051131, 2026-09-27): the
+    // window's profiles and depths (same spec table), always two leaves, five hinges per
+    // side (straight photo 202443671_3). Set on a WINDOW zone with sill 0.
+    id: 'window_hemera_pf2_white', surface: 'window', pattern: 'window', design: 'hemera',
+    w: 0, h: 0, joint: 0, frameDepth: 0.08, sashDepth: 0.084, leaves: 2, hinges: 5,
+    color: 0xf5f5f3, accent: 0xcfe0e6, pack: null,
+    name: { en: 'Lapeyre Héméra PVC French door, 2 leaves, white', fr: 'Porte-fenêtre PVC Héméra Lapeyre 2 vantaux, blanc', zh: 'Lapeyre Héméra 白色 PVC 双开落地窗' },
+  },
+  {
+    // Lapeyre Néva aluminium sliding bay, 2 leaves, white (FPC804460, 2026-09-27; standard
+    // 215 × 180 or made to measure): frame 100 mm, sashes 36 mm, 4/20/4, handle supplied.
+    // Faces from the straight photo 202600034_5 (src/ui/windowProducts.js NEVA).
+    id: 'window_neva_white', surface: 'window', pattern: 'window', design: 'neva',
+    w: 0, h: 0, joint: 0, frameDepth: 0.1, sashDepth: 0.036, leaves: 2,
+    color: 0xf4f4f2, accent: 0xcfe0e6, pack: null,
+    name: { en: 'Lapeyre Néva aluminium sliding bay, 2 leaves, white', fr: 'Baie coulissante Néva aluminium Lapeyre 2 vantaux, blanc', zh: 'Lapeyre Néva 白色铝合金推拉门 双扇' },
   },
   {
     // Schneider Electric Ovalis two-way switch, white (Leroy Merlin 85231759): 87 mm square

@@ -556,16 +556,27 @@ export class Project {
   setFloorFinish(componentIds, seedId, material) {
     const floor = this.activeFloor;
     const ids = new Set(componentIds);
-    // A new material keeps the room's pattern start corner (it is about the room).
-    const anchor = (floor.finishes || []).find((f) => !f.target?.edge && ids.has(f.target?.rect) && f.anchor)?.anchor;
+    // A new material keeps the room's pattern start corner and turn (they are about the room).
+    const old = (floor.finishes || []).filter((f) => !f.target?.edge && ids.has(f.target?.rect));
+    const anchor = old.find((f) => f.anchor)?.anchor, turn = old.some((f) => f.turn);
     floor.finishes = (floor.finishes || []).filter((f) => f.target?.edge || !ids.has(f.target?.rect));
-    if (material) floor.finishes.push({ target: { rect: seedId }, material, ...(anchor ? { anchor } : {}) });
+    if (material) floor.finishes.push({ target: { rect: seedId }, material, ...(anchor ? { anchor } : {}), ...(turn ? { turn } : {}) });
     this._emit({ solveRectangles: false });
   }
 
   // Pattern start corner of a floor laying region (docs/materials.md): cleared on every
   // floor finish of the region (`regionRectIds`), then stored on the finish of the room
   // `componentIds` (the room holding the corner). A null anchor = the plan origin.
+  // Pattern turned 90° for a whole laying region: set on every floor finish of it.
+  setFloorTurn(regionRectIds, turn) {
+    const region = new Set(regionRectIds);
+    for (const f of this.activeFloor.finishes || []) {
+      if (f.target?.edge || !region.has(f.target?.rect)) continue;
+      if (turn) f.turn = true; else delete f.turn;
+    }
+    this._emit({ solveRectangles: false });
+  }
+
   setFloorAnchor(regionRectIds, componentIds, anchor) {
     const floor = this.activeFloor;
     const region = new Set(regionRectIds), comp = new Set(componentIds);

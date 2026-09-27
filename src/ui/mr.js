@@ -3411,11 +3411,23 @@ export function setupMR(view, project, getFootprint) {
   // The laying region (takeoff) of a selected room on the active floor, or null.
   const matRegionOf = (comp) => matTakeoff?.regions.find((r) => r.floorId === project.activeFloor.id
     && comp && r.rectIds.has(comp.rectangles[0].id)) || null;
-  function setFloorStartCorner() {
+  // "Near a corner" = within 60 cm of it, or 35 % of the region's short side in a small
+  // room, so the middle of a 1 m wide WC still turns rather than picks a corner.
+  function floorLayoutPress() {
     const region = matRegionOf(matSelRoom);
     if (!region || !matReticle) return;
     const pick = anchorNear(region.rects, region.boxes, matReticle.px, matReticle.py);
     if (!pick) return;
+    const xs = region.boxes.flatMap((b) => [b.x0, b.x1]), ys = region.boxes.flatMap((b) => [b.y0, b.y1]);
+    const short = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    const d = Math.hypot(matReticle.px - pick.point.x, matReticle.py - pick.point.y);
+    if (d > Math.min(0.6, 0.35 * short)) {
+      project.setFloorTurn([...region.rectIds], !region.turn);
+      rlog('floor pattern turn', { turn: !region.turn });
+      buildMaterials();
+      buildArch3d();
+      return;
+    }
     const same = region.anchor && Math.hypot(region.anchor.x - pick.point.x, region.anchor.y - pick.point.y) < 1e-3;
     const comp = matRooms.find((c) => c.ids.has(pick.anchor.rect));
     project.setFloorAnchor([...region.rectIds], [...(comp?.ids || [])], same ? null : pick.anchor);
@@ -3459,7 +3471,8 @@ export function setupMR(view, project, getFootprint) {
       return [
         [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
         [`${fmt(width)} × ${fmt(tall)} ${unitLabel()}`, 0xe2e8f0],
-        ...(isWindow ? [[t((rect.hinge ?? 'left') === 'both' ? 'mat.leaves2' : 'mat.leaves1'), 0xe2e8f0]] : []),
+        // A product with its own leaf count (porte-fenêtre, sliding bay) ignores the hinge.
+        ...(isWindow ? [[t((mat?.leaves ?? ((rect.hinge ?? 'left') === 'both' ? 2 : 1)) === 2 ? 'mat.leaves2' : 'mat.leaves1'), 0xe2e8f0]] : []),
         ...(mat ? [[t('mat.toMeasure'), 0xfbbf24]] : []),
       ];
     }
@@ -3485,8 +3498,11 @@ export function setupMR(view, project, getFootprint) {
       .sort((a, b) => parseFloat(b.split('×')[0]) * parseFloat(b.split('×')[1]) - parseFloat(a.split('×')[0]) * parseFloat(a.split('×')[1]));
     const formatLines = (formats, color) => bySize(formats)
       .map((k) => [`${k} ${formats[k].pieces} ${t('mat.pcs')} (${formats[k].pieces - formats[k].whole} ${t('mat.cut')})`, color]);
-    // A pattern starting at a room corner says so on the quantity line (the pill is full).
-    if (item) lines.push([qty(item.count) + (floorMode && item.anchor ? ` · ${t('mat.fromCorner')}` : ''), 0xe2e8f0]);
+    // A pattern starting at a room corner, or turned 90°, says so on the quantity line (the pill is full).
+    if (item) {
+      lines.push([qty(item.count) + (floorMode && item.anchor ? ` · ${t('mat.fromCorner')}` : '')
+        + (floorMode && item.turn ? ' · ↻90°' : ''), 0xe2e8f0]);
+    }
     if (item?.count.formats) lines.push(...formatLines(item.count.formats, 0xe2e8f0));
     else if (floorMode) lines.push([`${target.area.toFixed(2)} m²`, 0xe2e8f0]);
     const total = id && matTakeoff?.totals.get(id);
@@ -7892,9 +7908,9 @@ export function setupMR(view, project, getFootprint) {
         project.touch();
         buildPlan(); applyPlanMatrix(); buildMaterials();
       }
-      // MATERIAL · FLOOR: A/X starts the selected room's pattern at the corner nearest the
-      // reticle; A/X on that same corner again returns it to the plan origin.
-      else if (modes[currentMode].id === 'mat_floor') setFloorStartCorner();
+      // MATERIAL · FLOOR: A/X near a corner starts the selected room's pattern there (again
+      // on that corner: back to the plan origin); A/X away from the corners turns it 90°.
+      else if (modes[currentMode].id === 'mat_floor') floorLayoutPress();
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();

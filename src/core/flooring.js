@@ -79,6 +79,7 @@ const bboxOf = (boxes) => boxes.reduce((o, b) => ({
 // touches with positive area; `whole` cells are fully covered. A cut piece is counted
 // as a full piece bought (offcut reuse across cells is not assumed: conservative).
 function latticeCount(material, boxes) {
+  if (material.pattern === 'octagon' && material.diagonal) return diagonalOctagonCount(material, boxes);
   const px = material.w + (material.joint || 0), py = material.h + (material.joint || 0);
   const cellArea = px * py;
   const cells = new Map();
@@ -118,6 +119,59 @@ function latticeCount(material, boxes) {
     out.cabochonWhole = cw;
   }
   return out;
+}
+
+// Octagon + cabochon turned 45° (`diagonal`, owner 2026-09-27): the cabochons become squares
+// square to the walls. A regular octagon is unchanged by a 45° turn, so the laid pattern is
+// a square grid of pitch q = (w + joint)/√2 in plan x/y: a cabochon on each vertex (m, n)
+// with m + n even (one at the origin, as in the straight lattice) and an octagon on each
+// with m + n odd. Counted by the real tile shapes: a piece the region touches is bought,
+// whole when the region covers it.
+function clipArea(poly, b) { // area of a convex polygon inside box b (Sutherland–Hodgman)
+  let pts = poly;
+  const planes = [[0, b.x0, 1], [0, b.x1, -1], [1, b.y0, 1], [1, b.y1, -1]];
+  for (const [axis, v, sgn] of planes) {
+    const inside = (p) => (p[axis] - v) * sgn >= 0;
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[(i + 1) % pts.length];
+      if (inside(a)) out.push(a);
+      if (inside(a) !== inside(c)) {
+        const t = (v - a[axis]) / (c[axis] - a[axis]);
+        out.push([a[0] + t * (c[0] - a[0]), a[1] + t * (c[1] - a[1])]);
+      }
+    }
+    pts = out;
+    if (!pts.length) return 0;
+  }
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], c = pts[(i + 1) % pts.length];
+    s += a[0] * c[1] - c[0] * a[1];
+  }
+  return Math.abs(s) / 2;
+}
+function diagonalOctagonCount(material, boxes) {
+  const w = material.w, q = (w + (material.joint || 0)) / Math.SQRT2;
+  const hw = w / 2, c = w / (2 + Math.SQRT2), side = w / (1 + Math.SQRT2), hs = side / 2;
+  const octArea = w * w - 2 * c * c, cabArea = side * side;
+  const bb = bboxOf(boxes);
+  let whole = 0, cut = 0, cw = 0, cc = 0;
+  for (let n = Math.floor((bb.y0 - hw) / q); n * q <= bb.y1 + hw; n++) {
+    for (let m = Math.floor((bb.x0 - hw) / q); m * q <= bb.x1 + hw; m++) {
+      const X = m * q, Y = n * q;
+      const octagon = (m + n) % 2 !== 0;
+      const poly = octagon
+        ? [[-hw + c, -hw], [hw - c, -hw], [hw, -hw + c], [hw, hw - c], [hw - c, hw], [-hw + c, hw], [-hw, hw - c], [-hw, -hw + c]]
+        : [[-hs, -hs], [hs, -hs], [hs, hs], [-hs, hs]];
+      const pts = poly.map(([x, y]) => [X + x, Y + y]);
+      const a = boxes.reduce((s, b) => s + clipArea(pts, b), 0);
+      if (a < 1e-6) continue; // a sub-mm² touch needs no piece
+      const full = a >= (octagon ? octArea : cabArea) * (1 - 1e-6);
+      if (octagon) { if (full) whole++; else cut++; } else if (full) cw++; else cc++;
+    }
+  }
+  return { pieces: whole + cut, whole, cut, cabochons: cw + cc, cabochonWhole: cw };
 }
 
 // Pinwheel (opus) of 30/50 cm tiles (owner spec, 2026-09-27): a 130 × 130 cm module of
@@ -171,8 +225,7 @@ export function plankAlongX(boxes) {
   const bb = bboxOf(boxes);
   return bb.x1 - bb.x0 >= bb.y1 - bb.y0;
 }
-function staggerCount(material, boxes) {
-  const alongX = plankAlongX(boxes);
+function staggerCount(material, boxes, alongX = plankAlongX(boxes)) {
   // Work in (u along the row, v across rows) coordinates.
   const uv = boxes.map((b) => (alongX
     ? { u0: b.x0, u1: b.x1, v0: b.y0, v1: b.y1 }
@@ -259,11 +312,12 @@ export function groutKg(material, area) {
   return area * perM2 * material.joint * (material.thickness || GROUT_DEFAULT_DEPTH) * GROUT_DENSITY;
 }
 
-export function countPieces(material, boxes) {
+// `alongX` (planks only) overrides the long-axis rule (a turned region, below).
+export function countPieces(material, boxes, { alongX } = {}) {
   const area = boxesArea(boxes);
   if (!material || !boxes.length) return { area, pieces: 0 };
   if (material.pattern === 'paint' || !(material.w > 0 && material.h > 0)) return { area, pieces: 0 };
-  const counted = material.pattern === 'stagger' ? staggerCount(material, boxes)
+  const counted = material.pattern === 'stagger' ? staggerCount(material, boxes, alongX ?? plankAlongX(boxes))
     : material.pattern === 'pinwheel' ? pinwheelCount(material, boxes) : latticeCount(material, boxes);
   // Naive estimate beside it: area ÷ piece area + 10 % waste (pinwheel: the mean piece).
   const piece = material.pattern === 'pinwheel' ? 1.69 / PINWHEEL.length : material.w * material.h;
@@ -332,6 +386,11 @@ export function anchorNear(rects, boxes, px, py) {
   const rect = rects.reduce((m, r) => (dist2(rectCorner(r.bounds, c.corner), c) < dist2(rectCorner(m.bounds, c.corner), c) ? r : m));
   return { anchor: { rect: rect.id, corner: c.corner }, point: { x: c.x, y: c.y } };
 }
+// A region may also turn its pattern 90° (`turn`, owner 2026-09-27: the mosaic sticks and
+// the planks have a direction). Planks just swap to the other axis (they already follow the
+// region's long axis). Every other pattern turns about the start point: its own frame is
+// (u, v) = (y, −x) of the shifted plan, in the takeoff and the 3D UVs alike.
+const turnBoxes = (boxes) => boxes.map((b) => ({ ...b, x0: b.y0, x1: b.y1, y0: -b.x1, y1: -b.x0 }));
 const shiftBoxes = (boxes, a) => (a ? boxes.map((b) => ({ ...b, x0: b.x0 - a.x, x1: b.x1 - a.x, y0: b.y0 - a.y, y1: b.y1 - a.y })) : boxes);
 
 // Half of a doorway box on the side of `component` (across the doorway's short axis).
@@ -377,6 +436,7 @@ export function floorRegions(project, floor, { count = true } = {}) {
     for (const r of c.rectangles) { g.rectIds.add(r.id); g.rects.push(r); g.include.push(r.bounds); }
     g.add.push(...adds[i]);
     g.anchor ??= finishes[i]?.anchor || null;
+    g.turn ??= finishes[i]?.turn ?? null;
     groups.set(root, g);
   });
   for (const [bounds, i] of merged) groups.get(find(i))?.add.push(bounds);
@@ -386,8 +446,13 @@ export function floorRegions(project, floor, { count = true } = {}) {
     // The pattern starts at `anchor` (plan point) or the plan origin: count in the
     // pattern's own frame by shifting the region, not the lattice.
     const anchor = resolveAnchor(g.rects, g.anchor, boxes);
+    const turn = !!g.turn, plank = material?.pattern === 'stagger';
+    // alongX: planks' row axis (the long axis, swapped by a turn); other patterns never swap.
+    const alongX = plank ? plankAlongX(boxes) !== turn : true;
+    const local = shiftBoxes(boxes, anchor);
     return { floorId: floor.id, material: g.material, rectIds: g.rectIds, rects: g.rects, boxes, anchor,
-      count: count ? countPieces(material, shiftBoxes(boxes, anchor)) : null };
+      turn, alongX, patternTurn: turn && !plank,
+      count: count ? countPieces(material, turn && !plank ? turnBoxes(local) : local, { alongX }) : null };
   });
 }
 
@@ -506,7 +571,7 @@ export function wallFaceBoxes(floor, rect, edge) {
 export function finishSurfaces(project, floor) {
   const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
   const floors = floorRegions(project, floor, { count: false })
-    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: plankAlongX(r.boxes) }));
+    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: r.alongX, patternTurn: r.patternTurn }));
   const walls = [];
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;

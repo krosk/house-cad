@@ -135,6 +135,7 @@ function serializeFinish(f) {
   if (f.target.edge) target.edge = f.target.edge;
   const out = { target, material: f.material };
   if (f.anchor) out.anchor = { rect: f.anchor.rect, corner: f.anchor.corner };
+  if (f.turn) out.turn = true;
   return out;
 }
 // Additive fields (no FILE_VERSION bump): missing = none. Unknown shapes are dropped.
@@ -149,6 +150,7 @@ function loadFinishes(list, rectIds = null) {
     if (!edge && typeof anchorRect === 'string' && ['bl', 'br', 'tl', 'tr'].includes(f.anchor.corner)) {
       out.anchor = { rect: anchorRect, corner: f.anchor.corner };
     }
+    if (!edge && f.turn === true) out.turn = true; // floor pattern turned 90°
     return [out];
   });
 }

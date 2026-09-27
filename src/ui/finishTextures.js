@@ -35,8 +35,13 @@ const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
   || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design])
   || (m.pattern === 'pinwheel' && !!PINWHEEL_DESIGNS[m.design]);
 
-// Repeat unit (metres) of a pattern.
+// Repeat unit (metres) of a pattern. A `diagonal` octagon draws its straight unit turned
+// 45°: that repeats along plan x and y every √2 × the straight unit.
 export function patternUnit(m) {
+  if (m.pattern === 'octagon' && m.diagonal) return straightUnit(m).map((u) => u * Math.SQRT2);
+  return straightUnit(m);
+}
+function straightUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
@@ -870,6 +875,30 @@ function paintUnit(ctx, m, W, H, ppm) {
   }
 }
 
+// Paint a `diagonal` octagon: draw the straight unit (same ppm) on its own canvas, then
+// fill this canvas with it as a pattern turned 45° about the origin, so a cabochon stays
+// on the plan origin (as in the takeoff, flooring.js) and the tiling has no seams.
+function paintDiagonal(ctx, m, W, H, ppm, paintStraight) {
+  const [ux, uy] = straightUnit(m);
+  const src = document.createElement('canvas');
+  src.width = Math.max(8, Math.round(ux * ppm));
+  src.height = Math.max(8, Math.round(uy * ppm));
+  paintStraight(src.getContext('2d'), src.width, src.height, ppm);
+  // Scale the source so its turned period is exactly W / √2 canvas px: the canvas then
+  // holds exactly one period along x and y (the source's integer size would leave a seam).
+  const pattern = ctx.createPattern(src, 'repeat');
+  pattern.setTransform(new DOMMatrix([W / Math.SQRT2 / src.width, 0, 0, H / Math.SQRT2 / src.height, 0, 0]));
+  ctx.save();
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = pattern;
+  const R = W + H;
+  ctx.fillRect(-R, -R, 2 * R, 2 * R);
+  ctx.restore();
+}
+const withDiagonal = (m, paint) => (m.pattern === 'octagon' && m.diagonal
+  ? (ctx, W, H, ppm) => paintDiagonal(ctx, m, W, H, ppm, paint)
+  : paint);
+
 function unitCanvas(m, paint) {
   const [uw, uh] = patternUnit(m);
   const ppm = (hasDesign(m) ? 2048 : 512) / Math.max(uw, uh);
@@ -892,7 +921,7 @@ function repeatTexture({ canvas, uw, uh }, anisotropy) {
 // (paint) materials.
 export function finishTexture(m, anisotropy = 1) {
   if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
-  const map = repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm)), anisotropy);
+  const map = repeatTexture(unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm))), anisotropy);
   map.colorSpace = THREE.SRGBColorSpace;
   return map;
 }
@@ -901,7 +930,7 @@ export function finishTexture(m, anisotropy = 1) {
 // line up), else null. View 3D only: the AR 3D view's Lambert materials ignore it.
 export function finishBumpTexture(m, anisotropy = 1) {
   if (m?.pattern === 'octagon' && OCT_DESIGNS[m.design]) {
-    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintOctDesign(ctx, m, W, H, ppm, true)), anisotropy);
+    return repeatTexture(unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintOctDesign(ctx, m, W, H, ppm, true))), anisotropy);
   }
   if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
     return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true)), anisotropy);
