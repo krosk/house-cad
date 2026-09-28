@@ -61,6 +61,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MARKER · LINK: routes still dashed cyan (dashes flow round the ceiling corners); selecting a switch turns only its routes amber; `draw` count ~17 lower than before on Ground
 - [ ] DOUBLE SWITCH marker: in MARKER · EDIT the type list has DOUBLE SWITCH after SWITCH, with a two-rocker glyph; in LINK a selected double switch shows `ROCKER 1/2`, thumbstick up/down swaps it, and lights linked on each rocker show amber/pink routes; the sheet shows the split-square symbol and a 1/2 chip per leg
 - [ ] Merge an old pair: retype the top switch of a double-switch pair to DOUBLE SWITCH, readout offers `A/X: MERGE…`, A/X removes the other marker and its light moves to rocker 2 (check in LINK)
+- [ ] MARKER · CONDUIT with no pen: over a spot with a device, a node and a run, each grip steps to the next one and it stays highlighted while the hand wobbles; after all of them it wraps round; trigger starts the pen on the highlighted one
 - [ ] Overlap count badge: a floor icon shared by markers at one plan point shows an amber "2"/"3" at its top-right corner; a double switch (same point and height) shows it on the wall glyph too; single markers show none
 - Owner walk 2026-09-27 (build `4cad922`): applied materials on the Quest; the MATERIAL flow for floors,
   windows etc. was understood. No per-item pass/fail was given, so the boxes below stay open. The owner

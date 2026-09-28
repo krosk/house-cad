@@ -161,8 +161,12 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `Project`, not a floor): a graph of `conduitNodes` (bare junctions carrying `{x,y,z,floorId}`, or
   nodes bound to a device `markerId` that follow the live marker) joined by `conduitSegments`. Pen
   model: `penNodeId` is the growing end. The nearest eligible device/node inside the reticle is
-  highlighted; **grip over a target cycles the combined overlap stack without changing geometry**, and
-  trigger commits only the highlighted target. Trigger empty space to drop a junction (X/Y from the
+  highlighted; **grip over a target cycles the combined overlap stack (devices, nodes and runs to split)
+  without changing geometry**, and trigger commits only the highlighted target. The grip choice is
+  sticky (2026-09-28): it stays highlighted while it remains under the reticle, and grips walk the stack
+  in a fixed order (devices, nodes, runs; high to low), because re-sorting by distance each frame made
+  the cycle jump with hand jitter. Leaving it, or committing, returns to nearest-first. Grip over a
+  lone target does nothing (it no longer lifts the pen). Trigger empty space to drop a junction (X/Y from the
   floor reticle, z from the tip, floorId = active floor—or the tip's storey in ALL FLOORS) and run a segment to it; trigger another target
   to join/branch/loop. **Trigger an existing run** (picked by its floor projection, like CONDUIT
   EDIT; the hovered run turns yellow and the preview snaps to the split point) to **branch from it**:

@@ -2716,9 +2716,11 @@ export function setupMR(view, project, getFootprint) {
 
   // MARKER · CONDUIT uses one combined pick stack instead of hard-prioritizing every
   // nearby conduit node over a device. Nearest-to-reticle wins; exact ties put markers
-  // first, then order vertical stacks high→low. Grip advances `afterKey`, while trigger
-  // commits only the currently highlighted target.
-  function conduitTargetAtFloorPoint(px, py, afterKey = null) {
+  // first, then order vertical stacks high→low. Trigger commits only the highlighted one.
+  // Grip picks the next candidate and that choice STICKS (`pickKey`) while it stays
+  // under the reticle (owner, 2026-09-28: re-sorting by distance every frame made "the
+  // one after X" jump with hand jitter). Returns { target, candidates }.
+  function conduitTargetAtFloorPoint(px, py, pickKey = null) {
     const candidates = [];
     const rank = pickRanker();
     project.floors.forEach((floor, floorOrder) => {
@@ -2767,9 +2769,20 @@ export function setupMR(view, project, getFootprint) {
     candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
       || KIND_RANK[a.kind] - KIND_RANK[b.kind]
       || b.z - a.z || a.order - b.order);
-    if (!candidates.length) return null;
-    const current = candidates.findIndex((candidate) => candidate.key === afterKey);
-    return candidates[(current + 1) % candidates.length];
+    const target = candidates.find((candidate) => candidate.key === pickKey) || candidates[0] || null;
+    return { target, candidates };
+  }
+  // Grip in MARKER · CONDUIT: the key of the candidate after the highlighted one, in a
+  // stable order (kind, then id) so repeated grips walk the whole stack once round
+  // whatever the jitter does to the distances.
+  let conduitCandidates = [], conduitHoverKey = null;
+  function nextConduitPickKey() {
+    if (conduitCandidates.length < 2) return null;
+    const KIND_RANK = { marker: 0, node: 1, segment: 2 };
+    const ring = [...conduitCandidates].sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]
+      || b.z - a.z || a.key.localeCompare(b.key));
+    const i = ring.findIndex((c) => c.key === conduitHoverKey);
+    return ring[(i + 1) % ring.length].key;
   }
 
   // Where triggering run `seg` (a conduitNetworkSegments entry, world-Z ends) under the
@@ -4138,7 +4151,7 @@ export function setupMR(view, project, getFootprint) {
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
-  let conduitPickAfterKey = null;
+  let conduitPickAfterKey = null; // the grip-chosen target key (sticky; see conduitTargetAtFloorPoint)
   // B/Y undo for the pen: one entry per trigger step, newest last. Records only what
   // the step CREATED (addConduitSegment / ensureConduitNodeAtMarker can return an
   // existing item), so undo never removes conduit that existed before the step.
@@ -6687,6 +6700,7 @@ export function setupMR(view, project, getFootprint) {
         // The per-frame combined picker has already disambiguated active-floor nodes
         // and devices by distance/cycle order. Adjacent targets and empty floor follow.
         const prevPen = penNodeId;
+        conduitPickAfterKey = null; // a grip choice lasts until it is committed
         const nodesBefore = new Set(project.conduitNodes.map((n) => n.id));
         const segmentsBefore = new Set(project.conduitSegments.map((s) => s.id));
         let targetNodeId = hoverConduitNode?.id || null;
@@ -7739,15 +7753,10 @@ export function setupMR(view, project, getFootprint) {
     if (mode.id === 'marker_conduit') {
       // Over a target, grip advances the combined node/marker pick stack without
       // changing geometry. On empty space it retains its original pen-lift meaning.
-      if (hoverMarker) {
-        conduitPickAfterKey = `marker:${hoverMarker.id}`;
-        rlog('conduit target cycle', { after: conduitPickAfterKey });
-        return;
-      }
-      if (hoverConduitNode) {
-        conduitPickAfterKey = `node:${hoverConduitNode.id}`;
-        rlog('conduit target cycle', { after: conduitPickAfterKey });
-        return;
+      if (hoverMarker || hoverConduitNode || hoverPenSplit) {
+        const next = nextConduitPickKey();
+        if (next) { conduitPickAfterKey = next; rlog('conduit target cycle', { pick: next }); }
+        return; // a lone target: nothing to cycle, and the pen stays down
       }
       if (penNodeId) { rlog('conduit pen lift', { node: penNodeId }); penNodeId = null; }
       return;
@@ -8998,11 +9007,13 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = true;
         reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        const target = conduitTargetAtFloorPoint(px, py, conduitPickAfterKey);
+        const { target, candidates } = conduitTargetAtFloorPoint(px, py, conduitPickAfterKey);
+        conduitCandidates = candidates;
+        conduitHoverKey = target?.key ?? null;
+        if (target?.key !== conduitPickAfterKey) conduitPickAfterKey = null; // the pick left the reticle: nearest again
         if (target?.kind === 'node') hoverConduitNode = target.item;
         else if (target?.kind === 'marker') hoverMarker = target.item;
         else if (target?.kind === 'segment') hoverPenSplit = target.item;
-        else conduitPickAfterKey = null; // leaving the stack restarts it at nearest
         // Fall back to an adjacent-floor node/device → the next pen segment is a riser.
         if (!hoverConduitNode && !hoverMarker && !hoverPenSplit) hoverAdjacent = adjacentTargetAtFloorPoint(px, py);
       } else {
