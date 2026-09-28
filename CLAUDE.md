@@ -130,6 +130,14 @@ The key insight: because every rectangle edge is axis-aligned, each edge is a si
 
 All geometry is stored in **meters** (maps 1:1 to the extruded mesh and future WebXR world scale). `src/core/units.js` converts only what the user reads/types (m/cm/mm) via `fmt()`, `toMeters()`, `unitLabel()`, and an `onUnitChange` bus. The display-unit preference persists in localStorage and can be changed from either desktop or `PROJECT · UNIT` in AR; it is not project geometry. Never store display units in the model.
 
+**Every stored length is on a 0.1 mm grid** (owner, 2026-09-28: float noise split a marker stack
+that was one point). `snapM` (`src/core/constraints.js`) rounds to the canonical double `n / 1e4`, so
+two lengths meaning the same point are bit-identical and `===` is safe. `Project._emit` snaps every
+authored length first (`_snapToGrid`: rect x/y/w/h and band heights, constraint values, marker and
+node x/y/z, floor heights); the solvers snap what they write; `edgeCoord`, `bounds` and elevations
+snap the derived sums. A new stored length field must be added to `_snapToGrid`. Loading an older
+file moves values by at most 0.05 mm.
+
 ### Sizing is constraint-first (deliberate design decision)
 
 A rectangle's exact size is authored **only** through dimension constraints. There is intentionally **no** on-canvas size label, no inline size editor, and no W/H field in the properties panel — do not re-add these. Rough sizing is via drawing and the 8 resize handles; the properties panel edits X/Y position and add/subtract only.

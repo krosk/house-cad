@@ -146,6 +146,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   on the floor icon when markers share the plan point (any heights), and on the wall glyph when they
   also share the height (e.g. a double switch). Drawn in the same two marker batches (no extra draw
   call); not pickable; during a live grip-drag it stays at the old point until the release rebuild.
+  **Same point = same double** (trap, 2026-09-28). One solved stack differed by float noise: in
+  the owner's house an Ethernet at 132 cm had `y = -0.3700000000000021` and its switches
+  `-0.37000000000000216`. Strict equality split it into a 2-stack plus a lone marker, so the EDIT
+  grip cycle jumped with whichever was nearest the hand, and the badge read "2". Fixed at the root:
+  every stored length is on a 0.1 mm grid (CLAUDE.md "Units"), so the stack is bit-identical and
+  `===` holds everywhere, sheets included. AR stack groupings also accept 0.1 mm (`samePlanPoint` in
+  `mr.js`) as a second guard.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Grip cycles eligible
   overlapping switches (then lights), and trigger confirms the yellow candidate. Triggering one or
   more selected light icons toggles each control link. Pairwise links allow one switch to

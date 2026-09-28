@@ -29,12 +29,27 @@ const CONFLICT_TOL = 1e-3; // meters
 
 export const EDGE_AXIS = { left: 'x', right: 'x', bottom: 'y', top: 'y' };
 
+// Every stored length sits on a 0.1 mm grid (owner, 2026-09-28: float noise split a
+// marker stack that was one point, docs/ar-survey.md "Same point"). `n / 1e4` is the
+// one canonical double for n tenths of a millimetre, so two lengths that mean the same
+// point are bit-identical and compare equal with ===. Project._emit snaps the inputs;
+// the solvers snap what they write; a derived edge (x + w) is snapped where it is read.
+const GRID_PER_M = 1e4;
+export const snapM = (v) => (Number.isFinite(v) ? Math.round(v * GRID_PER_M) / GRID_PER_M : v);
+
+// Store a solved edge pair as the rect's min + size on one axis (both on the grid).
+function writeAxis(r, axis, lo, hi) {
+  lo = snapM(lo); hi = snapM(hi);
+  if (axis === 'x') { r.x = Math.min(lo, hi); r.w = snapM(Math.abs(hi - lo)); }
+  else { r.y = Math.min(lo, hi); r.h = snapM(Math.abs(hi - lo)); }
+}
+
 export function edgeCoord(rect, edge) {
   switch (edge) {
     case 'left': return rect.x;
-    case 'right': return rect.x + rect.w;
+    case 'right': return snapM(rect.x + rect.w);
     case 'bottom': return rect.y;
-    case 'top': return rect.y + rect.h;
+    case 'top': return snapM(rect.y + rect.h);
     default: throw new Error(`bad edge ${edge}`);
   }
 }
@@ -349,9 +364,7 @@ function solveFurniture(allRects, furniture, constraints) {
       return sw / w + o;
     };
     for (const r of furniture) {
-      const lo = value(`${r.id}:${edges[0]}`), hi = value(`${r.id}:${edges[1]}`);
-      if (axis === 'x') { r.x = Math.min(lo, hi); r.w = Math.abs(hi - lo); }
-      else { r.y = Math.min(lo, hi); r.h = Math.abs(hi - lo); }
+      writeAxis(r, axis, value(`${r.id}:${edges[0]}`), value(`${r.id}:${edges[1]}`));
     }
   }
   return removed;
@@ -438,10 +451,7 @@ function solveRects(rects, constraints) {
     // identity (used by every picker/highlight) then always agrees with edgeCoord
     // (raw), so picking an edge never resolves to its opposite.
     for (const r of rects) {
-      const lo = x[index.get(`${r.id}:${edges[0]}`)];
-      const hi = x[index.get(`${r.id}:${edges[1]}`)];
-      if (axis === 'x') { r.x = Math.min(lo, hi); r.w = Math.abs(hi - lo); }
-      else { r.y = Math.min(lo, hi); r.h = Math.abs(hi - lo); }
+      writeAxis(r, axis, x[index.get(`${r.id}:${edges[0]}`)], x[index.get(`${r.id}:${edges[1]}`)]);
     }
   }
 }
@@ -480,7 +490,7 @@ export function solveMarkers(floor) {
       refCoord = edgeCoord(rr, refEnd.edge);
     }
     // value = coord(b) − coord(a). Solve for the marker's coordinate.
-    m[c.axis] = markerIsB ? refCoord + c.value : refCoord - c.value;
+    m[c.axis] = snapM(markerIsB ? refCoord + c.value : refCoord - c.value);
     m._locked[c.axis] = true;
   }
 
@@ -519,7 +529,7 @@ export function solveConduitNodes(project) {
         if (!rr) continue; // dangling ref (rect deleted) — leave the node free
         refCoord = edgeCoord(rr, refEnd.edge);
       }
-      n[c.axis] = nodeIsB ? refCoord + c.value : refCoord - c.value;
+      n[c.axis] = snapM(nodeIsB ? refCoord + c.value : refCoord - c.value);
       n._locked[c.axis] = true;
     }
   }

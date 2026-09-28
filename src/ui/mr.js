@@ -828,6 +828,12 @@ export function setupMR(view, project, getFootprint) {
   // current mode. The cyan one belongs permanently to the optional LEFT companion
   // and is always a teleport target.
   const RETICLE_OUTER = 0.08; // m; also the EDGE-pick radius (edge must fall in the ring)
+  // "Same plan point" for AR stacks (edit/dims pick, stack readout, count badges, device
+  // products). Stored lengths are on the 0.1 mm grid (snapM), so a stack is bit-identical;
+  // this tolerance is a second guard against the float noise that once split one
+  // (docs/ar-survey.md "Same point = same double").
+  const SAME_POINT_M = 1e-4;
+  const samePlanPoint = (a, b) => Math.abs(a.x - b.x) < SAME_POINT_M && Math.abs(a.y - b.y) < SAME_POINT_M;
   const reticleGeom = new THREE.RingGeometry(0.06, RETICLE_OUTER, 32).rotateX(-Math.PI / 2);
   const reticleMaterial = (color) => new THREE.MeshBasicMaterial({
     color, transparent: true, opacity: 0.6,
@@ -2206,22 +2212,22 @@ export function setupMR(view, project, getFootprint) {
     // devices"): floor icons overlap at one plan point, wall glyphs at one point AND
     // height. Drawn last in each batch, so above the icons. Not proxies in markerGroup:
     // nothing picks them, and a live drag leaves them until the release rebuild.
-    const counts = (keyOf) => {
-      const groups = new Map();
+    const counts = (same) => {
+      const groups = [];
       for (const m of floor.markers) {
-        const k = keyOf(m);
-        groups.set(k, [...(groups.get(k) || []), m]);
+        const g = groups.find((group) => same(group[0], m));
+        if (g) g.push(m); else groups.push([m]);
       }
-      return [...groups.values()].filter((g) => g.length > 1);
+      return groups.filter((g) => g.length > 1);
     };
-    for (const g of counts((m) => `${m.x}|${m.y}`)) {
+    for (const g of counts(samePlanPoint)) {
       const badge = new THREE.Object3D();
       badge.userData.glyphSlot = markerCountSlot(g.length);
       badge.userData.half = 0.022;
       badge.position.set(g[0].x + MARKER_FLOOR_HALF, elevation + 0.017, -(g[0].y + MARKER_FLOOR_HALF));
       floorProxies.push(badge);
     }
-    for (const g of counts((m) => `${m.x}|${m.y}|${m.z}`)) {
+    for (const g of counts((a, b) => samePlanPoint(a, b) && Math.abs((a.z || 0) - (b.z || 0)) < SAME_POINT_M)) {
       const badge = new THREE.Object3D();
       badge.userData.glyphSlot = markerCountSlot(g.length);
       badge.userData.corner = [MARKER_WALL_HALF, MARKER_WALL_HALF, 0.018];
@@ -2832,7 +2838,7 @@ export function setupMR(view, project, getFootprint) {
       return project.conduitNodes
         .filter((n) => !n.markerId && project.conduitNodeFloorId(n) === project.activeFloorId)
         .map((n) => ({ n, p: conduitNodePos(project, n) }))
-        .filter(({ p }) => p.x === p0.x && p.y === p0.y)
+        .filter(({ p }) => samePlanPoint(p, p0))
         .sort((a, b) => (b.p.z || 0) - (a.p.z || 0))
         .map(({ n }) => ({ kind: 'node', id: n.id }));
     }
@@ -2840,7 +2846,7 @@ export function setupMR(view, project, getFootprint) {
       const anchor = markerAtFloorPoint(px, py);
       if (!anchor) return [];
       return project.markers
-        .filter((m) => m.x === anchor.x && m.y === anchor.y)
+        .filter((m) => samePlanPoint(m, anchor))
         .sort((a, b) => (b.z || 0) - (a.z || 0))
         .map((m) => ({ kind: 'marker', id: m.id }));
     }
@@ -3464,7 +3470,7 @@ export function setupMR(view, project, getFootprint) {
     const toMulti = rockers(materialById(project, id)) > 1;
     const fromMulti = rockers(markerProduct(project, marker)) > 1;
     const stack = project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
-      && m.type !== 'switch_dual' && m.x === marker.x && m.y === marker.y);
+      && m.type !== 'switch_dual' && samePlanPoint(m, marker));
     for (const m of toMulti || fromMulti ? stack : [marker]) {
       project.setMarkerProduct(m.id, toMulti || m === marker || !id ? id : null);
     }
@@ -6080,7 +6086,7 @@ export function setupMR(view, project, getFootprint) {
     if (!found) return null;
     const stack = found.floor.markers
       .map((candidate, index) => ({ candidate, index }))
-      .filter(({ candidate }) => candidate.x === marker.x && candidate.y === marker.y)
+      .filter(({ candidate }) => samePlanPoint(candidate, marker))
       .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
       .map(({ candidate }) => candidate);
     if (stack.length < 2) return null;
@@ -6147,7 +6153,7 @@ export function setupMR(view, project, getFootprint) {
     if (!marker) return null;
     const stack = project.markers
       .map((candidate, index) => ({ candidate, index }))
-      .filter(({ candidate }) => candidate.x === marker.x && candidate.y === marker.y)
+      .filter(({ candidate }) => samePlanPoint(candidate, marker))
       .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
       .map(({ candidate }) => candidate);
     if (stack.length < 2) return marker;

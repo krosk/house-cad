@@ -9,7 +9,7 @@
 //
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
-import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
+import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, snapM } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch } from './electrical.js';
@@ -258,9 +258,9 @@ export class Rectangle {
 
   // Normalized bounds (handles rectangles drawn right-to-left / top-to-bottom).
   get bounds() {
-    const x0 = Math.min(this.x, this.x + this.w);
-    const y0 = Math.min(this.y, this.y + this.h);
-    return { x0, y0, x1: x0 + Math.abs(this.w), y1: y0 + Math.abs(this.h) };
+    const x0 = snapM(Math.min(this.x, this.x + this.w));
+    const y0 = snapM(Math.min(this.y, this.y + this.h));
+    return { x0, y0, x1: snapM(x0 + Math.abs(this.w)), y1: snapM(y0 + Math.abs(this.h)) };
   }
 
   contains(px, py) {
@@ -388,10 +388,10 @@ export class Project {
     if (gi < 0) gi = 0;
     this.floors[gi].elevation = 0;
     for (let i = gi + 1; i < this.floors.length; i++) {
-      this.floors[i].elevation = this.floors[i - 1].elevation + this.floors[i - 1].height;
+      this.floors[i].elevation = snapM(this.floors[i - 1].elevation + this.floors[i - 1].height);
     }
     for (let i = gi - 1; i >= 0; i--) {
-      this.floors[i].elevation = this.floors[i + 1].elevation - this.floors[i].height;
+      this.floors[i].elevation = snapM(this.floors[i + 1].elevation - this.floors[i].height);
     }
   }
 
@@ -399,7 +399,23 @@ export class Project {
   // listeners so they see fully-solved, stacked geometry. Markers are resolved
   // in a one-way pass AFTER the rectangle solve (they read resolved wall edges
   // but never move them — see solveMarkers).
+  // Put every authored length on the 0.1 mm grid (snapM, constraints.js) before the
+  // solve, whatever path set it: typed values, AR captures, drags, loaded files. Moves a
+  // loaded value by at most 0.05 mm. Solver outputs are snapped where they are written.
+  _snapToGrid() {
+    const snap = (o, keys) => { for (const k of keys) if (typeof o[k] === 'number') o[k] = snapM(o[k]); };
+    for (const f of this.floors) {
+      snap(f, ['height']);
+      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top']);
+      for (const c of f.constraints) snap(c, ['value']);
+      for (const m of f.markers || []) snap(m, ['x', 'y', 'z']);
+    }
+    for (const n of this.conduitNodes) snap(n, ['x', 'y', 'z']);
+    for (const n of this.pipeNodes || []) snap(n, ['x', 'y', 'z']);
+  }
+
   _emit({ solveRectangles = true } = {}) {
+    this._snapToGrid();
     this._recomputeElevations();
     const removed = [];
     for (const f of this.floors) {
