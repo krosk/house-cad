@@ -7762,6 +7762,7 @@ export function setupMR(view, project, getFootprint) {
     ['links', () => [electricalGroup, routedWireGroup]],
     ['condt', () => [conduitGroup, adjacentGroup, pipeGroup]],
     ['furn', () => [furnitureGroup, furniturePlanGroup]],
+    ['mat', () => [materialGroup]], // MATERIAL badges, start-corner L and hover highlight
     ['plan', () => [planGroup]], // the whole plan; what remains is HUD + controllers
   ];
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
