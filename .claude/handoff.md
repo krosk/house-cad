@@ -15,15 +15,16 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon/terrazzo/**pinwheel (Monastère)**/**stone wall tile (Lucia)** products, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**), window, switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/**pinwheel (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-27 (session 32)
-**Status:** Proven (git): `origin/main` = `8948472` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-09-28 (session 33)
+**Status:** Proven (git): `origin/main` = `f5f30f9` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl): the live
-`version.json` served `ac60665` while `8948472` was still deploying. Owner-confirmed on the Quest: AR
-performance (session 29), the MATERIAL flow, the 3D-only AR view and FURNISH's removal (session 32).
-Everything else from sessions 30–32 is verified by build, Node or a desktop browser only (Next step A).
+`version.json` serves `f5f30f9`. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
+flow, the 3D-only AR view, FURNISH's removal (session 32) and the floor pattern **start corner**
+(session 33). Everything else from sessions 30–33 is verified by build, Node or a scratch/desktop
+browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -58,27 +59,31 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 32
+## What changed in session 33
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Detail for every item is in the named doc. Sessions
-> 30–31 are folded into the sections below and the docs.
+> decisions" or "Findings" and delete this list. Detail for every item is in the named doc. Session 32
+> is folded into the sections below.
 
-1. **Owner walk:** applied materials on the Quest; the MATERIAL flow was clear (no per-item
-   pass/fail). They looked for a furniture material and found none, which led to (2).
-2. **Furniture merge built** (`e9ace98`): a FURNITURE zone carries an optional product (`article`,
-   `productMm`, `facing`); product picked in **MATERIAL · FURNITURE**; furniture solved one-way after
-   the structure; old `floor.furniture[]` items migrate to zones on load. `docs/furniture.md` "One
-   furniture zone" + "The merge" hold the design and the evidence (Node on the owner's house: 0 of 57
-   furniture dims removed, sheets byte-identical; desktop Chrome: a migrated item drawn in View 3D).
-3. **Material badges** (`63e640a`): an applied material shows one swatch badge at its target's centre
-   on the AR plan, never a colour fill or strip (owner: overlays made the plan hard to read).
-4. **FURNISH removed + AR 3D view shows only the model** (`912be58`), both owner-confirmed on the Quest.
-5. **PASSAGE zone kind + Monastère readout** (`ac60665`): PASSAGE = open doorway, door-family for
-   flooring/3D, no leaf. The 30×30 line was cut off by the 4-line readout pill; the pill now fits 6.
-6. **Doors open in the AR 3D view too** (`8948472`): the owner expected it; asked, chose open in AR.
-7. Not built: a desktop product picker for furniture, a desktop "dimension removed" message, the
-   furniture front notch in the desktop 2D sketch.
+1. **Floor pattern start corner** (`4ba575d`, **owner-confirmed on the Quest**): MATERIAL · FLOOR, A/X
+   near a room corner starts that laying region's pattern there (amber L, `⌞ CORNER`); again = back
+   to the plan origin. Stored as `anchor {rect, corner}` on the floor finish, resolved to the laid
+   floor's own corner (inside linings). `docs/materials.md` "Continuity rule".
+2. **Grout weight** (`a7ac8bb`): the room's quantity line ends `… kg grout` (joint length × width ×
+   depth × 1.6 kg/dm³); the owner wants it per room only, not on the HOUSE line.
+3. **90° pattern turn** (`ecca41f`): A/X away from the corners turns the region's pattern (`↻90°`).
+   Fixed on the way: floor UVs used to swap x/y for every pattern in rooms deeper than wide.
+4. **Etruria octagon laid diagonally** (`ecca41f`, `diagonal: true`): tozzetti square to the walls.
+5. **Windows** (`ecca41f`): Héméra porte-fenêtre 2 leaves (reuses the Héméra profile) and the **Néva
+   aluminium 2-leaf sliding bay** (new `buildSliding`). The owner first said "triple Héméra baie";
+   there is no sliding Héméra, and they corrected it to the Néva.
+6. **AR 3D view** (`8eb1b99`): a white painted ceiling, and opaque window glass showing a generic
+   daylight exterior (`src/ui/exteriorView.js`), so the real room no longer shows through.
+7. **Rail-hung sliding door** (`f5f30f9`): Leroy Merlin postformé 83 × 204 on the ARTENS Indus rail,
+   a door product on a **SLIDING** zone (MATERIAL · DOOR now picks SLIDING zones).
+8. **Owner rule: generators embed their sources** (`f5f30f9`): the `/model-product` skill and
+   `docs/product-modelling.md` step 6 require a `// Sources:` block in the builder. `buildRailDoor` is
+   the first full one; older builders cite their sources more loosely (not back-filled).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -109,7 +114,10 @@ Read `docs/product-intent.md` before planning AR work.
   `needsPower` devices (outlet*/switch/light), and never flags spare breakers (owner choices).
 - **A double switch = two switch markers at one point**; never draw stacked markers apart in AR.
 - **Materials** (`docs/materials.md`):
-  - patterns are anchored at the plan origin (continuity over efficiency, owner-acknowledged);
+  - patterns are anchored at the plan origin, unless a laying region sets its own **start corner**
+    (A/X near a corner; one per region so joints stay continuous through doorways) or a **90° turn**
+    (A/X away from corners); floors only, walls keep the plan origin;
+  - grout weight is shown per room only (owner); no waste margin; ρ 1.6 is generic, not a product;
   - same-material rooms joined by a doorway are one region; different materials meet mid-doorway;
   - packs are rounded once per product for the whole house;
   - wall faces are set one at a time: the owner removed a copy-to-every-wall action, so don't re-add it.
@@ -117,8 +125,13 @@ Read `docs/product-intent.md` before planning AR work.
   `procedural` furniture builder or a door `design`. A non-code model would go in
   `public/furniture/models/` (not built). Follow `docs/product-modelling.md` / `/model-product`.
 - **A door product is a material of its DOOR zone** (owner decision), authored in MATERIAL · DOOR;
-  made-to-measure products take the zone's size. **Window products follow the same rule** (WINDOW zone,
-  MATERIAL · WINDOW).
+  made-to-measure products take the zone's size. A **rail-hung** product (`mount: 'rail'`) goes on a
+  **SLIDING** zone instead, at its own fixed leaf size (zone = opening, swing = rail face, hinge =
+  slide side). **Window products follow the same rule** (WINDOW zone, MATERIAL · WINDOW); a product
+  with its own `leaves` ignores the zone hinge. Portes-fenêtres and bays go on WINDOW zones with sill 0
+  (owner).
+- **Every product generator embeds its source material** (owner, 2026-09-28): a `// Sources:` block
+  with page URLs, spec values, photo/PDF ids and what each gave, and the estimates. Ids, never copies.
 - **Switch, outlet and Ethernet products are a material category on the marker** (owner, 2026-09-27):
   stored as `marker.product` (not a finish, carried by view links), switch products on switches,
   outlet products on `outlet` / `outlet_appliance`, Ethernet products on `ethernet` only (not
@@ -136,7 +149,10 @@ Read `docs/product-intent.md` before planning AR work.
 - **AR furniture models show only with the AR 3D view on**; otherwise flat plan pieces (owner, 2026-09-27).
 - **The AR 3D view (LEFT X) shows only the 3D model** (owner, 2026-09-27): plan overlays are hidden
   for the render only (`hideForArch3d` / `view.onXRAfterRender`), so modes' visibility logic is
-  untouched; reticle, HUD and panels stay.
+  untouched; reticle, HUD and panels stay. It draws a **white ceiling** and **opaque exterior-picture
+  glass** (owner, 2026-09-27); the real floor still shows. Desktop View 3D keeps transparent glass.
+- **MATERIAL · FLOOR A/X** = start corner (near a corner) or 90° turn (elsewhere); the thumbstick stays
+  the material cycle. A/X is the flip/turn button in every mode.
 - **An applied material is a centre badge on the AR plan, never a coloured fill/strip** (owner, 2026-09-27).
 - **PASSAGE** (owner, 2026-09-27): an open doorway between two rooms; floors meet at its middle like
   a door; no leaf, nothing to rotate.
@@ -186,9 +202,11 @@ Read `docs/product-intent.md` before planning AR work.
 - **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
   curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
   of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
-- **Chrome tools:** screenshots of a WebGL preview tab can time out even though the page rendered.
-  Instead the scratch page POSTs `canvas.toDataURL()` to a tiny local receiver (`scratchpad/bedview/recv.mjs`
-  on :5191), and ffmpeg builds side-by-side comparisons with the photos. The javascript tool returns a bare
+- **Chrome tools:** screenshots of a WebGL preview tab time out (every time in session 33, even on
+  plain pages). Instead the scratch page POSTs `canvas.toDataURL()` to a tiny local receiver on :5191
+  (a ~20-line Python `http.server` that base64-decodes the body to a file; rewrite it in the new
+  scratchpad), and ffmpeg builds side-by-side comparisons with the photos. For a texture, sampling
+  pixels with `getImageData` in the tab is enough to prove layout. The javascript tool returns a bare
   async IIFE as `{}` (prefix `await`) and blocks output containing a query string. Stop
   scratch Vite servers by port (`ss -ltnp | grep :5190`), not `pkill -f` (it kills its own shell).
 - **Browser checks of the app:** Chrome shows an error page for the dev server's self-signed HTTPS, so
@@ -222,6 +240,9 @@ Read `docs/product-intent.md` before planning AR work.
 - **The furniture catalog is fetched** (`src/ui/furnitureCatalog.js`), so core code can't size a zone
   from it synchronously: `productMm` snapshots the size, and `applyFurnitureCatalog` sizes migrated
   zones later (main.js listener; mr.js on every `buildPlan`).
+- **A pattern that looks the same after a 90° turn** (pinwheel, octagon) is unchanged by the floor
+  turn; a UV x↔y swap is a **mirror**, not a turn, which is why only planks may swap.
+- **No PIL here**: dump pixels with `ffmpeg -f rawvideo -pix_fmt gray|rgb24` and read them in Python.
 - **Solved coordinates carry float noise**; grids built from edges must snap (`snap()` in
   `architectural3d.js`).
 - **`addConduitSegment` / `ensureConduitNodeAtMarker` return EXISTING items**; `addWire` returns
@@ -237,6 +258,9 @@ Read `docs/product-intent.md` before planning AR work.
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 33:** `4ba575d` floor start corner · `a7ac8bb` grout weight · `ecca41f` diagonal
+  octagon, 90° turn, UV fix, Héméra porte-fenêtre, Néva bay · `8eb1b99` AR ceiling + exterior glass ·
+  `f5f30f9` rail-hung sliding door, sources-in-generators rule.
 - **Session 32:** `e9ace98` furniture merge + MATERIAL · FURNITURE · `63e640a` material badges ·
   `912be58` 3D-only AR view, FURNISH removed · `ac60665` PASSAGE, Monastère readout fits ·
   `8948472` doors open in the AR 3D view.
@@ -280,9 +304,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano); used by the AR 3D view and View 3D |
-| `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE; hardware) from `doorProductPlacements` |
+| `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
-| `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware) from `windowProductPlacements` |
+| `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware; `buildSliding` for the Néva) from `windowProductPlacements` |
+| `src/ui/exteriorView.js` | The AR 3D view's opaque glass material (procedural daylight exterior) |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
 
@@ -290,6 +315,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 33: the rail sliding door on a SLIDING zone; the white ceiling + exterior glass with LEFT X
+    (PERF on); the Héméra porte-fenêtre and Néva bay (sill-0 WINDOW zones); the diagonal Etruria; the
+    90° turn (Blue stone, Charme; A/X near a corner still sets the corner); grout on the quantity
+    line; Monastère in a room deeper than wide (spin now matches the takeoff);
   - session 32: MATERIAL · FURNITURE on a real zone (cycle, A/X turn, B/Y clear, `DIM REMOVED`
     flash), a slot saved with old FURNISH items migrating, the material badges, a PASSAGE between two
     rooms of different floors, the Monastère 6-line readout, doors open with LEFT X;
@@ -317,7 +346,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   `docs/share-view.md` "Parked" (first step: a ping-only page pair on the Deck).
 - **B″ — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
   `project.materials`. Possible improvements the owner has not asked for (see `docs/materials.md`):
-  - per-region pattern offset to cut waste;
+  - ~~per-region pattern offset~~ — done as the start corner (owner chose a corner, not a wall line or a
+    numeric offset); an automatic "fewest tiles" corner was offered, not asked for;
+  - start corner / turn for wall faces (floors only today);
   - a plank texture drawn from the real cut plan;
   - the hidden face below a half wall that stands inside a room (still counted in the wall area).
 - **C — Conduit-drawing speed-ups:** height snap + "ceiling run" toggle, straight runs, one-press drop
@@ -332,7 +363,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Session 32: everything in Next step A's first bullet. Session 30:
+- **Unwalked, Hypothesis only.** Sessions 32–33: everything in Next step A's first two bullets.
+  Session 33 estimates: the Néva faces (photo scale assumes the 180 cm width), the rail door's bar
+  section, wheel Ø and wall gap; the exterior picture's horizon sits at the same pane fraction for every
+  window. Session 30:
   - everything in Next step A;
   - frame cost of the AR 3D view (Lambert walls + textures; opaque walls may hide the real room);
   - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
