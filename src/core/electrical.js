@@ -6,13 +6,21 @@
 // (As-built runs are now modeled as wires routed over the conduit network — see
 // src/core/conduit.js — which reuses segmentSurface below for classification.)
 
+// Switch fixtures: a single rocker, or a double switch as ONE marker (owner, 2026-09-28)
+// whose control links each name the rocker that drives the light (`link.rocker`, 1 or 2;
+// absent = 1). The earlier convention, a double switch as two stacked switch markers,
+// still loads and works; MARKER · EDIT can merge such a pair (Project.mergeSwitchPair).
+export const isSwitch = (marker) => marker?.type === 'switch' || marker?.type === 'switch_dual';
+export const switchRockers = (marker) => (marker?.type === 'switch_dual' ? 2 : 1);
+export const linkRocker = (link) => (link?.rocker === 2 ? 2 : 1);
+
 // A control link's endpoints require compatible fixtures (switch → light).
 export function electricalLinkEndpoints(floor, link) {
   const markers = floor?.markers || [];
   const from = markers.find((m) => m.id === link?.fromMarkerId);
   const to = markers.find((m) => m.id === link?.toMarkerId);
   if (!from || !to) return null;
-  return from.type === 'switch' && to.type === 'light' ? { from, to } : null;
+  return isSwitch(from) && to.type === 'light' ? { from, to } : null;
 }
 
 // Points use model coordinates {x, y, z}: x/y are plan axes and z is height above

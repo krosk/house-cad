@@ -23,7 +23,7 @@ import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
-import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE } from '../core/materials.js';
+import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces, anchorNear } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
@@ -44,7 +44,7 @@ import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
-import { electricalRoutePoints } from '../core/electrical.js';
+import { electricalRoutePoints, isSwitch, linkRocker } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
@@ -1790,6 +1790,19 @@ export function setupMR(view, project, getFootprint) {
       ctx.lineWidth = 2; ctx.strokeStyle = '#64748b'; ctx.stroke();
       return;
     }
+    if (type === 'switch_dual') {
+      // Two rockers side by side, each with the split and the shaded pressed half.
+      for (const x of [40, 66]) {
+        ctx.beginPath(); ctx.roundRect(x, 38, 22, 52, 6);
+        ctx.fillStyle = '#e5e7eb'; ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(x, 64, 22, 26, 6);
+        ctx.fillStyle = 'rgba(100,116,139,0.20)'; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x + 2, 64); ctx.lineTo(x + 20, 64);
+        ctx.lineWidth = 2; ctx.strokeStyle = '#64748b'; ctx.stroke();
+      }
+      return;
+    }
     if (type === 'light') {
       // Ceiling light: a filled bulb with radiating rays.
       ctx.beginPath(); ctx.arc(64, 62, 17, 0, Math.PI * 2);
@@ -2433,21 +2446,60 @@ export function setupMR(view, project, getFootprint) {
   // ceiling route; LINK mode recolors these by source switch. The path comes from live
   // marker positions so edits never detach its ends. (Routed wires draw separately in
   // routedWireGroup; the conduit network in conduitGroup.)
+  // BATCHED (2026-09-28): every route is one LineSegments with per-vertex colour and a
+  // lineDistance that runs on along each route, so the dashes flow round its corners as
+  // they did with one THREE.Line (and one draw call) per link.
+  let linkBatch = null; // { lines, ranges: [{ from, start, count }], selKey }
   function buildElectricalLinks(floor = project.activeFloor) {
     clearElectricalLinks();
+    linkBatch = null;
+    const positions = [], distances = [], ranges = [];
     for (const link of floor.electricalLinks || []) {
       if ((link.kind || 'control') !== 'control') continue;
       const route = electricalRoutePoints(floor, link);
-      if (!route.length) continue;
+      if (route.length < 2) continue;
       // Lift the ceiling run slightly so it reads above the overlay.
-      const line = makeRouteLine(route.map((p, i) =>
-        (i === 1 || i === 2) ? { x: p.x, y: p.y, z: p.z + 0.012 } : p), 0x38bdf8);
-      line.userData.electricalLinkId = link.id;
-      line.userData.kind = 'control';
-      line.userData.fromMarkerId = link.fromMarkerId;
-      line.userData.toMarkerId = link.toMarkerId;
-      electricalGroup.add(line);
+      const pts = route.map((p, i) => ((i === 1 || i === 2) ? { x: p.x, y: p.y, z: p.z + 0.012 } : p))
+        .map((p) => new THREE.Vector3(p.x, p.z, -p.y));
+      const start = positions.length / 3;
+      let d = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        distances.push(d, d + a.distanceTo(b));
+        d += a.distanceTo(b);
+      }
+      ranges.push({ from: link.fromMarkerId, rocker: linkRocker(link), start, count: positions.length / 3 - start });
     }
+    if (!ranges.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('lineDistance', new THREE.Float32BufferAttribute(distances, 1));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(positions.length), 3));
+    const lines = new THREE.LineSegments(geometry, new THREE.LineDashedMaterial({
+      vertexColors: true, dashSize: 0.035, gapSize: 0.035,
+      transparent: true, opacity: 0.92, depthTest: false, depthWrite: false,
+    }));
+    lines.renderOrder = 14;
+    lines.frustumCulled = false;
+    electricalGroup.add(lines);
+    linkBatch = { lines, ranges, selKey: undefined };
+    styleElectricalLinks(null);
+  }
+  // All routes cyan; the selected switch's routes amber (a double switch: its other
+  // rocker's pink). Rewrites colours only when the selection changes.
+  const LINK_OTHER_ROCKER = 0xf472b6;
+  function styleElectricalLinks(switchId, rocker = 1) {
+    const key = `${switchId}|${rocker}`;
+    if (!linkBatch || linkBatch.selKey === key) return;
+    linkBatch.selKey = key;
+    const color = linkBatch.lines.geometry.attributes.color;
+    const c = new THREE.Color();
+    for (const r of linkBatch.ranges) {
+      c.setHex(r.from !== switchId ? 0x38bdf8 : r.rocker === rocker ? 0xfbbf24 : LINK_OTHER_ROCKER);
+      for (let v = r.start; v < r.start + r.count; v++) color.setXYZ(v, c.r, c.g, c.b);
+    }
+    color.needsUpdate = true;
   }
 
   // ---- Conduit/wire pick geometry ----------------------------------------------
@@ -3393,11 +3445,13 @@ export function setupMR(view, project, getFootprint) {
   // from a multi-rocker product to a single one keeps it on the selected marker only,
   // so two single plates never draw on top of each other.
   function setDeviceProduct(marker, id) {
+    // A double-switch marker is the whole device: its product is its own.
+    if (marker.type === 'switch_dual') { project.setMarkerProduct(marker.id, id); return; }
     const rockers = (def) => def?.rockers ?? 1;
     const toMulti = rockers(materialById(project, id)) > 1;
     const fromMulti = rockers(markerProduct(project, marker)) > 1;
     const stack = project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
-      && m.x === marker.x && m.y === marker.y);
+      && m.type !== 'switch_dual' && m.x === marker.x && m.y === marker.y);
     for (const m of toMulti || fromMulti ? stack : [marker]) {
       project.setMarkerProduct(m.id, toMulti || m === marker || !id ? id : null);
     }
@@ -3415,7 +3469,8 @@ export function setupMR(view, project, getFootprint) {
     if (DEVICE_MODE[modeId]) {
       if (!matSelDevice) matSelDevice = matHoverDevice;
       if (!matSelDevice) return;
-      const ids = [null, ...materialsFor(project, DEVICE_MODE[modeId]).map((m) => m.id)];
+      const ids = [null, ...materialsFor(project, DEVICE_MODE[modeId])
+        .filter((m) => productFitsMarker(m, matSelDevice)).map((m) => m.id)];
       const cur = ids.indexOf(markerProduct(project, matSelDevice)?.id ?? null);
       const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
       setDeviceProduct(matSelDevice, next);
@@ -4042,7 +4097,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_TYPES = [
     'outlet', 'outlet_shutter', 'outlet_aircon', 'outlet_cooktop',
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
-    'switch', 'light', 'ethernet', 'ethernet_dual', 'tv_antenna', 'camera_ethernet', 'patch_panel', 'intercom',
+    'switch', 'switch_dual', 'light', 'ethernet', 'ethernet_dual', 'tv_antenna', 'camera_ethernet', 'patch_panel', 'intercom',
     'panel', 'breaker', 'radiator', 'boiler', 'sink', 'washing_machine',
   ];
   let currentMarkerType = MARKER_TYPES[0];
@@ -4074,6 +4129,7 @@ export function setupMR(view, project, getFootprint) {
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
   let hoverStackInfo = null; // markerStackInfo() of the hovered marker when it shares its point
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
+  let selectedLinkRocker = 1;    // its rocker (a double switch: thumbstick-y picks 1 or 2)
   let markerLinkPickAfterId = null;
   // MARKER · WIRE (routed): the pending first endpoint of a new wire pair.
   let wireFromMarker = null;
@@ -6093,10 +6149,10 @@ export function setupMR(view, project, getFootprint) {
   // advances; aiming at a light exits the stack naturally and makes that light
   // the link target.
   function linkMarkerAtFloorPoint(px, py, afterId = null) {
-    const wanted = selectedLinkSwitch ? 'light' : 'switch';
+    const wanted = selectedLinkSwitch ? (m) => m.type === 'light' : isSwitch;
     const candidates = project.markers
       .map((marker, order) => ({ marker, order, distance: Math.hypot(px - marker.x, py - marker.y) }))
-      .filter(({ marker, distance }) => marker.type === wanted && distance <= RETICLE_OUTER)
+      .filter(({ marker, distance }) => wanted(marker) && distance <= RETICLE_OUTER)
       .sort((a, b) => a.distance - b.distance || (b.marker.z || 0) - (a.marker.z || 0) || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex(({ marker }) => marker.id === afterId);
@@ -6603,14 +6659,15 @@ export function setupMR(view, project, getFootprint) {
       // from pairwise links.
       onTouch: () => {
         if (!placed || !hoverMarker) return;
-        if (hoverMarker.type === 'switch') {
+        if (isSwitch(hoverMarker)) {
           selectedLinkSwitch = hoverMarker;
+          selectedLinkRocker = 1;
           markerLinkPickAfterId = null;
           rlog('link switch selected', { id: hoverMarker.id });
           return;
         }
         if (!selectedLinkSwitch || hoverMarker.type !== 'light') return;
-        const result = project.toggleElectricalLink(selectedLinkSwitch.id, hoverMarker.id);
+        const result = project.toggleElectricalLink(selectedLinkSwitch.id, hoverMarker.id, selectedLinkRocker);
         if (!result.ok) return;
         buildPlan();
         applyPlanMatrix();
@@ -7993,6 +8050,13 @@ export function setupMR(view, project, getFootprint) {
       // MATERIAL · FLOOR: A/X near a corner starts the selected room's pattern there (again
       // on that corner: back to the plan origin); A/X away from the corners turns it 90°.
       else if (modes[currentMode].id === 'mat_floor') floorLayoutPress();
+      // MARKER · EDIT: a selected double switch absorbs the single switch at exactly its
+      // point and height (the older two-marker survey of a double switch) as rocker 2.
+      else if (modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)) {
+        const gone = project.mergeSwitchPair(selectedMarker.id);
+        rlog('switch pair merged', { id: selectedMarker.id, removed: gone });
+        buildPlan(); applyPlanMatrix();
+      }
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();
@@ -8020,6 +8084,10 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'level') switchFloor(stickY < 0 ? 1 : -1);
       else if (modeId === 'marker') cycleMarkerType(stickY < 0 ? 1 : -1); // retype selected / drop type
       else if (modeId === 'marker_wire') cycleWireType(stickY < 0 ? 1 : -1); // retype selected / new-wire type
+      else if (modeId === 'marker_link' && selectedLinkSwitch?.type === 'switch_dual') {
+        selectedLinkRocker = 3 - selectedLinkRocker; // rocker 1 ⇄ 2
+        rlog('link rocker', { rocker: selectedLinkRocker });
+      }
       else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
       else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
@@ -8195,7 +8263,8 @@ export function setupMR(view, project, getFootprint) {
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
-      ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch') : null;
+      ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch')
+        + (selectedLinkSwitch?.type === 'switch_dual' ? ` · ${t('link.rocker')} ${selectedLinkRocker}/2` : '') : null;
     // A selected wire adds its circuit length and, when non-zero, the conduit length it
     // shares with the other wire nature. That line reads "SHARED <len>" in the OTHER
     // nature's color (naming it would overflow the pill).
@@ -8249,7 +8318,9 @@ export function setupMR(view, project, getFootprint) {
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     checkRemovedDims();
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || hovDim;
+    const mergeHint = modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)
+      ? `\n${t('marker.mergePair')}` : '';
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || hovDim;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
       : matStatus ? matColors
@@ -8670,23 +8741,20 @@ export function setupMR(view, project, getFootprint) {
       } else {
         reticle.visible = false;
       }
-      if (selectedLinkSwitch && (!project.markers.includes(selectedLinkSwitch) || selectedLinkSwitch.type !== 'switch')) {
+      if (selectedLinkSwitch && (!project.markers.includes(selectedLinkSwitch) || !isSwitch(selectedLinkSwitch))) {
         selectedLinkSwitch = null;
       }
-      const linkedLightIds = new Set((project.electricalLinks || [])
-        .filter((link) => link.fromMarkerId === selectedLinkSwitch?.id)
-        .map((link) => link.toMarkerId));
-      for (const lightId of linkedLightIds) {
-        const light = project.markers.find((m) => m.id === lightId);
-        outlineMarker(light, 'floor', 0x22d3ee);
-        outlineMarker(light, 'wall', 0x22d3ee);
+      // A double switch's lights on the OTHER rocker than the one being linked: pink.
+      for (const link of project.electricalLinks || []) {
+        if (link.fromMarkerId !== selectedLinkSwitch?.id) continue;
+        const light = project.markers.find((m) => m.id === link.toMarkerId);
+        const color = linkRocker(link) === selectedLinkRocker ? 0x22d3ee : LINK_OTHER_ROCKER;
+        outlineMarker(light, 'floor', color);
+        outlineMarker(light, 'wall', color);
       }
       // All routes remain visible in cyan; the selected switch's routes brighten
       // amber so the one-to-many control set is immediately readable.
-      for (const line of electricalGroup.children) {
-        if (line.userData.kind !== 'control') continue;
-        line.material.color.setHex(line.userData.fromMarkerId === selectedLinkSwitch?.id ? 0xfbbf24 : 0x38bdf8);
-      }
+      styleElectricalLinks(selectedLinkSwitch?.id ?? null, selectedLinkRocker);
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
       outlineMarker(selectedLinkSwitch, 'floor', 0xfbbf24);

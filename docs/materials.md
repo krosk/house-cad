@@ -649,7 +649,9 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   2026-09-27). The same plate and rocker, with the rocker divided into two halves (owner); the split is
   ~0.5 mm on the straight front photo (media 3162824) and draws as a dark line on the faces
   (`rockers: 2`, `splitMm`).
-  - **One device, two markers:** a double switch is surveyed as two switch markers at one plan point
+  - **Double switch marker** (2026-09-28): a `switch_dual` marker takes only a two-rocker product
+    (`productFitsMarker`) and carries it alone; the two-marker stack below still works for older surveys.
+  - **One device, two markers (older surveys):** a double switch is surveyed as two switch markers at one plan point
     (one per rocker, so each drives its own light). MATERIAL · SWITCH sets or clears a multi-rocker
     product on that whole stack; going back to a single product keeps it on the selected marker only.
     `markerProductDraws` draws such a stack once, at the markers' mean height.

@@ -116,8 +116,23 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   free (never-height-set) marker grabs in full 3D. **B/Y deletes the selected marker** (distinct from DEL, which only frees Z). Every marker
   also has the flat projected floor icon showing its plan X/Y, and a per-type wall glyph
   (`markerFace`: outlet = Type E socket, switch = rocker). Plan zones are inert.
-- **Stacked devices** (owner decision, 2026-09-26). A double switch is authored as **two switch markers
-  at the same point**, one per rocker. Circuits alone would not need that: one marker is correct when both
+- **Double switch marker** (owner decision, 2026-09-28, supersedes the two-marker convention below for
+  new surveys). `switch_dual` is ONE marker (MARKER · EDIT type list, after `switch`) with its own glyph
+  in AR, View 3D, the sheet and DXF (`MARKER_SWITCH_DUAL`). Each control link from it stores the rocker
+  that drives the light (`link.rocker`, 1 or 2; absent = 1; `isSwitch`/`linkRocker` in
+  `src/core/electrical.js`). In **LINK**, a selected double switch starts on rocker 1 and
+  **thumbstick up/down swaps the rocker** (readout `PICK LIGHT · ROCKER 1/2`); its routes on the rocker
+  being linked are amber, the other rocker's pink, and its lights are outlined cyan / pink the same way.
+  Triggering a light already on the other rocker moves it to this one. The sheet puts a small `1`/`2`
+  chip on each double-switch leg near the switch. Retyping a double switch to a single one keeps its
+  links (rocker dropped). Only a two-rocker product fits it (MATERIAL · SWITCH filters the list).
+  **Converting an old pair:** select the double switch in MARKER · EDIT (retype one of the pair) and,
+  when a plain switch sits at exactly its point and height, the readout offers `A/X: MERGE…`: A/X makes
+  that switch its rocker 2 (its lights, wires, conduit/pipe bindings move over; its dimensions go), see
+  `Project.mergeSwitchPair`. It is explicit because retyping steps through the type list, so an
+  automatic merge would fire just by scrolling past DOUBLE SWITCH.
+- **Stacked devices** (owner decision, 2026-09-26; still loads and works). A double switch was authored as
+  **two switch markers at the same point**, one per rocker. Circuits alone would not need that: one marker is correct when both
   rockers share a feed. But a LINK goes from a switch marker to a light, so two rockers driving two lights
   need two markers. **Do not draw stacked markers apart in AR.** That was considered and rejected: the floor
   icon, reticle pick, marker dims and sheet all use the shared point, so a display-only offset would put

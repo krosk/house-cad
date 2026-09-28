@@ -93,6 +93,7 @@ function serializeElectricalLink(link) {
     kind: link.kind || 'control',
     fromMarkerId: link.fromMarkerId,
     toMarkerId: link.toMarkerId,
+    ...(link.rocker === 2 ? { rocker: 2 } : {}),
     route: serializeRoute(link.route),
   };
 }
@@ -308,6 +309,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       kind: link.kind || 'control',
       fromMarkerId,
       toMarkerId,
+      ...(link.rocker === 2 ? { rocker: 2 } : {}),
       route: serializeRoute(link.route),
     }];
   });
@@ -466,6 +468,7 @@ export function deserializeInto(project, data) {
       kind: link.kind || 'control',
       fromMarkerId: link.fromMarkerId,
       toMarkerId: link.toMarkerId,
+      ...(link.rocker === 2 ? { rocker: 2 } : {}),
       route: serializeRoute(link.route),
     })),
     finishes: loadFinishes(f.finishes),

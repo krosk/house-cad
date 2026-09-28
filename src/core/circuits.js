@@ -153,7 +153,7 @@ export function deriveCircuits(project, { type = 'electrical' } = {}) {
 // and plumbing markers are not fed by a breaker wire, so none of those are flagged.
 export function needsPower(marker) {
   const type = marker?.type || 'outlet';
-  return type === 'outlet' || type.startsWith('outlet_') || type === 'switch' || type === 'light';
+  return type === 'outlet' || type.startsWith('outlet_') || type === 'switch' || type === 'switch_dual' || type === 'light';
 }
 
 // Survey diagnostics for the power lane (owner request, 2026-09-26), most severe

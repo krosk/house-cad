@@ -577,7 +577,7 @@ export class View3D {
       outlet: 0xd8dee5, outlet_shutter: 0x60a5fa, outlet_aircon: 0x38bdf8,
       outlet_cooktop: 0xef4444, outlet_oven: 0xf97316,
       outlet_water_heater: 0x06b6d4, outlet_appliance: 0xeab308,
-      switch: 0xcbd5e1, ethernet: 0x3b82f6, ethernet_dual: 0x2563eb,
+      switch: 0xcbd5e1, switch_dual: 0xcbd5e1, ethernet: 0x3b82f6, ethernet_dual: 0x2563eb,
       tv_antenna: 0xa855f7, camera_ethernet: 0x14b8a6,
       patch_panel: 0x6366f1, intercom: 0x84cc16, panel: 0xf59e0b, breaker: 0xef4444,
       radiator: 0xfb923c, boiler: 0xef4444, sink: 0x60a5fa, washing_machine: 0x3b82f6,
@@ -639,6 +639,11 @@ export class View3D {
     if (type === 'switch') {
       addBox(0, 0, 0.045, 0.057, 0.005, accent);
       addBox(0, 0, 0.038, 0.002, 0.007);
+    } else if (type === 'switch_dual') { // two rockers side by side, each split across
+      for (const x of [-0.0115, 0.0115]) {
+        addBox(x, 0, 0.021, 0.057, 0.005, accent);
+        addBox(x, 0, 0.017, 0.002, 0.007);
+      }
     } else if (type === 'ethernet' || type === 'ethernet_dual') {
       const ys = type === 'ethernet_dual' ? [-0.018, 0.018] : [0];
       for (const y of ys) { addBox(0, y, 0.044, 0.022, 0.004, accent); addBox(0, y, 0.028, 0.010, 0.006); }

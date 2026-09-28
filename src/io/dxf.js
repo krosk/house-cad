@@ -49,6 +49,7 @@ const LAYERS = [
   ['MARKER_INTERCOM', 7, 'CONTINUOUS'],
   ['MARKER_PANEL', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
+  ['MARKER_SWITCH_DUAL', 7, 'CONTINUOUS'],
   ['MARKER_LIGHT', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET', 7, 'CONTINUOUS'],
   ['MARKER_ETHERNET_DUAL', 7, 'CONTINUOUS'],
@@ -344,6 +345,10 @@ function writeMarker(w, marker) {
   if (marker.type === 'switch') {
     w.polyline(layer, [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]);
     w.line(layer, x - r * 0.5, y - r * 0.5, x + r * 0.5, y + r * 0.5);
+  } else if (marker.type === 'switch_dual') {
+    w.polyline(layer, [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]);
+    w.line(layer, x, y - r, x, y + r);
+    for (const dx of [-0.5, 0.5]) w.line(layer, x + r * (dx - 0.3), y - r * 0.5, x + r * (dx + 0.3), y + r * 0.5);
   } else if (marker.type === 'light') {
     w.circle(layer, x, y, r);
     w.line(layer, x - r * 0.7, y - r * 0.7, x + r * 0.7, y + r * 0.7);

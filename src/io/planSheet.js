@@ -21,7 +21,7 @@ import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../c
 import { fmt, unitLabel } from '../core/units.js';
 import { zoneKind, isStairs } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
-import { electricalRoutePoints } from '../core/electrical.js';
+import { electricalRoutePoints, linkRocker } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
 // Injected by Vite as the source revision + UTC build time. The fallback keeps
@@ -83,7 +83,7 @@ const MARKER_LABELS = {
   outlet: 'Outlet', outlet_shutter: 'Shutter', outlet_aircon: 'Aircon',
   outlet_cooktop: 'Cooktop', outlet_oven: 'Oven',
   outlet_water_heater: 'Water heater', outlet_appliance: 'Appliance outlet',
-  switch: 'Switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
+  switch: 'Switch', switch_dual: 'Double switch', light: 'Light', ethernet: 'Ethernet', ethernet_dual: 'Dual Ethernet',
   tv_antenna: 'TV antenna',
   camera_ethernet: 'Camera Ethernet',
   patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
@@ -693,6 +693,13 @@ export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
   if (type === 'switch') {
     be.rect(cx - r, cy - r, size, size, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.line(cx - r * 0.5, cy + r * 0.5, cx + r * 0.5, cy - r * 0.5, { stroke: C_MARK, width: 0.25 }); // rocker
+  } else if (type === 'switch_dual') {
+    // The switch square split in two, one rocker stroke per half.
+    be.rect(cx - r, cy - r, size, size, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    be.line(cx, cy - r, cx, cy + r, { stroke: C_MARK, width: 0.14 });
+    for (const dx of [-0.5, 0.5]) {
+      be.line(cx + r * (dx - 0.3), cy + r * 0.5, cx + r * (dx + 0.3), cy - r * 0.5, { stroke: C_MARK, width: 0.25 });
+    }
   } else if (type === 'light') {
     be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.line(cx - r * 0.7, cy - r * 0.7, cx + r * 0.7, cy + r * 0.7, { stroke: C_MARK, width: 0.2 });
@@ -1242,6 +1249,14 @@ function drawElectricalLinks(be, L, floor) {
       be.line(L.X(a.x), L.Y(a.y), L.X(b.x), L.Y(b.y), {
         stroke: C_ELECTRICAL, width: 0.28, dash: [0.35, 0.9], cap: 'round',
       });
+      // A double switch's leg says which rocker drives the light: a small "1"/"2" chip a
+      // third of the way from the switch (clear of the fixture stack callout).
+      const from = floor.markers.find((m) => m.id === link.fromMarkerId);
+      if (from?.type === 'switch_dual') {
+        const ax = L.X(a.x), ay = L.Y(a.y), bx = L.X(b.x), by = L.Y(b.y);
+        const k = Math.min(0.33, 6 / Math.max(1e-6, Math.hypot(bx - ax, by - ay))); // ≤ 6 mm out
+        drawTextChip(be, String(linkRocker(link)), ax + (bx - ax) * k, ay + (by - ay) * k, 1.6);
+      }
     }
   }
 }

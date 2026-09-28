@@ -12,6 +12,7 @@
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
+import { isSwitch } from './electrical.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -688,24 +689,37 @@ export class Project {
     m.type = type;
     // Retyping an endpoint to an incompatible fixture removes its logical CONTROLS
     // rather than retaining hidden/dangling data. As-built wires connect any marker
-    // and therefore survive retyping untouched.
+    // and therefore survive retyping untouched. A double switch retyped to a single one
+    // keeps its links, all on the one rocker.
     this.electricalLinks = this.electricalLinks.filter((link) =>
       (link.kind || 'control') !== 'control' ||
-      ((link.fromMarkerId !== id || type === 'switch') &&
+      ((link.fromMarkerId !== id || isSwitch(m)) &&
        (link.toMarkerId !== id || type === 'light')));
+    if (type !== 'switch_dual') {
+      for (const link of this.electricalLinks) if (link.fromMarkerId === id) delete link.rocker;
+    }
     this._emit();
   }
 
   // Toggle one logical switch-to-light control. The physical V1 wire route is
   // derived via the ceiling at render time and therefore needs no stale XYZ copy.
-  toggleElectricalLink(fromMarkerId, toMarkerId) {
+  // `rocker` (1 or 2) names the double switch's rocker that drives the light: toggling a
+  // light already linked on the OTHER rocker moves it to this one.
+  toggleElectricalLink(fromMarkerId, toMarkerId, rocker = 1) {
     const from = this.markers.find((m) => m.id === fromMarkerId);
     const to = this.markers.find((m) => m.id === toMarkerId);
-    if (!from || !to || from.type !== 'switch' || to.type !== 'light') {
+    if (!from || !to || !isSwitch(from) || to.type !== 'light') {
       return { ok: false, reason: 'incompatible' };
     }
+    const r = from.type === 'switch_dual' && rocker === 2 ? 2 : 1;
     const i = this.electricalLinks.findIndex((link) =>
       link.kind === 'control' && link.fromMarkerId === fromMarkerId && link.toMarkerId === toMarkerId);
+    if (i >= 0 && (this.electricalLinks[i].rocker === 2 ? 2 : 1) !== r) {
+      const link = this.electricalLinks[i];
+      if (r === 2) link.rocker = 2; else delete link.rocker;
+      this._emit();
+      return { ok: true, linked: true, link };
+    }
     if (i >= 0) {
       const [link] = this.electricalLinks.splice(i, 1);
       this._emit();
@@ -716,11 +730,63 @@ export class Project {
       kind: 'control',
       fromMarkerId,
       toMarkerId,
+      ...(r === 2 ? { rocker: 2 } : {}),
       route: { mode: 'ceiling' },
     };
     this.electricalLinks.push(link);
     this._emit();
     return { ok: true, linked: true, link };
+  }
+
+  // Merge a double switch surveyed the old way (two switch markers at one point, one per
+  // rocker) into the double-switch marker `id`: the plain switch at exactly the same
+  // x, y and height becomes its rocker 2. Its lights move to rocker 2 (a light both
+  // already drive stays on rocker 1), its wires and conduit/pipe bindings move to `id`,
+  // then it is removed with its dimensions (`id` keeps its own, at the same point).
+  // Returns the removed marker's id, or null when there is no partner.
+  switchPairPartner(id) {
+    const m = this.markers.find((k) => k.id === id);
+    if (m?.type !== 'switch_dual') return null;
+    return this.markers.find((k) => k !== m && k.type === 'switch'
+      && k.x === m.x && k.y === m.y && (k.z ?? null) === (m.z ?? null)) || null;
+  }
+  mergeSwitchPair(id) {
+    const partner = this.switchPairPartner(id);
+    if (!partner) return null;
+    const pid = partner.id;
+    const mine = new Set(this.electricalLinks.filter((l) => l.fromMarkerId === id).map((l) => l.toMarkerId));
+    for (const link of this.electricalLinks) {
+      if (link.fromMarkerId !== pid || mine.has(link.toMarkerId)) continue;
+      link.fromMarkerId = id; link.rocker = 2;
+    }
+    for (const w of this.wires) {
+      if (w.fromMarkerId === pid) w.fromMarkerId = id;
+      if (w.toMarkerId === pid) w.toMarkerId = id;
+    }
+    this.wires = this.wires.filter((w) => w.fromMarkerId !== w.toMarkerId);
+    // Conduit: rebind the partner's box node, or fold it into ours if we have one.
+    const ours = this.conduitNodes.find((n) => n.markerId === id);
+    for (const node of this.conduitNodes.filter((n) => n.markerId === pid)) {
+      if (!ours) { node.markerId = id; continue; }
+      for (const seg of this.conduitSegments) {
+        if (seg.a === node.id) seg.a = ours.id;
+        if (seg.b === node.id) seg.b = ours.id;
+      }
+      for (const w of this.wires) w.via = (w.via || []).map((v) => (v === node.id ? ours.id : v));
+      this.conduitNodes = this.conduitNodes.filter((n) => n !== node);
+    }
+    const seen = new Set();
+    this.conduitSegments = this.conduitSegments.filter((seg) => {
+      const key = [seg.a, seg.b].sort().join('|');
+      if (seg.a === seg.b || seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    for (const node of this.pipeNodes) if (node.markerId === pid) node.markerId = id;
+    if (!this.markers.find((k) => k.id === id).product && partner.product) {
+      this.markers.find((k) => k.id === id).product = partner.product;
+    }
+    this.removeMarker(pid); // what is left on it: its dimensions and any duplicate link
+    return pid;
   }
 
   // Remove one electrical link (control) by id.
