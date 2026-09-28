@@ -126,6 +126,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   grip-cycle order: top to bottom, then authoring order, counting every marker at that point, e.g.
   shutter 214 cm, 2 switches 109 cm, outlet 24 cm = 4. The lights it controls are outlined cyan in every
   mode except LINK, which already shows them. MARKER · CHECK folds `i/n` into its hover line.
+  **Overlap count badge** (owner, 2026-09-28): so an overlap is visible without hovering, a small
+  amber disc with the count sits at the top-right corner of the icons drawn on top of each other:
+  on the floor icon when markers share the plan point (any heights), and on the wall glyph when they
+  also share the height (e.g. a double switch). Drawn in the same two marker batches (no extra draw
+  call); not pickable; during a live grip-drag it stays at the old point until the release rebuild.
 - **MARKER · LINK** (`id: marker_link`) — electrical control relationships. Grip cycles eligible
   overlapping switches (then lights), and trigger confirms the yellow candidate. Triggering one or
   more selected light icons toggles each control link. Pairwise links allow one switch to
@@ -159,7 +164,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   Empty-space junctions are assigned to the storey whose vertical band contains the controller tip.
   In a normal single-floor view, the floor directly above/below is also drawn dimmed (`adjacentGroup`)
   at its true relative height, its nodes + devices pickable (`adjacentTargetAtFloorPoint`, hover
-  yellow); triggering one runs a segment across the slab — a **riser**. The network is drawn live in
+  yellow); triggering one runs a segment across the slab — a **riser**. Those dots are two
+  InstancedMeshes (devices, junctions), never one mesh each: per-dot meshes were 146 draw calls on
+  the owner's Ground floor and PERF put the layer at ~12 ms with CONDUIT at 30 fps (2026-09-28). The network is drawn live in
   `conduitGroup` at active-plan-local Z (`worldZ − activeElevation`) in uniform purple, showing only
   segments touching the active floor, with a node sphere per active-floor vertex. Readout: `START PEN`,
   then `RUN CONDUIT`. **The intended conduit→wire→circuit workflow and the conduit/wire/control-link

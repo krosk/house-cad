@@ -57,6 +57,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] PLAN · EDIT: select a STAIRS zone, A/X turns its floor arrow 90° clockwise per press; the printed sheet, DXF and View 3D treads follow; STAIRS DOWN on the storey above points the opposite way for the same `climb`
 - [ ] MARKER · CHECK: rings are red (cross-tie), orange (no breaker) and white (unwired outlet/switch/light), with pins up to each glyph; thumbstick up/down filters one issue; aiming at a ring names the device and issue; readout counts match the house (rev 9: 0 / 5 / 93); Ethernet-only runs are not flagged; frame rate holds with ~100 rings
 - [ ] Stacked devices (double switch = two switch markers at one point): hovering one in EDIT/WIRE/CHECK shows `switch i/n → k× light` and outlines its lights cyan; grip advances i/n
+- [ ] CONDUIT on Ground: fps back near 72, PERF `condt` a few ms and the `draw` count well under 350; adjacent-floor dots still dim slate, hover turns yellow and enlarges, trigger still makes a riser
+- [ ] Overlap count badge: a floor icon shared by markers at one plan point shows an amber "2"/"3" at its top-right corner; a double switch (same point and height) shows it on the wall glyph too; single markers show none
 - Owner walk 2026-09-27 (build `4cad922`): applied materials on the Quest; the MATERIAL flow for floors,
   windows etc. was understood. No per-item pass/fail was given, so the boxes below stay open. The owner
   looked for the same material option for **furniture** and found none: furniture products live in

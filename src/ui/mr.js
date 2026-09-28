@@ -2038,7 +2038,7 @@ export function setupMR(view, project, getFootprint) {
   const MARKER_SLOTS = MARKER_COLS * MARKER_COLS; // 64 ≥ every type × pinned/unpinned
   const MARKER_WALL_HALF = 0.045, MARKER_FLOOR_HALF = 0.05; // the old 0.09 sprite / 0.10 plane
   const markerAtlas = { ctx: null, texture: null, wallMat: null, floorMat: null, slots: new Map(), dirty: false };
-  function markerGlyphSlot(marker) {
+  function initMarkerAtlas() {
     if (!markerAtlas.texture) {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = MARKER_ATLAS;
@@ -2050,7 +2050,26 @@ export function setupMR(view, project, getFootprint) {
         side: THREE.DoubleSide, depthTest: false, depthWrite: false,
       });
     }
-    const key = `${marker.type}|${marker._full ? 1 : 0}`;
+  }
+  function markerGlyphSlot(marker) {
+    return atlasSlot(`${marker.type}|${marker._full ? 1 : 0}`, (ctx) => drawMarkerGlyph(ctx, marker));
+  }
+  // An overlap count badge ("2", "3"…): amber disc, white ring, dark digits.
+  function markerCountSlot(n) {
+    return atlasSlot(`count|${n}`, (ctx) => {
+      const c = MARKER_TEX / 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(c, c, c - 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath(); ctx.arc(c, c, c - 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111827';
+      ctx.font = `bold ${n > 9 ? 56 : 76}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(n), c, c + 4);
+    });
+  }
+  function atlasSlot(key, draw) {
+    initMarkerAtlas();
     let slot = markerAtlas.slots.get(key);
     if (slot) return slot;
     const i = Math.min(markerAtlas.slots.size, MARKER_SLOTS - 1); // full: reuse the last cell
@@ -2059,7 +2078,7 @@ export function setupMR(view, project, getFootprint) {
     ctx.save();
     ctx.translate(x, y);
     ctx.clearRect(0, 0, MARKER_TEX, MARKER_TEX);
-    drawMarkerGlyph(ctx, marker);
+    draw(ctx);
     ctx.restore();
     markerAtlas.dirty = true;
     const inset = 0.5 / MARKER_ATLAS; // half a texel, so neighbours never bleed in
@@ -2086,7 +2105,8 @@ export function setupMR(view, project, getFootprint) {
         // Flat on the floor, texture top toward plan +y (local -z), like the old
         // PlaneGeometry(0.10).rotateX(-PI/2).
         const sx = k === 0 || k === 3 ? -1 : 1, sz = k < 2 ? 1 : -1;
-        pos.setXYZ(q * 4 + k, p.x + sx * MARKER_FLOOR_HALF, p.y, p.z + sz * MARKER_FLOOR_HALF);
+        const h = proxy.userData.half ?? MARKER_FLOOR_HALF;
+        pos.setXYZ(q * 4 + k, p.x + sx * h, p.y, p.z + sz * h);
       }
     });
     pos.needsUpdate = true;
@@ -2099,8 +2119,9 @@ export function setupMR(view, project, getFootprint) {
     proxies.forEach((proxy, q) => {
       const { u0, u1, v0, v1 } = proxy.userData.glyphSlot;
       uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
-      const h = MARKER_WALL_HALF;
-      corner.push(-h, -h, h, -h, h, h, -h, h);
+      // A count badge sits off-centre in view space ([dx, dy, half]); a glyph is centred.
+      const [dx, dy, h] = proxy.userData.corner ?? [0, 0, MARKER_WALL_HALF];
+      corner.push(dx - h, dy - h, dx + h, dy - h, dx + h, dy + h, dx - h, dy + h);
       index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
     });
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -2166,6 +2187,33 @@ export function setupMR(view, project, getFootprint) {
       const floorOutline = makeMarkerOutline(m, 'floor');
       floorOutline.position.set(m.x, elevation + 0.018, -m.y);
       markerGroup.add(wallOutline, floorOutline);
+    }
+    // Markers drawn on top of each other get a count badge at the icon's corner (owner,
+    // 2026-09-28; they are still not drawn apart, see docs/ar-survey.md "Stacked
+    // devices"): floor icons overlap at one plan point, wall glyphs at one point AND
+    // height. Drawn last in each batch, so above the icons. Not proxies in markerGroup:
+    // nothing picks them, and a live drag leaves them until the release rebuild.
+    const counts = (keyOf) => {
+      const groups = new Map();
+      for (const m of floor.markers) {
+        const k = keyOf(m);
+        groups.set(k, [...(groups.get(k) || []), m]);
+      }
+      return [...groups.values()].filter((g) => g.length > 1);
+    };
+    for (const g of counts((m) => `${m.x}|${m.y}`)) {
+      const badge = new THREE.Object3D();
+      badge.userData.glyphSlot = markerCountSlot(g.length);
+      badge.userData.half = 0.022;
+      badge.position.set(g[0].x + MARKER_FLOOR_HALF, elevation + 0.017, -(g[0].y + MARKER_FLOOR_HALF));
+      floorProxies.push(badge);
+    }
+    for (const g of counts((m) => `${m.x}|${m.y}|${m.z}`)) {
+      const badge = new THREE.Object3D();
+      badge.userData.glyphSlot = markerCountSlot(g.length);
+      badge.userData.corner = [MARKER_WALL_HALF, MARKER_WALL_HALF, 0.018];
+      badge.position.set(g[0].x, elevation + g[0].z, -g[0].y);
+      wallProxies.push(badge);
     }
     if (floor.markers.length) markerGroup.add(makeMarkerBatch(floorProxies, true), makeMarkerBatch(wallProxies, false));
   }
@@ -3544,42 +3592,64 @@ export function setupMR(view, project, getFootprint) {
   // Draw the adjacent floors' pickable targets, dimmed at their true relative height
   // (planLocalZ): device markers in both CONDUIT and WIRE modes (a riser can terminate at
   // a box; a wire spans storeys between two boxes), plus bare conduit junctions in CONDUIT
-  // mode. Each carries userData.adjacent = {kind, id, floorId} for the trigger handlers.
+  // mode. Each target carries `adjacent` = {kind, id, floorId} for the trigger handlers.
+  // BATCHED (2026-09-28): one InstancedMesh per kind (device 0.5 / junction 0.6 opacity),
+  // recoloured per instance. One mesh per dot cost 146 draw calls on the owner's Ground
+  // floor (57 + 35 devices, 5 + 49 junctions above and below) and PERF showed the layer at
+  // ~12 ms while CONDUIT ran at 30 fps.
+  let adjacentTargets = []; // [{ adjacent, mesh, index, pos: Vector3, key }]
   function buildAdjacentTargets(modeId) {
     for (const child of [...adjacentGroup.children]) {
-      adjacentGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+      adjacentGroup.remove(child); child.dispose?.(); child.material?.dispose(); // the geometry is shared
     }
+    adjacentTargets = [];
     if (allFloorsView || !['marker_conduit', 'marker_wire', 'marker_pipe'].includes(modeId)) return;
     const wantNodes = modeId === 'marker_conduit';
-    const addDot = (wp, adjacent, opacity) => {
-      const p = planLocalZ(wp);
-      const mesh = new THREE.Mesh(adjacentTargetGeom, new THREE.MeshBasicMaterial({
-        color: 0x64748b, depthTest: false, depthWrite: false, transparent: true, opacity,
-      }));
-      mesh.position.set(p.x, p.z, -p.y);
-      mesh.renderOrder = 15;
-      mesh.userData.adjacent = adjacent;
-      adjacentGroup.add(mesh);
-    };
+    const found = { marker: [], node: [] };
     for (const floor of adjacentFloors()) {
       for (const m of floor.markers || []) {
-        addDot({ x: m.x, y: m.y, z: (floor.elevation || 0) + (m.z || 0) }, { kind: 'marker', id: m.id, floorId: floor.id }, 0.5);
+        found.marker.push([{ x: m.x, y: m.y, z: (floor.elevation || 0) + (m.z || 0) }, { kind: 'marker', id: m.id, floorId: floor.id }]);
       }
       if (wantNodes) {
         for (const node of project.conduitNodes) {
           if (node.markerId || project.conduitNodeFloorId(node) !== floor.id) continue;
-          addDot(conduitNodePos(project, node), { kind: 'node', id: node.id, floorId: floor.id }, 0.6);
+          found.node.push([conduitNodePos(project, node), { kind: 'node', id: node.id, floorId: floor.id }]);
         }
       }
     }
+    for (const [kind, opacity] of [['marker', 0.5], ['node', 0.6]]) {
+      const list = found[kind];
+      if (!list.length) continue;
+      const mesh = new THREE.InstancedMesh(adjacentTargetGeom, new THREE.MeshBasicMaterial({
+        color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity,
+      }), list.length);
+      mesh.renderOrder = 15;
+      mesh.frustumCulled = false;
+      list.forEach(([wp, adjacent], index) => {
+        const p = planLocalZ(wp);
+        const target = { adjacent, mesh, index, pos: new THREE.Vector3(p.x, p.z, -p.y), key: null };
+        adjacentTargets.push(target);
+        styleAdjacentTarget(target, 0x64748b, 1);
+      });
+      adjacentGroup.add(mesh);
+    }
+  }
+  // Set one instance's colour and scale; unchanged styles upload nothing.
+  function styleAdjacentTarget(target, color, scale) {
+    const key = color * 4 + scale;
+    if (target.key === key) return;
+    target.key = key;
+    _cm.compose(target.pos, _cq.identity(), _cs.setScalar(scale));
+    target.mesh.setMatrixAt(target.index, _cm);
+    target.mesh.setColorAt(target.index, _cc.setHex(color));
+    target.mesh.instanceMatrix.needsUpdate = true;
+    target.mesh.instanceColor.needsUpdate = true;
   }
 
   // Nearest adjacent-floor target under the reticle (plan projection), or null.
   function adjacentTargetAtFloorPoint(px, py) {
     let best = null, bestD = RETICLE_OUTER;
-    for (const child of adjacentGroup.children) {
-      const a = child.userData.adjacent;
-      if (!a) continue;
+    for (const { adjacent: a } of adjacentTargets) {
       let mx, my;
       if (a.kind === 'marker') { const f = project.findMarker(a.id); if (!f) continue; mx = f.marker.x; my = f.marker.y; }
       else { const n = project.conduitNodes.find((nn) => nn.id === a.id); if (!n) continue; const wp = conduitNodePos(project, n); mx = wp.x; my = wp.y; }
@@ -3596,9 +3666,8 @@ export function setupMR(view, project, getFootprint) {
       ? new Set([selectedRoutedWire.fromMarkerId, selectedRoutedWire.toMarkerId])
       : selectedPipe ? new Set([selectedPipe.a, selectedPipe.b]
         .map((id) => project.pipeNodes.find((n) => n.id === id)?.markerId).filter(Boolean)) : null;
-    for (const child of adjacentGroup.children) {
-      const a = child.userData.adjacent;
-      if (!a) continue;
+    for (const target of adjacentTargets) {
+      const a = target.adjacent;
       const hot = hoverAdjacent && hoverAdjacent.kind === a.kind && hoverAdjacent.id === a.id;
       const directEndpoint = a.kind === 'marker' && selectedEndpointIds?.has(a.id);
       const circuitMember = a.kind === 'marker' && selectedCircuit?.markerIds.has(a.id);
@@ -3606,9 +3675,8 @@ export function setupMR(view, project, getFootprint) {
         && (wireFromMarker?.id === a.id || (pipePenNodeId
           && project.pipeNodes.find((n) => n.id === pipePenNodeId)?.markerId === a.id));
       const emphasized = hot || directEndpoint || circuitMember || pendingEndpoint;
-      child.material.color.setHex(hot || directEndpoint || pendingEndpoint ? 0xffe14d
-        : circuitMember ? CIRCUIT_CONNECTED_COLOR : 0x64748b);
-      child.scale.setScalar(emphasized ? 1.6 : 1);
+      styleAdjacentTarget(target, hot || directEndpoint || pendingEndpoint ? 0xffe14d
+        : circuitMember ? CIRCUIT_CONNECTED_COLOR : 0x64748b, emphasized ? 1.6 : 1);
     }
   }
 
