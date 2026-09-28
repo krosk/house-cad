@@ -3210,7 +3210,7 @@ export function setupMR(view, project, getFootprint) {
         }
       }
     }
-    matDoors = floor.rectangles.filter((r) => ['door', 'window', 'furniture'].includes(zoneKindOf(r)));
+    matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'window', 'furniture'].includes(zoneKindOf(r)));
     // A target that has a material shows one small swatch badge at the centre of its plan
     // box, not a coloured fill (owner, 2026-09-27: full overlays made the plan hard to read).
     const arr = [], colors = [];
@@ -3312,7 +3312,9 @@ export function setupMR(view, project, getFootprint) {
   function matDoorAt(px, py, kind) {
     let best = null, bestD = Infinity;
     for (const rect of matDoors) {
-      if (zoneKindOf(rect) !== kind) continue;
+      // MATERIAL · DOOR also takes SLIDING zones (rail-hung door products).
+      const k = zoneKindOf(rect);
+      if (k !== kind && !(kind === 'door' && k === 'sliding')) continue;
       const b = rect.bounds;
       const dx = Math.max(b.x0 - px, 0, px - b.x1), dy = Math.max(b.y0 - py, 0, py - b.y1);
       if (Math.hypot(dx, dy) > 0.3) continue;
@@ -3386,7 +3388,10 @@ export function setupMR(view, project, getFootprint) {
     if (APT_KIND[modeId]) {
       if (!matSelDoor) matSelDoor = matHoverDoor;
       if (!matSelDoor) return;
-      const ids = [null, ...materialsFor(project, APT_KIND[modeId]).map((m) => m.id)];
+      // A SLIDING zone cycles the rail-hung products only; a DOOR zone the others.
+      const sliding = zoneKindOf(matSelDoor) === 'sliding';
+      const ids = [null, ...materialsFor(project, APT_KIND[modeId])
+        .filter((m) => APT_KIND[modeId] !== 'door' || (m.mount === 'rail') === sliding).map((m) => m.id)];
       const cur = ids.indexOf(doorMaterialId(matSelDoor));
       const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
       project.setDoorFinish(matSelDoor.id, next);
@@ -3474,7 +3479,11 @@ export function setupMR(view, project, getFootprint) {
         [`${fmt(width)} × ${fmt(tall)} ${unitLabel()}`, 0xe2e8f0],
         // A product with its own leaf count (porte-fenêtre, sliding bay) ignores the hinge.
         ...(isWindow ? [[t((mat?.leaves ?? ((rect.hinge ?? 'left') === 'both' ? 2 : 1)) === 2 ? 'mat.leaves2' : 'mat.leaves1'), 0xe2e8f0]] : []),
-        ...(mat ? [[t('mat.toMeasure'), 0xfbbf24]] : []),
+        // A rail-hung door is a fixed size (not made to measure): its leaf, and whether the
+        // opening fits under it.
+        ...(mat?.mount === 'rail'
+          ? [[`${t('mat.leaf')} ${fmt(mat.leafWidth)} × ${fmt(mat.leafHeight)} ${unitLabel()}`, width > mat.leafWidth + 1e-3 ? 0xf87171 : 0xfbbf24]]
+          : mat ? [[t('mat.toMeasure'), 0xfbbf24]] : []),
       ];
     }
     const floorMode = modeId === 'mat_floor';

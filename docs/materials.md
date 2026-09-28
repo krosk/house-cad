@@ -512,6 +512,35 @@ the zone.
   sliding and garage zones stay closed slabs. Proven on a scratch render: each open leaf lies on the
   plan symbol's leaf line (hinge left/in, right/out, both). Not yet seen in the real app or on device.
 
+### Rail-hung sliding doors (`mount: 'rail'`)
+
+Owner request 2026-09-27: a surface-mounted sliding door on a wall rail. Set on a **SLIDING** zone in
+MATERIAL · DOOR (which now also picks SLIDING zones; a SLIDING zone cycles only rail-hung products, a
+DOOR zone only the others). The zone is the **opening** and keeps the existing SLIDING convention
+(`apertureGlyph.js`): `swing` = the wall face carrying the rail, `hinge` = the side it slides to open
+(PLAN · EDIT A/X cycles both). The leaf is the product's **fixed size** (`leafWidth`/`leafHeight`/
+`leafDepth`), not made to measure; the AR readout shows `LEAF 0.83 × 2.04` and turns it red when the
+opening is wider than the leaf. Closed = centred on the opening; open (View 3D and AR) = parked with
+its leading edge on the jamb. `doorProductPlacements` passes the zone's wall `depth` so the rail sits on
+the right face.
+
+- **Postformé sliding door 83 on Indus rail, white** (`door_postforme_rail_white`, design
+  `postforme`, `buildRailDoor` + `drawPostforme` in `src/ui/doorProducts.js`). **The full source
+  list, every number's origin and the estimates are embedded in that code** (the owner's rule,
+  `docs/product-modelling.md` step 6). In short:
+  - leaf: [Leroy Merlin 60742675](https://www.leroymerlin.fr/produits/porte-coulissante-postforme-bois-h-204-x-l-83-cm-60742675.html),
+    204 × 83 cm, 40 mm, white, honeycomb core, no handle supplied; the 3-panel layout measured on
+    the straight photo media 4334229;
+  - rail: [ARTENS Indus 2, Leroy Merlin 82002392](https://www.leroymerlin.fr/produits/rail-coulissant-indus-2-pour-porte-de-largeur-93-cm-maximum-artens-82002392.html),
+    186 cm black steel, 4 cm deep; the manual (PDF media 3837502) gives the rail line at H + 4.8 cm,
+    a 1 cm floor gap, spacers every 45 cm, rollers 12.5 cm in from each edge, the rail's start
+    (90 − W) cm past the jamb; the drawing (4285352) 11.7 cm door top to roller top;
+  - estimates: bar 40 × 6 mm, wheel Ø 59 mm, spacer blocks, the door centred under the bar.
+  - No handle is modelled (none supplied). The floor guide and anti-jump blocks are not modelled.
+  - Proven 2026-09-27: build; front and three-quarter renders, closed and open against a wall with
+    an 80 cm opening, beside the studio photo (panel layout and proportions agree). Not yet seen
+    in View 3D on a real plan or in AR.
+
 ## Windows (window products)
 
 Same model as doors: a window product is a **material of a WINDOW zone**, stored as a `{rect}` finish on

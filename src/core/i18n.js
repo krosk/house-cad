@@ -212,9 +212,9 @@ const STRINGS = {
     zh: '逐面选择墙面材料。扳机选择离准星最近的墙；摇杆上/下循环材料；B/Y 清除。门窗洞口已扣除。',
   },
   'help.mat_door': {
-    en: 'Choose a door product for a DOOR zone. Trigger selects the door under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the door takes the zone\'s width and head height, hinge and swing. Shown in the 3D view (LEFT X).',
-    fr: 'Choisissez un modèle de porte pour une zone PORTE. Gâchette : sélectionner la porte visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la porte prend la largeur, la hauteur, les paumelles et le sens d’ouverture de la zone. Visible dans la vue 3D (GAUCHE X).',
-    zh: '为门区域选择门款。扳机选择准星下的门；摇杆上/下循环门款（首项为无）；B/Y 清除。按尺寸定制：门采用该区域的宽度、门头高度、铰链和开启方向。在三维视图中显示（左 X）。',
+    en: 'Choose a door product for a DOOR zone. Trigger selects the door under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the door takes the zone\'s width and head height, hinge and swing. A SLIDING zone takes the rail-hung doors (fixed leaf size; the rail on the zone\'s swing face, sliding toward its hinge end). Shown in the 3D view (LEFT X).',
+    fr: 'Choisissez un modèle de porte pour une zone PORTE. Gâchette : sélectionner la porte visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la porte prend la largeur, la hauteur, les paumelles et le sens d’ouverture de la zone. Une zone COULISSANTE prend les portes sur rail (vantail de taille fixe ; rail sur la face d’ouverture de la zone, coulissant vers son côté paumelles). Visible dans la vue 3D (GAUCHE X).',
+    zh: '为门区域选择门款。扳机选择准星下的门；摇杆上/下循环门款（首项为无）；B/Y 清除。按尺寸定制：门采用该区域的宽度、门头高度、铰链和开启方向。推拉门区域使用轨道吊门（门扇尺寸固定；轨道位于区域的开启面，向铰链端滑动）。在三维视图中显示（左 X）。',
   },
   'help.mat_window': {
     en: 'Choose a window product for a WINDOW zone. Trigger selects the window under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the window takes the zone\'s width, sill and head; its hinge picks the leaves (both = two leaves). Shown in the 3D view (LEFT X).',
@@ -432,6 +432,7 @@ const STRINGS = {
   'mat.pickDoor':  { en: 'PICK DOOR',   fr: 'CHOISIR PORTE',  zh: '选择门' },
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
   'mat.pickFurniture': { en: 'PICK FURNITURE', fr: 'CHOISIR MOBILIER', zh: '选择家具' },
+  'mat.leaf':      { en: 'LEAF', fr: 'VANTAIL', zh: '门扇' },
   'mat.groutKg':   { en: 'kg grout', fr: 'kg joint', zh: 'kg 填缝剂' },
   'mat.fromCorner': { en: '⌞ CORNER', fr: '⌞ ANGLE', zh: '⌞ 墙角起铺' },
   'mat.furnitureTurn': { en: 'A/X: TURN 90°', fr: 'A/X : TOURNER 90°', zh: 'A/X：旋转 90°' },

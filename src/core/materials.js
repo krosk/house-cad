@@ -173,6 +173,15 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Lapeyre LINE acoustic door, white', fr: 'Bloc-porte LINE acoustique Lapeyre, blanc', zh: 'Lapeyre LINE 隔音门（白）' },
   },
   {
+    // Leroy Merlin postformé sliding door 204 × 83 cm, white (60742675), hung on the ARTENS
+    // Indus 2 black rail (82002392); a SLIDING zone's product, not made to measure. Sources,
+    // measurements and estimates: src/ui/doorProducts.js buildRailDoor / drawPostforme.
+    id: 'door_postforme_rail_white', surface: 'door', pattern: 'door', design: 'postforme', mount: 'rail',
+    w: 0, h: 0, joint: 0, leafWidth: 0.83, leafHeight: 2.04, leafDepth: 0.04, roughness: 0.6, metalness: 0,
+    color: 0xeeede8, accent: 0xeeede8, pack: null,
+    name: { en: 'Postformé sliding door 83 on Indus rail, white', fr: 'Porte coulissante postformée 83 sur rail Indus, blanc', zh: '白色模压推拉门 83（Indus 轨道）' },
+  },
+  {
     // Lapeyre Héméra PVC window, white, made to measure (FPC5837268, 2026-09-26): hidden
     // sash ("ouvrant caché"), frame 80 mm and sash 84 mm deep, 4/20/4 glazing. Profile
     // faces measured on the product photos (src/ui/windowProducts.js PROFILES.hemera).

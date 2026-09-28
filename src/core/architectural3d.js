@@ -526,9 +526,11 @@ export function doorProductPlacements(floor, materialOf) {
   for (const f of floor?.finishes || []) {
     if (f.target?.edge) continue;
     const rect = (floor.rectangles || []).find((r) => r.id === f.target?.rect);
-    if (!rect || zoneKind(rect) !== 'door' || !validBounds(rect.bounds)) continue;
+    // A rail-hung product (`mount: 'rail'`) goes on a SLIDING zone; any other on a DOOR zone.
+    const kind = rect && zoneKind(rect);
+    if (!rect || (kind !== 'door' && kind !== 'sliding') || !validBounds(rect.bounds)) continue;
     const def = materialOf(f.material);
-    if (def?.surface !== 'door') continue;
+    if (def?.surface !== 'door' || (kind === 'sliding') !== (def.mount === 'rail')) continue;
     const b = rect.bounds;
     const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
     const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
@@ -536,6 +538,7 @@ export function doorProductPlacements(floor, materialOf) {
       rectId: rect.id, material: f.material, def, alongX,
       cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
       width: alongX ? b.x1 - b.x0 : b.y1 - b.y0,
+      depth: alongX ? b.y1 - b.y0 : b.x1 - b.x0, // the wall thickness at the zone
       head: clipped(rect.head ?? 2.1, 0, height),
       hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
       swingZ: alongX ? -perp : perp,

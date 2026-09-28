@@ -134,6 +134,16 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
 
 ## 6. Measure, record, verify
 
+- **Sources live in the generator** (owner, 2026-09-27). The builder in code carries a `// Sources:`
+  comment block, and the catalog entry a short one pointing to it:
+  - every page URL (product, and any accessory it is modelled with, e.g. a rail);
+  - the spec-table values used, quoted as the page gives them;
+  - each photo and document by its retailer id (Leroy Merlin media id, Lapeyre image ref, IKEA id,
+    PDF media id), with what was read from it;
+  - for each dimension constant: its source, or "estimate" and from what.
+  No stored images (the code-only rule stands): ids and URLs, not copies. The docs entry summarises
+  and points to the code.
+
 - Report numbers you measured: bounding box (`Box3.setFromObject`), and if asked, GLB size via
   `GLTFExporter.parseAsync(obj, {binary: true})` (the bed: 204 KB, 14 meshes, 1,624 triangles).
 - `npm run build`, then document the entry (sources, which dimensions are photo estimates) and add an

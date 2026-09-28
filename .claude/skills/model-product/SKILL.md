@@ -33,6 +33,10 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
    - Tell the owner which photos you use and what you read from each.
 4. **Build** (step 4) with the photo-derived dimensions as named constants or `params`. Everything is
    procedural: seeded canvas textures, no stored images.
+   **Embed the source material in the generator** (owner, 2026-09-27): a `// Sources:` comment block
+   at the builder (and a short one on the catalog entry) with every page URL, the spec-table values
+   used, each photo / PDF by its retailer id, and which dimension came from which source or is an
+   estimate. The code must be re-checkable against the retailer without the scratchpad or the doc.
 5. **Preview and iterate** (step 5): render beside the photos in a scratch preview.
    - Objects: front + side views.
    - Surfaces: a straight top-down photo at the same scale, then a room view. Compare pixel statistics
