@@ -15,15 +15,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/**pinwheel (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-28 (session 33)
-**Status:** Proven (git): `origin/main` = `f5f30f9` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-09-29 (session 34)
+**Status:** Proven (git): `origin/main` = `26aa3f2` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl): the live
-`version.json` serves `f5f30f9`. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
+`version.json` serves `26aa3f2`. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
 flow, the 3D-only AR view, FURNISH's removal (session 32) and the floor pattern **start corner**
-(session 33). Everything else from sessions 30–33 is verified by build, Node or a scratch/desktop
+(session 33). Everything else from sessions 30–34 is verified by build, Node or a scratch/desktop
 browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
@@ -59,31 +59,32 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 33
+## What changed in session 34
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Detail for every item is in the named doc. Session 32
-> is folded into the sections below.
+> decisions" or "Findings" and delete this list. Session 33 is folded into the sections below.
 
-1. **Floor pattern start corner** (`4ba575d`, **owner-confirmed on the Quest**): MATERIAL · FLOOR, A/X
-   near a room corner starts that laying region's pattern there (amber L, `⌞ CORNER`); again = back
-   to the plan origin. Stored as `anchor {rect, corner}` on the floor finish, resolved to the laid
-   floor's own corner (inside linings). `docs/materials.md` "Continuity rule".
-2. **Grout weight** (`a7ac8bb`): the room's quantity line ends `… kg grout` (joint length × width ×
-   depth × 1.6 kg/dm³); the owner wants it per room only, not on the HOUSE line.
-3. **90° pattern turn** (`ecca41f`): A/X away from the corners turns the region's pattern (`↻90°`).
-   Fixed on the way: floor UVs used to swap x/y for every pattern in rooms deeper than wide.
-4. **Etruria octagon laid diagonally** (`ecca41f`, `diagonal: true`): tozzetti square to the walls.
-5. **Windows** (`ecca41f`): Héméra porte-fenêtre 2 leaves (reuses the Héméra profile) and the **Néva
-   aluminium 2-leaf sliding bay** (new `buildSliding`). The owner first said "triple Héméra baie";
-   there is no sliding Héméra, and they corrected it to the Néva.
-6. **AR 3D view** (`8eb1b99`): a white painted ceiling, and opaque window glass showing a generic
-   daylight exterior (`src/ui/exteriorView.js`), so the real room no longer shows through.
-7. **Rail-hung sliding door** (`f5f30f9`): Leroy Merlin postformé 83 × 204 on the ARTENS Indus rail,
-   a door product on a **SLIDING** zone (MATERIAL · DOOR now picks SLIDING zones).
-8. **Owner rule: generators embed their sources** (`f5f30f9`): the `/model-product` skill and
-   `docs/product-modelling.md` step 6 require a `// Sources:` block in the builder. `buildRailDoor` is
-   the first full one; older builders cite their sources more loosely (not back-filled).
+1. **PERF:** a `mat` layer in the sweep (`4e080fc`). The owner's reading in MARKER · CONDUIT was
+   30 fps, conduits 12 ms, zones 12 ms, everything else < 2 ms, 350 draw calls. Fix: the adjacent-floor
+   dots became InstancedMeshes (`0110e85`), and the LINK routes one `LineSegments` (`42aa336`). **Not
+   re-measured since.** Hypothesis: the `zones` 12 ms is a vsync-quantisation artefact.
+2. **Overlap count badge** (`0110e85`): an amber "2"/"3" on AR marker icons drawn on top of each other
+   (owner chose a badge over drawing them apart).
+3. **Double switch marker `switch_dual`** (`42aa336`, owner chose "new marker type"): one marker, links
+   carry `rocker: 2` (absent = 1). In LINK the thumbstick swaps the rocker; the other rocker's routes
+   show pink. In MARKER · EDIT, A/X on a `switch_dual` merges an old two-marker pair into it (never on
+   retype: scrolling the type list past it would merge). Sheet, DXF (`MARKER_SWITCH_DUAL`) and 3D
+   faceplate are included. Detail: `docs/ar-survey.md` "Double switch marker".
+4. **Sticky grip cycling in MARKER · CONDUIT** (`283ba28`): grip chooses a target (runs included) and it
+   stays chosen while it's under the reticle; the ring order is stable (kind, z high→low, key).
+5. **0.1 mm length grid** (`7babb98`, owner: "fine with going integer"): the owner's EDIT grip jumped
+   at a stack whose Ethernet was 10⁻¹⁷ m off its switches. Every stored length is now snapped
+   (`snapM`, rule in `CLAUDE.md` "Units"). Proven on both house files: 0 new conflicts, ≤ 0.05 mm
+   moves, only that stack changed.
+6. **Monastère laid "stepped random"** (`26aa3f2`, owner spec): a 5-tile module on the oblique lattice
+   A = (80, −30), B = (50, 80) cm; no joint crosses a room. The id `monastere_beige_pinwheel` is kept.
+   Without a start corner a module is centred in the region. The texture repeats along the lattice
+   (a sheared texture matrix). Detail: `docs/materials.md` "Stepped random".
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -112,9 +113,15 @@ Read `docs/product-intent.md` before planning AR work.
   Windows-only.
 - **Circuits are derived per wire nature**; Ethernet never counts toward breakers. CHECK flags only
   `needsPower` devices (outlet*/switch/light), and never flags spare breakers (owner choices).
-- **A double switch = two switch markers at one point**; never draw stacked markers apart in AR.
+- **A double switch is one `switch_dual` marker** with per-rocker links (owner, 2026-09-28); older
+  two-marker pairs still load and work, and A/X in MARKER · EDIT merges one. Never draw stacked markers
+  apart in AR; a count badge shows the overlap.
+- **Every stored length is on a 0.1 mm grid** (`CLAUDE.md` "Units"): a new stored length field must
+  be added to `Project._snapToGrid`; `===` on stored coordinates is then safe.
 - **Materials** (`docs/materials.md`):
-  - patterns are anchored at the plan origin, unless a laying region sets its own **start corner**
+  - Monastère is laid **stepped random** (owner, 2026-09-29), not pinwheel; the pinwheel code stays,
+    unused by the catalog;
+  - patterns are anchored at the plan origin (a stepped pattern: centred in its region), unless a laying region sets its own **start corner**
     (A/X near a corner; one per region so joints stay continuous through doorways) or a **90° turn**
     (A/X away from corners); floors only, walls keep the plan origin;
   - grout weight is shown per room only (owner); no waste margin; ρ 1.6 is generic, not a product;
@@ -157,7 +164,7 @@ Read `docs/product-intent.md` before planning AR work.
 - **PASSAGE** (owner, 2026-09-27): an open doorway between two rooms; floors meet at its middle like
   a door; no leaf, nothing to rotate.
 - **The controller readout holds up to 6 lines** (tighter pitch past 4); a mode that needs more must
-  condense, as the pinwheel house line does (`HOUSE 8 · 4 · 2 packs`).
+  condense, as the mixed-format house line does (`HOUSE 8 · 4 · 2 packs`).
 - **Doors are drawn open in both View 3D and the AR 3D view** (owner, 2026-09-27; AR was closed
   until then). `main.js` and `mr.js` both pass `openDoors` / `open`.
 - **A mixed-format product counts and boxes each size separately** (each is its own article): `pack:
@@ -202,7 +209,7 @@ Read `docs/product-intent.md` before planning AR work.
 - **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
   curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
   of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
-- **Chrome tools:** screenshots of a WebGL preview tab time out (every time in session 33, even on
+- **Chrome tools:** screenshots of a WebGL preview tab time out (every time in sessions 33–34, even on
   plain pages). Instead the scratch page POSTs `canvas.toDataURL()` to a tiny local receiver on :5191
   (a ~20-line Python `http.server` that base64-decodes the body to a file; rewrite it in the new
   scratchpad), and ffmpeg builds side-by-side comparisons with the photos. For a texture, sampling
@@ -243,8 +250,11 @@ Read `docs/product-intent.md` before planning AR work.
 - **A pattern that looks the same after a 90° turn** (pinwheel, octagon) is unchanged by the floor
   turn; a UV x↔y swap is a **mirror**, not a turn, which is why only planks may swap.
 - **No PIL here**: dump pixels with `ffmpeg -f rawvideo -pix_fmt gray|rgb24` and read them in Python.
-- **Solved coordinates carry float noise**; grids built from edges must snap (`snap()` in
-  `architectural3d.js`).
+- **Float noise:** stored lengths are on the 0.1 mm grid since `7babb98`, but values computed from
+  them (x + w, pin + value) are not, unless they go through `snapM`. Grids built from edges also
+  snap (`snap()` in `architectural3d.js`).
+- **A texture that repeats obliquely** uses its own `texture.matrix` (`matrixAutoUpdate = false`):
+  don't set `repeat`/`offset` on the stepped texture, they would be ignored.
 - **`addConduitSegment` / `ensureConduitNodeAtMarker` return EXISTING items**; `addWire` returns
   `{ ok, wire }`; `wireSegmentPath` returns segment IDS (compare routes physically).
 - **The owner's house file is a real wired network** (rev 9, 47 wires). It suits wire/length tests
@@ -258,6 +268,9 @@ Read `docs/product-intent.md` before planning AR work.
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 34:** `4e080fc` PERF `mat` layer · `0110e85` adjacent dots batched + overlap badge ·
+  `42aa336` double switch marker + LINK batch · `283ba28` conduit sticky grip · `7babb98` 0.1 mm grid
+  · `26aa3f2` Monastère stepped layout.
 - **Session 33:** `4ba575d` floor start corner · `a7ac8bb` grout weight · `ecca41f` diagonal
   octagon, 90° turn, UV fix, Héméra porte-fenêtre, Néva bay · `8eb1b99` AR ceiling + exterior glass ·
   `f5f30f9` rail-hung sliding door, sources-in-generators rule.
@@ -270,7 +283,8 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - Earlier sessions: see `git log`.
 
 **Never stage** `Document from Alexis He.json` (untracked): it is the owner's real 3-storey house (rev 9,
-47 wires) and the read-only Node fixture for almost every check.
+47 wires) and the read-only Node fixture for almost every check. A newer export (rev 12, double
+switches merged) came as an upload in session 34 and is not in the repo; ask the owner if needed.
 
 ## Resuming from a clean checkout
 
@@ -315,10 +329,14 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 34: Monastère stepped with LEFT X (centred module, a 30×30 in a start corner, no seams,
+    first-draw delay); MARKER · EDIT grip on the Ethernet/switch stack (badge "3"); CONDUIT grip
+    cycling; the double switch (LINK rocker swap, A/X merge); **PERF in CONDUIT again** (did the
+    batching fix the 30 fps? does `zones` still read 12 ms?);
   - session 33: the rail sliding door on a SLIDING zone; the white ceiling + exterior glass with LEFT X
     (PERF on); the Héméra porte-fenêtre and Néva bay (sill-0 WINDOW zones); the diagonal Etruria; the
     90° turn (Blue stone, Charme; A/X near a corner still sets the corner); grout on the quantity
-    line; Monastère in a room deeper than wide (spin now matches the takeoff);
+    line;
   - session 32: MATERIAL · FURNITURE on a real zone (cycle, A/X turn, B/Y clear, `DIM REMOVED`
     flash), a slot saved with old FURNISH items migrating, the material badges, a PASSAGE between two
     rooms of different floors, the Monastère 6-line readout, doors open with LEFT X;
@@ -351,6 +369,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - start corner / turn for wall faces (floors only today);
   - a plank texture drawn from the real cut plan;
   - the hidden face below a half wall that stands inside a room (still counted in the wall area).
+- **B⁗ — Sticky pick for CONDUIT · EDIT and WIRE**, offered in session 34, only if the owner reports
+  the same jitter there (MARKER · CONDUIT's fix is `283ba28`).
 - **C — Conduit-drawing speed-ups:** height snap + "ceiling run" toggle, straight runs, one-press drop
   from a device, snap-to-wall + auto-pin. The owner decides priority.
 - **D — Remaining AR per-object layers**, only if a mode drops frames (adjacent-floor spheres, pipes,
@@ -363,7 +383,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Sessions 32–33: everything in Next step A's first two bullets.
+- **Unwalked, Hypothesis only.** Sessions 32–34: everything in Next step A's first three bullets.
+  Session 34: the stepped Monastère's joint comes out of nominal cells (tiles drawn 5 mm under
+  size); the texture's paint time on the Quest (0.65 s per map on desktop); the plan sheet grouping
+  the Ethernet into its stack now that coordinates are equal (SVG not looked at).
   Session 33 estimates: the Néva faces (photo scale assumes the 180 cm width), the rail door's bar
   section, wheel Ø and wall gap; the exterior picture's horizon sits at the same pane fraction for every
   window. Session 30:
