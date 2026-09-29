@@ -1249,13 +1249,13 @@ function drawElectricalLinks(be, L, floor) {
       be.line(L.X(a.x), L.Y(a.y), L.X(b.x), L.Y(b.y), {
         stroke: C_ELECTRICAL, width: 0.28, dash: [0.35, 0.9], cap: 'round',
       });
-      // A double switch's leg says which rocker drives the light: a small "1"/"2" chip a
+      // A double switch's leg says which rocker drives the light: a small "L"/"R" chip a
       // third of the way from the switch (clear of the fixture stack callout).
       const from = floor.markers.find((m) => m.id === link.fromMarkerId);
       if (from?.type === 'switch_dual') {
         const ax = L.X(a.x), ay = L.Y(a.y), bx = L.X(b.x), by = L.Y(b.y);
         const k = Math.min(0.33, 6 / Math.max(1e-6, Math.hypot(bx - ax, by - ay))); // ≤ 6 mm out
-        drawTextChip(be, String(linkRocker(link)), ax + (bx - ax) * k, ay + (by - ay) * k, 1.6);
+        drawTextChip(be, linkRocker(link) === 2 ? 'R' : 'L', ax + (bx - ax) * k, ay + (by - ay) * k, 1.6);
       }
     }
   }

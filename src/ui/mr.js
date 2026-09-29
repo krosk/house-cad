@@ -44,7 +44,7 @@ import {
   getOutputSettings, cycleOutputFormat, toggleOutputLayer, onOutputSettingsChange,
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
-import { electricalRoutePoints, isSwitch, linkRocker } from '../core/electrical.js';
+import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core/electrical.js';
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
@@ -5102,6 +5102,27 @@ export function setupMR(view, project, getFootprint) {
     rlog('marker type', { type: currentMarkerType });
   }
 
+  // MARKER · WIRE A/X: a selected wire ending on a double switch picks the rocker (left/
+  // right) each such end lands on; each rocker is its own circuit terminal (circuits.js).
+  // With both ends on double switches it steps through the four combinations.
+  const isDualEnd = (wire, end) =>
+    project.findMarker(end === 'from' ? wire.fromMarkerId : wire.toMarkerId)?.marker?.type === 'switch_dual';
+  function cycleWireRocker(wire) {
+    const ends = ['from', 'to'].filter((end) => isDualEnd(wire, end));
+    if (!ends.length) return false;
+    const r = { from: wireRocker(wire, 'from'), to: wireRocker(wire, 'to') };
+    // Binary count over the dual ends, so each A/X press reaches a new combination.
+    for (const end of ends) { if (r[end] === 1) { r[end] = 2; break; } r[end] = 1; }
+    project.setWireRockers(wire.id, r.from, r.to);
+    buildRoutedWires();
+    rlog('wire rocker', { id: wire.id, from: r.from, to: r.to });
+    return true;
+  }
+  function wireRockerLabel(wire) {
+    const ends = ['from', 'to'].filter((end) => isDualEnd(wire, end));
+    return ends.length ? ` · ${t('link.rocker')} ${ends.map((end) => t(`rocker.${wireRocker(wire, end)}`)).join('/')}` : '';
+  }
+
   // MARKER · WIRE thumbstick-y mirrors marker/zone typing: it chooses the nature
   // for the next wire, or retypes the currently selected wire in place.
   function cycleWireType(dir = 1) {
@@ -8072,6 +8093,7 @@ export function setupMR(view, project, getFootprint) {
         rlog('switch pair merged', { id: selectedMarker.id, removed: gone });
         buildPlan(); applyPlanMatrix();
       }
+      else if (modes[currentMode].id === 'marker_wire' && selectedRoutedWire) cycleWireRocker(selectedRoutedWire);
     }
     if (bBtn && !btn.b) {
       if (isDimMode(modes[currentMode].id)) deleteDimContext();
@@ -8279,7 +8301,7 @@ export function setupMR(view, project, getFootprint) {
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
     const linkStatus = modes[currentMode].id === 'marker_link'
       ? t(selectedLinkSwitch ? 'link.pickLight' : 'link.pickSwitch')
-        + (selectedLinkSwitch?.type === 'switch_dual' ? ` · ${t('link.rocker')} ${selectedLinkRocker}/2` : '') : null;
+        + (selectedLinkSwitch?.type === 'switch_dual' ? ` · ${t('link.rocker')} ${t(`rocker.${selectedLinkRocker}`)}` : '') : null;
     // A selected wire adds its circuit length and, when non-zero, the conduit length it
     // shares with the other wire nature. That line reads "SHARED <len>" in the OTHER
     // nature's color (naming it would overflow the pill).
@@ -8287,7 +8309,7 @@ export function setupMR(view, project, getFootprint) {
       ? selectedCircuitLengths(selectedRoutedWire) : null;
     const wireStatus = modes[currentMode].id === 'marker_wire'
       ? `${t(`wire.type.${selectedRoutedWire?.type || currentWireType}`)} · ${selectedRoutedWire
-        ? `${t('wire.override')} ${(selectedRoutedWire.via || []).length}`
+        ? `${t('wire.override')} ${(selectedRoutedWire.via || []).length}${wireRockerLabel(selectedRoutedWire)}`
         : wireFromMarker ? t('wire.pickEnd') : t('wire.pickStart')}`
         + (wireLengths ? `\n${t('wire.circuit')} ${fmt(wireLengths.circuit)} ${unitLabel()}` : '')
         + (wireLengths?.shared > 5e-4 ? `\n${t('wire.shared')} ${fmt(wireLengths.shared)} ${unitLabel()}` : '')

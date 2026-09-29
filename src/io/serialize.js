@@ -107,7 +107,12 @@ function serializeWire(w) {
   return {
     id: w.id, fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId,
     type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via: [...(w.via || [])],
+    ...wireRockerFields(w),
   };
+}
+// A double-switch end's rocker (`fromRocker`/`toRocker`), stored only when it is 2.
+function wireRockerFields(w) {
+  return { ...(w.fromRocker === 2 ? { fromRocker: 2 } : {}), ...(w.toRocker === 2 ? { toRocker: 2 } : {}) };
 }
 function serializePipe(pipe) {
   return { id: pipe.id, service: pipe.service, diameter: pipe.diameter, a: pipe.a, b: pipe.b };
@@ -327,6 +332,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
     return [{
       id: nextWireId(), fromMarkerId, toMarkerId,
       type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via,
+      ...wireRockerFields(w),
     }];
   });
   const pipeNodeIds = new Map();
@@ -500,6 +506,7 @@ export function deserializeInto(project, data) {
   const makeWire = (w) => ({
     id: w.id || nextWireId(), fromMarkerId: w.fromMarkerId, toMarkerId: w.toMarkerId,
     type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via: [...(w.via || [])],
+    ...wireRockerFields(w),
   });
   const topLevelNetwork = Array.isArray(data.conduitNodes) || Array.isArray(data.conduitSegments) || Array.isArray(data.wires);
   if (topLevelNetwork) {

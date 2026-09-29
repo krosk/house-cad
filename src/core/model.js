@@ -12,7 +12,7 @@
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, snapM } from './constraints.js';
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
-import { isSwitch } from './electrical.js';
+import { isSwitch, linkRocker } from './electrical.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -713,6 +713,10 @@ export class Project {
        (link.toMarkerId !== id || type === 'light')));
     if (type !== 'switch_dual') {
       for (const link of this.electricalLinks) if (link.fromMarkerId === id) delete link.rocker;
+      for (const w of this.wires) {
+        if (w.fromMarkerId === id) delete w.fromRocker;
+        if (w.toMarkerId === id) delete w.toRocker;
+      }
     }
     this._emit();
   }
@@ -757,7 +761,8 @@ export class Project {
   // Merge a double switch surveyed the old way (two switch markers at one point, one per
   // rocker) into the double-switch marker `id`: the plain switch at exactly the same
   // x, y and height becomes its rocker 2. Its lights move to rocker 2 (a light both
-  // already drive stays on rocker 1), its wires and conduit/pipe bindings move to `id`,
+  // already drive stays on rocker 1), its wires move to `id` landing on rocker 2 (so two
+  // independent circuits stay apart), its conduit/pipe bindings move to `id`,
   // then it is removed with its dimensions (`id` keeps its own, at the same point).
   // Returns the removed marker's id, or null when there is no partner.
   switchPairPartner(id) {
@@ -776,8 +781,8 @@ export class Project {
       link.fromMarkerId = id; link.rocker = 2;
     }
     for (const w of this.wires) {
-      if (w.fromMarkerId === pid) w.fromMarkerId = id;
-      if (w.toMarkerId === pid) w.toMarkerId = id;
+      if (w.fromMarkerId === pid) { w.fromMarkerId = id; w.fromRocker = 2; }
+      if (w.toMarkerId === pid) { w.toMarkerId = id; w.toRocker = 2; }
     }
     this.wires = this.wires.filter((w) => w.fromMarkerId !== w.toMarkerId);
     // Conduit: rebind the partner's box node, or fold it into ours if we have one.
@@ -887,11 +892,19 @@ export class Project {
   // Remove a node and its incident segments; drop any `via` references to it. A
   // bare junction disappears entirely; a marker-bound node just detaches the marker
   // from the network (the marker itself is untouched).
+  // Removing a node deletes its segments. A pass-through node (exactly two segments)
+  // keeps the run: its two neighbours are rejoined by one segment (owner, 2026-09-29).
+  // A branch node (3+ segments) has no single way to rejoin, so its segments just go.
   removeConduitNode(id) {
     if (!this.conduitNodes.some((n) => n.id === id)) return;
+    const incident = this.conduitSegments.filter((s) => s.a === id || s.b === id);
     this.conduitNodes = this.conduitNodes.filter((n) => n.id !== id);
     this.conduitSegments = this.conduitSegments.filter((s) => s.a !== id && s.b !== id);
     for (const w of this.wires) w.via = (w.via || []).filter((v) => v !== id);
+    if (incident.length === 2) {
+      const [a, b] = incident.map((s) => (s.a === id ? s.b : s.a));
+      this.addConduitSegment(a, b, { emit: false }); // no-op when a === b or already joined
+    }
     this._emit();
   }
 
@@ -924,9 +937,35 @@ export class Project {
       id: nextWireId(), fromMarkerId, toMarkerId,
       type: WIRE_TYPES.includes(type) ? type : 'electrical', via: [],
     };
+    // A double-switch end starts on the rocker that controls the other end's light, if
+    // any (the switched leg); otherwise rocker 1. setWireRockers changes it.
+    if (this._controlRocker(from, to) === 2) wire.fromRocker = 2;
+    if (this._controlRocker(to, from) === 2) wire.toRocker = 2;
     this.wires.push(wire);
     this._emit();
     return { ok: true, wire };
+  }
+
+  _controlRocker(sw, light) {
+    if (sw.type !== 'switch_dual') return 1;
+    for (const f of this.floors) {
+      const link = (f.electricalLinks || []).find((l) =>
+        (l.kind || 'control') === 'control' && l.fromMarkerId === sw.id && l.toMarkerId === light.id);
+      if (link) return linkRocker(link);
+    }
+    return 1;
+  }
+
+  // Set the rocker each double-switch end of a wire lands on (1 or 2; ignored for an
+  // end that is not a double switch).
+  setWireRockers(id, fromRocker, toRocker) {
+    const wire = this.wires.find((w) => w.id === id);
+    if (!wire) return false;
+    const dual = (markerId) => this.findMarker(markerId)?.marker?.type === 'switch_dual';
+    if (dual(wire.fromMarkerId) && fromRocker === 2) wire.fromRocker = 2; else delete wire.fromRocker;
+    if (dual(wire.toMarkerId) && toRocker === 2) wire.toRocker = 2; else delete wire.toRocker;
+    this._emit();
+    return true;
   }
 
   removeWire(id) {

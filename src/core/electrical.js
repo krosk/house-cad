@@ -8,11 +8,17 @@
 
 // Switch fixtures: a single rocker, or a double switch as ONE marker (owner, 2026-09-28)
 // whose control links each name the rocker that drives the light (`link.rocker`, 1 or 2;
-// absent = 1). The earlier convention, a double switch as two stacked switch markers,
+// absent = 1). Rocker 1 is the LEFT one facing the switch, 2 the RIGHT; the UI and the
+// sheets say left/right (owner, 2026-09-29), storage keeps 1/2. The earlier convention, a double switch as two stacked switch markers,
 // still loads and works; MARKER · EDIT can merge such a pair (Project.mergeSwitchPair).
 export const isSwitch = (marker) => marker?.type === 'switch' || marker?.type === 'switch_dual';
 export const switchRockers = (marker) => (marker?.type === 'switch_dual' ? 2 : 1);
 export const linkRocker = (link) => (link?.rocker === 2 ? 2 : 1);
+// A WIRE ending on a double switch also names the rocker it lands on, per end
+// (`wire.fromRocker` / `wire.toRocker`, 2 or absent = 1; owner, 2026-09-29): the two
+// rockers may sit on independent circuits, so each is its own terminal in the circuit
+// graph (src/core/circuits.js), never one shared point.
+export const wireRocker = (wire, end) => ((end === 'from' ? wire?.fromRocker : wire?.toRocker) === 2 ? 2 : 1);
 
 // A control link's endpoints require compatible fixtures (switch → light).
 export function electricalLinkEndpoints(floor, link) {

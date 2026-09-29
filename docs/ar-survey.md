@@ -120,15 +120,20 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   new surveys). `switch_dual` is ONE marker (MARKER · EDIT type list, after `switch`) with its own glyph
   in AR, View 3D, the sheet and DXF (`MARKER_SWITCH_DUAL`). Each control link from it stores the rocker
   that drives the light (`link.rocker`, 1 or 2; absent = 1; `isSwitch`/`linkRocker` in
-  `src/core/electrical.js`). In **LINK**, a selected double switch starts on rocker 1 and
-  **thumbstick up/down swaps the rocker** (readout `PICK LIGHT · ROCKER 1/2`); its routes on the rocker
+  `src/core/electrical.js`). Rocker 1 is the **left** one facing the switch and 2 the **right**; every
+  UI string and the sheet say left/right (owner, 2026-09-29), storage keeps 1/2. In **LINK**, a selected
+  double switch starts on the left rocker and **thumbstick up/down swaps the rocker** (readout
+  `PICK LIGHT · ROCKER LEFT|RIGHT`); its routes on the rocker
   being linked are amber, the other rocker's pink, and its lights are outlined cyan / pink the same way.
-  Triggering a light already on the other rocker moves it to this one. The sheet puts a small `1`/`2`
-  chip on each double-switch leg near the switch. Retyping a double switch to a single one keeps its
-  links (rocker dropped). Only a two-rocker product fits it (MATERIAL · SWITCH filters the list).
+  Triggering a light already on the other rocker moves it to this one. The sheet puts a small `L`/`R`
+  chip on each double-switch leg near the switch. **Wires land on a rocker too** (owner, 2026-09-29: two
+  independent circuits wired through one double switch were joined into one, a false cross-tie): see
+  `docs/electrical-workflow.md` "Double switch: one terminal per rocker". Retyping a double switch to a
+  single one keeps its links and wires (rockers dropped, so its wires join one terminal again). Only a two-rocker product fits it (MATERIAL · SWITCH filters the list).
   **Converting an old pair:** select the double switch in MARKER · EDIT (retype one of the pair) and,
   when a plain switch sits at exactly its point and height, the readout offers `A/X: MERGE…`: A/X makes
-  that switch its rocker 2 (its lights, wires, conduit/pipe bindings move over; its dimensions go), see
+  that switch its right rocker (its lights and wires move over onto the right rocker, its conduit/pipe
+  bindings move over; its dimensions go), see
   `Project.mergeSwitchPair`. It is explicit because retyping steps through the type list, so an
   automatic merge would fire just by scrolling past DOUBLE SWITCH.
 - **Stacked devices** (owner decision, 2026-09-26; still loads and works). A double switch was authored as
@@ -213,7 +218,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
   immovable** (they follow their device) and have no pad. **B/Y deletes only the explicit selection**:
   a selected node + its incident segments, or a selected conduit segment alone (`deleteInMode` →
-  `removeConduitNode` / `removeConduitSegment`; `via` references are dropped). Readout: `PICK NODE / CONDUIT`,
+  `removeConduitNode` / `removeConduitSegment`; `via` references are dropped). A node with exactly two
+  segments is a pass-through, so its neighbours are **rejoined by one segment** and the run survives
+  (owner, 2026-09-29); a branch node (3+ segments) loses them all. Readout: `PICK NODE / CONDUIT`,
   then `EDIT NODE` or `CONDUIT SELECTED`.
 - **CONDUIT · DIMS** (`id: conduit_dims`) — dimension a **bare junction to a wall** so it tracks that
   wall on every edit. It shares the DIMS numpad machinery with PLAN/OUTLET DIMS via a third

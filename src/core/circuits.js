@@ -19,6 +19,13 @@
 //   ≥2 breakers→ a CONFLICT (an illegal cross-tie between breakers) — flagged, not owned
 //   0 breakers → UNASSIGNED (wired devices not yet traced back to a breaker) — benign
 //                during an incomplete survey, shown as "no circuit yet".
+//
+// A double switch is ONE marker but TWO terminals (owner, 2026-09-29): each rocker may
+// be on its own circuit, so a wire's end on a `switch_dual` joins the vertex of the
+// rocker it names (`wireRocker`), never the marker as a whole. Such a marker can then
+// belong to two components; `deviceIds` still lists marker ids.
+
+import { wireRocker } from './electrical.js';
 
 // A small, stable palette so each circuit reads distinctly in AR and (later) DXF layers.
 // NOTE: print sheets are monochrome by design — there, distinguish circuits by NUMBER
@@ -80,13 +87,20 @@ export function deriveCircuits(project, { type = 'electrical' } = {}) {
   // (all "unassigned"), used to highlight a selected Ethernet run's network.
   const power = type === 'electrical';
 
-  // Which markers touch a wire? Those + all breakers are the graph's vertices.
+  // Graph vertices are terminals: a marker id, or `id#2` for a double switch's rocker 2.
+  const terminal = (w, end) => {
+    const id = end === 'from' ? w.fromMarkerId : w.toMarkerId;
+    return byId.get(id).type === 'switch_dual' && wireRocker(w, end) === 2 ? `${id}#2` : id;
+  };
+  const markerOf = (key) => key.replace(/#2$/, '');
+
+  // Which terminals touch a wire? Those + all breakers are the graph's vertices.
   const touched = new Set();
-  for (const w of wires) { touched.add(w.fromMarkerId); touched.add(w.toMarkerId); }
+  for (const w of wires) { touched.add(terminal(w, 'from')); touched.add(terminal(w, 'to')); }
 
   const dsu = makeDSU();
   if (power) for (const m of markers) if (isBreaker(m)) dsu.find(m.id); // an unwired breaker = its own (empty) circuit
-  for (const w of wires) dsu.union(w.fromMarkerId, w.toMarkerId);
+  for (const w of wires) dsu.union(terminal(w, 'from'), terminal(w, 'to'));
 
   // Bucket everything into components keyed by DSU root.
   const comp = new Map();
@@ -94,14 +108,20 @@ export function deriveCircuits(project, { type = 'electrical' } = {}) {
     if (!comp.has(root)) comp.set(root, { deviceIds: [], wireIds: [], breakerIds: [] });
     return comp.get(root);
   };
-  for (const m of markers) {
-    const anchor = power && isBreaker(m);
-    if (!anchor && !touched.has(m.id)) continue; // isolated non-breaker markers aren't in any circuit
+  for (const m of markers) if (power && isBreaker(m)) {
     const c = ensure(dsu.find(m.id));
     c.deviceIds.push(m.id);
-    if (anchor) c.breakerIds.push(m.id);
+    c.breakerIds.push(m.id);
   }
-  for (const w of wires) ensure(dsu.find(w.fromMarkerId)).wireIds.push(w.id);
+  // Isolated non-breaker markers aren't in any circuit; a double switch wired on both
+  // rockers of one circuit is listed once.
+  for (const key of touched) {
+    const id = markerOf(key);
+    if (power && isBreaker(byId.get(id))) continue;
+    const c = ensure(dsu.find(key));
+    if (!c.deviceIds.includes(id)) c.deviceIds.push(id);
+  }
+  for (const w of wires) ensure(dsu.find(terminal(w, 'from'))).wireIds.push(w.id);
 
   // Classify components.
   const circuitComps = [];

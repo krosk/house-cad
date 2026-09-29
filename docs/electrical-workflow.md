@@ -118,6 +118,26 @@ breaker marker; membership is **derived, never stored**. Control links are delib
 `deriveCircuits(project)` returns `{ circuits, conflicts, unassigned, deviceCircuit,
 wireCircuit, circuitColor }`. It is pure and recomputed like wire routes.
 
+### Double switch: one terminal per rocker
+
+A `switch_dual` is one marker but two terminals (owner, 2026-09-29): its two rockers may be on
+independent circuits. Before this, a vertex was a marker, so wiring circuit A to one rocker and
+circuit B to the other joined them into one component: a false cross-tie. Now each wire end on a
+double switch names its rocker (`wire.fromRocker` / `wire.toRocker`: 2 = right, absent = 1 = left;
+`wireRocker` in `src/core/electrical.js`), and the circuit graph's vertex is `id` (left) or `id#2`
+(right). The marker then belongs to two components, and `deviceIds` lists it in both.
+
+- A new wire's double-switch end starts on the rocker that controls the other end's light (the
+  switched leg); otherwise on the left.
+- In `MARKER · WIRE`, **A/X on a selected wire** swaps its rocker (with both ends on double
+  switches, it steps through the four combinations). The readout shows `ROCKER LEFT|RIGHT`.
+- Merging an old two-marker pair puts the single switch's wires on the right rocker.
+- Retyping to a single switch drops the rockers, so its wires share one terminal again.
+- Wires created before 2026-09-29 all sit on the left rocker: to split a circuit that was already
+  surveyed, select the other circuit's wire at the switch and press A/X.
+- Deliberate limit: `unwired` in CHECK looks at the marker, so a double switch with only one
+  wired rocker is not flagged.
+
 In AR `MARKER · WIRE`, selecting any existing wire keeps that wire and its direct endpoints
 yellow, while every other wire and marker in its connected component turns green. Unrelated
 wires remain dim in their normal type color. This inspection works for a normal breaker-owned
