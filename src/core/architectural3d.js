@@ -615,11 +615,13 @@ export function finishGeometries(surfaces) {
     // The pattern frame of the takeoff (flooring.js): from the region's start corner
     // (`anchor`), planks swapped to their row axis (`alongX`), any other pattern turned
     // 90° when the region is (`patternTurn`: (u, v) = (y, −x)).
+    // A stepped pattern then moves by `frameOffset` inside that frame (flooring.js).
     const ax = region.anchor?.x || 0, ay = region.anchor?.y || 0;
+    const ox = region.frameOffset?.x || 0, oy = region.frameOffset?.y || 0;
     const uvOf = (x, y) => {
       const dx = x - ax, dy = y - ay;
       if (region.alongX === false) return [dy, dx];
-      return region.patternTurn ? [dy, -dx] : [dx, dy];
+      return region.patternTurn ? [dy + ox, -dx + oy] : [dx + ox, dy + oy];
     };
     for (const r of region.boxes) {
       const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];

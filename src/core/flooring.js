@@ -217,6 +217,81 @@ function pinwheelCount(material, boxes) {
   return { pieces: whole + cut, whole, cut, formats };
 }
 
+// Stepped random (owner spec, 2026-09-29): a 5-tile module of 30/50 cm tiles that is NOT a
+// rectangle, repeated on the oblique lattice m·A + n·B, so no joint line crosses a room
+// (longest straight joint 210 cm across, 110 cm along). [x, y, w, h] in nominal cm with the
+// spec's y DOWN; the pattern frame is plan (y up), so y is flipped once here (the top view
+// then matches the spec's drawing). det(A, B) = 7900 cm² = the module area: exact cover.
+// Cells are nominal (the joint is taken out of each tile, 5 mm on a 50 cm cell), unlike the
+// pinwheel whose pitch grows by its joints: this lattice has no joint-consistent pitch.
+export const STEPPED = {
+  tiles: [[0, 0, 30, 30], [30, 0, 50, 30], [0, 30, 50, 30], [50, 30, 50, 50], [20, 60, 30, 50]],
+  a: [80, -30], b: [50, 80],
+};
+// Lattice vectors and cells in the pattern frame, metres ({x0, y0, x1, y1, format}).
+export const steppedA = () => [STEPPED.a[0] / 100, -STEPPED.a[1] / 100];
+export const steppedB = () => [STEPPED.b[0] / 100, -STEPPED.b[1] / 100];
+export function steppedCells() {
+  return STEPPED.tiles.map(([x, y, w, h]) => ({
+    x0: x / 100, x1: (x + w) / 100, y0: -(y + h) / 100, y1: -y / 100,
+    format: `${Math.min(w, h)}×${Math.max(w, h)}`,
+  }));
+}
+const steppedArea = () => STEPPED.tiles.reduce((s, [, , w, h]) => s + w * h, 0) / 1e4;
+// Area centroid of the module (pattern frame): the point centred in a region.
+function steppedCentroid() {
+  let sx = 0, sy = 0, sa = 0;
+  for (const c of steppedCells()) {
+    const a = (c.x1 - c.x0) * (c.y1 - c.y0);
+    sx += a * (c.x0 + c.x1) / 2; sy += a * (c.y0 + c.y1) / 2; sa += a;
+  }
+  return { x: sx / sa, y: sy / sa };
+}
+// (x, y) → lattice coordinates (s, t) with (x, y) = s·A + t·B.
+export function steppedLattice(x, y) {
+  const [ax, ay] = steppedA(), [bx, by] = steppedB(), det = ax * by - ay * bx;
+  return [(x * by - y * bx) / det, (ax * y - ay * x) / det];
+}
+// Stepped: one piece per module cell the region touches, whole vs cut, per format.
+function steppedCount(boxes) {
+  const cells = steppedCells(), bb = bboxOf(boxes), [ax, ay] = steppedA(), [bx, by] = steppedB();
+  // Lattice range: the region's corners grown by the module's own extent (≤ 1.1 m).
+  const R = 1.2, ls = [[bb.x0 - R, bb.y0 - R], [bb.x1 + R, bb.y0 - R], [bb.x0 - R, bb.y1 + R], [bb.x1 + R, bb.y1 + R]]
+    .map(([x, y]) => steppedLattice(x, y));
+  const lo = (i) => Math.floor(Math.min(...ls.map((l) => l[i]))), hi = (i) => Math.ceil(Math.max(...ls.map((l) => l[i])));
+  const formats = {};
+  let whole = 0, cut = 0;
+  for (let m = lo(0); m <= hi(0); m++) {
+    for (let n = lo(1); n <= hi(1); n++) {
+      const ox = m * ax + n * bx, oy = m * ay + n * by;
+      for (const c of cells) {
+        const x0 = ox + c.x0, x1 = ox + c.x1, y0 = oy + c.y0, y1 = oy + c.y1;
+        if (x1 <= bb.x0 || x0 >= bb.x1 || y1 <= bb.y0 || y0 >= bb.y1) continue;
+        const a = overlapArea(boxes, x0, x1, y0, y1);
+        if (a < 1e-6) continue; // a sub-mm² touch needs no piece
+        const f = formats[c.format] || (formats[c.format] = { pieces: 0, whole: 0 });
+        f.pieces++;
+        if (a >= (x1 - x0) * (y1 - y0) * (1 - 1e-6)) { whole++; f.whole++; } else cut++;
+      }
+    }
+  }
+  return { pieces: whole + cut, whole, cut, formats };
+}
+// Where the stepped pattern frame sits in a region (added after the start-corner shift and
+// turn, see floorRegions): with a start corner, the corner of the module's 30×30 tile that
+// points into the room lands on it (a whole tile in the corner); without one, the module
+// centroid lands on the region's bounding-box centre (the spec's advice: balanced cuts on
+// opposite walls). `dir` = the corner's floor direction in the pattern frame.
+function steppedOffset(boxes, anchor, dir, turn) {
+  if (anchor) {
+    const t = steppedCells()[0];
+    return { x: dir[0] > 0 ? t.x0 : t.x1, y: dir[1] > 0 ? t.y0 : t.y1 };
+  }
+  const bb = bboxOf(boxes), cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2, c = steppedCentroid();
+  const [u, v] = turn ? [cy, -cx] : [cx, cy];
+  return { x: c.x - u, y: c.y - v };
+}
+
 // Planks: rows across the region's long axis at the global row phase. Each row is
 // laid left to right; a row starts with a pooled offcut when that keeps every joint
 // ≥ minStagger from the previous row's and the piece ≥ minPiece, else a fresh plank.
@@ -292,6 +367,10 @@ export function jointLengthPerM2(material) {
     const len = PINWHEEL.reduce((sum, [, , cw, ch]) => sum + (cw + ch) / 100, 0);
     return len / (1.3 * 1.3);
   }
+  if (pattern === 'stepped') {
+    const len = STEPPED.tiles.reduce((sum, [, , cw, ch]) => sum + (cw + ch) / 100, 0);
+    return len / steppedArea();
+  }
   if (pattern === 'octagon') {
     // Per lattice cell: half an octagon (8 sides) + half a cabochon (4 equal sides).
     const side = w / (1 + Math.SQRT2);
@@ -318,9 +397,11 @@ export function countPieces(material, boxes, { alongX } = {}) {
   if (!material || !boxes.length) return { area, pieces: 0 };
   if (material.pattern === 'paint' || !(material.w > 0 && material.h > 0)) return { area, pieces: 0 };
   const counted = material.pattern === 'stagger' ? staggerCount(material, boxes, alongX ?? plankAlongX(boxes))
-    : material.pattern === 'pinwheel' ? pinwheelCount(material, boxes) : latticeCount(material, boxes);
-  // Naive estimate beside it: area ÷ piece area + 10 % waste (pinwheel: the mean piece).
-  const piece = material.pattern === 'pinwheel' ? 1.69 / PINWHEEL.length : material.w * material.h;
+    : material.pattern === 'pinwheel' ? pinwheelCount(material, boxes)
+      : material.pattern === 'stepped' ? steppedCount(boxes) : latticeCount(material, boxes);
+  // Naive estimate beside it: area ÷ piece area + 10 % waste (mixed formats: the mean piece).
+  const piece = material.pattern === 'pinwheel' ? 1.69 / PINWHEEL.length
+    : material.pattern === 'stepped' ? steppedArea() / STEPPED.tiles.length : material.w * material.h;
   const naive = Math.ceil(area / piece * 1.1);
   return { area, ...counted, naive, grout: groutKg(material, area) };
 }
@@ -450,9 +531,18 @@ export function floorRegions(project, floor, { count = true } = {}) {
     // alongX: planks' row axis (the long axis, swapped by a turn); other patterns never swap.
     const alongX = plank ? plankAlongX(boxes) !== turn : true;
     const local = shiftBoxes(boxes, anchor);
+    const framed = turn && !plank ? turnBoxes(local) : local;
+    // A stepped pattern also moves within its frame (steppedOffset); the 3D UVs add the
+    // same `frameOffset`, so the picture and the count stay one layout.
+    let frameOffset = null;
+    if (material?.pattern === 'stepped') {
+      const d = anchor ? [anchor.corner[1] === 'l' ? 1 : -1, anchor.corner[0] === 'b' ? 1 : -1] : [1, 1];
+      frameOffset = steppedOffset(boxes, anchor, turn ? [d[1], -d[0]] : d, turn);
+    }
+    const pattern = frameOffset ? shiftBoxes(framed, { x: -frameOffset.x, y: -frameOffset.y }) : framed;
     return { floorId: floor.id, material: g.material, rectIds: g.rectIds, rects: g.rects, boxes, anchor,
-      turn, alongX, patternTurn: turn && !plank,
-      count: count ? countPieces(material, turn && !plank ? turnBoxes(local) : local, { alongX }) : null };
+      turn, alongX, patternTurn: turn && !plank, frameOffset,
+      count: count ? countPieces(material, pattern, { alongX }) : null };
   });
 }
 
@@ -571,7 +661,8 @@ export function wallFaceBoxes(floor, rect, edge) {
 export function finishSurfaces(project, floor) {
   const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
   const floors = floorRegions(project, floor, { count: false })
-    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: r.alongX, patternTurn: r.patternTurn }));
+    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: r.alongX, patternTurn: r.patternTurn,
+      frameOffset: r.frameOffset }));
   const walls = [];
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;

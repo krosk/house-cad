@@ -8,7 +8,7 @@
 // count comes from src/core/flooring.js, the picture only shows the product.
 
 import * as THREE from 'three';
-import { pinwheelCells, pinwheelPitch } from '../core/flooring.js';
+import { pinwheelCells, pinwheelPitch, steppedCells, steppedA, steppedB } from '../core/flooring.js';
 
 const css = (hex) => `#${(hex >>> 0).toString(16).padStart(6, '0')}`;
 const GROUT = 0xcbd5e1;
@@ -29,16 +29,23 @@ const OCT_CELLS = 4;
 // overrides it), so 36 different faces before the picture repeats.
 const PINWHEEL_MODULES = 2;
 const pinwheelModules = (m) => m.modules || PINWHEEL_MODULES;
+// Stepped designs: STEPPED_CELLS × STEPPED_CELLS lattice cells (one module each, so 45
+// different faces) in one square canvas, sheared back onto the plan by the texture matrix.
+const STEPPED_CELLS = 3;
 const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
   || (m.pattern === 'brick' && !!BRICK_DESIGNS[m.design])
   || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design])
   || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design])
-  || (m.pattern === 'pinwheel' && !!PINWHEEL_DESIGNS[m.design]);
+  || (m.pattern === 'pinwheel' && !!PINWHEEL_DESIGNS[m.design])
+  || (m.pattern === 'stepped' && !!PINWHEEL_DESIGNS[m.design]);
 
 // Repeat unit (metres) of a pattern. A `diagonal` octagon draws its straight unit turned
 // 45°: that repeats along plan x and y every √2 × the straight unit.
 export function patternUnit(m) {
   if (m.pattern === 'octagon' && m.diagonal) return straightUnit(m).map((u) => u * Math.SQRT2);
+  // Stepped: the texture repeats along the oblique lattice, not x/y (steppedTexture); its
+  // nominal unit = STEPPED_CELLS cells of the lattice's mean pitch (√det), for the detail layer.
+  if (m.pattern === 'stepped') return [STEPPED_CELLS * steppedPitch(), STEPPED_CELLS * steppedPitch()];
   return straightUnit(m);
 }
 function straightUnit(m) {
@@ -816,6 +823,60 @@ function paintPinwheel(ctx, m, W, H, ppm, bump) {
   if (design) grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 71) + 1), bump ? 0.2 : 0.09);
 }
 
+// ---- Stepped random (src/core/flooring.js STEPPED) --------------------------------------
+// Its smallest x/y-aligned repeat is 7.9 × 7.9 m (0.26 px/mm in 2048 px), so the texture
+// repeats along the lattice instead: the canvas is lattice space, (s, t) ∈ [0, N)² with the
+// plan point s·A + t·B, drawn through a shear (ctx transform) and mapped back by the
+// texture's own matrix (UV plan metres → (s/N, −t/N); the minus undoes the canvas flip).
+const steppedDet = () => { const [ax, ay] = steppedA(), [bx, by] = steppedB(); return ax * by - ay * bx; };
+const steppedPitch = () => Math.sqrt(Math.abs(steppedDet()));
+function steppedCanvas(m, bump) {
+  const N = STEPPED_CELLS, S = 2048, design = PINWHEEL_DESIGNS[m.design];
+  const ppm = (S / N) / steppedPitch(); // draw units per plan metre (area-true)
+  const [ax, ay] = steppedA(), [bx, by] = steppedB(), det = steppedDet();
+  // plan metres → lattice (s, t): the inverse of [A B]; canvas px = (S/N)·(s, t).
+  const k = S / N / ppm;
+  const toCanvas = [by / det * k, -ay / det * k, -bx / det * k, ax / det * k]; // a b c d (DOMMatrix order)
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.grout ?? GROUT);
+  ctx.fillRect(0, 0, S, S);
+  const cells = steppedCells(), jp = (m.joint || 0) * ppm, seed = m.seed ?? 71;
+  const px = (x, y) => [toCanvas[0] * x + toCanvas[2] * y, toCanvas[1] * x + toCanvas[3] * y];
+  const mod = (v) => ((v % N) + N) % N;
+  for (let mi = -2; mi <= N + 1; mi++) {
+    for (let ni = -2; ni <= N + 1; ni++) {
+      cells.forEach((c, i) => {
+        const x = (mi * ax + ni * bx + c.x0) * ppm + jp / 2, y = (mi * ay + ni * by + c.y0) * ppm + jp / 2;
+        const w = (c.x1 - c.x0) * ppm - jp, h = (c.y1 - c.y0) * ppm - jp;
+        const q = [px(x, y), px(x + w, y), px(x, y + h), px(x + w, y + h)];
+        if (q.every(([u]) => u < -4) || q.every(([u]) => u > S + 4)
+          || q.every(([, v]) => v < -4) || q.every(([, v]) => v > S + 4)) return; // off canvas
+        // One seed per (cell mod N, tile): a tile wrapped across the canvas edge draws the
+        // same face on both sides, so the repeat has no seam.
+        const r = rng(seed * 7919 + (mod(mi) * N + mod(ni)) * 31 + i * 7);
+        ctx.save();
+        ctx.setTransform(...toCanvas, 0, 0);
+        if (design) design(ctx, m, x, y, w, h, ppm, rng(Math.floor(r() * 1e9)), bump);
+        else { ctx.fillStyle = css(m.color); ctx.fillRect(x, y, w, h); }
+        ctx.restore();
+      });
+    }
+  }
+  if (design) grainPass(ctx, S, S, rng(seed + 1), bump ? 0.2 : 0.09);
+  return canvas;
+}
+function steppedTexture(m, bump, anisotropy) {
+  const t = new THREE.CanvasTexture(steppedCanvas(m, bump));
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = anisotropy;
+  const [ax, ay] = steppedA(), [bx, by] = steppedB(), det = steppedDet(), N = STEPPED_CELLS;
+  t.matrixAutoUpdate = false; // the shear is not an offset/repeat/rotation
+  t.matrix.set(by / det / N, -bx / det / N, 0, ay / det / N, -ax / det / N, 0, 0, 0, 1);
+  return t;
+}
+
 function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return paintDesign(ctx, m, W, H, ppm);
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return paintBrickDesign(ctx, m, W, H, ppm, false);
@@ -921,6 +982,11 @@ function repeatTexture({ canvas, uw, uh }, anisotropy) {
 // (paint) materials.
 export function finishTexture(m, anisotropy = 1) {
   if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
+  if (m.pattern === 'stepped') {
+    const t = steppedTexture(m, false, anisotropy);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
   const map = repeatTexture(unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm))), anisotropy);
   map.colorSpace = THREE.SRGBColorSpace;
   return map;
@@ -938,6 +1004,7 @@ export function finishBumpTexture(m, anisotropy = 1) {
   if (m?.pattern === 'pinwheel' && PINWHEEL_DESIGNS[m.design]) {
     return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintPinwheel(ctx, m, W, H, ppm, true)), anisotropy);
   }
+  if (m?.pattern === 'stepped' && PINWHEEL_DESIGNS[m.design]) return steppedTexture(m, true, anisotropy);
   if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
   return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);
 }

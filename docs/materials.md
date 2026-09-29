@@ -69,7 +69,7 @@ later `herringbone`. `pack` is pieces per box or m² per box.
   length per m² × joint width × depth × 1.6 kg/dm³. That is the usual manufacturer formula
   `(A + B) / (A × B) × C × D × 1.6` for a rectangular tile (a 30×30 tile, 3 mm joint, 10 mm deep =
   0.32 kg/m², matching it), generalised per pattern: pinwheel = Σ (w + h) of the 9 cells per 1.69 m²
-  (4.62 m/m²), octagon + cabochon = 6 sides per lattice cell, a mosaic sheet = its sticks. Depth = the
+  (4.62 m/m²), stepped = Σ (w + h) of the 5 cells per 0.79 m² (5.06 m/m²), octagon + cabochon = 6 sides per lattice cell, a mosaic sheet = its sticks. Depth = the
   tile thickness (full-depth joint), 10 mm for products with none. ρ = 1.6 is a typical cement grout,
   not a chosen product: the bag's own coverage wins. No waste margin; plank (click) floors, paint and
   joint-free products have none. AR shows it only for the room being looked at, on its quantity line
@@ -118,6 +118,7 @@ later `herringbone`. `pack` is pieces per box or m² per box.
 - **Pinwheel (30/50 opus)**: count the module cells (9 per 1.30 m module, `PINWHEEL`) that
   intersect the region, whole vs cut, per format (50×50, 30×50, 30×30); each format is its own
   article and box, so whole-house packs need every format's box size (`pack.formats`).
+- **Stepped random**: the same per-format count over the oblique lattice copies (`steppedCount`).
 - **Walls**: net face area = face length × height, minus door and window openings on that face
   (their `sill/head` bands are known). Paint = m²; tile = the lattice count on the face rectangle.
 - Implementation limits (v1):
@@ -293,7 +294,36 @@ column of the module crosses three tiles, so the pitch is 1.30 m + 3 joints (1.3
 anchored at the plan origin (or the region's start corner) like every pattern. `w = h = 1.3` (the module). The texture unit is
 2 × 2 modules (`m.modules`), 36 different faces, about 0.78 px/mm; `PINWHEEL_DESIGNS` draws each tile.
 
-- `monastere_beige_pinwheel`: Leroy Merlin Monastère beige, glazed matte porcelain, aged limestone
+No catalog product uses the pinwheel since 2026-09-29 (Monastère moved to the stepped layout below);
+the code stays, as a documented owner layout.
+
+## Stepped random (mixed 30/50 cm tiles, no continuous joint)
+
+`pattern: 'stepped'` (owner spec, 2026-09-29, replacing the pinwheel on Monastère): a 5-tile module
+that is not a rectangle, `[x, y, w, h]` cm with the spec's y down: (0,0,30×30), (30,0,50×30),
+(0,30,50×30), (50,30,50×50), (20,60,30×50), repeated at `m·A + n·B`, A = (80, −30), B = (50, 80).
+The layout lives once in `src/core/flooring.js` (`STEPPED`, `steppedCells`); the pattern frame is
+plan (y up), so y is flipped there and the top view matches the spec's drawing.
+- **Proven** (raster test and Node takeoff, 2026-09-29): exact cover (det = 7900 cm² = the module
+  area; clipped tiles sum to the region area); longest straight joint 210 cm across, 110 cm along;
+  a 20 × 20 m room counts 1.32 50×50, 3.92 30×50 (both ways) and 1.29 30×30 per m², the spec's
+  1.27 / 3.80 / 1.27 plus edge cuts.
+- **Placement:** with a start corner, the module's 30×30 lands whole in that corner; without one, the
+  module centroid sits at the region's bounding-box centre (the spec's advice: balanced cuts), not
+  at the plan origin. `floorRegions` returns it as `frameOffset`, which the takeoff and the 3D UVs
+  (`finishGeometries`) both add, after the start-corner shift and the turn.
+- **Joints:** cells are nominal and the joint comes out of each tile (a 50 cm cell holds a 49.5 cm
+  tile at 5 mm). This lattice has no joint-consistent pitch (a 30 and a 50 would each need their own
+  scale), unlike the pinwheel.
+- **Texture:** the smallest x/y repeat is 7.9 × 7.9 m (0.26 px/mm in 2048 px), so the texture repeats
+  along the lattice instead. `steppedCanvas` draws 3 × 3 lattice cells (45 faces) through a shear, and
+  the texture's own `matrix` maps plan metres to lattice coordinates (`matrixAutoUpdate = false`):
+  about 0.77 px/mm, like the old pinwheel unit. The detail layer samples the same sheared UVs, so the
+  grain is skewed by about 11°, which does not show on random grain. **Proven** in a Chrome render: tile
+  joints on the takeoff's outlines, no seam at the wrap. Paint takes about 0.65 s on desktop Chrome.
+
+- `monastere_beige_pinwheel` (id kept from the pinwheel so saved finishes resolve; laid `stepped`):
+  Leroy Merlin Monastère beige, glazed matte porcelain, aged limestone
   look. Three articles, each with its own box (the takeoff counts and boxes each size):
 
   | Size | Ref | Box |
@@ -372,7 +402,7 @@ anchored at the plan origin (or the region's start corner) like every pattern. `
 ## Detail layer (View 3D close-ups)
 
 - **Why:** a finish's texture is one repeat unit in at most 2048 px (`unitCanvas`). On a 2–3 m unit
-  that is under 1 px/mm: the Monastère unit (2 × 2 modules, 2.63 m) gets 0.78 px/mm and Lucia 0.76, so
+  that is under 1 px/mm: the Monastère unit (then 2 × 2 pinwheel modules, 2.63 m) got 0.78 px/mm and Lucia 0.76, so
   sub-mm pits and flecks became 1 px dots and blurred to mush up close. Owner noticed, 2026-09-27.
   The earlier checks hid it: photos were compared after shrinking them to the texture's scale.
 - **How:** a design listed in `DETAIL_DESIGNS` (`finishTextures.js`) draws its fine grain once on a

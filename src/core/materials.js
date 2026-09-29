@@ -6,17 +6,19 @@
 //
 //   pattern  stagger (planks: rows, offcut starts the next row) | grid | brick (rows
 //            offset half a piece) | octagon (octagon + cabochon at each lattice corner)
-//            | pinwheel (30/50 cm opus module of 9 tiles, w = h = the module) | paint (area only)
+//            | pinwheel (30/50 cm opus module of 9 tiles, w = h = the module)
+//            | stepped (30/50 cm 5-tile module on an oblique lattice, flooring.js STEPPED;
+//              w/h = the module's bounding box, informative) | paint (area only)
 //   w, h     piece size in metres (octagon: w = octagon width); joint in metres
 //   diagonal octagon only: the pattern turned 45°, cabochons square to the walls
 //   surface  floor | wall | both
 //   pack     { pieces } per box, or { area } m² per pack (paint), or { formats: { '50×50': n } }
-//            pieces per box for each format of a pinwheel
+//            pieces per box for each format of a pinwheel or stepped layout
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
 //            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
 //            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
 //            sheet of `mosaic` = [cols, rows] sticks, with a bump map; octagon: 'porcelain-matte',
-//            accent = the tozzetto colour, `grout` = the joint colour; pinwheel: 'aged-stone',
+//            accent = the tozzetto colour, `grout` = the joint colour; pinwheel/stepped: 'aged-stone',
 //            accent = cloud, `light`, `pit`, `grout`, `edgeWobble` m); `roughness` optional (3D)
 //
 // Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
@@ -141,18 +143,20 @@ export const BUILTIN_MATERIALS = [
     //   50×50 ref 72831325: box 5 tiles = 1.25 m²
     //   30×50 ref 72831311: box 7 tiles = 1.05 m²
     //   30×30 ref 72831304: box 12 tiles = 1.08 m²
-    // The owner lays all three as a pinwheel (src/core/flooring.js PINWHEEL, 2026-09-27), so
-    // w/h = the 1.30 m module and the takeoff counts each format. Colours: the retailer's
+    // The owner lays all three in the "stepped random" layout (src/core/flooring.js STEPPED,
+    // owner spec 2026-09-29, replacing the 2026-09-27 pinwheel: no joint line crosses a room);
+    // the id keeps its old name so saved finishes still resolve. w/h = the module's 1.0 × 1.1 m
+    // bounding box; the takeoff counts each format. Colours: the retailer's
     // straight tile photos (50×50 media 1165024, 30×50 989865, 30×30 1182128) for the base
     // and spread, the owner's showroom photo (2026-09-27, not stored) for the greige tone, the
     // cream grout and the even surface, and the laid mixed-format render (4237191) for the
     // pillowed, round-cornered edges.
-    id: 'monastere_beige_pinwheel', surface: 'floor', pattern: 'pinwheel', design: 'aged-stone',
-    w: 1.3, h: 1.3, joint: 0.005, thickness: 0.009, edgeWobble: 0.003,
+    id: 'monastere_beige_pinwheel', surface: 'floor', pattern: 'stepped', design: 'aged-stone',
+    w: 1.0, h: 1.1, joint: 0.005, thickness: 0.009, edgeWobble: 0.003,
     color: 0xd4cfc3, accent: 0xb3a288, light: 0xe4e0d6, pit: 0x8f7f6c, rust: 0xa86a3c, grout: 0xe6dfcd,
     roughness: 0.8, bumpScale: 3,
     pack: { formats: { '50×50': 5, '30×50': 7, '30×30': 12 } },
-    name: { en: 'Monastère beige stone, pinwheel 30/50', fr: 'Monastère effet pierre beige, opus 30/50', zh: 'Monastère 米色石纹 风车铺 30/50' },
+    name: { en: 'Monastère beige stone, stepped 30/50', fr: 'Monastère effet pierre beige, opus décalé 30/50', zh: 'Monastère 米色石纹 错阶铺 30/50' },
   },
   {
     // Lapeyre Ange-Line aluminium entrance door, made to measure; RAL 7016-like
