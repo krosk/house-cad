@@ -18,12 +18,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-29 (session 34)
-**Status:** Proven (git): `origin/main` = `26aa3f2` plus this handoff's commit, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl): the live
-`version.json` serves `26aa3f2`. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
+**Date:** 2026-09-30 (session 35)
+**Status:** Proven (git): `origin/main` = `ba33078` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl, at handoff
+time): the live `version.json` served `d481128`; the `ba33078` deploy (material card) had not landed
+yet, so re-check. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
 flow, the 3D-only AR view, FURNISH's removal (session 32) and the floor pattern **start corner**
-(session 33). Everything else from sessions 30–34 is verified by build, Node or a scratch/desktop
+(session 33). Everything else from sessions 30–35 is verified by build, Node or a scratch/desktop
 browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
@@ -59,32 +60,39 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 34
+## What changed in session 35
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Session 33 is folded into the sections below.
+> decisions" or "Findings" and delete this list. Session 34 is folded into the sections below.
 
-1. **PERF:** a `mat` layer in the sweep (`4e080fc`). The owner's reading in MARKER · CONDUIT was
-   30 fps, conduits 12 ms, zones 12 ms, everything else < 2 ms, 350 draw calls. Fix: the adjacent-floor
-   dots became InstancedMeshes (`0110e85`), and the LINK routes one `LineSegments` (`42aa336`). **Not
-   re-measured since.** Hypothesis: the `zones` 12 ms is a vsync-quantisation artefact.
-2. **Overlap count badge** (`0110e85`): an amber "2"/"3" on AR marker icons drawn on top of each other
-   (owner chose a badge over drawing them apart).
-3. **Double switch marker `switch_dual`** (`42aa336`, owner chose "new marker type"): one marker, links
-   carry `rocker: 2` (absent = 1). In LINK the thumbstick swaps the rocker; the other rocker's routes
-   show pink. In MARKER · EDIT, A/X on a `switch_dual` merges an old two-marker pair into it (never on
-   retype: scrolling the type list past it would merge). Sheet, DXF (`MARKER_SWITCH_DUAL`) and 3D
-   faceplate are included. Detail: `docs/ar-survey.md` "Double switch marker".
-4. **Sticky grip cycling in MARKER · CONDUIT** (`283ba28`): grip chooses a target (runs included) and it
-   stays chosen while it's under the reticle; the ring order is stable (kind, z high→low, key).
-5. **0.1 mm length grid** (`7babb98`, owner: "fine with going integer"): the owner's EDIT grip jumped
-   at a stack whose Ethernet was 10⁻¹⁷ m off its switches. Every stored length is now snapped
-   (`snapM`, rule in `CLAUDE.md` "Units"). Proven on both house files: 0 new conflicts, ≤ 0.05 mm
-   moves, only that stack changed.
-6. **Monastère laid "stepped random"** (`26aa3f2`, owner spec): a 5-tile module on the oblique lattice
-   A = (80, −30), B = (50, 80) cm; no joint crosses a room. The id `monastere_beige_pinwheel` is kept.
-   Without a start corner a module is centred in the region. The texture repeats along the lattice
-   (a sheared texture matrix). Detail: `docs/materials.md` "Stepped random".
+All owner requests; all build-verified, none walked on the Quest yet (Next step A).
+1. **Double switch on two circuits** (`948c5ed`): wiring two independent circuits through one
+   `switch_dual` joined them (a false cross-tie: circuits were components over marker ids). A wire end on
+   a double switch now names its rocker (`wire.fromRocker`/`toRocker`, 2 = right, absent = left); the
+   circuit vertex is `id` or `id#2`. A new wire starts on the rocker controlling the other end's light;
+   **A/X on a selected wire in MARKER · WIRE swaps it**. The pair merge puts the old single's wires on
+   the right rocker. Owner asked for **left/right instead of 1/2** in every UI string and the sheet chip
+   (`L`/`R`); storage keeps 1/2. Proven in Node (2 breakers → 2 circuits, 0 cross-ties).
+   Wires drawn before this sit on the left rocker: the owner splits them with A/X.
+2. **Deleting a pass-through conduit node rejoins its neighbours** (`948c5ed`): exactly two segments →
+   one A–B segment; a branch node (3+) still loses them all. Proven in Node.
+3. **Shared grip cycle with an `i/n` readout** (`10c320a`): `gripCycle` in `mr.js` drives MARKER · EDIT,
+   LINK, WIRE, CONDUIT · EDIT and MATERIAL · SWITCH/OUTLET/ETHERNET (MARKER · CONDUIT keeps its own
+   `conduitPickRing`). Sticky target, grip steps a fixed ring, last yellow readout line `<type> i/n`.
+   **EDIT now cycles every marker in the reticle** (owner: "align with the new way"), not only an
+   exact-point stack. This supersedes session 34's conduit-only sticky pick and its B⁗ option.
+4. **FLOOR calibration keeps the teleport** (`a031a0c`): FLOOR called `placeAt` (a fresh registration:
+   clears `navOffset`, `navLift`, resets `anchorYaw`), sending the owner back to the origin. `regroundAt`
+   now changes only the height and folds `anchorYaw` into `planYaw`. ORIGIN/RECAL still clear it.
+5. **Controller pills widen to fit** (`d481128`): long material names were cut off. The mode label and
+   readout pills grow from 256 to 576 canvas px (readout up to 0.45 m) before shrinking the font. 576 comes
+   from glyph advances read from the font files (longest name 468 px Noto / 532 px DejaVu at 16 px, text
+   area 536). The **help box** also overflows (~15 help texts > 8 lines, estimate); the owner said no need.
+6. **Material card** (`ba33078`, owner chose option 1 of 3): in MATERIAL modes the LEFT grip shows the
+   target's material instead of the sheet: a texture patch with a scale bar (floor/wall), or the product
+   in 3D on a turntable (door, window, device, furniture), built after a 0.3 s rest. `src/ui/materialCard.js`;
+   finish textures now one shared cache (`finishMapFor`) with the AR 3D view. Rendered in a desktop
+   preview (not furniture). Detail: `docs/ar-survey.md` "Material card".
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -113,9 +121,14 @@ Read `docs/product-intent.md` before planning AR work.
   Windows-only.
 - **Circuits are derived per wire nature**; Ethernet never counts toward breakers. CHECK flags only
   `needsPower` devices (outlet*/switch/light), and never flags spare breakers (owner choices).
-- **A double switch is one `switch_dual` marker** with per-rocker links (owner, 2026-09-28); older
-  two-marker pairs still load and work, and A/X in MARKER · EDIT merges one. Never draw stacked markers
-  apart in AR; a count badge shows the overlap.
+- **A double switch is one `switch_dual` marker** with per-rocker links (owner, 2026-09-28) and
+  **per-rocker wire ends** (2026-09-29: each rocker may be its own circuit); rockers read **left/right**
+  in the UI (1 = left facing the switch), storage keeps 1/2. Older two-marker pairs still load and work,
+  and A/X in MARKER · EDIT merges one (never on retype). Never draw stacked markers apart in AR; an
+  amber count badge shows the overlap (owner's choice).
+- **One grip cycle for every picking mode** (`gripCycle`, owner 2026-09-29): sticky target, grip steps
+  a fixed ring, `i/n` shown when 2+ targets. A new picking mode should use it, not its own distance sort
+  (a distance-sorted "next after" jumps with the hand).
 - **Every stored length is on a 0.1 mm grid** (`CLAUDE.md` "Units"): a new stored length field must
   be added to `Project._snapToGrid`; `===` on stored coordinates is then safe.
 - **Materials** (`docs/materials.md`):
@@ -143,8 +156,9 @@ Read `docs/product-intent.md` before planning AR work.
   stored as `marker.product` (not a finish, carried by view links), switch products on switches,
   outlet products on `outlet` / `outlet_appliance`, Ethernet products on `ethernet` only (not
   `ethernet_dual` / `camera_ethernet`). **Model only the visible parts** (plate, rocker, socket), never the in-wall
-  mechanism. A double switch stays two markers; a multi-rocker product is set on the whole stack and
-  drawn once. Where targets overlap, **grip cycles them before the trigger selects** (owner).
+  mechanism. A `switch_dual` takes only a two-rocker product; on an old two-marker pair a multi-rocker
+  product is set on the whole stack and drawn once. Where targets overlap, **grip cycles them before
+  the trigger selects** (owner).
 - **Catalog entries for the owner's real products replace generic placeholders** when the owner says
   so (`octagon_200` removed for Etruria). A saved finish naming a removed id shows as no material:
   every `materialById` caller handles null.
@@ -164,7 +178,8 @@ Read `docs/product-intent.md` before planning AR work.
 - **PASSAGE** (owner, 2026-09-27): an open doorway between two rooms; floors meet at its middle like
   a door; no leaf, nothing to rotate.
 - **The controller readout holds up to 6 lines** (tighter pitch past 4); a mode that needs more must
-  condense, as the mixed-format house line does (`HOUSE 8 · 4 · 2 packs`).
+  condense, as the mixed-format house line does (`HOUSE 8 · 4 · 2 packs`). Pills **widen** to fit up to
+  `LABEL_MAX_W` (576 px) before the font shrinks (owner, 2026-09-30); no marquee (per-frame uploads).
 - **Doors are drawn open in both View 3D and the AR 3D view** (owner, 2026-09-27; AR was closed
   until then). `main.js` and `mr.js` both pass `openDoors` / `open`.
 - **A mixed-format product counts and boxes each size separately** (each is its own article): `pack:
@@ -178,8 +193,11 @@ Read `docs/product-intent.md` before planning AR work.
   - sheets/DXF print the rectangle plus a front notch;
   - furniture solves one-way after the structure;
   - an over-specified furniture dimension is **deleted, never shown as a conflict**.
-- **LEFT controller:** trigger = teleport, grip = hold-to-view sheet, stick-x = rotate plan, stick-y =
-  storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the stick click are free.
+- **LEFT controller:** trigger = teleport, grip = hold-to-view sheet (**material card in MATERIAL
+  modes**), stick-x = rotate plan, stick-y = storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the
+  stick click are free.
+- **FLOOR changes only the ground height** (owner, 2026-09-30): it keeps the teleport and the plan's
+  world yaw; only ORIGIN/RECAL re-register.
 
 ## Findings / traps worth knowing
 
@@ -216,6 +234,19 @@ Read `docs/product-intent.md` before planning AR work.
   pixels with `getImageData` in the tab is enough to prove layout. The javascript tool returns a bare
   async IIFE as `{}` (prefix `await`) and blocks output containing a query string. Stop
   scratch Vite servers by port (`ss -ltnp | grep :5190`), not `pkill -f` (it kills its own shell).
+- **Scratch previews of AR UI code** (session 35 pattern): a Vite config in the scratchpad (`root` = the
+  scratch dir, `resolve.alias.three` → the project's `node_modules/three`, `server.fs.allow` both dirs,
+  plain HTTP on :5190) lets a page import `/@fs/…/src/ui/*.js` directly, e.g. `materialCard.js` with real
+  finish textures and product builders, then POST the canvas to the :5191 receiver.
+- **HUD panels live in three's transparent pass** (order 90 sheet/card, 100 HUD, 110 pointer): world
+  overlays ignore depth and draw in that pass too. An opaque panel would be drawn first and painted
+  over; an opaque model on a transparent panel is painted over by the panel. The material card clones
+  its model's materials as transparent (never mutate shared product/AR 3D materials).
+- **`placeAt` is a fresh registration**: it resets `navOffset`, `navLift` and `anchorYaw`. Anything that
+  only re-anchors (FLOOR) goes through `regroundAt`.
+- **Measuring text width without a browser:** Node has no canvas; read glyph advances from
+  `/usr/share/fonts/noto/NotoSans-Bold.ttf` or DejaVu Sans Bold (a ~40-line Python `cmap`/`hmtx` parser,
+  no fontTools here). A per-character average is not good enough (not monospace).
 - **Browser checks of the app:** Chrome shows an error page for the dev server's self-signed HTTPS, so
   serve `dist/` over plain HTTP (e.g. `python3 -m http.server 5192 -d dist`). The window can't be
   resized here: load the app in a 390 × 844 iframe for phone width. The app's service worker then
@@ -250,6 +281,9 @@ Read `docs/product-intent.md` before planning AR work.
 - **A pattern that looks the same after a 90° turn** (pinwheel, octagon) is unchanged by the floor
   turn; a UV x↔y swap is a **mirror**, not a turn, which is why only planks may swap.
 - **No PIL here**: dump pixels with `ffmpeg -f rawvideo -pix_fmt gray|rgb24` and read them in Python.
+- **Circuits over a `switch_dual`:** vertices are terminals (`id`, `id#2`); a double switch can sit in
+  two components and `deviceIds` lists it in both. CHECK's `unwired` looks at the marker, so one wired
+  rocker hides the other (deliberate limit).
 - **Float noise:** stored lengths are on the 0.1 mm grid since `7babb98`, but values computed from
   them (x + w, pin + value) are not, unless they go through `snapM`. Grids built from edges also
   snap (`snap()` in `architectural3d.js`).
@@ -268,6 +302,9 @@ Read `docs/product-intent.md` before planning AR work.
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
+  grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
+  card.
 - **Session 34:** `4e080fc` PERF `mat` layer · `0110e85` adjacent dots batched + overlap badge ·
   `42aa336` double switch marker + LINK batch · `283ba28` conduit sticky grip · `7babb98` 0.1 mm grid
   · `26aa3f2` Monastère stepped layout.
@@ -329,6 +366,12 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 35: the material card (LEFT grip in each MATERIAL mode; paint stall when flicking? debug
+    log `material card` ms; a furniture card); the widened pills (a long French name reads whole; is a
+    0.45 m pill too big?); teleport then FLOOR (stays put, plan doesn't turn); the `i/n` line in EDIT,
+    LINK, WIRE, CONDUIT, CONDUIT · EDIT and MATERIAL devices (EDIT at the 132 cm Ethernet stack: no
+    jump); A/X rocker swap on a wire to the double switch, then CHECK shows no cross-tie; deleting a
+    node mid-run in CONDUIT · EDIT;
   - session 34: Monastère stepped with LEFT X (centred module, a 30×30 in a start corner, no seams,
     first-draw delay); MARKER · EDIT grip on the Ethernet/switch stack (badge "3"); CONDUIT grip
     cycling; the double switch (LINK rocker swap, A/X merge); **PERF in CONDUIT again** (did the
@@ -369,8 +412,12 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   - start corner / turn for wall faces (floors only today);
   - a plank texture drawn from the real cut plan;
   - the hidden face below a half wall that stands inside a room (still counted in the wall area).
-- **B⁗ — Sticky pick for CONDUIT · EDIT and WIRE**, offered in session 34, only if the owner reports
-  the same jitter there (MARKER · CONDUIT's fix is `283ba28`).
+- ~~**B⁗ — Sticky pick for CONDUIT · EDIT and WIRE**~~ — done in session 35 as the shared `gripCycle`
+  (`10c320a`), which also covers EDIT, LINK and MATERIAL devices.
+- ~~Help box overflow (grow + smaller font, or one line per control)~~ — offered in session 35; the
+  owner said no need. ~15 help texts exceed its 8 lines (estimate), mostly FR.
+- **B⁗′ — Material card extras**, not asked for: a thumbnail beside the readout (option 2), piece size
+  and pack on the card, the AR 3D view on the target (option 3 already exists as LEFT X).
 - **C — Conduit-drawing speed-ups:** height snap + "ceiling run" toggle, straight runs, one-press drop
   from a device, snap-to-wall + auto-pin. The owner decides priority.
 - **D — Remaining AR per-object layers**, only if a mode drops frames (adjacent-floor spheres, pipes,
@@ -383,7 +430,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Sessions 32–34: everything in Next step A's first three bullets.
+- **Unwalked, Hypothesis only.** Sessions 32–35: everything in Next step A's first four bullets.
+  Session 35: the card's paint time on the Quest (five cards ~1 s on desktop) and a furniture card
+  (not previewed); the Quest's `sans-serif` font (likely Roboto, narrower than the fonts measured);
+  **PERF in MARKER · CONDUIT is still not re-measured** since session 34's batching.
   Session 34: the stepped Monastère's joint comes out of nominal cells (tiles drawn 5 mm under
   size); the texture's paint time on the Quest (0.65 s per map on desktop); the plan sheet grouping
   the Ethernet into its stack now that coordinates are equal (SVG not looked at).
