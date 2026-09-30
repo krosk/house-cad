@@ -2782,11 +2782,14 @@ export function setupMR(view, project, getFootprint) {
   // stable order (kind, then id) so repeated grips walk the whole stack once round
   // whatever the jitter does to the distances.
   let conduitCandidates = [], conduitHoverKey = null;
+  function conduitPickRing() {
+    const KIND_RANK = { marker: 0, node: 1, segment: 2 };
+    return [...conduitCandidates].sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]
+      || b.z - a.z || a.key.localeCompare(b.key));
+  }
   function nextConduitPickKey() {
     if (conduitCandidates.length < 2) return null;
-    const KIND_RANK = { marker: 0, node: 1, segment: 2 };
-    const ring = [...conduitCandidates].sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]
-      || b.z - a.z || a.key.localeCompare(b.key));
+    const ring = conduitPickRing();
     const i = ring.findIndex((c) => c.key === conduitHoverKey);
     return ring[(i + 1) % ring.length].key;
   }
@@ -2891,14 +2894,9 @@ export function setupMR(view, project, getFootprint) {
     candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
       || (a.kind === b.kind ? 0 : a.kind === 'node' ? -1 : 1)
       || b.z - a.z || a.order - b.order);
-    if (!candidates.length) return null;
-    // Reticle jitter may reorder this distance-sorted list. Preserve the current
-    // highlight whenever it is still present; only an explicit grip cycles it.
-    if (cycleAfterKey) {
-      const current = candidates.findIndex((candidate) => candidate.key === cycleAfterKey);
-      return candidates[current < 0 ? 0 : (current + 1) % candidates.length];
-    }
-    return candidates.find((candidate) => candidate.key === currentKey) || candidates[0];
+    // Reticle jitter may reorder this distance-sorted list: gripCycle keeps the
+    // current highlight while present and steps a fixed ring on grip.
+    return gripCycle(candidates, currentKey, cycleAfterKey);
   }
 
   // Live conduit-node drag, mirroring the waypoint drag: 'direct' carries the node
@@ -3257,7 +3255,8 @@ export function setupMR(view, project, getFootprint) {
   // MATERIAL · SWITCH / OUTLET: device markers of the active floor (DEVICE_SURFACE picks
   // which marker types each takes); grip cycles overlapping ones (a stack at one plan
   // point, or neighbours inside the reticle) before trigger selects.
-  let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null;
+  let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null; // after = one-shot grip request
+  let matDeviceHoverId = null; // the sticky yellow device (gripCycle)
   const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet' }; // mode → catalog surface
   const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
   // Zone material modes → the zone kind they edit (door/window: that materials surface;
@@ -3442,18 +3441,10 @@ export function setupMR(view, project, getFootprint) {
     }
     return best;
   }
-  // Device markers (of `surface`) within the reticle, nearest first, then top to bottom
-  // and authoring order; `afterId` (a grip) advances to the next candidate so an
-  // overlapped device (a double switch is two markers at one plan point) can be reached.
-  function matDeviceAt(px, py, surface, afterId = null) {
-    const candidates = project.markers
-      .map((marker, order) => ({ marker, order, d: Math.hypot(px - marker.x, py - marker.y) }))
-      .filter(({ marker, d }) => DEVICE_SURFACE[marker.type] === surface && d <= RETICLE_OUTER)
-      .sort((a, b) => a.d - b.d || (b.marker.z || 0) - (a.marker.z || 0) || a.order - b.order)
-      .map(({ marker }) => marker);
-    if (!candidates.length) return null;
-    const i = candidates.findIndex((m) => m.id === afterId);
-    return candidates[i < 0 ? 0 : (i + 1) % candidates.length];
+  // Device markers (of `surface`) within the reticle, in the shared grip cycle
+  // (gripCycle): a grip reaches an overlapped device (e.g. a stack at one plan point).
+  function matDeviceAt(px, py, surface, currentId = null, afterId = null) {
+    return gripCycle(markerPickCandidates(px, py, (m) => DEVICE_SURFACE[m.type] === surface), currentId, afterId);
   }
   function matDeviceCandidates(marker) {
     return marker ? project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
@@ -4144,7 +4135,8 @@ export function setupMR(view, project, getFootprint) {
   let roomComponentCache = null;
   let roomAreaHud = null;   // m² shown in the info panel for the selected room component
   let selectedMarker = null; // OUTLET mode: marker being height-edited
-  let markerEditPickAfterId = null;
+  let markerEditPickAfterId = null; // one-shot grip request (gripCycle)
+  let hoverMarkerKey = null; // the sticky yellow marker of EDIT / LINK (gripCycle)
   let hoverMarker = null;    // OUTLET mode: marker under the pointer this frame
   let hoverStackInfo = null; // markerStackInfo() of the hovered marker when it shares its point
   let selectedLinkSwitch = null; // MARKER · LINK source; targets are toggled lights
@@ -4154,6 +4146,12 @@ export function setupMR(view, project, getFootprint) {
   let wireFromMarker = null;
   let wireEndpointPickAfterKey = null; // one-shot grip-cycle request (consumed per frame)
   let wireHoverKey = null; // the sticky yellow MARKER · WIRE target ('marker:<id>' / 'wire:<id>')
+  // The hovered target's place in the mode's grip cycle, shown as a yellow `<what> i/n`
+  // readout line when 2+ targets share the reticle (owner request): WIRE, CONDUIT and
+  // CONDUIT · EDIT set it each frame. { mode, label, index, size } or null.
+  let gripPick = null;
+  const GRIP_PICK_MODES = new Set(['marker', 'marker_link', 'marker_wire', 'marker_conduit', 'conduit_edit',
+    'mat_switch', 'mat_outlet', 'mat_ethernet']);
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
@@ -6152,52 +6150,63 @@ export function setupMR(view, project, getFootprint) {
   // advances.
   function wireTargetAtFloorPoint(px, py, currentKey = null, afterKey = null, withWires = true) {
     const candidates = [
-      ...wireMarkerCandidates(px, py).map((c) => ({ ...c, kind: 'marker' })),
+      ...wireMarkerCandidates(px, py).map((c) => ({
+        ...c, kind: 'marker', x: c.marker.x, y: c.marker.y, order: c.floorOrder * 100000 + c.order,
+      })),
       ...(withWires ? routedWireCandidates(px, py).map((c) => ({
-        kind: 'wire', wire: c.wire, key: `wire:${c.wire.id}`, rank: c.rank,
+        kind: 'wire', wire: c.wire, key: `wire:${c.wire.id}`, rank: c.rank, order: c.order,
       })) : []),
     ].sort((a, b) => a.rank - b.rank); // stable: devices stay ahead of wires per rank
+    return gripCycle(candidates, currentKey, afterKey);
+  }
+
+  // The shared grip cycle (owner, 2026-09-29) of MARKER · EDIT, LINK, WIRE, CONDUIT ·
+  // EDIT and MATERIAL · SWITCH/OUTLET/ETHERNET. `candidates` come nearest first, each
+  // with a `key`. The yellow target is STICKY: `currentKey` holds while it stays in the
+  // reticle, so jitter or an item entering the reticle never steals it; with none, the
+  // nearest wins. A grip (`afterKey`, a one-shot request) steps to the next one in a
+  // FIXED ring (storey rank, kind, plan x, y, top to bottom, authoring order), so
+  // repeated grips walk every candidate once and `index` (the readout's `i/n`) doesn't
+  // jitter with distance. Returns the candidate plus { index, size }, or null.
+  const GRIP_KIND = { marker: 0, node: 1, segment: 2, wire: 3 };
+  const gripRing = (a, b) => (a.rank || 0) - (b.rank || 0)
+    || (GRIP_KIND[a.kind] ?? 0) - (GRIP_KIND[b.kind] ?? 0)
+    || (a.x ?? 0) - (b.x ?? 0) || (a.y ?? 0) - (b.y ?? 0)
+    || (b.z ?? 0) - (a.z ?? 0) || (a.order ?? 0) - (b.order ?? 0);
+  function gripCycle(candidates, currentKey = null, afterKey = null) {
     if (!candidates.length) return null;
+    const ring = [...candidates].sort(gripRing);
+    let pick;
     if (afterKey) {
-      const current = candidates.findIndex((candidate) => candidate.key === afterKey);
-      return candidates[current < 0 ? 0 : (current + 1) % candidates.length];
+      const i = ring.findIndex((candidate) => candidate.key === afterKey);
+      pick = i < 0 ? candidates[0] : ring[(i + 1) % ring.length];
+    } else {
+      pick = candidates.find((candidate) => candidate.key === currentKey) || candidates[0];
     }
-    return candidates.find((candidate) => candidate.key === currentKey) || candidates[0];
+    return { ...pick, index: ring.indexOf(pick) + 1, size: ring.length };
   }
+  // Active-floor markers passing `wanted` within the reticle, nearest first, as
+  // gripCycle candidates keyed by marker id.
+  function markerPickCandidates(px, py, wanted = () => true) {
+    return project.markers
+      .map((marker, order) => ({
+        kind: 'marker', marker, key: marker.id, order, x: marker.x, y: marker.y, z: marker.z || 0,
+        distance: Math.hypot(px - marker.x, py - marker.y),
+      }))
+      .filter((c) => wanted(c.marker) && c.distance <= RETICLE_OUTER)
+      .sort((a, b) => a.distance - b.distance || b.z - a.z || a.order - b.order);
+  }
+  const pickTypeLabel = (kind, item) => (kind === 'wire'
+    ? `${t('wire.label')} ${t(`wire.type.${item.type || 'electrical'}`).toLowerCase()}`
+    : kind === 'node' ? t('conduit.node')
+    : kind === 'segment' ? t('conduit.segment')
+    : t(`marker.${item.type || 'outlet'}`));
 
-  // MARKER · EDIT disambiguates any marker types sharing the exact same floor
-  // projection. Once one is selected, keep the amber selection on it and preview
-  // the next marker in height order under the yellow reticle; another trigger
-  // advances the selection and refreshes its height editor.
-  function editMarkerAtFloorPoint(px, py, afterId = null) {
-    const marker = markerAtFloorPoint(px, py);
-    if (!marker) return null;
-    const stack = project.markers
-      .map((candidate, index) => ({ candidate, index }))
-      .filter(({ candidate }) => samePlanPoint(candidate, marker))
-      .sort((a, b) => (b.candidate.z || 0) - (a.candidate.z || 0) || a.index - b.index)
-      .map(({ candidate }) => candidate);
-    if (stack.length < 2) return marker;
-    const selectedIndex = stack.findIndex((candidate) => candidate.id === afterId);
-    return stack[selectedIndex < 0 ? 0 : (selectedIndex + 1) % stack.length];
-  }
-
-  // LINK must disambiguate switches that share one floor projection. Keep the
-  // shared marker picker unchanged for EDIT/DIMS. LINK ignores unrelated marker
-  // types entirely, then previews the next switch in top-to-bottom order after
-  // each trigger. The amber source remains selected while the yellow reticle
-  // advances; aiming at a light exits the stack naturally and makes that light
-  // the link target.
-  function linkMarkerAtFloorPoint(px, py, afterId = null) {
-    const wanted = selectedLinkSwitch ? (m) => m.type === 'light' : isSwitch;
-    const candidates = project.markers
-      .map((marker, order) => ({ marker, order, distance: Math.hypot(px - marker.x, py - marker.y) }))
-      .filter(({ marker, distance }) => wanted(marker) && distance <= RETICLE_OUTER)
-      .sort((a, b) => a.distance - b.distance || (b.marker.z || 0) - (a.marker.z || 0) || a.order - b.order);
-    if (!candidates.length) return null;
-    const current = candidates.findIndex(({ marker }) => marker.id === afterId);
-    return candidates[(current + 1) % candidates.length].marker;
-  }
+  // MARKER · EDIT: every marker in the reticle (a stack at one point AND near
+  // neighbours) is in one grip cycle (gripCycle), like WIRE (owner, 2026-09-29; it
+  // used to cycle only an exact-point stack).
+  // LINK: only switches, or lights once a switch is the source; the amber source stays
+  // selected while the yellow target moves.
 
   function outlineMarker(marker, role = 'wall', color = 0xffe14d) {
     if (!marker) return;
@@ -7163,7 +7172,7 @@ export function setupMR(view, project, getFootprint) {
     roomComponentCache = null;
     roomAreaHud = null;
     lastHudAt = -Infinity;
-    selectedMarker = null; markerEditPickAfterId = null; // ...and marker edit picker
+    selectedMarker = null; markerEditPickAfterId = null; hoverMarkerKey = null; // ...and marker edit picker
     selectedLinkSwitch = null; markerLinkPickAfterId = null; // ...and link picker/source
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
     selectedRoutedWire = null; // ...and routed-wire selection (its cycle key is wireEndpointPickAfterKey)
@@ -7204,7 +7213,7 @@ export function setupMR(view, project, getFootprint) {
     routedWireGroup.visible = m.id === 'marker_wire' || m.id === 'circuit_check';
     checkHover = null;
     matHoverRoom = matSelRoom = matHoverFace = matSelFace = matHoverDoor = matSelDoor = null;
-    matHoverDevice = matSelDevice = null; matDevicePickAfterId = null;
+    matHoverDevice = matSelDevice = null; matDevicePickAfterId = null; matDeviceHoverId = null;
     if (MAT_MODES.has(m.id)) buildMaterials();
     materialGroup.visible = MAT_MODES.has(m.id);
     if (m.id === 'circuit_check') buildCheckOverlay();
@@ -8369,11 +8378,20 @@ export function setupMR(view, project, getFootprint) {
         : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
       : exportStatus ? C_EXPORT : 0x38bdf8;
     // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
+    // In WIRE, a grip cycle of 2+ devices/wires shows the target's `i/n` there instead
+    // (it covers a stack too: stacked devices are all in that cycle).
     let pillText = readoutText, pillColor = readoutColor;
-    if (hoverStackInfo && !checkStatus) {
+    const cycleMode = GRIP_PICK_MODES.has(modes[currentMode].id);
+    const gripPickLine = cycleMode && gripPick?.mode === modes[currentMode].id && gripPick.size > 1
+      ? `${gripPick.label} ${gripPick.index}/${gripPick.size}`
+        + (gripPick.marker && hoverStackInfo?.marker === gripPick.marker && hoverStackInfo.lights.length
+          ? ` → ${hoverStackInfo.lights.length}× ${t('marker.light')}` : '')
+      : null;
+    const pickLine = gripPickLine || (hoverStackInfo && !checkStatus ? stackLabel(hoverStackInfo) : null);
+    if (pickLine) {
       const lines = pillText ? String(pillText).split('\n') : [];
       const colors = lines.map((_, i) => (Array.isArray(pillColor) ? (pillColor[i] ?? pillColor[0]) : pillColor));
-      lines.push(stackLabel(hoverStackInfo)); colors.push(0xffe14d);
+      lines.push(pickLine); colors.push(0xffe14d);
       pillText = lines.join('\n'); pillColor = colors;
     }
     controllers.forEach((c, i) => {
@@ -8768,13 +8786,17 @@ export function setupMR(view, project, getFootprint) {
       hoverKey = null;
       numpadCursor.visible = false;
       const hit = rayFloorHit(editCtl);
-      hoverMarker = null;
+      hoverMarker = null; gripPick = null;
       if (hit) {
         reticle.visible = true;
         reticle.position.set(hit.x, hit.y + 0.002, hit.z);
         const { px, py } = worldToPlan(hit);
-        hoverMarker = linkMarkerAtFloorPoint(px, py, markerLinkPickAfterId);
-        if (!hoverMarker) markerLinkPickAfterId = null;
+        const wanted = selectedLinkSwitch ? (m) => m.type === 'light' : isSwitch;
+        const target = gripCycle(markerPickCandidates(px, py, wanted), hoverMarkerKey, markerLinkPickAfterId);
+        markerLinkPickAfterId = null; // consume the grip request
+        hoverMarker = target?.marker || null;
+        hoverMarkerKey = target?.key || null;
+        if (target) gripPick = { mode: 'marker_link', index: target.index, size: target.size, marker: target.marker, label: pickTypeLabel('marker', target.marker) };
       } else {
         reticle.visible = false;
       }
@@ -8808,6 +8830,7 @@ export function setupMR(view, project, getFootprint) {
       if (wireFromMarker && !project.findMarker(wireFromMarker.id)) wireFromMarker = null;
       if (selectedRoutedWire && !project.wires.includes(selectedRoutedWire)) selectedRoutedWire = null;
       hoverMarker = null; hoverConduitNode = null; hoverRoutedWire = null; hoverAdjacent = null;
+      gripPick = null;
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
@@ -8822,6 +8845,10 @@ export function setupMR(view, project, getFootprint) {
           );
           wireEndpointPickAfterKey = null; // consume the explicit grip-cycle request
           wireHoverKey = target?.key || null;
+          if (target) gripPick = {
+            mode: 'marker_wire', index: target.index, size: target.size, marker: target.marker || null,
+            label: pickTypeLabel(target.kind, target.kind === 'wire' ? target.wire : target.marker),
+          };
           if (target?.kind === 'wire') hoverRoutedWire = target.wire;
           else if (target && (allFloorsView || target.floorId === project.activeFloorId)) hoverMarker = target.marker;
           else if (target) hoverAdjacent = {
@@ -8909,7 +8936,7 @@ export function setupMR(view, project, getFootprint) {
       hoverKey = null;
       numpadCursor.visible = false;
       matHoverRoom = null; matHoverFace = null; matHoverDoor = null;
-      matHoverDevice = null;
+      matHoverDevice = null; gripPick = null;
       const hit = rayFloorHit(editCtl);
       if (hit) {
         reticle.visible = true;
@@ -8917,8 +8944,11 @@ export function setupMR(view, project, getFootprint) {
         const { px, py } = worldToPlan(hit);
         if (DEVICE_MODE[modeId]) {
           // The grip's pick holds while the reticle stays on the group (as MARKER · EDIT).
-          matHoverDevice = matDeviceAt(px, py, DEVICE_MODE[modeId], matDevicePickAfterId);
-          if (!matHoverDevice) matDevicePickAfterId = null;
+          const target = matDeviceAt(px, py, DEVICE_MODE[modeId], matDeviceHoverId, matDevicePickAfterId);
+          matDevicePickAfterId = null; // consume the grip request
+          matHoverDevice = target?.marker || null;
+          matDeviceHoverId = target?.key || null;
+          if (target) gripPick = { mode: modeId, index: target.index, size: target.size, marker: target.marker, label: pickTypeLabel('marker', target.marker) };
         } else if (modeId === 'mat_floor') { matHoverRoom = matRoomAt(px, py); matReticle = { px, py }; }
         else if (APT_KIND[modeId]) matHoverDoor = matDoorAt(px, py, APT_KIND[modeId]);
         else matHoverFace = matFaceAt(px, py);
@@ -9029,7 +9059,7 @@ export function setupMR(view, project, getFootprint) {
       numpadCursor.visible = false;
       const source = editCtl;
       if (penNodeId && !project.conduitNodes.some((n) => n.id === penNodeId)) penNodeId = null;
-      hoverConduitNode = null; hoverMarker = null; hoverAdjacent = null; hoverPenSplit = null;
+      hoverConduitNode = null; hoverMarker = null; hoverAdjacent = null; hoverPenSplit = null; gripPick = null;
       const hit = rayFloorHit(source);
       if (hit) {
         reticle.visible = true;
@@ -9039,6 +9069,12 @@ export function setupMR(view, project, getFootprint) {
         conduitCandidates = candidates;
         conduitHoverKey = target?.key ?? null;
         if (target?.key !== conduitPickAfterKey) conduitPickAfterKey = null; // the pick left the reticle: nearest again
+        // i/n follows the grip ring's order (what repeated grips walk), not the distance sort.
+        if (target && candidates.length > 1) gripPick = {
+          mode: 'marker_conduit', index: conduitPickRing().findIndex((c) => c.key === target.key) + 1,
+          size: candidates.length, marker: target.kind === 'marker' ? target.item : null,
+          label: pickTypeLabel(target.kind, target.kind === 'marker' ? target.item : null),
+        };
         if (target?.kind === 'node') hoverConduitNode = target.item;
         else if (target?.kind === 'marker') hoverMarker = target.item;
         else if (target?.kind === 'segment') hoverPenSplit = target.item;
@@ -9100,7 +9136,7 @@ export function setupMR(view, project, getFootprint) {
         }
       }
       if (gripDrag?.kind === 'conduitNode') applyConduitNodeGripDrag(source);
-      hoverConduitNode = null; hoverConduitSegmentId = null;
+      hoverConduitNode = null; hoverConduitSegmentId = null; gripPick = null;
       if (hoverKey) {
         reticle.visible = false; // the pad owns the ray this frame
       } else {
@@ -9115,6 +9151,7 @@ export function setupMR(view, project, getFootprint) {
             );
             conduitEditPickAfterKey = null; // consume the explicit grip-cycle request
             conduitEditHoverKey = target?.key || null;
+            if (target) gripPick = { mode: 'conduit_edit', index: target.index, size: target.size, label: pickTypeLabel(target.kind) };
             if (target?.kind === 'node') {
               hoverConduitNode = project.conduitNodes.find((n) => n.id === target.id) || null;
             } else if (target?.kind === 'segment') {
@@ -9159,7 +9196,7 @@ export function setupMR(view, project, getFootprint) {
         }
       }
       if (gripDrag?.kind === 'marker') applyMarkerGripDrag(source);
-      hoverMarker = null;
+      hoverMarker = null; gripPick = null;
       if (hoverKey) {
         reticle.visible = false; // the pad owns the ray
       } else {
@@ -9169,11 +9206,14 @@ export function setupMR(view, project, getFootprint) {
           reticle.position.set(hit.x, hit.y + 0.002, hit.z);
           const { px, py } = worldToPlan(hit);
           if (selectedMarker) {
-            const picked = markerAtFloorPoint(px, py);
-            hoverMarker = picked?.id === selectedMarker.id ? picked : null;
+            // The selection stays the target (grip-drag) while it is in the reticle.
+            hoverMarker = Math.hypot(px - selectedMarker.x, py - selectedMarker.y) <= RETICLE_OUTER ? selectedMarker : null;
           } else {
-            hoverMarker = editMarkerAtFloorPoint(px, py, markerEditPickAfterId);
-            if (!hoverMarker) markerEditPickAfterId = null;
+            const target = gripCycle(markerPickCandidates(px, py), hoverMarkerKey, markerEditPickAfterId);
+            markerEditPickAfterId = null; // consume the grip request
+            hoverMarker = target?.marker || null;
+            hoverMarkerKey = target?.key || null;
+            if (target) gripPick = { mode: 'marker', index: target.index, size: target.size, marker: target.marker, label: pickTypeLabel('marker', target.marker) };
           }
         } else {
           reticle.visible = false;

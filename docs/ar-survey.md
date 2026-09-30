@@ -102,8 +102,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   that changes while cycling. A **floor reticle**
   tracks the aimed floor point and the marker under it is picked through its **flat floor icon**
   (`markerAtFloorPoint`, reticle-radius gated) — a stable plan-space target, not the floating wall
-  billboard. When markers overlap, grip cycles them before selection and trigger confirms the yellow
-  candidate. Both the selected floor
+  billboard. With nothing selected, **grip cycles every marker in the reticle** (a stack at one
+  point and near neighbours alike; before 2026-09-29 only an exact-point stack) and trigger confirms
+  the yellow candidate: the shared grip cycle, see **Grip cycle** under MARKER · WIRE. A selected
+  marker stays the target while it is in the reticle. Both the selected floor
   icon and wall glyph are outlined, and the height pad refreshes for each cycled marker.
   Empty-space trigger places a marker of the current type **at the tip** (z capture); triggering the
   hovered marker opens its **height pad** (a single-value datum pad — see "Vertical authoring"): the
@@ -142,10 +144,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   need two markers. **Do not draw stacked markers apart in AR.** That was considered and rejected: the floor
   icon, reticle pick, marker dims and sheet all use the shared point, so a display-only offset would put
   glyphs where the data is not. Instead, when the hovered marker shares its plan point with others
-  (`markerStackInfo`), the controller readout adds `<type> i/n → k× light`. `i/n` is its place in the
-  grip-cycle order: top to bottom, then authoring order, counting every marker at that point, e.g.
-  shutter 214 cm, 2 switches 109 cm, outlet 24 cm = 4. The lights it controls are outlined cyan in every
-  mode except LINK, which already shows them. MARKER · CHECK folds `i/n` into its hover line.
+  (`markerStackInfo`), the controller readout adds `<type> i/n → k× light`: its place in the stack,
+  top to bottom, then authoring order, counting every marker at that point, e.g. shutter 214 cm,
+  2 switches 109 cm, outlet 24 cm = 4. In a mode with a grip cycle that line is replaced by the
+  cycle's own `i/n` (**Grip cycle**, which counts near neighbours too) and keeps the `→ k× light`;
+  the stack line remains where no cycle line shows (a selected marker, CHECK). The lights it controls
+  are outlined cyan in every mode except LINK, which already shows them. MARKER · CHECK folds `i/n`
+  into its hover line.
   **Overlap count badge** (owner, 2026-09-28): so an overlap is visible without hovering, a small
   amber disc with the count sits at the top-right corner of the icons drawn on top of each other:
   on the floor icon when markers share the plan point (any heights), and on the wall glyph when they
@@ -252,10 +257,16 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   ALL FLOORS, ordered by storey rank first). Trigger selects the yellow ribbon, and trigger on empty
   space deselects it. An earlier version offered wires only when no device was in the reticle, so
   a wire running past a device could not be selected (owner report); keep the single cycle.
-  As in CONDUIT · EDIT, the yellow target is **sticky** (`wireHoverKey`). It stays highlighted
-  while it remains in the reticle, even when new devices or wires enter it. Only grip advances
-  (a one-shot `wireEndpointPickAfterKey` request), and the first candidate takes over only when
-  the highlighted one leaves the reticle. A selected wire's readout adds `CIRCUIT <len>` and, when
+  **Grip cycle** (shared, owner 2026-09-29: `gripCycle` in `mr.js`, used by MARKER · EDIT, LINK,
+  WIRE, CONDUIT · EDIT and MATERIAL · SWITCH/OUTLET/ETHERNET; MARKER · CONDUIT keeps its own
+  equivalent `conduitPickRing`). The yellow target is **sticky**: it stays highlighted while it
+  remains in the reticle, even when the reticle jitters or new items enter it; with none, the
+  nearest wins. Only grip advances (a one-shot request consumed that frame), stepping a **fixed ring**
+  (storey rank, kind, plan x, y, top to bottom, authoring order), so repeated grips walk every
+  candidate once. When the cycle holds 2+ targets, the readout's last line (yellow, `gripPick`)
+  names the target and its place in that ring: `<device type> i/n`, `wire <nature> i/n`,
+  `node i/n`, `conduit i/n`; a stacked switch keeps its `→ k× light`. Because the ring is fixed,
+  `i` doesn't jitter with distance. A selected wire's readout adds `CIRCUIT <len>` and, when
   non-zero, `SHARED <len>` in the other nature's color (definitions in `docs/electrical-workflow.md`).
   The readout pill takes up to 4 lines (`makeLabel(128)`); lengths are memoized per selection and
   wire-layer rebuild, never computed per frame. The

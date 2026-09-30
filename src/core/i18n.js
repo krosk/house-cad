@@ -463,6 +463,8 @@ const STRINGS = {
   'conduit.pickStart': { en: 'START PEN', fr: 'DÉBUT TRACÉ',        zh: '落笔' },
   'conduit.run':     { en: 'RUN CONDUIT', fr: 'TIRER GAINE',        zh: '布管' },
   'conduit.node':    { en: 'node',       fr: 'nœud',                zh: '节点' },
+  'conduit.segment': { en: 'conduit',    fr: 'gaine',               zh: '管段' },
+  'wire.label':      { en: 'wire',       fr: 'câble',               zh: '线路' },
   'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
   'conduit.pickTarget': { en: 'PICK NODE / CONDUIT', fr: 'CHOISIR NŒUD / GAINE', zh: '选择节点 / 管段' },
   'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
