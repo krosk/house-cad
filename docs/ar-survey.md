@@ -273,7 +273,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `node i/n`, `conduit i/n`; a stacked switch keeps its `→ k× light`. Because the ring is fixed,
   `i` doesn't jitter with distance. A selected wire's readout adds `CIRCUIT <len>` and, when
   non-zero, `SHARED <len>` in the other nature's color (definitions in `docs/electrical-workflow.md`).
-  The readout pill takes up to 4 lines (`makeLabel(128)`); lengths are memoized per selection and
+  The readout pill takes up to 4 lines at full size, 6 tighter (`makeLabel(128)`). Every controller
+  pill (mode label and readout) **widens to fit its longest line** at the normal font (owner,
+  2026-09-30: long material names were cut off), from 256 up to `LABEL_MAX_W` = 576 canvas px at the
+  same pixel density (readout 0.2 → at most 0.45 m wide), and only past that shrinks the font (16 px
+  minimum). 576 was chosen from glyph advances read from the font files, not a per-character
+  average: the longest catalog name is 468 px (Noto Sans Bold) or 532 px (DejaVu Sans Bold, wider)
+  at 16 px, within the 536 px text area; 37 of 46 Latin names fit at the full 24 px. A width change swaps in a new CanvasTexture (three may allocate fixed storage per size);
+  it happens only when the text changes. Lengths are memoized per selection and
   wire-layer rebuild, never computed per frame. The
   conduit network shows for via-picking (hovered node yellow, existing vias cyan); wires draw in
   `routedWireGroup` as narrow ribbons colored by nature (electrical amber, Ethernet cyan), showing

@@ -119,15 +119,33 @@ export function setupMR(view, project, getFootprint) {
   // always shows the current mode — so a shared touch gesture can't be misfired.
   // `height` > 64 leaves room for multi-line text ('\n'-separated; colorHex may then be
   // an array of per-line colors). One line still draws the original centered pill.
+  // The pill WIDENS to fit its longest line at the normal font (owner, 2026-09-30: long
+  // material names were cut off), from 256 up to LABEL_MAX_W canvas px, growing both
+  // sides at the same pixel density; only past that does the font shrink. The caller
+  // sets the sprite's scale for the 256-px width; a resize keeps that density.
+  // 576 fits the longest catalog name (FR Néva bay, 56 chars) at the 16 px minimum: 468 px in
+  // Noto Sans Bold, 532 px in the wider DejaVu Sans Bold, within the 536 px text area.
+  const LABEL_MAX_W = 576;
   function makeLabel(height = 64) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    const tex = new THREE.CanvasTexture(canvas);
+    let ctx = canvas.getContext('2d');
+    let tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
     sprite.scale.set(0.12, 0.03, 1);
     sprite.position.set(0, 0.06, 0); // just above the tip
+    // A new width needs a new texture: three may allocate immutable storage per size.
+    const resize = (w) => {
+      if (w === canvas.width) return;
+      const perPx = sprite.scale.x / canvas.width; // metres per canvas px, set by the caller
+      canvas.width = w; // also resets the 2D context state
+      ctx = canvas.getContext('2d');
+      tex.dispose();
+      tex = new THREE.CanvasTexture(canvas);
+      sprite.material.map = tex;
+      sprite.scale.x = perPx * w;
+    };
     // The controller readout calls this EVERY frame; skip the canvas redraw + texture
     // upload when nothing changed (a per-frame canvas upload can stall the Quest GPU).
     let shown = null;
@@ -142,25 +160,29 @@ export function setupMR(view, project, getFootprint) {
       const pitch = multi ? Math.min(26, (height - 12) / lines.length) : 40;
       const boxH = multi ? lines.length * pitch + 12 : 48;
       const top = (height - boxH) / 2;
-      ctx.clearRect(0, 0, 256, height);
+      // Breadcrumbs are longer than the old flat labels. Keep short tool names at the
+      // original, highly legible size; widen the pill for longer ones, then shrink.
+      const maxFont = multi ? Math.min(24, Math.floor(pitch) - 2) : 40;
+      ctx.font = `bold ${maxFont}px sans-serif`;
+      const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
+      resize(Math.min(LABEL_MAX_W, Math.max(256, Math.ceil((widest + 40) / 32) * 32)));
+      const W = canvas.width, textW = W - 40;
+      ctx.clearRect(0, 0, W, height);
       // Dark backing pill so the label stays legible over passthrough.
       ctx.fillStyle = 'rgba(15, 18, 24, 0.78)';
       ctx.beginPath();
-      ctx.roundRect(8, top, 240, boxH, 12);
+      ctx.roundRect(8, top, W - 16, boxH, 12);
       ctx.fill();
-      // Breadcrumbs are longer than the old flat labels. Fit them within the pill
-      // while keeping short tool names at the original, highly legible size.
-      const maxFont = multi ? Math.min(24, Math.floor(pitch) - 2) : 40;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       lines.forEach((line, i) => {
         ctx.font = `bold ${maxFont}px sans-serif`;
         const fontSize = Math.max(multi ? Math.min(16, maxFont) : 24, Math.min(maxFont,
-          Math.floor(maxFont * 216 / Math.max(216, ctx.measureText(line).width))));
+          Math.floor(maxFont * textW / Math.max(textW, ctx.measureText(line).width))));
         ctx.font = `bold ${fontSize}px sans-serif`;
         const hex = Array.isArray(colorHex) ? (colorHex[i] ?? colorHex[0]) : colorHex;
         ctx.fillStyle = '#' + hex.toString(16).padStart(6, '0');
-        ctx.fillText(line, 128, multi ? top + 6 + pitch * (i + 0.5) + 1 : top + 26);
+        ctx.fillText(line, W / 2, multi ? top + 6 + pitch * (i + 0.5) + 1 : top + 26);
       });
       tex.needsUpdate = true;
     };
