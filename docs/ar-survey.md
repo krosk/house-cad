@@ -45,11 +45,16 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **FLOOR** — calibrate the shared ground datum `floorY` by touching the real floor of whichever
   storey is active. The active floor's derived elevation is subtracted from the touch, so an upper
   floor or basement calibrates the same datum without double-counting its vertical offset.
+  FLOOR changes **only the height** (`regroundAt`, owner 2026-09-30: calibrating after a teleport
+  sent the user back to the origin). It re-anchors through `placeAt`, then restores the teleport
+  (`navOffset`, kept as the plan's world X/Z), the ALL FLOORS `navLift`, and the plan's world yaw
+  (the old anchor's `anchorYaw` folds into `planYaw`, since the new anchor has identity yaw; without
+  that, a FLOOR touch after a Quest relocalization would also turn the plan).
 - **LEVEL** — per-storey height + floor switch (see Multi-floor below).
 - **SETUP · TELEPORT** (`id: teleport`) — aim the pointer reticle at the active floor and trigger
   to bring that plan coordinate beneath the headset. WebXR cannot move the physical passthrough
   camera, so this applies a horizontal `navOffset` to the CAD frame while preserving the surveyed
-  `planPos`, yaw, and XR anchor. ORIGIN/FLOOR/RECAL (`placeAt`) clear the navigation offset.
+  `planPos`, yaw, and XR anchor. ORIGIN/RECAL (`placeAt`) clear the navigation offset; FLOOR keeps it.
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.

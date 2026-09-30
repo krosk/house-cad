@@ -6552,7 +6552,7 @@ export function setupMR(view, project, getFootprint) {
       onTouch: (pos) => {
         const elevation = activeElevation();
         floorY = pos.y - elevation;
-        if (placed) placeAt(planPos.x, floorY, planPos.z);
+        if (placed) regroundAt(floorY);
         rlog('floor calibrated', {
           floor: project.activeFloor?.name,
           touchY: +pos.y.toFixed(3),
@@ -7362,6 +7362,21 @@ export function setupMR(view, project, getFootprint) {
     project.setActiveFloor(floors[j].id);
     afterFloorChange();
     rlog('floor switch', { name: project.activeFloor.name, elev: +project.activeFloor.elevation.toFixed(3) });
+  }
+
+  // FLOOR changes only the ground height (owner report, 2026-09-30: calibrating after a
+  // teleport sent the user back to the origin). placeAt is a fresh registration and
+  // resets the navigation, so re-anchor through it, then restore what FLOOR must not
+  // touch: the plan's world X/Z under the user (teleport), its world yaw (the old
+  // anchor's yaw folds into planYaw, since the new anchor has identity orientation),
+  // and the ALL FLOORS lift.
+  function regroundAt(y) {
+    const world = planGroupWorldXZ(), yaw = anchorYaw, lift = navLift;
+    placeAt(planPos.x, y, planPos.z);
+    planYaw += yaw;
+    navLift = lift;
+    setNavOffsetForWorldXZ(world.x, world.z);
+    applyPlanMatrix();
   }
 
   function placeAt(x, y, z) {

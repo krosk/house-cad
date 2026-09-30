@@ -116,7 +116,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Trigger brings the reticle's plan coordinate beneath the headset without changing height
 - [ ] Repeated teleports accumulate correctly
 - [ ] Survey geometry, dimensions, yaw, and anchored `planPos` are unchanged
-- [ ] Switching modes keeps the teleported position; ORIGIN/FLOOR/RECAL clears it
+- [ ] Switching modes keeps the teleported position; ORIGIN/RECAL clears it
+- [ ] (2026-09-30) Teleport, then FLOOR-touch the real floor: the plan's height updates but you stay where you teleported, and the plan does not turn (also after the headset slept and woke)
 - [ ] Grip and thumbstick up/down are inert
 - [ ] LEFT has its own cyan teleport reticle in every mode; LEFT trigger teleports without invoking RIGHT's active tool
 
