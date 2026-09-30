@@ -27,6 +27,7 @@ import { materialsFor, materialById, materialName, markerProduct, markerProductD
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces, anchorNear } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
 import { finishTexture } from './finishTextures.js';
+import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
@@ -1016,6 +1017,8 @@ export function setupMR(view, project, getFootprint) {
   // SHEET plan-preview panel (a rasterized to-scale sheet; read-only).
   const sheetPanel = makeSheetPanel();
   scene.add(sheetPanel.group);
+  // MATERIAL modes: the LEFT grip shows the target's material card instead of the sheet.
+  const materialCard = makeMaterialCard({ renderOrder: SHEET_RENDER_ORDER });
 
   // Origin gizmo: a ring at the plan origin plus a short +X arrow showing the ALIGN
   // direction, so you always see where the frame is registered — and, when there
@@ -3468,10 +3471,6 @@ export function setupMR(view, project, getFootprint) {
   function matDeviceAt(px, py, surface, currentId = null, afterId = null) {
     return gripCycle(markerPickCandidates(px, py, (m) => DEVICE_SURFACE[m.type] === surface), currentId, afterId);
   }
-  function matDeviceCandidates(marker) {
-    return marker ? project.markers.filter((m) => DEVICE_SURFACE[m.type] === DEVICE_SURFACE[marker.type]
-      && Math.hypot(m.x - marker.x, m.y - marker.y) <= RETICLE_OUTER * 2) : [];
-  }
   // A double switch is two switch markers at one plan point (one per rocker): a
   // multi-rocker product is set on (or cleared from) that whole stack together. Going
   // from a multi-rocker product to a single one keeps it on the selected marker only,
@@ -3583,11 +3582,10 @@ export function setupMR(view, project, getFootprint) {
       const marker = matSelDevice || matHoverDevice;
       if (!marker) return [[t(`mat.pick${{ switch: 'Switch', outlet: 'Outlet', ethernet: 'Ethernet' }[DEVICE_MODE[modeId]]}`), 0xe2e8f0]];
       const mat = markerProduct(project, marker);
-      const near = matDeviceCandidates(marker);
+      // Overlapping devices: the shared grip cycle's `i/n` line (gripPick) says which.
       return [
         [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
         [`h ${fmt(marker.z ?? 1.1)} ${unitLabel()}`, 0xe2e8f0],
-        ...(near.length > 1 && !matSelDevice ? [[`${near.indexOf(marker) + 1}/${near.length} · ${t('mat.gripCycles')}`, 0xfbbf24]] : []),
       ];
     }
     if (modeId === 'mat_furniture') {
@@ -3998,11 +3996,19 @@ export function setupMR(view, project, getFootprint) {
     outlines: new THREE.LineBasicMaterial({ color: 0x475569 }),
   };
   const arch3dFinishMats = new Map(); // catalog entry (JSON) → material; never disposed
+  // One painted texture per catalog entry, shared by the AR 3D view and the material
+  // card (painting can take a second on the Quest; never twice). Never disposed.
+  const finishMaps = new Map();
+  function finishMapFor(def) {
+    const key = JSON.stringify(def || {});
+    if (!finishMaps.has(key)) finishMaps.set(key, finishTexture(def, 4));
+    return finishMaps.get(key);
+  }
   function arch3dFinishMaterial(def) {
     const key = JSON.stringify(def || {});
     let material = arch3dFinishMats.get(key);
     if (!material) {
-      const map = finishTexture(def, 4);
+      const map = finishMapFor(def);
       material = new THREE.MeshLambertMaterial({
         color: map ? 0xffffff : (def?.color ?? 0xffffff), map, side: THREE.DoubleSide,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
@@ -5414,6 +5420,95 @@ export function setupMR(view, project, getFootprint) {
   // permanently obstructing the left teleport ray.
   const LEFT_SHEET_POS = new THREE.Vector3(0, 0.46, 0);
 
+  // ---- Material card (LEFT grip in MATERIAL modes; docs/ar-survey.md) ----------
+  // What the card shows for the mode's target: { key, cheap, build() → spec | Promise }.
+  // A change of key waits CARD_SETTLE_MS before building (painting a texture can take a
+  // second on the Quest), so flicking through the catalog paints only where it stops.
+  const CARD_SETTLE_MS = 300;
+  let lastCardTime = 0, cardWantKey = null, cardWantSince = 0, cardBuiltKey = null;
+  const textCard = (title, message) => ({
+    key: `text|${title}|${message}`, cheap: true,
+    build: () => ({ key: `text|${title}|${message}`, kind: 'text', title, message }),
+  });
+  const sizeCaption = (size) => `${fmt(size.x)} × ${fmt(size.y)} × ${fmt(size.z)} ${unitLabel()}`;
+  function materialCardTarget(modeId) {
+    const lang = getLang(), unit = unitLabel();
+    const hint = () => textCard(t('mode.' + modeId), materialReadout(modeId)[0][0]);
+    const none = (title) => textCard(title, t('mat.none'));
+    const objectCard = (key, title, makeRoot, dispose) => ({
+      key, build: () => {
+        const root = makeRoot();
+        return { key, kind: 'object', title, caption: sizeCaption, object: { root, dispose: dispose && (() => dispose(root)) } };
+      },
+    });
+    const disposeGeometry = (root) => root.traverse((o) => o.geometry?.dispose());
+    if (DEVICE_MODE[modeId]) {
+      const marker = matSelDevice || matHoverDevice;
+      if (!marker) return hint();
+      const def = markerProduct(project, marker);
+      if (!def) return none(t(`marker.${marker.type || 'outlet'}`));
+      // Device geometry is shared by the builder: never disposed here.
+      return objectCard(`dev|${def.id}|${lang}|${unit}`, materialName(def, lang),
+        () => buildDeviceProduct(def, { lambert: true }));
+    }
+    if (modeId === 'mat_furniture') {
+      const rect = matSelDoor || matHoverDoor;
+      if (!rect) return hint();
+      if (!rect.article) return none(t('mode.' + modeId));
+      const key = `furn|${rect.article}|${lang}|${unit}`;
+      return {
+        key, build: () => loadFurnitureSource(rect.article)
+          .then((src) => ({ key, kind: 'object', title: furnitureLabel(rect.article), caption: sizeCaption, object: { root: src.clone(true) } }))
+          .catch(() => ({ key, kind: 'text', title: furnitureLabel(rect.article), message: '—' })),
+      };
+    }
+    if (APT_KIND[modeId]) {
+      const rect = matSelDoor || matHoverDoor;
+      if (!rect) return hint();
+      const def = materialById(project, doorMaterialId(rect));
+      if (!def) return none(t('mode.' + modeId));
+      // The zone's own placement (its width and heights), built closed and at the origin.
+      const isWindow = APT_KIND[modeId] === 'window';
+      const place = (isWindow ? windowProductPlacements : doorProductPlacements)(project.activeFloor, (id) => materialById(project, id))
+        .find((p) => p.rectId === rect.id);
+      if (!place) return none(materialName(def, lang));
+      const key = `apt|${def.id}|${rect.id}|${place.width.toFixed(3)}|${place.head}|${place.sill ?? ''}|${lang}|${unit}`;
+      return objectCard(key, materialName(def, lang), () => {
+        const g = new THREE.Group();
+        const meshes = isWindow ? buildWindowProduct(place, { lambert: true }) : buildDoorProduct(place, { lambert: true, open: false });
+        for (const m of meshes) g.add(m);
+        return g;
+      }, disposeGeometry); // door/window geometry is built per call; materials are cached
+    }
+    const floorMode = modeId === 'mat_floor';
+    const target = floorMode ? (matSelRoom || matHoverRoom) : (matSelFace || matHoverFace);
+    if (!target) return hint();
+    const def = materialById(project, floorMode ? roomMaterialId(target) : faceMaterialId(target));
+    if (!def) return none(t('mode.' + modeId));
+    const key = `finish|${JSON.stringify(def)}|${lang}|${unit}`;
+    return {
+      key, build: () => ({
+        key, kind: 'finish', title: materialName(def, lang),
+        map: finishMapFor(def), color: def.color, span: swatchSpan(def),
+        barLabel: (len) => `${fmt(len)} ${unitLabel()}`,
+      }),
+    };
+  }
+  function updateMaterialCard(time) {
+    const target = materialCardTarget(modes[currentMode].id);
+    if (target.key !== cardWantKey) { cardWantKey = target.key; cardWantSince = time; }
+    if (cardBuiltKey === cardWantKey || (!target.cheap && time - cardWantSince < CARD_SETTLE_MS)) return;
+    cardBuiltKey = cardWantKey;
+    const t0 = performance.now();
+    const spec = target.build();
+    const show = (s) => {
+      if (cardBuiltKey !== s.key) return; // the target moved on while it loaded
+      materialCard.show(s);
+      rlog('material card', { key: s.key.slice(0, 60), ms: Math.round(performance.now() - t0) });
+    };
+    if (spec?.then) spec.then(show); else show(spec);
+  }
+
   const currentSheetFloor = () => project.activeFloor;
   const redrawSheet = () => {
     sheetPanel.redraw(currentSheetFloor(), exportChangeMap());
@@ -5427,10 +5522,26 @@ export function setupMR(view, project, getFootprint) {
   // pose exactly like the controller HUD. The panel + dedicated teleport reticle are
   // both absent when LEFT is not connected.
   function updateLeftSheet(time, leftController, gripPressed) {
+    const cardDt = Math.min(0.1, Math.max(0, (time - lastCardTime) / 1000));
+    lastCardTime = time;
     if (!leftController || !gripPressed) {
       sheetPanel.group.visible = false;
+      materialCard.group.visible = false;
       return;
     }
+    if (MAT_MODES.has(modes[currentMode].id)) {
+      sheetPanel.group.visible = false;
+      if (materialCard.group.parent !== leftController) {
+        leftController.add(materialCard.group);
+        materialCard.group.position.copy(LEFT_SHEET_POS);
+        materialCard.group.rotation.set(0, 0, 0);
+      }
+      updateMaterialCard(time);
+      materialCard.update(cardDt);
+      materialCard.group.visible = true;
+      return;
+    }
+    materialCard.group.visible = false;
     if (sheetPanel.group.parent !== leftController) {
       leftController.add(sheetPanel.group);
       sheetPanel.group.position.copy(LEFT_SHEET_POS);

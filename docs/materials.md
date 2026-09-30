@@ -182,7 +182,9 @@ Prototype (Proven, Node, owner's upstairs bathroom 1.88 × 2.39 m = 4.49 m²):
    - Unmeasured: check PROJECT · PERF with it on, because the AR budget is tight and batching was what
      fixed it.
    - Other free LEFT buttons: **Y** (`buttons[5]`) and the stick click (`buttons[3]`).
-4. **Custom products in AR:** the numpad enters w/h/joint/pack; the list is kept per project.
+4. **Material card** (implemented 2026-09-30): LEFT grip in a MATERIAL mode shows the target's
+   texture patch with a scale bar, or its product in 3D; see `docs/ar-survey.md` "Material card".
+5. **Custom products in AR:** the numpad enters w/h/joint/pack; the list is kept per project.
 
 ## Flooring products (a design on a plank material)
 

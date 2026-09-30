@@ -445,7 +445,6 @@ const STRINGS = {
   'mat.pickSwitch': { en: 'PICK SWITCH', fr: 'CHOISIR INTERRUPTEUR', zh: '选择开关' },
   'mat.pickOutlet': { en: 'PICK OUTLET', fr: 'CHOISIR PRISE', zh: '选择插座' },
   'mat.pickEthernet': { en: 'PICK ETHERNET', fr: 'CHOISIR PRISE RÉSEAU', zh: '选择网口' },
-  'mat.gripCycles': { en: 'GRIP: NEXT', fr: 'GRIP : SUIVANT', zh: '握把：下一个' },
   'mat.leaves1':   { en: '1 LEAF',      fr: '1 VANTAIL',      zh: '单扇' },
   'mat.leaves2':   { en: '2 LEAVES',    fr: '2 VANTAUX',      zh: '双扇' },
   'mat.toMeasure': { en: 'MADE TO MEASURE', fr: 'SUR MESURE', zh: '定制尺寸' },

@@ -322,6 +322,22 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
+- **Material card** (owner, 2026-09-30; `src/ui/materialCard.js`). In every MATERIAL mode, holding
+  **LEFT grip** shows the target's material card instead of the print sheet, at the sheet's place and
+  draw order. It follows the hovered or selected target, and updates as thumbstick-y cycles.
+  - Floor/wall finish: a square patch of the real texture (the same painted texture as the AR 3D view,
+    one cache `finishMapFor`), about three pieces across, 1–3 m (`swatchSpan`; a stepped layout counts
+    its 50 cm tile, not its 1.0 × 1.1 m module), with a scale bar. Paint shows its flat colour.
+  - Door, window, switch/outlet, furniture: the 3D product on a slow turntable, starting face-on
+    three-quarter, fitted to the card, with its overall W × H × D. A door/window is built from its zone's
+    own placement (width, heights), closed.
+  - Nothing targeted: the mode's hint; no material: `none`.
+  - A new target waits 0.3 s before building (`CARD_SETTLE_MS`), so flicking through the catalog paints
+    only where the stick stops (five cards painted in ~1 s on desktop; Quest slower). `material card`
+    in the debug log gives the build time.
+  - Draw order: the card is in the transparent pass at 90 like the sheet; the model uses its own
+    transparent clones of its materials at 92 (three draws opaque before transparent, and the
+    originals are shared with the AR 3D view).
 - **MATERIAL · FLOOR / WALL** (`id: mat_floor` / `mat_wall`, its own group; design and owner decisions
   in `docs/materials.md`). Active floor only; locked in ALL FLOORS.
   - **FLOOR:** trigger selects the room component under the reticle.
@@ -494,7 +510,7 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   cyan floor reticle, and its other controls never invoke the active editing mode. Roles require a
   physical controller input source (`gamepad` present, `hand` absent): tracked-hand select/pinch
   events are ignored. The sheet is **hold-to-view on LEFT grip**: hidden at rest and visible only
-  while the grip remains pressed. It sits directly above the controller in a neutral upright pose;
+  while the grip remains pressed (in MATERIAL modes the grip shows the **Material card** instead). It sits directly above the controller in a neutral upright pose;
   when the controller has no rotation, the sheet is a vertical plane facing back toward the user.
   Its solid-white canvas renders in the transparent pass at order 90: after all world plan tints,
   markers, dimension labels, and edit panels, but before the right-controller HUD at order 100 and
