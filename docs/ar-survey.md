@@ -415,6 +415,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   screen containing separate **CONFIRM OVERWRITE** and **CANCEL** buttons; the original slot is no
   longer a trigger target. Only the confirmation button writes. Changing mode or pressing grip also
   cancels the pending overwrite.
+- **PROJECT · HEAT LOSS** (`id: heat`; method and defaults in `docs/heat-loss.md`) — every heated room
+  of the active floor shows its loss in W at its largest rect's centre. A panel holds THIS FLOOR
+  (heated, unheated temperature, added floor and attic R) and WHOLE HOUSE settings (design outdoor /
+  indoor °C, air changes, bare wall R, window and door U, bare slab R, λ for an insulation zone with no
+  R). Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
+  default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
+  broken down by surface. An INSULATION zone's R is typed in PLAN · EDIT (the band pad, field R; an
+  empty ENTER clears it). Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
 - **PROJECT · COPY FLOOR / PASTE FLOOR** (`id: copy_floor` / `paste_floor`) — COPY snapshots the
   complete active floor (name, storey height, rectangles, dimensions, markers, and electrical links) to a separate
   persistent clipboard. It survives LOAD and an APK relaunch. PASTE **replaces the currently active

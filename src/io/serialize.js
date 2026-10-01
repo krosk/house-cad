@@ -19,6 +19,8 @@ import {
 import { ORIGIN_ID, nextConstraintId, syncConstraintIdCounter } from '../core/constraints.js';
 
 export const FILE_VERSION = 3;
+import { cleanHeat, cleanFloorHeat } from '../core/heatLoss.js';
+
 export const AUTOSAVE_KEY = 'house-cad:autosave:v1';
 export const FLOOR_CLIPBOARD_KEY = 'house-cad:floor-clipboard:v1';
 export const FLOOR_CLIPBOARD_VERSION = 1;
@@ -40,13 +42,14 @@ function serializeRect(r) {
   if (r.article !== undefined) out.article = r.article;
   if (r.productMm !== undefined) out.productMm = [...r.productMm];
   if (r.facing !== undefined) out.facing = r.facing;
+  if (r.rValue !== undefined) out.rValue = r.rValue; // insulation R (docs/heat-loss.md)
   return out;
 }
 // Every stored Rectangle field (the constructor validates), for load and paste.
 const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
   hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
-  article: r.article, productMm: r.productMm, facing: r.facing,
+  article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue,
 });
 function serializeConstraint(c) {
   return {
@@ -134,6 +137,7 @@ export function serializeFloor(f) {
     // conduitNodes/conduitSegments/wires/pipes are whole-house (top level), not per-floor.
     // Furniture is a zone kind in `rectangles` (the old `furniture[]` migrates on load).
     finishes: (f.finishes || []).map(serializeFinish),
+    ...(Object.keys(f.heat || {}).length ? { heat: { ...f.heat } } : {}), // docs/heat-loss.md
   };
 }
 function serializeFinish(f) {
@@ -179,6 +183,7 @@ export function serializeProject(project) {
     pipeNodes: (project.pipeNodes || []).map(serializePipeNode),
     pipes: (project.pipes || []).map(serializePipe),
     materials: (project.materials || []).map((m) => ({ ...m })), // the owner's own products
+    ...(Object.keys(project.heat || {}).length ? { heat: { ...project.heat } } : {}), // docs/heat-loss.md
   };
 }
 
@@ -478,6 +483,7 @@ export function deserializeInto(project, data) {
       route: serializeRoute(link.route),
     })),
     finishes: loadFinishes(f.finishes),
+    heat: cleanFloorHeat(f.heat),
   }));
   // Before the merge, placed furniture was a separate `furniture[]` per floor (saved
   // files, share links): each item becomes a furniture zone carrying its product. Fresh
@@ -487,6 +493,7 @@ export function deserializeInto(project, data) {
 
   project.floors = floors;
   project.materials = loadMaterials(data.materials);
+  project.heat = cleanHeat(data.heat);
   project.revision = Number.isFinite(data.revision) ? data.revision : 0; // 0 for pre-revision files
   project.groundFloorId = floors.some((f) => f.id === data.groundFloorId)
     ? data.groundFloorId : floors[0].id;

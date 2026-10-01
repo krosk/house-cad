@@ -49,6 +49,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
+import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -760,6 +761,87 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, actionAt, draw };
   }
 
+  // PROJECT · HEAT LOSS settings panel (docs/heat-loss.md): a title with the active
+  // floor's total, then one row per setting (`rows`, see HEAT_ROWS), grouped under
+  // THIS FLOOR / WHOLE HOUSE headers. A row is aimed with the ray; the caller changes it.
+  function makeHeatMenu(rows) {
+    const W = 512, TITLE_H = 116, HEAD_H = 44, ROW_H = 50;
+    const layout = [];
+    let y = TITLE_H;
+    rows.forEach((row, i) => {
+      if (i === 0 || rows[i - 1].floor !== row.floor) { layout.push({ head: row.floor ? 'heat.floor' : 'heat.project', y }); y += HEAD_H; }
+      layout.push({ row, y }); y += ROW_H;
+    });
+    const ROOM_Y = y + 10, ROOM_H = 150; // the room under the reticle: watts by surface
+    const H = ROOM_Y + ROOM_H + 14;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.32, 0.32 * H / W),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    );
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+    function rowAt(u, v) {
+      const cy = (1 - v) * H;
+      return layout.find((l) => l.row && cy >= l.y && cy < l.y + ROW_H)?.row.key ?? null;
+    }
+    // values: key → { text, set (authored, not the default), dim (inactive) }.
+    function draw(accent, hoverKey, floorName, totalW, values, room) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.96)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 24); ctx.fill();
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillStyle = accent; ctx.font = 'bold 36px sans-serif';
+      ctx.fillText(`${t('group.project')} · ${t('mode.heat')}`, 26, 40);
+      ctx.fillStyle = '#e6edf3'; ctx.font = 'bold 28px sans-serif';
+      ctx.fillText(floorName, 26, 88);
+      ctx.textAlign = 'right'; ctx.fillStyle = accent;
+      ctx.fillText(totalW == null ? '—' : `${t('heat.total')} ${Math.round(totalW)} W`, W - 26, 88);
+      for (const l of layout) {
+        if (l.head) {
+          ctx.textAlign = 'left'; ctx.fillStyle = '#768390'; ctx.font = 'bold 22px sans-serif';
+          ctx.fillText(t(l.head), 26, l.y + HEAD_H / 2 + 4);
+          continue;
+        }
+        const { row } = l, val = values[row.key] || {};
+        const y0 = l.y + 4, h = ROW_H - 8;
+        ctx.fillStyle = hoverKey === row.key ? 'rgba(72,79,88,0.98)' : 'rgba(38,44,52,0.96)';
+        ctx.beginPath(); ctx.roundRect(14, y0, W - 28, h, 12); ctx.fill();
+        ctx.textAlign = 'left'; ctx.font = 'bold 24px sans-serif';
+        ctx.fillStyle = val.dim ? '#5b6570' : '#e6edf3';
+        ctx.fillText(t(`heat.${row.key}`), 30, y0 + h / 2 + 1);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = val.dim ? '#5b6570' : val.set ? accent : '#aab4c0'; // grey = default
+        ctx.fillText(val.text ?? '', W - 30, y0 + h / 2 + 1);
+      }
+      ctx.fillStyle = 'rgba(38,44,52,0.96)';
+      ctx.beginPath(); ctx.roundRect(14, ROOM_Y, W - 28, ROOM_H, 12); ctx.fill();
+      ctx.textAlign = 'left';
+      if (!room) {
+        ctx.fillStyle = '#768390'; ctx.font = '22px sans-serif';
+        ctx.fillText(t('heat.aimRoom'), 30, ROOM_Y + ROOM_H / 2);
+      } else {
+        const w = (v) => `${Math.round(v)}`;
+        ctx.fillStyle = accent; ctx.font = 'bold 26px sans-serif';
+        ctx.fillText(`${room.area.toFixed(1)} m²  ·  ${Math.round(room.total)} W`, 30, ROOM_Y + 28);
+        ctx.fillStyle = '#e6edf3'; ctx.font = '22px sans-serif';
+        const p = room.parts;
+        ctx.fillText(`${t('heat.walls')} ${w(p.wall)} · ${t('heat.openings')} ${w(p.opening)} · ${t('heat.air')} ${w(p.air)}`, 30, ROOM_Y + 70);
+        ctx.fillText(`${t('heat.floorPart')} ${w(p.floor)} · ${t('heat.ceilingPart')} ${w(p.ceiling)}`, 30, ROOM_Y + 104);
+        ctx.fillStyle = '#aab4c0'; ctx.font = '20px sans-serif';
+        const d = room.detail;
+        ctx.fillText(`${t('heat.extWall')} ${d.wallArea.toFixed(1)} m² (${t('heat.insulated')} ${d.insulatedArea.toFixed(1)}) · ${t('heat.openings')} ${d.openingArea.toFixed(1)} m²`, 30, ROOM_Y + 134);
+      }
+      tex.needsUpdate = true;
+    }
+    return { group, mesh, rowAt, draw };
+  }
+
   // The marker sits ahead of the controller's tracked origin, along the pointing
   // ray, so it clears the physical controller body (which would occlude it) and
   // reads as a "tip." Placement uses this same offset point (see tipPosition).
@@ -1013,6 +1095,24 @@ export function setupMR(view, project, getFootprint) {
   // Unified SVG/PNG/DXF/JSON options + explicit export action.
   const exportMenu = makeExportMenu();
   scene.add(exportMenu.group);
+  // PROJECT · HEAT LOSS (docs/heat-loss.md). `floor` rows edit the active floor's
+  // settings; the others are whole-house. Steps are one thumbstick flick.
+  const HEAT_ROWS = [
+    { key: 'heated', floor: true, toggle: true },
+    { key: 'temp', floor: true, step: 1, min: -15, max: 25, unit: '°C' },
+    { key: 'floorR', floor: true, step: 0.5, min: 0, max: 15, r: true },
+    { key: 'ceilingR', floor: true, step: 0.5, min: 0, max: 15, r: true },
+    { key: 'tOut', step: 1, min: -25, max: 10, unit: '°C' },
+    { key: 'tRoom', step: 1, min: 10, max: 28, unit: '°C' },
+    { key: 'ach', step: 0.1, min: 0, max: 3 },
+    { key: 'wallR', step: 0.05, min: 0, max: 5, r: true },
+    { key: 'windowU', step: 0.1, min: 0.5, max: 6, u: true },
+    { key: 'doorU', step: 0.1, min: 0.5, max: 6, u: true },
+    { key: 'slabR', step: 0.05, min: 0, max: 5, r: true },
+    { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
+  ];
+  const heatMenu = makeHeatMenu(HEAT_ROWS);
+  scene.add(heatMenu.group);
 
   // SHEET plan-preview panel (a rasterized to-scale sheet; read-only).
   const sheetPanel = makeSheetPanel();
@@ -1045,6 +1145,8 @@ export function setupMR(view, project, getFootprint) {
   // activeFloorId untouched and renders the complete stack. Architectural editing
   // stays locked there, but whole-house conduit/wire tools remain available.
   let allFloorsView = false;
+  // PROJECT · HEAT LOSS draws each room's watts on the active plan (buildActivePlan).
+  let heatLabelsOn = false;
 
   // Marker glyphs (wall-anchored annotations) live in their own group under planGroup
   // so they ride the plan's yaw + per-floor elevation for free. buildPlan clears the
@@ -1751,6 +1853,21 @@ export function setupMR(view, project, getFootprint) {
     }
   };
 
+  // PROJECT · HEAT LOSS: each heated room's loss (W) at the centre of its largest rect
+  // (an L-shaped room's box centre can fall outside it). Rebuilt with the plan.
+  let heatRooms = [];      // floorHeatLoss of the active floor, rebuilt with the labels
+  let heatHoverRoom = null; // the room under the reticle in HEAT LOSS
+  function addHeatLabels(floor) {
+    const area = (r) => Math.abs(r.w * r.h);
+    heatRooms = floorHeatLoss(project, floor);
+    heatHoverRoom = null;
+    const labels = heatRooms.map((room) => {
+      const big = room.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m)).bounds;
+      return makeDimLabel(`${Math.round(room.total)} W`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
+    });
+    if (labels.length) addDimLabelBatch(labels, planGroup, 30);
+  }
+
   function buildActivePlan(withDims = true) {
     clearPlanGeometry();
     const floor = project.activeFloor;
@@ -1762,6 +1879,7 @@ export function setupMR(view, project, getFootprint) {
     // Per-rectangle edge strips, colored per kind (see edgeMat / zoneColors.js).
     // Non-active zones sit lower; the active zone is a lightened tint and on top.
     addFloorStrips(floor, 0, activeRect);
+    if (heatLabelsOn) addHeatLabels(floor);
     if (withDims) {
       buildDimensions(floor);       // constraint dimension lines + value labels
       buildMarkers();               // wall-anchored glyphs (own group, not cleared above)
@@ -4171,6 +4289,7 @@ export function setupMR(view, project, getFootprint) {
   let roomComponentCacheKey = '';
   let roomComponentCache = null;
   let roomAreaHud = null;   // m² shown in the info panel for the selected room component
+  let roomHeatHud = null;   // its heat loss (core/heatLoss.js roomHeatLoss), or null
   let selectedMarker = null; // OUTLET mode: marker being height-edited
   let markerEditPickAfterId = null; // one-shot grip request (gripCycle)
   let hoverMarkerKey = null; // the sticky yellow marker of EDIT / LINK (gripCycle)
@@ -4267,6 +4386,7 @@ export function setupMR(view, project, getFootprint) {
   let prevHoverLang = null; // last drawn lang hover
   let hoverUnit = null;     // UNIT menu row under the ray this frame (unit id)
   let prevHoverUnit = null; // last drawn unit hover
+  let hoverHeatRow = null, prevHoverHeatRow = null; // HEAT LOSS panel row under the ray
   let hoverExportAction = null;     // output toggle or explicit export button under the ray
   let prevHoverExportAction = null;
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
@@ -4520,6 +4640,8 @@ export function setupMR(view, project, getFootprint) {
   }
 
   function updateRoomAreaHud() {
+    roomHeatHud = selectedRect && zoneKindOf(selectedRect) === 'room'
+      ? roomHeatLoss(project, project.activeFloor, selectedRect) : null;
     const next = selectedZoneArea();
     if (next === roomAreaHud) return;
     roomAreaHud = next;
@@ -5997,6 +6119,60 @@ export function setupMR(view, project, getFootprint) {
     hoverExportAction = prevHoverExportAction = null;
   }
 
+  // ---- HEAT LOSS: room watts on the plan + the settings panel (docs/heat-loss.md) ----
+  function heatRowValues() {
+    const floor = project.activeFloor, s = heatSettings(project), fh = floorHeat(floor);
+    const out = {};
+    for (const row of HEAT_ROWS) {
+      const v = row.floor ? fh[row.key] : s[row.key];
+      const set = Object.prototype.hasOwnProperty.call(row.floor ? floor.heat || {} : project.heat || {}, row.key);
+      const decimals = Math.max(0, -Math.floor(Math.log10(row.step ?? 1) + 1e-9));
+      const text = row.toggle ? t(v ? 'heat.yes' : 'heat.no')
+        : `${v.toFixed(decimals)}${row.unit ? ` ${row.unit}` : row.u ? ' W/m²K' : row.r ? ' m²K/W' : ''}`;
+      // The unheated temperature only matters for an unheated floor; the rest of the
+      // floor rows only for a heated one.
+      const dim = row.floor && row.key !== 'heated' && (row.key === 'temp' ? fh.heated : !fh.heated);
+      out[row.key] = { text, set, dim };
+    }
+    return out;
+  }
+  const floorHeatTotal = () => (heatRooms.length ? heatRooms.reduce((a, r) => a + r.total, 0) : null);
+  const redrawHeatMenu = () => heatMenu.draw('#fb923c', hoverHeatRow, project.activeFloor.name,
+    floorHeatTotal(), heatRowValues(), heatHoverRoom);
+
+  function showHeatMenu() {
+    placePanel(heatMenu.group, 0.62, 0.10);
+    hoverHeatRow = prevHoverHeatRow = null;
+    heatMenu.group.visible = true;
+    redrawHeatMenu();
+  }
+
+  function hideHeatMenu() {
+    heatMenu.group.visible = false;
+    numpadCursor.visible = false;
+    hoverHeatRow = prevHoverHeatRow = null;
+  }
+
+  // One thumbstick flick on the aimed row (dir ±1), or a trigger: HEATED toggles, a
+  // value resets to its default. Settings are project data (saved with it).
+  function changeHeatRow(key, dir) {
+    const row = HEAT_ROWS.find((r) => r.key === key);
+    if (!row) return;
+    const floor = row.floor ? project.activeFloor : null;
+    const current = floor ? floorHeat(floor)[key] : heatSettings(project)[key];
+    let next;
+    if (row.toggle) next = !current;
+    else if (dir === 0) next = null; // back to the default
+    else {
+      const k = Math.round(1 / row.step) || 1;
+      next = Math.min(row.max, Math.max(row.min, Math.round((current + dir * row.step) * k) / k));
+    }
+    project.setHeat(key, next, floor);
+    rlog('heat setting', { key, floor: floor?.name ?? null, value: next });
+    buildPlan(); applyPlanMatrix(); // room labels
+    redrawHeatMenu();
+  }
+
   // Trigger in SAVE/LOAD: act on the slot under the ray. SAVE writes an empty slot
   // immediately but requires its separate confirmation button before overwrite; LOAD replaces the whole
   // project from a filled slot (empty = no-op) and
@@ -6474,11 +6650,13 @@ export function setupMR(view, project, getFootprint) {
   //   • furniture placeholders — solid body band [foot, top] (both bounds).
   // Bounds are always [lower, upper] in field order; the commit keeps them ordered.
   // Aperture hinge/swing stay on A/X rotate; B/Y deletes the whole zone.
-  const bandFields = (rect) => verticalBandFields(rect);
+  // An INSULATION zone reuses the pad for its thermal resistance R (docs/heat-loss.md),
+  // a plain number, not a length; an empty ENTER clears it (back to depth / λ).
+  const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue'] : verticalBandFields(rect));
   const rectHasBand = (rect) => bandFields(rect).length > 0;
   // Field labels are namespaced by which band the field belongs to.
-  const bandFieldLabel = (f) =>
-    (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
+  const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue')
+    : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
   const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
   // SWAP names the field it switches TO (null when a single bound is editable → inert).
@@ -6494,7 +6672,9 @@ export function setupMR(view, project, getFootprint) {
   function refreshBandPad() {
     const fs = bandFields(selectedRect);
     if (!fs.includes(bandField)) bandField = fs[0]; // clamp after a retype
-    bandBuffer = selectedRect ? fmt(selectedRect[bandField] ?? 0) : '';
+    bandBuffer = !selectedRect ? ''
+      : bandField === 'rValue' ? (selectedRect.rValue != null ? String(selectedRect.rValue) : '')
+      : fmt(selectedRect[bandField] ?? 0);
     bandPristine = true;
     redrawBandPad();
   }
@@ -6525,6 +6705,16 @@ export function setupMR(view, project, getFootprint) {
 
   function commitBandField() {
     if (!rectHasBand(selectedRect)) return;
+    if (bandField === 'rValue') {
+      const r = parseFloat(bandBuffer);
+      if (bandBuffer.trim() === '') delete selectedRect.rValue;
+      else if (Number.isFinite(r) && r >= 0) selectedRect.rValue = r;
+      else return;
+      project.touch(); // autosave; the heat labels/HUD recompute from the project
+      rlog('insulation R', { id: selectedRect.id, r: selectedRect.rValue ?? null });
+      refreshBandPad();
+      return;
+    }
     const val = parseFloat(bandBuffer);
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
     const m = toMeters(val);
@@ -7200,6 +7390,13 @@ export function setupMR(view, project, getFootprint) {
       onTouch: onExportTouch,
     },
     {
+      id: 'heat', color: 0xfb923c,
+      // Room heat loss (docs/heat-loss.md): every heated room of the active floor shows
+      // its watts on the plan; the panel holds the floor and whole-house settings. Ray
+      // aims a row, thumbstick-y steps it; trigger toggles HEATED or resets a value.
+      onTouch: () => { if (hoverHeatRow) changeHeatRow(hoverHeatRow, 0); },
+    },
+    {
       id: 'copy_floor', color: 0x34d399,
       // Snapshot the complete active floor into a clipboard that survives LOAD.
       onTouch: copyActiveFloor,
@@ -7250,7 +7447,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe',
     'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
-    'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
+    'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'heat', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
@@ -7258,7 +7455,7 @@ export function setupMR(view, project, getFootprint) {
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', marker_pipe: 'marker', outlet_dims: 'marker',
     mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
-    translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
+    translate: 'project', heat: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',
   };
   // These project tools stay defined and fully functional (SAVE/LOAD can still be
@@ -7341,6 +7538,12 @@ export function setupMR(view, project, getFootprint) {
     else hideUnitMenu();
     if (m.id === 'export') showExportMenu();
     else hideExportMenu();
+    if (heatLabelsOn !== (m.id === 'heat')) { // room watts on the plan in HEAT LOSS only
+      heatLabelsOn = m.id === 'heat';
+      buildPlan(); applyPlanMatrix(); // also computes heatRooms for the panel below
+    }
+    if (m.id === 'heat') showHeatMenu();
+    else hideHeatMenu();
     if (isSheetExportMode(m.id)) showSheet(); // refresh active-floor preview on entry
     else hideSheet();
     // CONDUIT authoring/editing and WIRE routing all need the network on screen;
@@ -7378,7 +7581,7 @@ export function setupMR(view, project, getFootprint) {
     const group = MODE_GROUP[id];
     // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
     // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
-    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'material' || id === 'translate')
+    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'material' || id === 'translate' || id === 'heat')
         && !ALL_FLOORS_TOPOLOGY.has(id)) return false;
     return true;
   };
@@ -7402,6 +7605,7 @@ export function setupMR(view, project, getFootprint) {
     if (langMenu.group.visible) redrawLangMenu();
     if (unitMenu.group.visible) redrawUnitMenu(); // title follows the current language
     if (exportMenu.group.visible) redrawExportMenu();
+    if (heatMenu.group.visible) redrawHeatMenu();
     if (sheetPanel.group.visible) redrawSheet(); // legend/marker names are localized
   });
 
@@ -7473,6 +7677,7 @@ export function setupMR(view, project, getFootprint) {
     applyPlanMatrix(); // real floor lifts; ALL FLOORS stays on the ground datum
     sheetDirty = true;
     if (exportMenu.group.visible) redrawExportMenu();
+    if (heatMenu.group.visible) redrawHeatMenu();
     if (modes[currentMode].id === 'level') {
       setModeInfo();
       if (allFloorsView) deactivateNumpad();
@@ -7621,6 +7826,7 @@ export function setupMR(view, project, getFootprint) {
     leftTeleportReticle.visible = false;
     sheetPanel.group.visible = false;
     exportMenu.group.visible = false;
+    heatMenu.group.visible = false;
     edgeHi.visible = false;
     edgeHi2.visible = false;
     cornerHi.visible = false;
@@ -8296,6 +8502,7 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
+      else if (modeId === 'heat') { if (hoverHeatRow) changeHeatRow(hoverHeatRow, stickY < 0 ? 1 : -1); } // up = more
       else if (modeId === 'export') { // point at Compare/Language → cycle that; else format
         if (hoverExportAction === 'baseline') cycleExportBaseline(stickY < 0 ? -1 : 1);
         else if (hoverExportAction === 'lang') cycleExportLang(stickY < 0 ? -1 : 1);
@@ -8602,7 +8809,10 @@ export function setupMR(view, project, getFootprint) {
         `ptr:    ${ptr ? `${f2(ptr.px)}, ${f2(ptr.py)}, ${f2(ptrW.y - groundY())}` : '—'}`,
         `ret:    ${ret ? `${f2(ret.px)}, ${f2(ret.py)}` : '—'}`,
         ...(modeId === 'level' ? [`floor:  ${floorLabel()}`] : []),
-        ...(modeId === 'edit' && roomAreaHud != null ? [`area:   ${roomAreaHud.toFixed(2)} m²`] : []),
+        // A room also shows its heat loss (one line: the HUD fits 10); the breakdown is in
+        // PROJECT · HEAT LOSS.
+        ...(modeId === 'edit' && roomAreaHud != null
+          ? [`area:   ${roomAreaHud.toFixed(2)} m²${roomHeatHud ? ` · ${Math.round(roomHeatHud.total)} W` : ''}`] : []),
         ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
@@ -9426,6 +9636,32 @@ export function setupMR(view, project, getFootprint) {
       if (hoverExportAction !== prevHoverExportAction) {
         redrawExportMenu();
         prevHoverExportAction = hoverExportAction;
+      }
+    } else if (modeId === 'heat') {
+      // HEAT LOSS: the ray aims a settings row; the room labels need no floor target.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      hoverHeatRow = null;
+      numpadCursor.visible = false;
+      const panelHit = rayPanelHit(editCtl, heatMenu.mesh);
+      if (heatMenu.group.visible && panelHit) {
+        hoverHeatRow = heatMenu.rowAt(panelHit.uv.x, panelHit.uv.y);
+        numpadCursor.position.copy(panelHit.point);
+        numpadCursor.visible = true;
+      }
+      const prevRoom = heatHoverRoom;
+      const hit = hoverHeatRow ? null : rayFloorHit(editCtl);
+      if (hit) {
+        reticle.visible = true;
+        reticle.position.set(hit.x, hit.y + 0.002, hit.z);
+        const { px, py } = worldToPlan(hit);
+        heatHoverRoom = heatRooms.find((room) => room.rectangles.some((r) => {
+          const b = r.bounds;
+          return px > b.x0 && px < b.x1 && py > b.y0 && py < b.y1;
+        })) || null;
+      } else if (!hoverHeatRow) heatHoverRoom = null; // aiming at the panel keeps the room shown
+      if (hoverHeatRow !== prevHoverHeatRow || heatHoverRoom !== prevRoom) {
+        redrawHeatMenu(); prevHoverHeatRow = hoverHeatRow;
       }
     } else if (modeId === 'lang') {
       // LANG: thumbstick up/down is the primary selector, but also let the ray hover a

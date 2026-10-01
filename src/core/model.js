@@ -13,6 +13,7 @@ import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, 
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
+import { cleanHeat, cleanFloorHeat } from './heatLoss.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -151,7 +152,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -184,6 +185,10 @@ export class Rectangle {
       if (article != null && article !== '') this.article = String(article);
       if (Array.isArray(productMm) && productMm.length === 3 && productMm.every((v) => v > 0)) this.productMm = [...productMm];
       if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
+    } else if (this.kind === 'insulation') {
+      // Thermal resistance R (m²K/W) from the product label, for the heat-loss
+      // calculation (docs/heat-loss.md); absent = drawn depth / the project's λ.
+      if (Number.isFinite(rValue) && rValue >= 0) this.rValue = rValue;
     } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
@@ -198,6 +203,7 @@ export class Rectangle {
   setKind(kind) {
     if (kind === 'stairs') kind = 'stairs_up';
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
+    if (this.kind !== 'insulation') delete this.rValue;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
     // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.
@@ -279,7 +285,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, elevation = 0 } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, elevation = 0, heat = null } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -306,6 +312,9 @@ export class Floor {
     this.finishes = finishes;
     this.height = height; // storey height, meters
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
+    // Heat-loss settings of this storey (heated or not, added slab/attic insulation),
+    // only the keys set; defaults in src/core/heatLoss.js FLOOR_HEAT_DEFAULTS.
+    this.heat = heat || {};
   }
 }
 
@@ -329,6 +338,9 @@ export class Project {
     this.pipes = [];
     // The owner's own finish products (same shape as BUILTIN_MATERIALS in materials.js).
     this.materials = [];
+    // Heat-loss settings (docs/heat-loss.md): only the keys the owner set; defaults in
+    // src/core/heatLoss.js HEAT_DEFAULTS.
+    this.heat = {};
     // Saved-revision counter: advanced by every explicit SAVE (desktop house.json,
     // AR slot) — NOT by autosave — so it tracks deliberate saves. Persisted with the
     // project and stamped on export filenames and printed sheets. 0 = never saved.
@@ -1217,6 +1229,15 @@ export class Project {
 
   // Call after mutating a rectangle in place (e.g. moving it).
   touch() {
+    this._emit();
+  }
+
+  // Heat-loss settings (docs/heat-loss.md), project-wide or for one floor. null resets
+  // the key to its default. Not solver inputs: the emit only saves and notifies.
+  setHeat(key, value, floor = null) {
+    const next = { ...(floor ? floor.heat : this.heat) };
+    if (value == null) delete next[key]; else next[key] = value;
+    if (floor) floor.heat = cleanFloorHeat(next); else this.heat = cleanHeat(next); // drops bad keys/types
     this._emit();
   }
 
