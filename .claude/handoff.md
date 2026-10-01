@@ -19,9 +19,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-01 (session 36)
-**Status:** Proven (git): `origin/main` = `99d0cd9` plus this handoff's commit, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Live site: see the
-commits section (the `99d0cd9` deploy was still running at handoff time).
+**Status:** Proven (git): `origin/main` = `c2f6e0b` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl, at handoff
+time): the live `version.json` serves `c2f6e0b`, so everything from sessions 35–36 is published.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32) and the floor pattern **start corner** (session 33). Everything else from
 sessions 30–36 is verified by build, Node or a scratch/desktop browser only (Next step A).
@@ -49,8 +49,8 @@ boots straight into passthrough AR):
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
    with circuit diagnostics, a plumbing pipe network, **surface materials and door, window,
-   furniture, switch, outlet and Ethernet products** (all in the MATERIAL group), **room heat loss
-   in W** (PROJECT · HEAT LOSS), save/load in 6
+   furniture, switch, outlet and Ethernet products** (all in the MATERIAL group), a **HEATING** group (pipes, room heat loss in W, insulation R
+   / window U), save/load in 6
    slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X** that hides every
    plan overlay while on. Mode list: `docs/ar-survey.md`.
 
@@ -80,13 +80,22 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
    Sources in each builder's `// Sources:` block; entries in `docs/furniture.md`. Proven: scratch
    previews (bounding boxes = the spec sizes). Mount heights (220 mm ACOVA from its manual minimum,
    150 mm De'Longhi, a guess) are Hypothesis.
-3. **Room heat loss, PROJECT · HEAT LOSS** (`99d0cd9`, design + defaults + owner answers in
+3. **Room heat loss** (`99d0cd9`, `a2084e2`; design + defaults + owner answers in
    `docs/heat-loss.md`): a simplified EN 12831 in `src/core/heatLoss.js` (pure, Node-testable), per
-   connected ROOM component. Room watts on the AR plan, a settings panel (this floor / whole house) and
-   the aimed room's breakdown; an INSULATION zone's R is typed on the PLAN · EDIT band pad. Settings
-   are project data (`project.heat`, `floor.heat`, zone `rValue`, only keys set). Proven: build, the
-   production build loads in Chrome with no console errors, Node on the owner's file (save/reload, one
-   room checked by hand). No desktop UI (not asked).
+   connected ROOM component. A new AR group **HEATING** (owner: "a master category"): **PIPE** (moved
+   from MARKER, id `marker_pipe` unchanged), **HEAT LOSS** (room watts on the plan, settings panel this
+   floor / whole house, aimed room's breakdown) and **R / U** (id `heat_r`: each INSULATION zone's R
+   and each window/door's own U on the plan, typed on the numpad; the R also on the PLAN · EDIT band
+   pad). Openings store **U** (label Uw), not R, on purpose. Settings are project data
+   (`project.heat`, `floor.heat`, zone `rValue` / `uValue`, only keys set). Proven: build, production
+   build loads with no console errors, Node on the owner's file (save/reload, one room by hand, window
+   U 2.8 doubles the window part). No desktop UI (not asked).
+4. **Stairs start at their floor** (`c2f6e0b`, owner): a stair zone holds only its own steps, rising
+   (UP) or descending (DOWN) from its floor at a fixed **18 cm riser**; count = run / 25 cm going
+   (the going is a Hypothesis). Was: every zone climbed the full storey. Proven in Node (the owner's
+   split flights add to 2.88 m for 2.95 m). AR 3D view and View 3D share it.
+5. **JOYFURNOS double pedal bin** (`51b0968`, builder `pedal-bin`, Joybuy 100001750045278): size from
+   the gallery dimension drawing; `tools/product-images.mjs` learned Joybuy (Chrome-only).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -196,7 +205,8 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
   every setting configurable in AR. Owner's house: basement unheated and staying uninsulated (stair
   door closed), Ground part on an earth slab, flat ceilings under a ~1 m attic (blown rock wool
   planned), VMC, Val-de-Marne at 43 m. Limits kept on purpose (one indoor temperature, stairs not
-  counted, attic = outside): `docs/heat-loss.md`.
+  counted, attic = outside): `docs/heat-loss.md`. Stairs stay circulation, not rooms (owner declined
+  merging them into rooms for now; their own walls are not counted).
 - **Radiators are furniture products** (session 36): a FURNITURE zone against the wall, picked in
   MATERIAL · FURNITURE; the catalog `mountZMm` sets the height. They are not tied to the `radiator`
   marker or the HEATER zone kind (no link was asked for).
@@ -263,6 +273,9 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
 - **Check a texture up close against the full-resolution photo**, not only after shrinking the photo to
   the texture's scale: that hid the 2048 px limit until the owner zoomed in. The detail layer is the fix;
   a bigger canvas is too heavy for the Quest (`docs/materials.md` "Detail layer").
+- **Joybuy** (`joybuy.fr`): the short `m.joybuy.fr/dp/<id>` link and any curl land on a login page
+  (never log in); the full product link opens in Chrome. No spec table: sizes are in a gallery
+  dimension drawing. Gallery = the `s128x128_` thumbnail strip (protocol-relative URLs).
 - **Leroy Merlin search:** type into the site's search box (it lands on `/search?q=…`); a guessed
   `/recherche=…` URL is a 404. A "Verifying the device" page can appear first and passes by itself
   after a few seconds (never solve a CAPTCHA). Variants of a range can differ in more than size: the
@@ -315,7 +328,8 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - **Session 36:** `542e46f` ACOVA towel radiators · `e08eb59` conduit length readout · `084709f`
-  De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` PROJECT · HEAT LOSS.
+  De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
+  `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
 - **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
   grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
   card.
@@ -361,7 +375,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/architectural3d.js` | Plan → slabs/walls/openings/stairs + `wallMarkerPlacements()` (pure, Node-testable) |
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
-| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss`, `roomHeatLoss`), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, settings sanitizers used by model + serialize |
+| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss`, `roomHeatLoss`), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
+| `src/core/architectural3d.js` stair part | `stairsGeometry`: `STAIR_RISER` 0.18 (owner), `STAIR_GOING` 0.25 (estimate) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
@@ -369,7 +384,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware; `buildSliding` for the Néva) from `windowProductPlacements` |
@@ -381,8 +396,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
-  - session 36: PROJECT · HEAT LOSS (set the Basement unheated first, it defaults to heated; then the
-    3 linings' R and the attic R; panel legibility/height, labels vs dims overlap); CONDUIT · EDIT
+  - session 36: HEATING (PIPE still works after the move; HEAT LOSS: set the Basement unheated first,
+    it defaults to heated, then the attic R; R / U: the 3 linings' R and the windows' Uw; panel
+    height, labels vs dims overlap); the stairs in LEFT X (treads from the floor, 25 cm going vs the
+    real one); the pedal bin on a furniture zone; CONDUIT · EDIT
     `LENGTH` / `RUN` against a tape measure; the ACOVA and De'Longhi radiators on furniture zones
     (LEFT X: size, wall side, mount height vs the real ones);
   - session 35: the material card (LEFT grip in each MATERIAL mode; paint stall when flicking? debug
@@ -453,8 +470,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   Session 36 heat loss: every default without an owner answer (bare wall R 0.25, slab R 0.15, window
   U 1.4, door U 2.0, λ 0.04 for the 3 linings until their R is set, basement 6 °C); Node totals with
   defaults (Ground 11.7 kW, Upper 8.4 kW; 8.8 / 4.6 with attic R 7) are not checked against any real
-  heating. Next, if asked: radiator W against the need (catalog entries carry no W yet; ratings are at
-  ΔT 50 K), a 22 °C bathroom, a desktop panel.
+  heating. Next, if asked: exterior/interior edges coloured in HEAT LOSS (offered), stairs merged into
+  their room (offered, declined for now), radiator W against the need (catalog entries carry no W
+  yet; ratings are at ΔT 50 K), window products' Uw, a 22 °C bathroom, a desktop panel.
+  Session 36 stairs: the 25 cm going; the 7–11 cm per storey no zone covers. Pedal bin estimates:
+  pedal height 52 mm (photos 43 vs 61), spacing ±145 mm, handle width, corner radius.
   Session 36 estimates: ACOVA bar end positions (±3 mm, photos), the 1728 mm size's bracket rules
   (manual draws only 1008/1332); EASY slot width 15 mm and depth 8 mm, the 46 mm horizontal margin on
   the 120 cm (its room photo suggests ~37), the 38 mm vertical margin on the 180 cm (copied from the
