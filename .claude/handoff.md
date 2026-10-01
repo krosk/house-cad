@@ -11,21 +11,20 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/ar-qa-checklist.md` | What has actually been walked on the Quest (mostly stale — see Open questions) |
 | `docs/electrical-workflow.md` | Conduit / wire / control-link lanes, derived circuits, owner decisions |
 | `docs/plumbing-workflow.md` | The pipe lane (first slice) and what's deferred |
-| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, furniture zones + products (the merge), procedural furniture (products with no IKEA model) |
+| `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, furniture zones + products (the merge), procedural furniture (products with no IKEA model: bed, Daikin units, shower tray, piano, **towel and panel radiators**) |
 | `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
 | `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-09-30 (session 35)
-**Status:** Proven (git): `origin/main` = `ba33078` plus this handoff's commit, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl, at handoff
-time): the live `version.json` served `d481128`; the `ba33078` deploy (material card) had not landed
-yet, so re-check. Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL
-flow, the 3D-only AR view, FURNISH's removal (session 32) and the floor pattern **start corner**
-(session 33). Everything else from sessions 30–35 is verified by build, Node or a scratch/desktop
-browser only (Next step A).
+**Date:** 2026-10-01 (session 36)
+**Status:** Proven (git): `origin/main` = `99d0cd9` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Live site: see the
+commits section (the `99d0cd9` deploy was still running at handoff time).
+Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
+FURNISH's removal (session 32) and the floor pattern **start corner** (session 33). Everything else from
+sessions 30–36 is verified by build, Node or a scratch/desktop browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -50,7 +49,8 @@ boots straight into passthrough AR):
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
    with circuit diagnostics, a plumbing pipe network, **surface materials and door, window,
-   furniture, switch, outlet and Ethernet products** (all in the MATERIAL group), save/load in 6
+   furniture, switch, outlet and Ethernet products** (all in the MATERIAL group), **room heat loss
+   in W** (PROJECT · HEAT LOSS), save/load in 6
    slots, export (sheets, DXF, JSON, view link, QR), and an **AR 3D view on LEFT X** that hides every
    plan overlay while on. Mode list: `docs/ar-survey.md`.
 
@@ -60,39 +60,33 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 35
+## What changed in session 36
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Session 34 is folded into the sections below.
+> decisions" or "Findings" and delete this list. Session 35 is folded into the sections below (its
+> unwalked items stay in Next step A).
 
-All owner requests; all build-verified, none walked on the Quest yet (Next step A).
-1. **Double switch on two circuits** (`948c5ed`): wiring two independent circuits through one
-   `switch_dual` joined them (a false cross-tie: circuits were components over marker ids). A wire end on
-   a double switch now names its rocker (`wire.fromRocker`/`toRocker`, 2 = right, absent = left); the
-   circuit vertex is `id` or `id#2`. A new wire starts on the rocker controlling the other end's light;
-   **A/X on a selected wire in MARKER · WIRE swaps it**. The pair merge puts the old single's wires on
-   the right rocker. Owner asked for **left/right instead of 1/2** in every UI string and the sheet chip
-   (`L`/`R`); storage keeps 1/2. Proven in Node (2 breakers → 2 circuits, 0 cross-ties).
-   Wires drawn before this sit on the left rocker: the owner splits them with A/X.
-2. **Deleting a pass-through conduit node rejoins its neighbours** (`948c5ed`): exactly two segments →
-   one A–B segment; a branch node (3+) still loses them all. Proven in Node.
-3. **Shared grip cycle with an `i/n` readout** (`10c320a`): `gripCycle` in `mr.js` drives MARKER · EDIT,
-   LINK, WIRE, CONDUIT · EDIT and MATERIAL · SWITCH/OUTLET/ETHERNET (MARKER · CONDUIT keeps its own
-   `conduitPickRing`). Sticky target, grip steps a fixed ring, last yellow readout line `<type> i/n`.
-   **EDIT now cycles every marker in the reticle** (owner: "align with the new way"), not only an
-   exact-point stack. This supersedes session 34's conduit-only sticky pick and its B⁗ option.
-4. **FLOOR calibration keeps the teleport** (`a031a0c`): FLOOR called `placeAt` (a fresh registration:
-   clears `navOffset`, `navLift`, resets `anchorYaw`), sending the owner back to the origin. `regroundAt`
-   now changes only the height and folds `anchorYaw` into `planYaw`. ORIGIN/RECAL still clear it.
-5. **Controller pills widen to fit** (`d481128`): long material names were cut off. The mode label and
-   readout pills grow from 256 to 576 canvas px (readout up to 0.45 m) before shrinking the font. 576 comes
-   from glyph advances read from the font files (longest name 468 px Noto / 532 px DejaVu at 16 px, text
-   area 536). The **help box** also overflows (~15 help texts > 8 lines, estimate); the owner said no need.
-6. **Material card** (`ba33078`, owner chose option 1 of 3): in MATERIAL modes the LEFT grip shows the
-   target's material instead of the sheet: a texture patch with a scale bar (floor/wall), or the product
-   in 3D on a turntable (door, window, device, furniture), built after a 0.3 s rest. `src/ui/materialCard.js`;
-   finish textures now one shared cache (`finishMapFor`) with the AR 3D view. Rendered in a desktop
-   preview (not furniture). Detail: `docs/ar-survey.md` "Material card".
+All owner requests; build-verified, none walked on the Quest yet (Next step A).
+1. **CONDUIT · EDIT shows a selected conduit's length** (`e08eb59`): `LENGTH` (the segment, 3D) and,
+   when it is part of a longer run, `RUN <len> (<n>)`: the run continues through bare junctions with
+   exactly two segments, stops at a device, branch or end; a loop counts once (`conduitRunLength` in
+   `core/conduit.js`). Proven in Node. Text only: the run is not highlighted (offered, not asked for).
+2. **Radiators as procedural furniture** (wall-mounted, `mountZMm` seeds the zone's foot, like Daikin):
+   - `542e46f` ACOVA Angora towel radiators 133.2 and 172.8 cm (builder `towel-radiator`, bar groups in
+     `params.rows`);
+   - `084709f` + `8824dc3` De'Longhi EASY panel radiators, builder `panel-radiator`: vertical 50 × 180,
+     50 × 200, 60 × 200 (type 21, 7 cm), horizontal 90 × 60 and 120 × 60 (double panel, 10 cm, top
+     grille, side ports). Slots on a **33.3 mm pitch** (measured), counted on studio renders or straight photos.
+   Sources in each builder's `// Sources:` block; entries in `docs/furniture.md`. Proven: scratch
+   previews (bounding boxes = the spec sizes). Mount heights (220 mm ACOVA from its manual minimum,
+   150 mm De'Longhi, a guess) are Hypothesis.
+3. **Room heat loss, PROJECT · HEAT LOSS** (`99d0cd9`, design + defaults + owner answers in
+   `docs/heat-loss.md`): a simplified EN 12831 in `src/core/heatLoss.js` (pure, Node-testable), per
+   connected ROOM component. Room watts on the AR plan, a settings panel (this floor / whole house) and
+   the aimed room's breakdown; an INSULATION zone's R is typed on the PLAN · EDIT band pad. Settings
+   are project data (`project.heat`, `floor.heat`, zone `rValue`, only keys set). Proven: build, the
+   production build loads in Chrome with no console errors, Node on the owner's file (save/reload, one
+   room checked by hand). No desktop UI (not asked).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -124,7 +118,8 @@ All owner requests; all build-verified, none walked on the Quest yet (Next step 
 - **A double switch is one `switch_dual` marker** with per-rocker links (owner, 2026-09-28) and
   **per-rocker wire ends** (2026-09-29: each rocker may be its own circuit); rockers read **left/right**
   in the UI (1 = left facing the switch), storage keeps 1/2. Older two-marker pairs still load and work,
-  and A/X in MARKER · EDIT merges one (never on retype). Never draw stacked markers apart in AR; an
+  and A/X in MARKER · EDIT merges one (never on retype). Wires drawn before session 35 sit on the left
+  rocker; the owner moves them with A/X on the wire in MARKER · WIRE. Never draw stacked markers apart in AR; an
   amber count badge shows the overlap (owner's choice).
 - **One grip cycle for every picking mode** (`gripCycle`, owner 2026-09-29): sticky target, grip steps
   a fixed ring, `i/n` shown when 2+ targets. A new picking mode should use it, not its own distance sort
@@ -196,6 +191,15 @@ All owner requests; all build-verified, none walked on the Quest yet (Next step 
 - **LEFT controller:** trigger = teleport, grip = hold-to-view sheet (**material card in MATERIAL
   modes**), stick-x = rotate plan, stick-y = storey teleport (ALL FLOORS), **X = AR 3D view**. Y and the
   stick click are free.
+- **Heat loss stays simple** (owner, session 36): simplified EN 12831 chosen over W/m³; **exterior
+  insulation is drawn as INSULATION zones outside the room** (within 0.6 m of the edge), linings inside;
+  every setting configurable in AR. Owner's house: basement unheated and staying uninsulated (stair
+  door closed), Ground part on an earth slab, flat ceilings under a ~1 m attic (blown rock wool
+  planned), VMC, Val-de-Marne at 43 m. Limits kept on purpose (one indoor temperature, stairs not
+  counted, attic = outside): `docs/heat-loss.md`.
+- **Radiators are furniture products** (session 36): a FURNITURE zone against the wall, picked in
+  MATERIAL · FURNITURE; the catalog `mountZMm` sets the height. They are not tied to the `radiator`
+  marker or the HEATER zone kind (no link was asked for).
 - **FLOOR changes only the ground height** (owner, 2026-09-30): it keeps the teleport and the plan's
   world yaw; only ORIGIN/RECAL re-register.
 
@@ -259,6 +263,14 @@ All owner requests; all build-verified, none walked on the Quest yet (Next step 
 - **Check a texture up close against the full-resolution photo**, not only after shrinking the photo to
   the texture's scale: that hid the 2048 px limit until the owner zoomed in. The detail layer is the fix;
   a bigger canvas is too heavy for the Quest (`docs/materials.md` "Detail layer").
+- **Leroy Merlin search:** type into the site's search box (it lands on `/search?q=…`); a guessed
+  `/recherche=…` URL is a 404. A "Verifying the device" page can appear first and passes by itself
+  after a few seconds (never solve a CAPTCHA). Variants of a range can differ in more than size: the
+  60 × 200 EASY exists slotted (82273211) and flat-fronted (82273207), so check the photo, and use a
+  power/weight ratio to spot the true sibling.
+- **Retailer marketing photos can be edited:** the EASY 60 × 200 room photo shows 18 slots at the 50 cm
+  photo's exact pixel pitch (a widened copy); its studio render shows 17. Count on a studio render or a
+  straight photo whose scale matches the body's known size.
 - **Leroy Merlin sibling articles** (other sizes of a range) aren't linked from the page. Their refs sit
   near each other: `HEAD` the same URL slug with neighbouring refs from inside the Chrome tab (found the
   Monastère 30×50, 72831311, that way).
@@ -302,6 +314,8 @@ All owner requests; all build-verified, none walked on the Quest yet (Next step 
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 36:** `542e46f` ACOVA towel radiators · `e08eb59` conduit length readout · `084709f`
+  De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` PROJECT · HEAT LOSS.
 - **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
   grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
   card.
@@ -346,7 +360,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/io/shareView.js` | View-link payload (compact positional schema; marker slot 4 height flag, slot 5 product) |
 | `src/core/architectural3d.js` | Plan → slabs/walls/openings/stairs + `wallMarkerPlacements()` (pure, Node-testable) |
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
-| `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph + routing |
+| `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
+| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss`, `roomHeatLoss`), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, settings sanitizers used by model + serialize |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
@@ -354,7 +369,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware; `buildSliding` for the Néva) from `windowProductPlacements` |
@@ -366,6 +381,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 36: PROJECT · HEAT LOSS (set the Basement unheated first, it defaults to heated; then the
+    3 linings' R and the attic R; panel legibility/height, labels vs dims overlap); CONDUIT · EDIT
+    `LENGTH` / `RUN` against a tape measure; the ACOVA and De'Longhi radiators on furniture zones
+    (LEFT X: size, wall side, mount height vs the real ones);
   - session 35: the material card (LEFT grip in each MATERIAL mode; paint stall when flicking? debug
     log `material card` ms; a furniture card); the widened pills (a long French name reads whole; is a
     0.45 m pill too big?); teleport then FLOOR (stays put, plan doesn't turn); the `i/n` line in EDIT,
@@ -430,7 +449,16 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Sessions 32–35: everything in Next step A's first four bullets.
+- **Unwalked, Hypothesis only.** Sessions 32–36: everything in Next step A's first five bullets.
+  Session 36 heat loss: every default without an owner answer (bare wall R 0.25, slab R 0.15, window
+  U 1.4, door U 2.0, λ 0.04 for the 3 linings until their R is set, basement 6 °C); Node totals with
+  defaults (Ground 11.7 kW, Upper 8.4 kW; 8.8 / 4.6 with attic R 7) are not checked against any real
+  heating. Next, if asked: radiator W against the need (catalog entries carry no W yet; ratings are at
+  ΔT 50 K), a 22 °C bathroom, a desktop panel.
+  Session 36 estimates: ACOVA bar end positions (±3 mm, photos), the 1728 mm size's bracket rules
+  (manual draws only 1008/1332); EASY slot width 15 mm and depth 8 mm, the 46 mm horizontal margin on
+  the 120 cm (its room photo suggests ~37), the 38 mm vertical margin on the 180 cm (copied from the
+  200 cm); every radiator's mount height. No radiator has been seen in View 3D or AR.
   Session 35: the card's paint time on the Quest (five cards ~1 s on desktop) and a furniture card
   (not previewed); the Quest's `sans-serif` font (likely Roboto, narrower than the fonts measured);
   **PERF in MARKER · CONDUIT is still not re-measured** since session 34's batching.
