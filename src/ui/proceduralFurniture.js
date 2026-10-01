@@ -710,9 +710,91 @@ function panelRadiator(entry) {
   return g;
 }
 
+// Double pedal bin (JOYFURNOS 2 × 30 L): a powder-coated steel body with rounded
+// vertical corners, a brushed-steel top frame holding two cream lids side by side
+// (closed), a black gasket line under the frame, a black base band, a recessed black
+// handle in each side and two brushed pedals in black housings at the front, one under
+// each bucket. Front toward +Z.
+//
+// Sources:
+//   - Joybuy 100001750045278, "JOYFURNOS Poubelle double à pédale, 2 seaux amovibles,
+//     couvercle à fermeture douce", colour Crème (also Blanc et gris, Gris verdâtre, Gris
+//     ardoise, Argent et Noir):
+//     https://www.joybuy.fr/dp/joyfurnos-poubelle-double-%C3%A0-p%C3%A9dale-2/100001750045278
+//     No spec table on the page ("Pays d'Origine Chine", "Marque JOYFURNOS" only).
+//   - Gallery image 6a4cad01E11ac9d64 (dimension drawing): "2 x 30 L", width 59 cm,
+//     depth 36,5 cm, height 62,4 cm closed, 91 cm with a lid open (`sizeMm`). On its
+//     near-straight front (1.39 px/mm vertically): top frame 24 mm tall (`rimMm`), a 6 mm
+//     black gasket under it, a 16 mm black base band (`baseMm`), pedals 27 mm tall in black
+//     housings topping out at 82 mm, about 130 mm wide (`pedal`); the pedal centre reads
+//     61 mm here and 43 mm on the ¾ render 6a4cad01Edf4c5c27 (perspective): 52 mm used. The
+//     housing shows black above the pedal (the pedal travels in it);
+//     side handle 47 mm tall, its top 43 mm below the frame top (`handle`).
+//   - Gallery 6a4cad01Edf4c5c27 (front ¾ studio render): rounded vertical corners, the
+//     frame slightly proud of the body, the lid seam in the middle; body colour sampled at
+//     about rgb(229, 222, 208) under the render's light. `color` 0xf0e8da gives the same hue
+//     in the scratch preview (rgb(211, 206, 194); the first guess 0xebe3d1 read yellow-green).
+//   - Gallery 6a4cad01E16a88556 / 6a4cad02E13ffa38e (lids open): one black inner bucket per
+//     lid, hinged at the back (not modelled: drawn closed).
+//   - Estimates: pedal centres ±145 mm (the two photos disagree, 130–156; placed under each
+//     bucket), pedal projection 20 mm (included in the 365 mm depth), handle width 100 mm
+//     along the depth, corner radius 25 mm, lid inset 14 mm inside the frame.
+function pedalBin(entry) {
+  const [W, H, D] = (entry.sizeMm || [590, 624, 365]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const rim = mm(p.rimMm, 24), base = mm(p.baseMm, 16), gasket = 0.006;
+  const proj = mm(p.pedal?.projMm, 20), r = mm(p.cornerMm, 25);
+  const bodyD = D - proj, zc = -proj / 2; // body centred behind the pedals
+  const coat = new THREE.MeshStandardMaterial({ color: p.color ?? 0xf0e8da, roughness: 0.55 });
+  // Brushed steel kept mostly dielectric: the AR and View 3D scenes have no environment
+  // map, so a strongly metallic surface renders near-black.
+  const steel = new THREE.MeshStandardMaterial({ color: 0xd4d7db, roughness: 0.35, metalness: 0.25 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x1d1e20, roughness: 0.7 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'pedal-bin';
+  const rounded = (w, h, d, y, material, radius = r) => {
+    const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(radius, w / 2, d / 2, h / 2)), material);
+    m.position.set(0, y, zc);
+    return m;
+  };
+  // Base band, body, gasket line, steel frame (2 mm proud), then the two lids.
+  g.add(rounded(W - 0.004, base, bodyD - 0.004, base / 2, black));
+  const bodyH = H - rim - gasket - base;
+  g.add(rounded(W, bodyH, bodyD, base + bodyH / 2, coat));
+  g.add(rounded(W - 0.002, gasket, bodyD - 0.002, H - rim - gasket / 2, black));
+  g.add(rounded(W + 0.004, rim, bodyD + 0.004, H - rim / 2, steel));
+  const inset = mm(p.lidInsetMm, 14), seam = 0.004;
+  const lidW = (W - 2 * inset - seam) / 2, lidD = bodyD - 2 * inset;
+  for (const sx of [-1, 1]) {
+    const lid = new THREE.Mesh(new RoundedBoxGeometry(lidW, 0.004, lidD, 2, 0.0015), coat);
+    lid.position.set(sx * (seam / 2 + lidW / 2), H - 0.0015, zc);
+    g.add(lid);
+  }
+  // Side handles: a black recess plate flush with each side, near the top.
+  const hW = mm(p.handle?.wMm, 100), hH = mm(p.handle?.hMm, 47), hTop = mm(p.handle?.topMm, 43);
+  for (const sx of [-1, 1]) {
+    const x = sx * (W / 2 + 0.0005);
+    g.add(box([x - 0.001, H - hTop - hH, zc - hW / 2], [x + 0.001, H - hTop, zc + hW / 2], black));
+  }
+  // Pedals: a black housing on the front face, the brushed pedal standing out of it.
+  const pw = mm(p.pedal?.wMm, 130), ph = mm(p.pedal?.hMm, 27), py = mm(p.pedal?.yMm, 52);
+  const hTopP = mm(p.pedal?.housingTopMm, 82);
+  const off = mm(p.pedal?.offMm, 145), zFace = zc + bodyD / 2;
+  for (const sx of [-1, 1]) {
+    const x = sx * off;
+    g.add(box([x - pw / 2 + 0.004, py - ph / 2 - 0.003, zFace - 0.001], [x + pw / 2 - 0.004, hTopP, zFace + 0.002], black));
+    const pedal = new THREE.Mesh(new RoundedBoxGeometry(pw, ph, proj, 2, 0.004), steel);
+    pedal.position.set(x, py, zFace + proj / 2);
+    g.add(pedal);
+  }
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
+  'pedal-bin': pedalBin,
 };
 
 export function isProcedural(entry) {

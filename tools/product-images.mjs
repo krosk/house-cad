@@ -37,7 +37,9 @@ function curl(url, outFile) {
 
 // Sites that 403 any scripted fetch: read them in Chrome with --snippet. Leroy Merlin runs
 // DataDome (a JS challenge; x-datadome header): a real Chrome passes it, curl never does.
-const BROWSER_ONLY = [/(^|\.)leroymerlin\.fr$/];
+// Joybuy sends curl to its login page (2026-10-01); in Chrome the full product link opens
+// without one (the short m.joybuy.fr/dp/<id> link redirects to login there too).
+const BROWSER_ONLY = [/(^|\.)leroymerlin\.fr$/, /(^|\.)joybuy\.fr$/];
 
 // → { images: [{ url, note }], docs: [{ url, name }], specs: [[name, value]], variants: [text] }
 // Images are full-size product photos in page order, deduplicated.
@@ -83,6 +85,15 @@ function extractProduct(pageUrl, html, filter = '') {
     }
     for (const m of all(/<a[^>]*data-file-name="([^"]*)"[^>]*href="(https:\/\/media\.adeo\.com\/media\/\d+\/media\.pdf)"/g)) {
       addDoc(m[2], m[1].trim());
+    }
+  } else if (host.endsWith('joybuy.fr')) {
+    // images<n>.joy-sourcing.com/product/s128x128_jfsintlpro-000-product/…/<id>/<hash>.jpg:
+    // the gallery strip's thumbnails, in order (each appears twice); dropping the size
+    // prefix gives the 1600 px photo. Other product ids on the page are recommendations.
+    // No spec table on the page (2026-10-01): dimensions are in a gallery drawing.
+    // The page writes them protocol-relative (//images4…).
+    for (const m of all(/(?:https:)?\/\/images\d\.joy-sourcing\.com\/product\/s128x128_(jfsintlpro-000-product\/[^"'\s\\!?]+?\/([0-9a-z]+E[0-9a-z]+)\/[0-9a-f]+\.(?:jpe?g|png))/g)) {
+      add(`https://images4.joy-sourcing.com/product/${m[1]}`, `joybuy ${m[2]}`, m[2]);
     }
   } else if (host.endsWith('lapeyre.fr')) {
     // statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg, or zoom1/…/<id>.jpg on

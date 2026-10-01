@@ -320,5 +320,37 @@
     },
     "source": "procedural: De'Longhi EASY horizontal double-panel hot-water radiator, white gloss, 1930 W, l 120 x H 60 cm (Leroy Merlin 82273196, no manufacturer 3D model); size, depth with brackets and 54 cm entraxe from the Leroy Merlin spec table, 35 slots counted on its room photo (media 4047370), the rest as the 90 x 60 (88144739); sources in the panel-radiator builder",
     "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "joyfurnos-double-pedal-bin-2x30l": {
+    "name": "joyfurnos-double-pedal-bin-2x30l",
+    "article": "100001750045278",
+    "sizeMm": [
+      590,
+      624,
+      365
+    ],
+    "procedural": "pedal-bin",
+    "params": {
+      "color": 15788250,
+      "rimMm": 24,
+      "baseMm": 16,
+      "cornerMm": 25,
+      "lidInsetMm": 14,
+      "pedal": {
+        "wMm": 130,
+        "hMm": 27,
+        "yMm": 52,
+        "offMm": 145,
+        "projMm": 20,
+        "housingTopMm": 82
+      },
+      "handle": {
+        "wMm": 100,
+        "hMm": 47,
+        "topMm": 43
+      }
+    },
+    "source": "procedural: JOYFURNOS double pedal bin 2 x 30 L, cream (Joybuy 100001750045278, no manufacturer 3D model); size from the gallery dimension drawing (image 6a4cad01E11ac9d64: 59 x 62.4 x 36.5 cm, 91 cm lid open), details from the studio renders; sources in the pedal-bin builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
   }
 }

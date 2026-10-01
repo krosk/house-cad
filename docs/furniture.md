@@ -265,6 +265,16 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   Proven in a scratch browser preview: bounding boxes 0.500 × 2.000 × 0.101, 0.500 × 1.800 × 0.101, 0.600 × 2.000 × 0.101,
   0.904 × 0.600 × 0.132 and 1.204 × 0.600 × 0.132 m (the side ports add 2 mm each side); ¾, front and side views beside the photos.
   Not yet seen in AR, View 3D or on device.
+- `joyfurnos-double-pedal-bin-2x30l`: JOYFURNOS double pedal bin, 2 × 30 L, cream (Joybuy
+  100001750045278; also sold in white/grey, green-grey, slate grey and silver/black), builder `pedal-bin`.
+  Floor-standing, drawn with both lids closed. 590 × 624 × 365 mm from the gallery's dimension drawing
+  (image 6a4cad01E11ac9d64: 59 × 62.4 × 36.5 cm, 91 cm with a lid open); the page has no spec table.
+  Rim, gasket, base band, pedal and handle sizes were read off that drawing; pedal height (two photos
+  disagree, 43 vs 61 mm: 52 used), pedal spacing (±145 mm), handle width and corner radius are
+  estimates. Joybuy needs Chrome: the short `m.joybuy.fr/dp/<id>` link redirects to a login page, the
+  full product link opens without one. Proven in a scratch browser preview: bounding box
+  0.594 × 0.6245 × 0.367 m (the steel frame is 2 mm proud each side); ¾, front and side views beside
+  the photos. Not yet seen in AR, View 3D or on device.
 
 ## Rendering
 
