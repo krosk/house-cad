@@ -482,9 +482,117 @@ function uprightPiano(entry) {
   return g;
 }
 
+// Hot-water towel radiator, ladder type (ACOVA Angora, "TYPE P34"): two round vertical
+// collectors joined by round horizontal bars in three groups (dense, widely spaced, dense),
+// held off the wall by four brackets. Wall at −Z, front toward +Z; the catalog `mountZMm`
+// lifts it on drop (the foot is the collectors' bottom end).
+//
+// Sources:
+//   - Leroy Merlin 69044605 (615 W, H 133.2 × L 50 cm):
+//     https://www.leroymerlin.fr/produits/seche-serviettes-a-eau-chaude-acova-615-w-h-133-2-x-l-50-cm-angora-69044605.html
+//   - Leroy Merlin 69044626 (795 W, H 172.8 × L 50 cm):
+//     https://www.leroymerlin.fr/produits/seche-serviettes-eau-chaude-acova-795-w-h-172-8-x-l-50-cm-angora-blanc-69044626.html
+//   - Spec tables (both pages): "Largeur 50", "Hauteur 133.2" / "172.8", "Profondeur 8",
+//     "Epaisseur totale avec fixations 8.9", "Entraxe (en mm) 462", "Forme des tubes Rond",
+//     "Couleur Blanc"; 10.2 / 13 kg.
+//   - Dimension photos, media 1630521 (133.2) and 1733745 (172.8): "Epaisseur : 3.8 cm"
+//     (the collector diameter), "Epaisseur totale (avec fixations) : entre 8.9 cm et 9.9 cm".
+//   - Installation manual "TYPE P34" (media 1316977, both pages link it): L 500 / H 1008, 1332;
+//     brackets L1 = L − 150 apart across and H1 = H − 180 apart up (so 90 mm from each end);
+//     connections N = L − 38 = 462 mm apart (the collector centres); wall to the tube axis 70–80
+//     mm; 4 brackets. Its 1728 mm size isn't drawn; the same rules are assumed (Hypothesis).
+//   - Close-up media 3273996: bar vs collector diameter (25 vs 38 mm), the grey ACOVA badge on
+//     the top bar next to the left collector (about 36 × 12 mm, 11 mm from it), a bracket's round
+//     standoff and square clip behind a bar.
+//   - Bar layout measured on media 1630521 and 1733745, scaled by the collector length
+//     (1.47 and 1.77 mm/px): `params.rows` [count, pitch units] with `params.groupGapUnits`
+//     between groups; first/last bar centres `topMm`/`bottomMm` from the ends (estimates, ±3 mm).
+//     The bars are spread evenly on those units, about 36–37 mm per unit.
+//   - Air vent on top of the right collector: media 1619614 (size an estimate).
+//   Not modelled: the valves (sold separately) and the towel hooks (media 1631660).
+function towelRadiator(entry) {
+  const [W, H, D] = (entry.sizeMm || [500, 1332, 89]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const colR = mm(p.collectorMm, 38) / 2;            // "Epaisseur : 3.8 cm"
+  const barR = mm(p.barMm, 25) / 2;                  // close-up 3273996 (estimate)
+  const colX = mm(p.entraxeMm, 462) / 2;             // "Entraxe 462"
+  const axisZ = D / 2 - colR;                        // collector front at +D/2: wall to axis 70 mm
+  const white = new THREE.MeshStandardMaterial({ color: p.color ?? 0xf1f1ee, roughness: 0.35 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xc8cacc, roughness: 0.2, metalness: 0.8 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'towel-radiator';
+
+  // Collectors, closed flat at both ends.
+  for (const x of [-colX, colX]) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(colR, colR, H, 24), white);
+    c.position.set(x, H / 2, axisZ);
+    g.add(c);
+  }
+  // Bars: positions in pitch units from the top, then spread between topMm and bottomMm.
+  const rows = p.rows || [[6, 1], [5, 2], [16, 1]];
+  const gap = p.groupGapUnits ?? 3;
+  const units = [];
+  for (const [n, step] of rows) {
+    for (let i = 0; i < n; i++) {
+      const last = units[units.length - 1];
+      units.push(last === undefined ? 0 : last + (i ? step : gap));
+    }
+  }
+  const yTop = H - mm(p.topMm, 44), yBottom = mm(p.bottomMm, 40);
+  const unitM = (yTop - yBottom) / units[units.length - 1];
+  const barGeo = new THREE.CylinderGeometry(barR, barR, colX * 2, 16);
+  barGeo.rotateZ(Math.PI / 2);
+  const barY = units.map((k) => yTop - k * unitM);
+  for (const y of barY) {
+    const b = new THREE.Mesh(barGeo, white);
+    b.position.set(0, y, axisZ);
+    g.add(b);
+  }
+
+  // ACOVA badge on the top bar's front, next to the left collector (close-up 3273996).
+  const badge = canvasTexture(128, (ctx, s) => {
+    ctx.fillStyle = '#b9bcbf'; ctx.fillRect(0, 0, s, s);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'italic bold 34px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('ACOVA', s / 2, s / 2 + 2);
+  });
+  badge.wrapS = badge.wrapT = THREE.ClampToEdgeWrapping;
+  badge.repeat.set(1, 0.34); badge.offset.set(0, 0.33);   // a 3:1 strip of the square canvas
+  const bw = 0.036, bh = 0.012;
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), new THREE.MeshStandardMaterial({ map: badge, roughness: 0.4 }));
+  plate.position.set(-colX + colR + 0.011 + bw / 2, barY[0], axisZ + barR + 0.0008);
+  g.add(plate);
+
+  // Air vent on top of the right collector (media 1619614).
+  const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.008, 0.012, 16), chrome);
+  vent.position.set(colX, H + 0.006, axisZ);
+  g.add(vent);
+
+  // Four brackets (manual: L − 150 across, 90 mm from each end): a round standoff from the
+  // wall to the back of the nearest bar, and a square clip around it.
+  const bx = (W - mm(p.bracketInsetMm, 150)) / 2;
+  const standR = 0.011;
+  const clipGeo = new THREE.BoxGeometry(0.016, barR * 2 + 0.006, 0.016);
+  for (const yEnd of [H - 0.09, 0.09]) {
+    const y = barY.reduce((a, b) => (Math.abs(b - yEnd) < Math.abs(a - yEnd) ? b : a));
+    for (const x of [-bx, bx]) {
+      const len = axisZ - barR - (-D / 2);
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(standR, standR, len, 16), white);
+      s.rotation.x = Math.PI / 2;
+      s.position.set(x, y, -D / 2 + len / 2);
+      g.add(s);
+      const clip = new THREE.Mesh(clipGeo, white);
+      clip.position.set(x, y, axisZ - barR + 0.004);
+      g.add(clip);
+    }
+  }
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
-  'upright-piano': uprightPiano,
+  'upright-piano': uprightPiano, 'towel-radiator': towelRadiator,
 };
 
 export function isProcedural(entry) {

@@ -221,6 +221,19 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   27 meshes in all. The polished look needs View 3D's Reflections toggle. Proven in a scratch browser
   preview (bounding box 1.518 × 1.200 × 0.624 m: the lid overhang and castors add a few mm; ¾, front
   and side views beside the Park Pianos photo); not yet seen in AR, View 3D or on device.
+- `acova-angora-1332x500`, `acova-angora-1728x500`: ACOVA Angora hot-water towel radiators, white, round
+  tubes (Leroy Merlin 69044605, 615 W, and 69044626, 795 W). 500 × 1332 / 1728 × 89 mm (`sizeMm`, depth
+  including the brackets), 462 mm between the collector centres, 38 mm collectors (spec tables and the
+  dimension photos 1630521 / 1733745). Builder `towel-radiator`: two collectors, 25 mm bars (close-up
+  3273996, estimate) in three groups (`params.rows` = [count, pitch units], `groupGapUnits`
+  between groups): 6 + 5 + 16 bars and 8 + 7 + 22 bars, counted and measured on the dimension photos.
+  The bars are spread evenly from `topMm` to `bottomMm` (first and last bar centres from the ends, photo
+  estimates ±3 mm). Four brackets from the TYPE P34 manual (media 1316977): 350 mm apart across, 90 mm
+  from each end, wall to tube axis 70 mm. Plus the grey ACOVA badge and the air vent on the right
+  collector. The valves and towel hooks are not modelled. `mountZMm: 220` is the manual's minimum
+  floor clearance. The full source list is in the builder's `// Sources:` block. Proven in a scratch
+  browser preview (bounding boxes 0.500 × 1.344 × 0.089 and 0.500 × 1.740 × 0.089 m, the vent adds
+  12 mm; ¾, front and side views beside the photos); not yet seen in AR, View 3D or on device.
 
 ## Rendering
 

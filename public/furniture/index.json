@@ -147,5 +147,69 @@
     },
     "source": "procedural: W. Hoffmann Vision V120 upright piano, traditional cabinet, polished black with brass fittings (owner's own; C. Bechstein, no manufacturer 3D model); size 151 x 120 x 62 cm and 245 kg from Morley Pianos / Bechstein, shape from Park Pianos and Morley 3/4 product photos; depths and heights are standard upright proportions",
     "registeredAt": "2026-09-27T00:00:00.000Z"
+  },
+  "acova-angora-1332x500": {
+    "name": "acova-angora-1332x500",
+    "article": "69044605",
+    "sizeMm": [
+      500,
+      1332,
+      89
+    ],
+    "mountZMm": 220,
+    "procedural": "towel-radiator",
+    "params": {
+      "rows": [
+        [
+          6,
+          1
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          16,
+          1
+        ]
+      ],
+      "groupGapUnits": 3,
+      "topMm": 44,
+      "bottomMm": 40
+    },
+    "source": "procedural: ACOVA Angora hot-water towel radiator, white, 615 W, H 133.2 x L 50 cm (Leroy Merlin 69044605, no manufacturer 3D model); size, 462 mm entraxe, 3.8 cm tubes and 8.9 cm depth with brackets from the Leroy Merlin spec table and dimension photo (media 1630521), brackets from the TYPE P34 manual (media 1316977), bar layout measured on media 1630521; sources in the towel-radiator builder",
+    "registeredAt": "2026-09-30T00:00:00.000Z"
+  },
+  "acova-angora-1728x500": {
+    "name": "acova-angora-1728x500",
+    "article": "69044626",
+    "sizeMm": [
+      500,
+      1728,
+      89
+    ],
+    "mountZMm": 220,
+    "procedural": "towel-radiator",
+    "params": {
+      "rows": [
+        [
+          8,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          22,
+          1
+        ]
+      ],
+      "groupGapUnits": 3,
+      "topMm": 38,
+      "bottomMm": 42
+    },
+    "source": "procedural: ACOVA Angora hot-water towel radiator, white, 795 W, H 172.8 x L 50 cm (Leroy Merlin 69044626, no manufacturer 3D model); size, 462 mm entraxe, 3.8 cm tubes and 8.9 cm depth with brackets from the Leroy Merlin spec table and dimension photo (media 1733745), brackets from the TYPE P34 manual (media 1316977), bar layout measured on media 1733745; sources in the towel-radiator builder",
+    "registeredAt": "2026-09-30T00:00:00.000Z"
   }
 }
