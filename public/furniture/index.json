@@ -211,5 +211,91 @@
     },
     "source": "procedural: ACOVA Angora hot-water towel radiator, white, 795 W, H 172.8 x L 50 cm (Leroy Merlin 69044626, no manufacturer 3D model); size, 462 mm entraxe, 3.8 cm tubes and 8.9 cm depth with brackets from the Leroy Merlin spec table and dimension photo (media 1733745), brackets from the TYPE P34 manual (media 1316977), bar layout measured on media 1733745; sources in the towel-radiator builder",
     "registeredAt": "2026-09-30T00:00:00.000Z"
+  },
+  "delonghi-easy-vertical-500x2000": {
+    "name": "delonghi-easy-vertical-500x2000",
+    "article": "82273209",
+    "sizeMm": [
+      500,
+      2000,
+      101
+    ],
+    "mountZMm": 150,
+    "procedural": "panel-radiator",
+    "params": {
+      "slots": 14,
+      "pitchMm": 33.3,
+      "slotMm": 15,
+      "insetMm": 38,
+      "depthMm": 8,
+      "wallGapMm": 31
+    },
+    "source": "procedural: De'Longhi EASY vertical, 1730 W, l 50 x H 200 cm, hot-water panel radiator, white gloss (Leroy Merlin 82273209, no manufacturer 3D model); size and depth with brackets from the Leroy Merlin spec table, slot layout from its room photo (media 4047392) and the 33.3 mm pitch measured on 88144739's front photo (media 3722974); sources in the panel-radiator builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "delonghi-easy-vertical-600x2000": {
+    "name": "delonghi-easy-vertical-600x2000",
+    "article": "82273211",
+    "sizeMm": [
+      600,
+      2000,
+      101
+    ],
+    "mountZMm": 150,
+    "procedural": "panel-radiator",
+    "params": {
+      "slots": 17,
+      "pitchMm": 33.3,
+      "slotMm": 15,
+      "insetMm": 38,
+      "depthMm": 8,
+      "wallGapMm": 31
+    },
+    "source": "procedural: De'Longhi EASY vertical, 2076 W, l 60 x H 200 cm, hot-water panel radiator, white gloss (Leroy Merlin 82273211, no manufacturer 3D model); size and depth with brackets from the Leroy Merlin spec table, slot layout from the 33.3 mm pitch measured on 88144739's front photo (media 3722974) and 17 slots counted on its studio render (media 912126); sources in the panel-radiator builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "delonghi-easy-horizontal-900x600": {
+    "name": "delonghi-easy-horizontal-900x600",
+    "article": "88144739",
+    "sizeMm": [
+      900,
+      600,
+      132
+    ],
+    "mountZMm": 150,
+    "procedural": "panel-radiator",
+    "params": {
+      "slots": 26,
+      "pitchMm": 33.3,
+      "slotMm": 15,
+      "insetMm": 46,
+      "depthMm": 8,
+      "wallGapMm": 32,
+      "topGrille": true,
+      "portsMm": 540
+    },
+    "source": "procedural: De'Longhi EASY horizontal double-panel, 1448 W, l 90 x H 60 cm, hot-water panel radiator, white gloss (Leroy Merlin 88144739, no manufacturer 3D model); size and depth with brackets from the Leroy Merlin spec table, slot layout from its straight front studio photo (media 3722974), grille from 3722980 / 3722976; sources in the panel-radiator builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "delonghi-easy-vertical-500x1800": {
+    "name": "delonghi-easy-vertical-500x1800",
+    "article": "82273208",
+    "sizeMm": [
+      500,
+      1800,
+      101
+    ],
+    "mountZMm": 150,
+    "procedural": "panel-radiator",
+    "params": {
+      "slots": 14,
+      "pitchMm": 33.3,
+      "slotMm": 15,
+      "insetMm": 38,
+      "depthMm": 8,
+      "wallGapMm": 31
+    },
+    "source": "procedural: De'Longhi EASY vertical hot-water panel radiator, white gloss, 1601 W, l 50 x H 180 cm (Leroy Merlin 82273208, no manufacturer 3D model); size and depth with brackets from the Leroy Merlin spec table, 70 mm type-21 body from the De'Longhi Plattella manual (media 5497890), 14 slots counted on its studio render (media 905084) at the 33.3 mm pitch; sources in the panel-radiator builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
   }
 }

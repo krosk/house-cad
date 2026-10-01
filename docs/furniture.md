@@ -234,6 +234,33 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   floor clearance. The full source list is in the builder's `// Sources:` block. Proven in a scratch
   browser preview (bounding boxes 0.500 × 1.344 × 0.089 and 0.500 × 1.740 × 0.089 m, the vent adds
   12 mm; ¾, front and side views beside the photos); not yet seen in AR, View 3D or on device.
+- De'Longhi EASY hot-water panel radiators, white gloss, builder `panel-radiator` (no manufacturer 3D
+  model). A body whose front has deep vertical slots inside a flat border, the slot floor drawn darker
+  to stand in for the shadow inside the slots; hidden brackets set the wall gap (`sizeMm` depth includes
+  them). All slots are centred at **33.3 mm** (`pitchMm`, measured on the horizontal model's straight
+  front photo 3722974 at 0.95 mm/px); slot width 15 mm and depth 8 mm are estimates. Valves are not
+  modelled. `mountZMm: 150` is a guess (Hypothesis): no page gives a height. The full source list is in
+  the builder's `// Sources:` block.
+  - `delonghi-easy-vertical-500x2000`: 1730 W, Leroy Merlin 82273209. 500 × 2000 × 101 mm (7 cm body,
+    10.1 with brackets), 46.8 kg, bottom connection. 14 slots (room photo 4047392, studio render
+    906020), stopping 38 mm from the top and bottom; plain top.
+  - `delonghi-easy-vertical-500x1800`: 1601 W, Leroy Merlin 82273208. 500 × 1800 × 101 mm, 45 kg.
+    14 slots (studio render 905084). Its manual (media 5497890, De'Longhi Plattella / Linear range)
+    draws the "C6 Vertical" type 21 at 70 mm deep, matching the spec: the vertical EASY is a type 21.
+  - `delonghi-easy-vertical-600x2000`: 2076 W, Leroy Merlin **82273211**, the same construction
+    (1.2 × the 50 cm one's power and weight). 600 × 2000 × 101 mm, 53.6 kg. 17 slots, counted on its
+    studio render 912126. Its room photo 4047395 shows 18 at the 50 cm photo's exact pixel pitch, so it
+    is an edited image and was not used. **Not** 82273207 (1888 W, same size): that one has a flat
+    front (media 996632).
+  - `delonghi-easy-horizontal-900x600`: 1448 W, Leroy Merlin 88144739, double panel. 900 × 600 × 132 mm
+    (10 cm body, 13.2 with brackets), 29.4 kg, side connections. 26 slots about 25 mm from each side,
+    stopping 46 mm from the top and bottom (photo 3722974); an open convector grille on top in two
+    halves (`topGrille`, top views 3722980 / 3722976); four side ports 540 mm apart (`portsMm`, the
+    spec's "Entraxe 5400" read as 540 mm). Manual media 3746505 (not used for dimensions).
+
+  Proven in a scratch browser preview: bounding boxes 0.500 × 2.000 × 0.101, 0.500 × 1.800 × 0.101, 0.600 × 2.000 × 0.101 and
+  0.904 × 0.600 × 0.132 m (the side ports add 2 mm each side); ¾, front and side views beside the photos.
+  Not yet seen in AR, View 3D or on device.
 
 ## Rendering
 

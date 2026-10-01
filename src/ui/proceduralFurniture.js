@@ -590,9 +590,122 @@ function towelRadiator(entry) {
   return g;
 }
 
+// Steel panel radiator (De'Longhi EASY, vertical and horizontal): a flat-sided body whose
+// front has a row of deep vertical slots inside a flat border (top and bottom bands, side
+// borders), standing off the wall on hidden brackets. The double-panel horizontal model
+// adds an open convector grille on top and pipe ports in its side covers. Wall at −Z,
+// front toward +Z; the catalog `mountZMm` lifts it on drop (the foot is the body's bottom).
+//
+// Sources:
+//   - Leroy Merlin 82273209 (vertical, 1730 W, l 50 × H 200 cm):
+//     https://www.leroymerlin.fr/produits/radiateur-eau-chaude-1730w-l-50xh-200-cm-easy-de-longhi-vertical-blanc-82273209.html
+//     Spec table: "Largeur 50", "Hauteur 200", "Profondeur 7", "Epaisseur totale avec
+//     fixations 10.1", "Raccordement par le bas", "Entraxe 44 ou 5", "Aspect Brillant", 46.8 kg.
+//     Room photo 4047392 (straight front, about 3.1 mm/px): 14 slots, stopping 36–39 mm from
+//     the top and bottom (`insetMm` 38). Studio render 906020: flat closed sides, plain top.
+//   - Leroy Merlin 82273208 (vertical, 1601 W, l 50 × H 180 cm):
+//     https://www.leroymerlin.fr/produits/radiateur-eau-chaude-1601w-l-50xh-180-cm-easy-de-longhi-vertical-blanc-82273208.html
+//     Spec table: "Largeur 50", "Hauteur 180", "Profondeur 7", "Epaisseur totale avec
+//     fixations 10.1", "Entraxe 44 ou 5", 45.01 kg. Studio render 905084: 14 slots. Its
+//     manual (media 5497890, De'Longhi "Plattella / Linear") draws the "C6 Vertical" range:
+//     type 21 is 70 mm deep, matching the spec, so this is a type-21 body. Room photo 4047391.
+//   - Leroy Merlin 82273211 (vertical, 2076 W, l 60 × H 200 cm):
+//     https://www.leroymerlin.fr/produits/radiateur-eau-chaude-2076w-l-60xh-200-cm-easy-de-longhi-vertical-blanc-82273211.html
+//     Spec table: "Largeur 60", "Hauteur 200", "Profondeur 7", "Epaisseur totale avec
+//     fixations 10.1", "Entraxe 54 ou 5", 53.6 kg (1.2 × the 50 cm one's power and weight:
+//     the same construction). Studio render 912126: 17 slots (counted at its top end; the
+//     50 cm render 906020 shows 14), which is the 33.3 mm pitch on 60 cm. Its room photo
+//     4047395 shows 18 at the 50 cm photo's exact pixel pitch: an edited image, not used.
+//     Not to be confused with 82273207 (1888 W, same size, flat front, media 996632).
+//   - Leroy Merlin 88144739 (horizontal, 1448 W, l 90 × H 60 cm):
+//     https://www.leroymerlin.fr/produits/radiateur-eau-chaude-1448w-l-90xh-60-cm-easy-de-longhi-horizontal-blanc-88144739.html
+//     Spec table: "Largeur 90", "Hauteur 60", "Profondeur 10", "Epaisseur totale avec
+//     fixations 13.2", "Raccordement Latéral", 4 connections, "Entraxe 5400" (read as 540 mm
+//     between the top and bottom ports), 29.4 kg; manual media 3746505.
+//     Straight front studio photo 3722974 (0.95 mm/px from the 900 × 600 body): 26 slots at
+//     33.3 mm (`pitchMm`), about 25 mm from each side, stopping 46 mm from the top and bottom.
+//     Top views 3722980 and 3722976: an open grille over the convector fins in two halves;
+//     3722976 also shows a round port in the side cover. Room photo 4047397.
+//   - All: slots centred at `pitchMm` (default 33.3, measured on 3722974); slot width 15 mm
+//     and depth 8 mm (`slotMm`, `depthMm`) are estimates from the photos' shading; the slot
+//     floor is drawn darker to stand in for the shadow inside; brackets are hidden blocks;
+//     valves are not part of the product and not modelled.
+function panelRadiator(entry) {
+  const [W, H, D] = (entry.sizeMm || [500, 2000, 101]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const gap = mm(p.wallGapMm, 31);                 // total with brackets − body depth
+  const depth = mm(p.depthMm, 8);
+  const slotW = mm(p.slotMm, 15);
+  const inset = mm(p.insetMm, 38);
+  const pitch = mm(p.pitchMm, 33.3);
+  const n = p.slots ?? Math.max(1, Math.round((W - 0.05 - slotW) / pitch) + 1);
+  const edge = (W - (n - 1) * pitch - slotW) / 2;
+  const white = new THREE.MeshStandardMaterial({ color: p.color ?? 0xf3f3f1, roughness: 0.25 });
+  const floor = new THREE.MeshStandardMaterial({ color: 0xc2c4c6, roughness: 0.6 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'panel-radiator';
+
+  // Top: plain, or an open grille (dark fins, light slats, split in two halves).
+  let top = white;
+  if (p.topGrille) {
+    const map = canvasTexture(512, (ctx, size) => {
+      ctx.fillStyle = '#4a4d50'; ctx.fillRect(0, 0, size, size);
+      const slats = Math.round(W / 0.012);
+      ctx.fillStyle = '#d9dadb';
+      for (let i = 0; i < slats; i++) ctx.fillRect((i + 0.5) / slats * size - 1, 0, 2, size);
+      ctx.fillStyle = css(p.color ?? 0xf3f3f1);
+      ctx.fillRect(size / 2 - 4, 0, 8, size);                       // centre divider
+      ctx.fillRect(0, 0, 6, size); ctx.fillRect(size - 6, 0, 6, size);  // end caps
+    });
+    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    top = new THREE.MeshStandardMaterial({ map, roughness: 0.5 });
+  }
+  // Body; its front face is the slot floor.
+  const zFront = D / 2, zSlot = zFront - depth, zBack = -D / 2 + gap;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, zSlot - zBack), [white, white, top, white, floor, white]);
+  body.position.set(0, H / 2, (zSlot + zBack) / 2);
+  g.add(body);
+  // Front border: top and bottom bands, then the side borders and the strips between
+  // slots with rounded front edges.
+  g.add(box([-W / 2, H - inset, zSlot], [W / 2, H, zFront], white));
+  g.add(box([-W / 2, 0, zSlot], [W / 2, inset, zFront], white));
+  const parts = [];
+  const strip = (x0, x1) => {
+    const s = new RoundedBoxGeometry(x1 - x0, H - 2 * inset, depth * 2, 2, Math.min(0.004, (x1 - x0) / 3));
+    s.translate((x0 + x1) / 2, H / 2, zSlot);
+    parts.push(s);
+  };
+  strip(-W / 2, -W / 2 + edge);
+  for (let k = 0; k < n - 1; k++) strip(-W / 2 + edge + k * pitch + slotW, -W / 2 + edge + (k + 1) * pitch);
+  strip(W / 2 - edge, W / 2);
+  g.add(new THREE.Mesh(mergeGeometries(parts), white));
+  // Side ports (horizontal model): a grey ring with a dark bore at each end, top and
+  // bottom, `portsMm` apart, centred in the depth.
+  if (p.portsMm) {
+    const ring = new THREE.MeshStandardMaterial({ color: 0xb4b7ba, roughness: 0.4, metalness: 0.3 });
+    const bore = new THREE.MeshStandardMaterial({ color: 0x3a3c3e, roughness: 0.8 });
+    const off = (H - p.portsMm / 1000) / 2, zc = (zFront + zBack) / 2;
+    for (const y of [H - off, off]) {
+      for (const sx of [-1, 1]) {
+        const r = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.002, 20), ring);
+        r.rotation.z = Math.PI / 2; r.position.set(sx * (W / 2 + 0.001), y, zc); g.add(r);
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.003, 16), bore);
+        c.rotation.z = Math.PI / 2; c.position.set(sx * (W / 2 + 0.0005), y, zc); g.add(c);
+      }
+    }
+  }
+  // Brackets: short blocks from the wall to the back, near the top and bottom.
+  const by = Math.min(0.15, H / 4), bx = Math.min(0.08, W / 4);
+  for (const y of [H - by, by]) {
+    for (const x of [-W / 2 + bx, W / 2 - bx]) g.add(box([x - 0.015, y - 0.02, -D / 2], [x + 0.015, y + 0.02, zBack], white));
+  }
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
-  'upright-piano': uprightPiano, 'towel-radiator': towelRadiator,
+  'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
 };
 
 export function isProcedural(entry) {
