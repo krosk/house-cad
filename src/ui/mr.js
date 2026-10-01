@@ -46,7 +46,7 @@ import {
 } from '../io/outputOptions.js';
 import { dimLabelCoord, setDimLabelCoord } from '../core/dimline.js';
 import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core/electrical.js';
-import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
+import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
@@ -3169,6 +3169,15 @@ export function setupMR(view, project, getFootprint) {
   // the selected nature and any wire of the other nature (Ethernet beside power, or
   // vice versa). Memoized per selection + wire-layer rebuild (one Dijkstra per wire).
   let wireLengthMemo = { key: null, batch: null, stats: null };
+  // CONDUIT · EDIT: the selected segment's 3D length, and its run's when the run is
+  // longer (it continues through bare pass-through junctions; core/conduit.js).
+  function conduitLengthLines(segId) {
+    const l = conduitRunLength(project, segId);
+    if (!l) return '';
+    return `\n${t('conduit.length')} ${fmt(l.segment)} ${unitLabel()}`
+      + (l.count > 1 ? `\n${t('conduit.runLength')} ${fmt(l.run)} ${unitLabel()} (${l.count})` : '');
+  }
+
   function selectedCircuitLengths(wire) {
     const type = wire.type || 'electrical';
     const key = `${wire.id}|${type}`;
@@ -8473,7 +8482,7 @@ export function setupMR(view, project, getFootprint) {
       : modes[currentMode].id === 'marker_conduit'
       ? (penNodeId ? t('conduit.run') : t('conduit.pickStart'))
       : modes[currentMode].id === 'conduit_edit'
-      ? (selectedConduitSegmentId ? t('conduit.editSeg')
+      ? (selectedConduitSegmentId ? t('conduit.editSeg') + conduitLengthLines(selectedConduitSegmentId)
         : selectedConduitNodeId ? t('conduit.editNode') : t('conduit.pickTarget'))
       : null;
     // CHECK: the hovered device's problem on top (yellow), then the filter's counts,

@@ -60,6 +60,33 @@ export function conduitAdjacency(project) {
   return adj;
 }
 
+// Length of one segment and of the run it belongs to: the chain continues through
+// bare junctions with exactly two segments and stops at a device, a branch or an end.
+// 3D (risers and vertical drops count). Returns { segment, run, count } or null.
+export function conduitRunLength(project, segId) {
+  const segs = project?.conduitSegments || [];
+  const seg = segs.find((s) => s.id === segId);
+  const ep = seg && conduitSegmentEndpoints(project, seg);
+  if (!ep) return null;
+  const segment = dist3(ep.a, ep.b);
+  const adj = conduitAdjacency(project);
+  const seen = new Set([seg.id]);
+  let run = segment;
+  for (const start of [seg.a, seg.b]) {
+    let node = start;
+    for (;;) {
+      const n = conduitNodeById(project, node), edges = adj.get(node) || [];
+      if (!n || n.markerId || edges.length !== 2) break;
+      const next = edges.find((e) => !seen.has(e.segId));
+      if (!next) break;                      // closed loop: every segment counted
+      seen.add(next.segId);
+      run += next.length;
+      node = next.to;
+    }
+  }
+  return { segment, run, count: seen.size };
+}
+
 // Dijkstra shortest path (segment-id list) between two nodes; [] if same node,
 // null if unreachable. Graphs are house-sized, so a linear-scan frontier is fine.
 function dijkstra(adj, from, to) {

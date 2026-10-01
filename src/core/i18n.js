@@ -467,6 +467,8 @@ const STRINGS = {
   'conduit.pickNode': { en: 'PICK NODE', fr: 'CHOISIR NŒUD',       zh: '选择节点' },
   'conduit.pickTarget': { en: 'PICK NODE / CONDUIT', fr: 'CHOISIR NŒUD / GAINE', zh: '选择节点 / 管段' },
   'conduit.editNode': { en: 'EDIT NODE', fr: 'MODIF. NŒUD',        zh: '编辑节点' },
+  'conduit.length':   { en: 'LENGTH', fr: 'LONGUEUR', zh: '长度' },
+  'conduit.runLength': { en: 'RUN', fr: 'PARCOURS', zh: '全段' },
   'conduit.editSeg':  { en: 'CONDUIT SELECTED · B DELETE', fr: 'GAINE SÉLECTIONNÉE · B SUPPR', zh: '已选择管段 · B 删除' },
 };
 

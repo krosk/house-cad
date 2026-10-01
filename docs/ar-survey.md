@@ -226,7 +226,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   **A node with a defined `zDatum` holds its Z even in the direct carry** (`nz = n.zDatum ? n.z :
   tipZ`, matching the marker grab), so a height-defined junction slides only in X/Y.
   Both use `moveConduitNode` with `emit:false`, committed once on release. **Marker-bound nodes are
-  immovable** (they follow their device) and have no pad. **B/Y deletes only the explicit selection**:
+  immovable** (they follow their device) and have no pad. **A selected conduit segment shows its length**
+  on the readout (`LENGTH`, 3D, so a vertical drop or a riser counts), plus `RUN <len> (<n>)` when it is
+  part of a longer run: the chain continues through bare junctions with exactly two segments and stops
+  at a device, a branch or an open end; a closed loop counts each segment once (`conduitRunLength`,
+  `core/conduit.js`; owner, 2026-10-01). **B/Y deletes only the explicit selection**:
   a selected node + its incident segments, or a selected conduit segment alone (`deleteInMode` →
   `removeConduitNode` / `removeConduitSegment`; `via` references are dropped). A node with exactly two
   segments is a pass-through, so its neighbours are **rejoined by one segment** and the run survives
