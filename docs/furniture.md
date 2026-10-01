@@ -257,9 +257,13 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
     stopping 46 mm from the top and bottom (photo 3722974); an open convector grille on top in two
     halves (`topGrille`, top views 3722980 / 3722976); four side ports 540 mm apart (`portsMm`, the
     spec's "Entraxe 5400" read as 540 mm). Manual media 3746505 (not used for dimensions).
+  - `delonghi-easy-horizontal-1200x600`: 1930 W, Leroy Merlin 82273196, the same double panel
+    (1.33 × the 90 cm one's power). 1200 × 600 × 132 mm, 37.7 kg, side connections, "Entraxe 54" cm
+    (which confirms reading the 90 cm page's "5400" as 540 mm). 35 slots, counted on the straight room
+    photo 4047370 at 33.5 mm (2.39 mm/px); studio render 1064260.
 
-  Proven in a scratch browser preview: bounding boxes 0.500 × 2.000 × 0.101, 0.500 × 1.800 × 0.101, 0.600 × 2.000 × 0.101 and
-  0.904 × 0.600 × 0.132 m (the side ports add 2 mm each side); ¾, front and side views beside the photos.
+  Proven in a scratch browser preview: bounding boxes 0.500 × 2.000 × 0.101, 0.500 × 1.800 × 0.101, 0.600 × 2.000 × 0.101,
+  0.904 × 0.600 × 0.132 and 1.204 × 0.600 × 0.132 m (the side ports add 2 mm each side); ¾, front and side views beside the photos.
   Not yet seen in AR, View 3D or on device.
 
 ## Rendering

@@ -626,6 +626,13 @@ function towelRadiator(entry) {
 //     33.3 mm (`pitchMm`), about 25 mm from each side, stopping 46 mm from the top and bottom.
 //     Top views 3722980 and 3722976: an open grille over the convector fins in two halves;
 //     3722976 also shows a round port in the side cover. Room photo 4047397.
+//   - Leroy Merlin 82273196 (horizontal, 1930 W, l 120 × H 60 cm):
+//     https://www.leroymerlin.fr/produits/radiateur-eau-chaude-1930w-l-120xh-60-cm-easy-de-longhi-horizontal-blanc-82273196.html
+//     Spec table: "Largeur 120", "Hauteur 60", "Profondeur 10", "Epaisseur totale avec
+//     fixations 13.2", "Entraxe 54" (cm: confirms the 90 cm page's "5400" as 540 mm),
+//     "Raccordement Latéral", 37.68 kg; 1.33 × the 90 cm one's power. Room photo 4047370
+//     (straight front, 2.39 mm/px from the 1200 mm body): 35 slots at 33.5 mm. Studio
+//     render 1064260 (¾): the same grille and ports as the 90 cm one.
 //   - All: slots centred at `pitchMm` (default 33.3, measured on 3722974); slot width 15 mm
 //     and depth 8 mm (`slotMm`, `depthMm`) are estimates from the photos' shading; the slot
 //     floor is drawn darker to stand in for the shadow inside; brackets are hidden blocks;

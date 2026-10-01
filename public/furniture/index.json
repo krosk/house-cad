@@ -297,5 +297,28 @@
     },
     "source": "procedural: De'Longhi EASY vertical hot-water panel radiator, white gloss, 1601 W, l 50 x H 180 cm (Leroy Merlin 82273208, no manufacturer 3D model); size and depth with brackets from the Leroy Merlin spec table, 70 mm type-21 body from the De'Longhi Plattella manual (media 5497890), 14 slots counted on its studio render (media 905084) at the 33.3 mm pitch; sources in the panel-radiator builder",
     "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "delonghi-easy-horizontal-1200x600": {
+    "name": "delonghi-easy-horizontal-1200x600",
+    "article": "82273196",
+    "sizeMm": [
+      1200,
+      600,
+      132
+    ],
+    "mountZMm": 150,
+    "procedural": "panel-radiator",
+    "params": {
+      "slots": 35,
+      "pitchMm": 33.3,
+      "slotMm": 15,
+      "insetMm": 46,
+      "depthMm": 8,
+      "wallGapMm": 32,
+      "topGrille": true,
+      "portsMm": 540
+    },
+    "source": "procedural: De'Longhi EASY horizontal double-panel hot-water radiator, white gloss, 1930 W, l 120 x H 60 cm (Leroy Merlin 82273196, no manufacturer 3D model); size, depth with brackets and 54 cm entraxe from the Leroy Merlin spec table, 35 slots counted on its room photo (media 4047370), the rest as the 90 x 60 (88144739); sources in the panel-radiator builder",
+    "registeredAt": "2026-10-01T00:00:00.000Z"
   }
 }
