@@ -27,8 +27,10 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
   and ignored. Wall height = floor height.
 - **Openings:** WINDOW / DOOR / SLIDING / GARAGE zones on an exterior edge are cut out of the wall
-  area (width × their sill/head band) and counted with their own U (default Uw 1.3 for recent double
-  glazing; a product's Uw when windows carry one).
+  area (width × their sill/head band) and counted at their own U: the zone's `uValue` (owner,
+  2026-10-01: each window carries its own, typed from its label's Uw / Ud in HEATING · R / U), else the
+  project's Window U (window, sliding) or Door U (door, garage). Window products carry no Uw yet. A
+  HALF WALL is plain wall; PASSAGE and HEATER are ignored (interior / not an opening).
 - **Floor and ceiling are split by overlap** with the floors below and above (rooms' plan union):
   heated room → no loss; unheated floor → `b`; nothing below → ground; nothing above → roof/attic.
 
@@ -82,7 +84,9 @@ zone's `rValue`; additive, no FILE_VERSION bump); defaults in `src/core/heatLoss
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned (λ ≈ 0.045; set R when known) |
 
-UI: PROJECT · HEAT LOSS (`docs/ar-survey.md`); the room's watts also show on the PLAN · EDIT `area:`
+UI: the HEATING group (owner, 2026-10-01: pipes, heat loss and R together), `docs/ar-survey.md`:
+HEATING · HEAT LOSS (room watts + settings) and HEATING · R / U (each insulation zone's R and each
+opening's U, typed on the numpad; an insulation R also on the PLAN · EDIT band pad). The room's watts also show on the PLAN · EDIT `area:`
 HUD line. No desktop UI yet.
 
 **Proven** (Node on the owner's file, 2026-10-01; Basement set unheated, everything else default):

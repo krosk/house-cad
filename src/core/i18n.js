@@ -20,6 +20,7 @@ const STRINGS = {
   'group.plan':    { en: 'PLAN',    fr: 'PLAN',   zh: '平面' },
   'group.marker':  { en: 'MARKER', fr: 'MARQUEUR', zh: '标记' },
   'group.material': { en: 'MATERIAL', fr: 'MATÉRIAU', zh: '材料' },
+  'group.heating': { en: 'HEATING', fr: 'CHAUFFAGE', zh: '供暖' },
   'group.project': { en: 'PROJECT', fr: 'PROJET', zh: '项目' },
 
   // --- mode labels (key = mode.<id>) ------------------------------------------
@@ -73,6 +74,7 @@ const STRINGS = {
   'controllers.handMode': { en: 'Hand tracking is not supported', fr: 'Le suivi des mains n’est pas pris en charge', zh: '不支持手部追踪' },
   'mode.export':   { en: 'EXPORT', fr: 'EXPORT',    zh: '导出' },
   'mode.heat':     { en: 'HEAT LOSS', fr: 'DÉPERDITIONS', zh: '热损失' },
+  'mode.heat_r':   { en: 'R / U', fr: 'R / U', zh: 'R / U 值' },
   'mode.copy_floor': { en: 'COPY FLOOR', fr: 'COPIER ÉTAGE', zh: '复制楼层' },
   'mode.paste_floor': { en: 'PASTE FLOOR', fr: 'COLLER ÉTAGE', zh: '粘贴楼层' },
   'mode.move_up':  { en: 'MOVE UP', fr: 'MONTER',   zh: '上移' },
@@ -273,10 +275,16 @@ const STRINGS = {
     zh: '将当前楼层导出为 SVG、PNG、详细 DXF 或简化的 COOHOM DXF，或将完整原始项目导出为 JSON。摇杆上/下切换格式；选择单独的“导出”按钮。',
   },
   'help.heat': {
-    en: 'Each room of the active floor shows its heat loss in W at the design temperatures. Aim at a row and flick the thumbstick up/down to change it; trigger toggles HEATED or resets a value. Aim at a room for its breakdown. Type an insulation zone\'s R in PLAN · EDIT.',
-    fr: 'Chaque pièce de l’étage actif affiche ses déperditions en W aux températures de base. Visez une ligne et poussez le joystick haut/bas pour la modifier ; la gâchette bascule CHAUFFÉ ou rétablit une valeur. Visez une pièce pour son détail. Le R d’un isolant se saisit dans PLAN · ÉDITER.',
-    zh: '当前楼层的每个房间显示设计温度下的热损失（W）。指向一行并上/下推摇杆修改；扳机切换“供暖”或恢复默认值。指向房间查看明细。保温区的 R 值在 平面 · 编辑 中输入。',
+    en: 'Each room of the active floor shows its heat loss in W at the design temperatures. Aim at a row and flick the thumbstick up/down to change it; trigger toggles HEATED or resets a value. Aim at a room for its breakdown. Each insulation zone\'s R and opening\'s U: HEATING · R / U.',
+    fr: 'Chaque pièce de l’étage actif affiche ses déperditions en W aux températures de base. Visez une ligne et poussez le joystick haut/bas pour la modifier ; la gâchette bascule CHAUFFÉ ou rétablit une valeur. Visez une pièce pour son détail. R de chaque isolant et U de chaque ouverture : CHAUFFAGE · R / U.',
+    zh: '当前楼层的每个房间显示设计温度下的热损失（W）。指向一行并上/下推摇杆修改；扳机切换“供暖”或恢复默认值。指向房间查看明细。各保温区 R 值与门窗 U 值：供暖 · R / U。',
   },
+  'help.heat_r': {
+    en: 'Each insulation zone of the active floor shows its R and each window/door its U (orange = typed from the label, grey ≈ default). Aim at one and trigger to type it (a window label gives Uw); CLEAR returns to the default. Draw exterior insulation as a zone outside the room.',
+    fr: 'Chaque isolant de l’étage actif affiche son R, chaque fenêtre/porte son U (orange = saisi depuis l’étiquette, gris ≈ défaut). Visez-en un et appuyez sur la gâchette pour le saisir (une fenêtre indique son Uw) ; EFFACER revient au défaut. Dessinez l’isolation extérieure comme une zone hors de la pièce.',
+    zh: '当前楼层的每个保温区显示其 R 值，每个门窗显示其 U 值（橙色 = 按标签输入，灰色 ≈ 默认）。指向一个并扣动扳机输入（窗户标签上为 Uw）；“清除”恢复默认。外保温请画在房间外侧。',
+  },
+
   'help.copy_floor': {
     en: 'Trigger to copy the active floor, including its dimensions and markers. It remains available after loading another save.',
     fr: 'Gâchette pour copier l’étage actif, avec ses cotes et marqueurs. Il reste disponible après le chargement d’une autre sauvegarde.',
@@ -501,6 +509,14 @@ const STRINGS = {
   'heat.ceilingPart': { en: 'ceiling', fr: 'plafond', zh: '顶棚' },
   'heat.extWall':  { en: 'ext. wall', fr: 'mur ext.', zh: '外墙' },
   'heat.insulated': { en: 'insul.', fr: 'isolé', zh: '保温' },
+  'heat.rSet':     { en: 'from the label (set)', fr: 'saisi (étiquette)', zh: '已输入（标签值）' },
+  'heat.rFromDepth': { en: 'default: depth', fr: 'défaut : épaisseur', zh: '默认：厚度' },
+  'heat.rEdit':    { en: 'Trigger: type its R', fr: 'Gâchette : saisir son R', zh: '扳机：输入 R 值' },
+  'heat.clear':    { en: 'CLEAR', fr: 'EFFACER', zh: '清除' },
+  'heat.uValue':   { en: 'U (W/m²K)', fr: 'U (W/m²K)', zh: 'U (W/m²K)' },
+  'heat.uDefaultWindow': { en: 'default: project Window U', fr: 'défaut : U fenêtre du projet', zh: '默认：项目窗 U' },
+  'heat.uDefaultDoor': { en: 'default: project Door U', fr: 'défaut : U porte du projet', zh: '默认：项目门 U' },
+  'heat.aimZone':  { en: 'Aim at an insulation zone, window or door', fr: 'Visez un isolant, une fenêtre ou une porte', zh: '指向保温区、窗或门' },
   'heat.rValue':   { en: 'R (m²K/W)', fr: 'R (m²K/W)', zh: 'R (m²K/W)' },
   'conduit.editSeg':  { en: 'CONDUIT SELECTED · B DELETE', fr: 'GAINE SÉLECTIONNÉE · B SUPPR', zh: '已选择管段 · B 删除' },
 };

@@ -306,7 +306,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (`buildCheckOverlay`), rebuilt on mode entry, filter change, or view change; never one object per
   device, since 90+ devices are flagged mid-survey. Available in ALL FLOORS. In a single-floor view only
   the active floor's devices get rings, though the counts are whole-house.
-- **MARKER · PIPE** (`id: marker_pipe`) — author a separate whole-house plumbing graph. Trigger a
+- **HEATING · PIPE** (`id: marker_pipe`; the HEATING group since 2026-10-01, was MARKER · PIPE) — author a separate whole-house plumbing graph. Trigger a
   fixture, existing pipe node, or empty space to start a pen; empty space creates a free junction,
   and subsequent triggers create segments and advance the pen for bends, branches, loops, and
   cross-floor risers. Grip cycles overlapping marker/node targets, or lifts the pen on empty space.
@@ -323,6 +323,19 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   same target again to convert/connect, or grip to cancel. Editable diameters, valves/manifolds, fixture
   role validation, derived networks, and output layers are intentionally deferred; see
   `docs/plumbing-workflow.md`.
+- **HEATING · HEAT LOSS** (`id: heat`; method and defaults in `docs/heat-loss.md`) — every heated room
+  of the active floor shows its loss in W at its largest rect's centre. A panel holds THIS FLOOR
+  (heated, unheated temperature, added floor and attic R) and WHOLE HOUSE settings (design outdoor /
+  indoor °C, air changes, bare wall R, window and door U, bare slab R, λ for an insulation zone with no
+  R). Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
+  default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
+  broken down by surface. Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
+- **HEATING · R / U** (`id: heat_r`) — every INSULATION zone of the active floor shows its R
+  (m²K/W; grey `≈` = drawn depth / λ) and every WINDOW / SLIDING / DOOR / GARAGE zone its U (W/m²K, the
+  label's Uw / Ud; grey `≈` = the project's Window or Door U); orange = typed. The readout names the
+  aimed zone's value and its source. Trigger on a zone opens the numpad: ENTER sets it (an empty ENTER
+  or CLEAR returns to the default). An insulation R can also be typed on the PLAN · EDIT band pad.
+  Not offered in ALL FLOORS.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
@@ -415,14 +428,6 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   screen containing separate **CONFIRM OVERWRITE** and **CANCEL** buttons; the original slot is no
   longer a trigger target. Only the confirmation button writes. Changing mode or pressing grip also
   cancels the pending overwrite.
-- **PROJECT · HEAT LOSS** (`id: heat`; method and defaults in `docs/heat-loss.md`) — every heated room
-  of the active floor shows its loss in W at its largest rect's centre. A panel holds THIS FLOOR
-  (heated, unheated temperature, added floor and attic R) and WHOLE HOUSE settings (design outdoor /
-  indoor °C, air changes, bare wall R, window and door U, bare slab R, λ for an insulation zone with no
-  R). Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
-  default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
-  broken down by surface. An INSULATION zone's R is typed in PLAN · EDIT (the band pad, field R; an
-  empty ENTER clears it). Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
 - **PROJECT · COPY FLOOR / PASTE FLOOR** (`id: copy_floor` / `paste_floor`) — COPY snapshots the
   complete active floor (name, storey height, rectangles, dimensions, markers, and electrical links) to a separate
   persistent clipboard. It survives LOAD and an APK relaunch. PASTE **replaces the currently active

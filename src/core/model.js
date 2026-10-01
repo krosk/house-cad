@@ -13,7 +13,7 @@ import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, 
 import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
-import { cleanHeat, cleanFloorHeat } from './heatLoss.js';
+import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -152,7 +152,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, uValue } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -173,6 +173,9 @@ export class Rectangle {
       this.head  = head  !== undefined ? head  : d.head;
       this.hinge = hinge !== undefined ? hinge : d.hinge;
       if (d.swing !== undefined) this.swing = swing !== undefined ? swing : d.swing;
+      // Thermal transmittance U (W/m²K) from the label (Uw / Ud), for the heat-loss
+      // calculation (docs/heat-loss.md); absent = the project's window / door U.
+      if (OPENING_KINDS.has(this.kind) && Number.isFinite(uValue) && uValue > 0) this.uValue = uValue;
     } else if (this.kind === 'furniture') {
       // A furniture placeholder carries a solid [foot, top] body band (the dual of
       // an aperture opening). Explicit values win on deserialize/clone.
@@ -204,6 +207,7 @@ export class Rectangle {
     if (kind === 'stairs') kind = 'stairs_up';
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
     if (this.kind !== 'insulation') delete this.rValue;
+    if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
     // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.

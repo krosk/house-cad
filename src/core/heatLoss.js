@@ -43,7 +43,10 @@ const RS_CEILING = 0.10 + 0.10;  // heat up, into an attic / heated room above
 const RS_FLOOR = 0.17 + 0.17;    // heat down, into a basement
 const RS_FLOOR_AIR = 0.17 + 0.04; // heat down, over outside air
 const FG1 = 1.45;                // EN 12831 ground: annual temperature swing
-const OPENING_KINDS = new Set(['window', 'sliding', 'door', 'garage']);
+// Openings cut out of an exterior wall; each may carry its own U (`uValue`, W/m²K, the
+// label's Uw/Ud), else the project's window / door U.
+export const OPENING_KINDS = new Set(['window', 'sliding', 'door', 'garage']);
+export const isGlazedKind = (kind) => kind === 'window' || kind === 'sliding';
 const SPACE_KINDS = new Set(['room', 'stairs_up', 'stairs_down']);
 // Across a slab, a neighbour floor's walls and linings count with its space (a room
 // edge sits over the partition below, not over outside air).
@@ -115,7 +118,8 @@ function wallLoss(floor, comp, s, dT) {
             const sill = Math.max(0, o.sill ?? 0), head = Math.min(H, o.head ?? H);
             if (head - sill > openH) {
               openH = head - sill;
-              openU = kind === 'window' || kind === 'sliding' ? s.windowU : s.doorU;
+              openU = Number.isFinite(o.uValue) && o.uValue > 0 ? o.uValue
+                : isGlazedKind(kind) ? s.windowU : s.doorU;
             }
           }
           const wallA = ds * Math.max(0, H - openH), openA = ds * openH;

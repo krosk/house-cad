@@ -389,13 +389,15 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Changing units does not change the plan geometry or stored meter values
 - [ ] Choice persists across an APK relaunch
 
-## PROJECT · HEAT LOSS (`heat`)  ⬜ NEW (2026-10-01) — build + Node-verified only
+## HEATING · PIPE / HEAT LOSS / R / U  ⬜ NEW (2026-10-01) — build + Node-verified only
+- [ ] The HEATING group follows MARKER in the mode cycle: PIPE (moved from MARKER), HEAT LOSS, R / U; PIPE works as before
 - [ ] Entering it shows each heated room's watts (orange) on the active plan; leaving removes them
 - [ ] The panel title shows the floor's TOTAL; aiming at a room fills the breakdown box (walls · openings · air · floor · ceiling, ext. wall / insulated / opening m²)
 - [ ] Ray on a row + thumbstick up/down steps it; labels and TOTAL update at once; trigger resets a value to its default (grey) and toggles HEATED
 - [ ] Basement HEATED → no: its rooms lose their labels, and Ground's floor watts drop (slab over an unheated floor)
 - [ ] Attic insulation R 7 on Ground/Upper cuts the ceiling part strongly (Node: Ground 12.1 → 8.8 kW)
-- [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W); ENTER sets it, an empty ENTER clears it; a room's `area:` HUD line adds its watts
+- [ ] R / U: each insulation zone shows `R ≈x` (grey) or `R x` (orange), each window/door `U ≈1.4` / `U ≈2.0` or its typed U; trigger opens the numpad, ENTER sets it, CLEAR / empty ENTER clears it; HEAT LOSS watts follow (Node: 5 Ground windows at U 2.8 → their part 336 → 672 W)
+- [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W) too; a room's `area:` HUD line adds its watts
 - [ ] Settings survive SAVE/LOAD and an APK relaunch (project data, autosaved)
 - [ ] Not offered in ALL FLOORS
 - [ ] Owner sanity check: a room's watts against an existing radiator that keeps it warm

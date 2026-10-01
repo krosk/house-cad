@@ -4,7 +4,7 @@ Plumbing is a separate whole-house lane from electrical conduit and wires.
 
 ## First AR authoring slice
 
-`MARKER · PIPE` authors a whole-house node graph. A node is either a free junction
+`HEATING · PIPE` (was MARKER · PIPE until 2026-10-01) authors a whole-house node graph. A node is either a free junction
 `{x,y,z,floorId}` or a logical fixture port `{markerId,role}` that follows its marker.
 Pipe segments join two node ids and carry their service and diameter. Thumbstick up/down
 chooses one of four services:
