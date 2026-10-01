@@ -400,8 +400,15 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
 // runs along the stair's `climb` (stairClimb: legacy = long axis toward max). STAIRS
 // UP climbs from this floor up along it; STAIRS DOWN is the same flight seen from
 // the storey above, so it descends against it.
+// A stair zone holds only the steps drawn in it, starting at its own floor level
+// (owner, 2026-10-01): STAIRS UP rises from the floor, STAIRS DOWN descends from it,
+// one STAIR_RISER per step. The step count is the zone's run / STAIR_GOING, capped so
+// the flight never passes the storey above (up) or the one below (down). Before this,
+// every zone climbed the full storey height, far too steep in a short zone.
 // Keeping treads as thin slabs (rather than a solid stepped mass) makes both the
 // direction and the opening below readable while staying cheap on mobile GPUs.
+export const STAIR_RISER = 0.18; // m, fixed (owner)
+export const STAIR_GOING = 0.25; // m per tread in plan (a common going; Hypothesis)
 function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
   const geometries = [];
   for (const rect of floor?.rectangles || []) {
@@ -414,17 +421,18 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
     const forward = climb[0] === '+';
     const run = alongX ? width : depth;
     const cross = alongX ? depth : width;
-    const rise = Math.max(0.2, kind === 'stairs_down' ? downRise : (floor.height || 2.8));
-    const count = Math.max(3, Math.min(24, Math.ceil(rise / 0.18)));
+    const maxRise = Math.max(STAIR_RISER, kind === 'stairs_down' ? downRise : (floor.height || 2.8));
+    const count = Math.max(1, Math.min(Math.round(run / STAIR_GOING), Math.floor(maxRise / STAIR_RISER + 1e-6)));
     const treadRun = run / count;
-    const slab = Math.min(0.05, rise / count * 0.3);
+    const slab = Math.min(0.05, STAIR_RISER * 0.3);
     for (let i = 0; i < count; i++) {
-      const t = count === 1 ? 0 : i / (count - 1);
-      const level = kind === 'stairs_up' ? t * rise : -rise + t * rise;
+      // i-th tread from the bottom of the flight, walking the climb direction. Up: the
+      // first tread is one riser above the floor. Down: the top tread, next to the
+      // floor edge, is one riser below it.
+      const level = kind === 'stairs_up' ? (i + 1) * STAIR_RISER : -(count - i) * STAIR_RISER;
       const geometry = alongX
         ? new THREE.BoxGeometry(treadRun, slab, cross)
         : new THREE.BoxGeometry(cross, slab, treadRun);
-      // i-th tread from the bottom of the flight, walking the climb direction.
       const s = forward ? treadRun * (i + 0.5) : run - treadRun * (i + 0.5);
       const planX = alongX ? b.x0 + s : (b.x0 + b.x1) / 2;
       const planY = alongX ? (b.y0 + b.y1) / 2 : b.y0 + s;

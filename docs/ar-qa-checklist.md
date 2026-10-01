@@ -389,6 +389,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Changing units does not change the plan geometry or stored meter values
 - [ ] Choice persists across an APK relaunch
 
+## Stairs in the AR 3D view (LEFT X)  ⬜ NEW (2026-10-01) — Node-verified only
+- [ ] Ground STAIRS UP: 8 treads from 18 cm up to 1.44 m, not the full storey; Upper STAIRS DOWN: 8 treads from −18 cm down; together they meet the real stair
+- [ ] Basement STAIRS UP (7 treads to 1.26 m) + Ground STAIRS DOWN (5 treads to −0.90 m) match the real basement stair
+- [ ] Tread depth (25 cm assumed) against the real treads; the same treads in desktop View 3D
+
 ## HEATING · PIPE / HEAT LOSS / R / U  ⬜ NEW (2026-10-01) — build + Node-verified only
 - [ ] The HEATING group follows MARKER in the mode cycle: PIPE (moved from MARKER), HEAT LOSS, R / U; PIPE works as before
 - [ ] Entering it shows each heated room's watts (orange) on the active plan; leaving removes them

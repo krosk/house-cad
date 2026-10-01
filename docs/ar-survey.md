@@ -679,6 +679,13 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   first rotated. The sheet, DXF, AR floor glyph (`stairSegments`/`resolveStairOrient`) and View 3D treads
   all read it. Climbing along the short axis is allowed, because wide flights exist. Halfwall/heater have no orientation (returns false → inert). This is gated on `edit` mode so it does
   not collide with A/X = FLIP in DIMS/TRANSLATE.
+- **Stair treads in 3D (owner, 2026-10-01):** a stair zone holds only the steps drawn in it, and they
+  **start at its own floor**: STAIRS UP rises from the floor, STAIRS DOWN descends from it, at a fixed
+  **18 cm riser** (`STAIR_RISER`). Step count = the zone's run / `STAIR_GOING` 25 cm (Hypothesis: a
+  common going, not measured), capped at the storey height. A flight split across two storeys is one
+  STAIRS UP below + one STAIRS DOWN above; their steps add up (owner's house: 8 + 8 risers = 2.88 m for a
+  2.95 m storey). Before this every zone climbed the full storey height, far too steep in a short zone.
+  View 3D shares the geometry (`architectural3d.js`).
 - **Band pad** — selecting a band-carrying rect in PLAN EDIT opens the reused DIMS numpad as a band
   editor (`activateBandPad`/`syncBandPad`/`commitBandField`). `verticalBandFields(rect)` is the
   authoritative per-kind field list: apertures → `apertureBounds` (door/garage/sliding = HEAD only since sill
