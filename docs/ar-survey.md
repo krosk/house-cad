@@ -498,6 +498,12 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   exposed (`gpu:`), else the frame interval (`frame:`, quantized by vsync). It keeps running in
   other modes and is session-only. `?perf` in the URL starts it on; the APK can't pass that,
   hence the menu toggle.
+  **With the AR 3D view on (LEFT X)** the sweep switches to the 3D view's parts (`PERF_LAYERS_3D`,
+  owner request 2026-10-03, after 226 calls facing a radiator and a bin): `struct` (walls, plain
+  doors/windows, stairs, ceiling), `finish`, `doorwin` (door and window products), `device`
+  (switch/outlet/Ethernet products), `furn` (furniture models) and `plan` (the rest of the plan
+  group). One per HUD line, each with its ms and its **draw calls** (both eyes; `renderer.info`
+  read in `scene.onAfterRender`). Toggling the 3D view restarts the sweep on the other list.
 
 ## Localization (`src/core/i18n.js`)
 
@@ -932,6 +938,12 @@ teleport reticle; no last-active routing remains.
   towel radiator 49 → 3, the piano 27 → 6, same triangles and exact bounds. **Hypothesis:** the
   living room drops back near its old count; unmeasured on the Quest. A new product builder needs
   nothing extra, but a product material created per call (not cached) would not merge across items.
+- **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
+  rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
+  maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.
+  Owner, 2026-10-03: fps dropped when a radiator and the bin came into view. **Hypothesis:** PBR
+  per-pixel shading on large close surfaces was the cost (the products are only 2–11k triangles);
+  measure with PROJECT · PERF (`furn` in the 3D list). Desktop View 3D keeps the PBR materials.
 - **Never add an AR overlay layer as one Mesh/Sprite per item.** Use the existing batch patterns:
   - dim + Z-dim labels: `addDimLabelBatch`, an atlas of 256x64 slots plus `makeBillboardMaterial`;
   - markers: `makeMarkerBatch`, a type+ring glyph atlas, one billboard mesh + one flat mesh;

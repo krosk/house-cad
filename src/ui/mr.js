@@ -4035,13 +4035,30 @@ export function setupMR(view, project, getFootprint) {
   // Give each instance its OWN materials (textures stay shared) so the hover/selected
   // emissive highlight applies per item, not to every clone of the same article.
   // Its meshes are first merged per material (mergeByMaterial.js: draw calls per eye).
+  // The copies are Lambert, like every other AR 3D material (owner, 2026-10-03: fps dropped
+  // when a radiator and the bin came into view; PBR shading is per-pixel heavy on the Quest).
   function instantiateFurniture(src) {
     const inst = mergeObjectByMaterial(src.clone());
     inst.traverse((o) => {
       if (!o.isMesh || !o.material) return;
-      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+      o.material = Array.isArray(o.material) ? o.material.map(arLambert) : arLambert(o.material);
     });
     return inst;
+  }
+  // A Lambert copy of a lit material (textures shared); others are cloned as they are.
+  // Kept: colour, map, emissive, opacity and side. Dropped: roughness, metalness, bump and
+  // normal maps. Metalness darkens a PBR colour with no environment map, so the colour is
+  // scaled to match.
+  function arLambert(m) {
+    if (!m.isMeshStandardMaterial) return m.clone();
+    const out = new THREE.MeshLambertMaterial({
+      color: m.color.clone().multiplyScalar(1 - 0.6 * (m.metalness || 0)), map: m.map,
+      emissive: m.emissive, emissiveMap: m.emissiveMap, emissiveIntensity: m.emissiveIntensity,
+      transparent: m.transparent, opacity: m.opacity, alphaTest: m.alphaTest, alphaMap: m.alphaMap,
+      side: m.side, vertexColors: m.vertexColors, depthWrite: m.depthWrite,
+    });
+    out.name = m.name;
+    return out;
   }
 
   // Rebuild furnitureGroup (the models) and furniturePlanGroup (the plan pieces) from the
@@ -4204,29 +4221,36 @@ export function setupMR(view, project, getFootprint) {
       });
       a.floorGeometry?.dispose(); // real floor stays visible; the ceiling is drawn (painted white)
       const y = (floor.elevation || 0) - displayElevation();
-      const parts = [
-        [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
-        [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
-        [a.ceilingGeometry, arch3dMats.ceiling],
-        ...finishGeometries(finishSurfaces(project, floor))
+      // Parts by PERF layer (`arch3dLayer`, PERF_LAYERS_3D), each merged into one mesh per
+      // material: products are many small meshes, drawn once per eye.
+      const layers = {
+        struct: [
+          [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
+          [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
+          [a.ceilingGeometry, arch3dMats.ceiling],
+        ],
+        finish: finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
-        // Door products (cached Lambert materials; only the geometry is disposed).
-        ...doorProducts.flatMap((d) => buildDoorProduct(d, { lambert: true, open: true }))
-          .map((mesh) => [mesh.geometry, mesh.material]),
-        ...windowProducts.flatMap((d) => buildWindowProduct(d, { lambert: true }))
-          .map((mesh) => [mesh.geometry, mesh.material]),
-        ...[...markerProductDraws(project, floor.markers)].filter(([, d]) => d)
+        // Door and window products (cached Lambert materials; only the geometry is disposed).
+        doorwin: [
+          ...doorProducts.flatMap((d) => buildDoorProduct(d, { lambert: true, open: true })),
+          ...windowProducts.flatMap((d) => buildWindowProduct(d, { lambert: true })),
+        ].map((mesh) => [mesh.geometry, mesh.material]),
+        device: [...markerProductDraws(project, floor.markers)].filter(([, d]) => d)
           .flatMap(([id, d]) => deviceProductParts(floor.markers.find((m) => m.id === id), d, a.markerPlacements?.get(id))),
-      ];
-      // One mesh per material: products are many small meshes, drawn once per eye.
-      for (const [geometry, material] of mergePartsByMaterial(parts)) {
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.y = y;
-        arch3dGroup.add(mesh);
+      };
+      for (const [layer, parts] of Object.entries(layers)) {
+        for (const [geometry, material] of mergePartsByMaterial(parts)) {
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.y = y;
+          mesh.userData.arch3dLayer = layer;
+          arch3dGroup.add(mesh);
+        }
       }
       if (a.outlineGeometry) {
         const lines = new THREE.LineSegments(a.outlineGeometry, arch3dMats.outlines);
         lines.position.y = y;
+        lines.userData.arch3dLayer = 'struct';
         arch3dGroup.add(lines);
       }
     }
@@ -8416,25 +8440,44 @@ export function setupMR(view, project, getFootprint) {
     ['mat', () => [materialGroup]], // MATERIAL badges, start-corner L and hover highlight
     ['plan', () => [planGroup]], // the whole plan; what remains is HUD + controllers
   ];
+  // With the AR 3D view on (LEFT X), the sweep measures its parts instead (buildArch3d tags
+  // each mesh's `arch3dLayer`), and the HUD adds each layer's draw calls.
+  const arch3dLayer = (name) => () => arch3dGroup.children.filter((o) => o.userData.arch3dLayer === name);
+  const PERF_LAYERS_3D = [
+    ['all', () => []],
+    ['struct', arch3dLayer('struct')], // walls, plain doors/windows, stairs, ceiling, outlines
+    ['finish', arch3dLayer('finish')], // floor and wall finishes
+    ['doorwin', arch3dLayer('doorwin')], // door and window products
+    ['device', arch3dLayer('device')], // switch, outlet and Ethernet products
+    ['furn', () => [furnitureGroup]], // furniture models
+    ['plan', () => planGroup.children.filter((o) => o !== arch3dGroup && o !== furnitureGroup)],
+  ];
+  const perfLayers = () => (arch3dOn ? PERF_LAYERS_3D : PERF_LAYERS);
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
-    ext: null, gl: null, active: false, pending: [], source: 'frame' };
+    ext: null, gl: null, active: false, pending: [], source: 'frame', layers: null, calls: new Map() };
   function perfRecord(name, ms) {
     const s = perf.samples.get(name) ?? perf.samples.set(name, { sum: 0, n: 0 }).get(name);
     s.sum += ms; s.n++;
   }
   // Per XR frame: advance the sweep, file this frame's interval, collect timer results.
   function perfFrame(time, dt) {
+    const layers = perfLayers();
+    if (perf.layers !== layers) { // 3D view toggled: restart the sweep on the other list
+      perf.layers = layers;
+      Object.assign(perf, { phase: 0, phaseStart: time });
+      perf.samples.clear(); perf.result.clear(); perf.calls.clear();
+    }
     if (perf.phaseStart < 0) perf.phaseStart = time;
     if (time - perf.phaseStart >= PERF_WINDOW_MS) {
-      const name = PERF_LAYERS[perf.phase][0];
+      const name = layers[perf.phase][0];
       const s = perf.samples.get(name);
       if (s?.n) perf.result.set(name, s.sum / s.n);
       perf.samples.delete(name);
-      perf.phase = (perf.phase + 1) % PERF_LAYERS.length;
+      perf.phase = (perf.phase + 1) % layers.length;
       perf.phaseStart = time;
     }
     const settled = time - perf.phaseStart >= PERF_SETTLE_MS;
-    perf.current = settled ? PERF_LAYERS[perf.phase][0] : null;
+    perf.current = settled ? layers[perf.phase][0] : null;
     if (!perf.ext && perf.current && dt > 0) perfRecord(perf.current, dt);
     const gl = perf.gl;
     while (perf.ext && perf.pending.length) {
@@ -8449,7 +8492,7 @@ export function setupMR(view, project, getFootprint) {
   function perfBeforeRender() {
     if (!renderer.xr.isPresenting) return;
     // Hide for the whole window (settling included); only recording waits to settle.
-    perf.hidden = PERF_LAYERS[perf.phase][1]().filter((o) => o.visible);
+    perf.hidden = (perf.layers || perfLayers())[perf.phase][1]().filter((o) => o.visible);
     for (const o of perf.hidden) o.visible = false;
     if (perf.ext && perf.pending.length < 8) {
       const query = perf.gl.createQuery();
@@ -8458,6 +8501,8 @@ export function setupMR(view, project, getFootprint) {
     }
   }
   function perfAfterRender() {
+    // Both eyes are drawn by now: this render's calls, without the swept layer.
+    if (perf.current) perf.calls.set(perf.current, renderer.info.render.calls);
     for (const o of perf.hidden) o.visible = true;
     perf.hidden = [];
     if (perf.active) {
@@ -8471,7 +8516,8 @@ export function setupMR(view, project, getFootprint) {
     perf.ext = perf.gl.getExtension('EXT_disjoint_timer_query_webgl2');
     perf.source = perf.ext ? 'gpu' : 'frame';
     Object.assign(perf, { phase: 0, phaseStart: -1, pending: [], active: false });
-    perf.samples.clear(); perf.result.clear();
+    perf.layers = null;
+    perf.samples.clear(); perf.result.clear(); perf.calls.clear();
     scene.onBeforeRender = perfBeforeRender;
     scene.onAfterRender = perfAfterRender;
   }
@@ -8489,13 +8535,25 @@ export function setupMR(view, project, getFootprint) {
     lastHudAt = -Infinity; // show the change on the next frame
   }
   // HUD lines: the running measurement, then each layer's cost vs 'all', two per line.
+  // The 3D view's list is shorter: one layer per line, with its draw calls (both eyes).
   function perfHudLines() {
     const all = perf.result.get('all');
+    const layers = perf.layers || perfLayers();
+    if (layers === PERF_LAYERS_3D) {
+      const allCalls = perf.calls.get('all');
+      const out = [`${perf.source} 3D: all ${all != null ? all.toFixed(1) : '?'} ms ${allCalls ?? '?'} calls [${layers[perf.phase][0]}]`];
+      for (const [name] of layers.slice(1)) {
+        const t = perf.result.get(name), c = perf.calls.get(name);
+        out.push(`${name.padEnd(8)}${all != null && t != null ? (all - t).toFixed(1).padStart(5) : '    ?'} ms`
+          + `${allCalls != null && c != null ? String(allCalls - c).padStart(5) : '    ?'} calls`);
+      }
+      return out;
+    }
     const cells = PERF_LAYERS.slice(1).map(([name]) => {
       const t = perf.result.get(name);
       return `${name.padEnd(6)} ${all != null && t != null ? (all - t).toFixed(1).padStart(5) : '    ?'}`;
     });
-    const out = [`${perf.source}:  all ${all != null ? all.toFixed(1) : '?'} ms [${PERF_LAYERS[perf.phase][0]}]`];
+    const out = [`${perf.source}:  all ${all != null ? all.toFixed(1) : '?'} ms [${layers[perf.phase][0]}]`];
     for (let i = 0; i < cells.length; i += 2) out.push(cells.slice(i, i + 2).join('  '));
     return out;
   }
