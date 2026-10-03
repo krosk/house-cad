@@ -173,7 +173,9 @@ function stockholmBed(entry) {
 
   const wood = new THREE.MeshStandardMaterial({ map: woodTexture(p.woodColor ?? 0x5b3a26), roughness: 0.6 });
   const woodV = wood.clone();
-  woodV.map = wood.map.clone();
+  // A variant, not a clone: a clone of a painted texture never receives its picture.
+  const color = p.woodColor ?? 0x5b3a26;
+  woodV.map = paintedTexture('furnWood', { color }, 256, 256, { placeholder: color, variant: 'vertical' });
   woodV.map.center.set(0.5, 0.5);
   woodV.map.rotation = Math.PI / 2; // grain along the legs
   const leatherMap = leatherTexture(p.cushionColor ?? 0x2a2422, 3, 1);
@@ -798,10 +800,174 @@ function pedalBin(entry) {
   return g;
 }
 
+// Habitat Moder II extendable round dining table, natural oak (Habitat ref 910365).
+// W × H × D from the catalog `sizeMm`: closed 1100 × 750 × 1100, extended 1550 × 750 × 1100
+// (a second catalog entry). The leaf is W − D: the top is two half-discs of radius D/2
+// with a straight middle of that length, and the legs move out with each half.
+// Extends along X; grain along X.
+//
+// Sources:
+//   - Product page https://www.habitat.fr/p/moder-table-de-salle-a-manger-naturel (RÉF 910365,
+//     sku 122190), "Dimensions": Longueur 155 cm, 110 cm; Hauteur 75 cm; Profondeur / Largeur
+//     110 cm; Longueur de la rallonge 45 cm. "Composition & matériaux": plateau et allonges
+//     panneaux de particules et MDF avec placage chêne; structure chêne massif et rail en
+//     acier; piètement chêne massif; finition laque nitrocellulose.
+//   - Assembly manual "Moder II - HA833381", "(110+45)x110x75 cm", 15 pages: the page's
+//     "Notice de montage" button, https://www.habitat.fr/asset/product/13552185 (PDF). p. 6
+//     parts: top (1), 4 legs (2), the leaf (3); p. 8 legs bolted to the outside corners of
+//     the apron frame, slide rails inside it, each leg's top a pentagon-like section; pp. 10–11
+//     the leaf is one panel folded in two, stored under the top; p. 9 / 11 the extended top:
+//     two seams across, the fold between them. Max load 30 kg (p. 14).
+//   - Measured on the manual's p. 1 drawing of the closed table, rendered at 600 dpi. It is a
+//     true isometric (the top's ellipse is 1561 × 899 px, ratio 0.576 = tan 30°), so plan
+//     lengths scale 1561 px / 1100 mm = 1.419 px/mm and heights 0.816 × that = 1.158 px/mm,
+//     everywhere in the drawing. The seam lies on an isometric axis, so the legs stand on
+//     the diagonals: the left/right legs show their depth along the diagonal, the front leg
+//     its width across it.
+//       top edge: 13 px square (11 mm) + 5 px of chamfer below, i.e. ~15 mm at 45°;
+//       leg depth along the diagonal: 77 mm at 495 mm up, 42 mm at the foot (side legs),
+//         so ~93 mm under the apron;
+//       leg width across: 44–47 mm at the top, 22 mm at the foot (front leg), with an
+//         outer flat face 29 mm wide at the top, 6 mm at the foot (the two inner lines);
+//       foot: its outer edge at 550 mm from the centre (the top's radius); centre at 529,
+//         i.e. ±374 mm per axis; outer face leaning in 61 mm to the top, inner face 87 mm,
+//         so the leg centre is ±313 mm per axis under the apron (61 mm splay per axis).
+//   - Photos (cdn.habitat.fr/thumbnails/product/122/122190/raw/<n>/<id>.webp):
+//     13546302 straight front view, closed: apron ~65 mm high (90 px at ~0.73 mm/px), its
+//       outer faces ~±310 mm (930 px); thin top with a darker chamfer under its edge.
+//     13546298 3/4 view, extended: two seams 45 cm apart and the leaf's fold, apron continuous
+//       along the long sides (it telescopes), legs at the four corners of the longer frame.
+//     13546301 / 13546300 the leaf being opened: steel rails inside the apron (not modelled,
+//       hidden under the top).
+//     13546303 3/4 closed, 13546304 grain close-up (fine straight oak grain).
+//   - Colour: mean of the top in 13546302 (rgb 209 164 122) under studio light; base colour
+//     0xd6a673 (rgb 214 166 115) chosen to match it in the preview (estimate).
+function moderTable(entry) {
+  const [W, H, D] = (entry.sizeMm || [1100, 750, 1100]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const R = D / 2, leaf = Math.max(0, W - D);
+  const edge = mm(p.topEdgeMm, 11), chamfer = mm(p.chamferMm, 15);
+  const apronH = mm(p.apronHMm, 65), apronT = mm(p.apronTMm, 20), apronOut = mm(p.apronOutMm, 310);
+  const leg = p.leg || {};
+  const legTopAt = mm(leg.topAtMm, 313), legFootAt = mm(leg.footAtMm, 374); // centre, per axis
+  const depthTop = mm(leg.depthTopMm, 93), depthFoot = mm(leg.depthFootMm, 42);
+  const widthTop = mm(leg.widthTopMm, 47), widthFoot = mm(leg.widthFootMm, 22);
+  const faceTop = mm(leg.faceTopMm, 29), faceFoot = mm(leg.faceFootMm, 6);
+  const half = leaf / 2;
+
+  const color = p.woodColor ?? 0xd6a673;
+  // Own texture variants, not clones: a clone of a painted texture never receives its picture.
+  const grain = (variant) => paintedTexture('furnWood', { color }, 256, 256, { placeholder: color, variant });
+  const topMap = grain('moder-top');
+  topMap.repeat.set(1 / 0.6, 1 / 0.6); // the cap UVs are plan metres: one picture per 60 cm
+  const legMap = grain('moder-leg');
+  legMap.repeat.set(1 / 0.6, 1 / 0.6);
+  legMap.center.set(0.5, 0.5);
+  legMap.rotation = Math.PI / 2; // grain along the legs (their UV v is the height)
+  const wood = new THREE.MeshStandardMaterial({ map: topMap, roughness: 0.55 });
+  const woodV = new THREE.MeshStandardMaterial({ map: legMap, roughness: 0.55 });
+  const seamMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.45), roughness: 0.8 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'moder-table';
+
+  // Top outline in plan: a stadium (a circle when there is no leaf), shape y = −Z.
+  const outline = (r) => {
+    const s = new THREE.Shape();
+    s.absarc(half, 0, r, -Math.PI / 2, Math.PI / 2, false);
+    s.absarc(-half, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+    return s;
+  };
+  const slab = (geometry, y) => {
+    geometry.rotateX(-Math.PI / 2); // shape XY → plan XZ, extrusion → +Y
+    const m = new THREE.Mesh(geometry, wood);
+    m.position.y = y;
+    return m;
+  };
+  // Upper slab with a square edge, then the 45° chamfer under it: a bevelled extrusion of
+  // the inset outline whose widest point meets the slab (its upper bevel hides inside it).
+  g.add(slab(new THREE.ExtrudeGeometry(outline(R), { depth: edge, bevelEnabled: false, curveSegments: 48 }), H - edge));
+  const under = new THREE.ExtrudeGeometry(outline(R - chamfer), {
+    depth: 0.0005, bevelEnabled: true, bevelThickness: chamfer, bevelSize: chamfer, bevelSegments: 1, curveSegments: 48,
+  });
+  const zs = under.attributes.position;
+  for (let i = 0; i < zs.count; i++) zs.setZ(i, Math.min(zs.getZ(i), edge * 0.9)); // keep the upper bevel inside the slab
+  g.add(slab(under, H - edge - 0.0005));
+
+  // Seams across the top: one in the middle closed, one each side of the leaf extended,
+  // and the leaf's fold between them (manual p. 10).
+  for (const x of leaf ? [-half, half] : [0]) {
+    g.add(box([x - 0.0008, H, -R + 0.003], [x + 0.0008, H + 0.0003, R - 0.003], seamMat));
+  }
+  if (leaf) g.add(box([-half, H, -0.0008], [half, H + 0.0003, 0.0008], seamMat));
+
+  // Square apron under the top; continuous along the long sides when extended (it
+  // telescopes, 13546298). The legs cover its corners.
+  const yA1 = H - edge - chamfer, yA0 = yA1 - apronH;
+  const ox = apronOut + half;
+  for (const sz of [-1, 1]) {
+    const z = sz * apronOut;
+    g.add(box([-ox, yA0, Math.min(z, z - sz * apronT)], [ox, yA1, Math.max(z, z - sz * apronT)], wood));
+  }
+  for (const sx of [-1, 1]) {
+    const x = sx * ox;
+    g.add(box([Math.min(x, x - sx * apronT), yA0, -apronOut], [Math.max(x, x - sx * apronT), yA1, apronOut], woodV));
+  }
+
+  // Legs: a six-sided blade along the diagonal (outer flat face, two bevels to the full
+  // width, sides narrowing to the inner edge), tapering from under the apron to the foot,
+  // which sits further out on the diagonal (manual p. 1, measured above).
+  const section = (depth, width, face) => {
+    const bev = (width - face) / 2, inner = width * 0.4;
+    return [[depth / 2, -face / 2], [depth / 2, face / 2], [depth / 2 - bev, width / 2],
+      [-depth / 2, inner / 2], [-depth / 2, -inner / 2], [depth / 2 - bev, -width / 2]];
+  };
+  const top = section(depthTop, widthTop, faceTop), foot = section(depthFoot, widthFoot, faceFoot);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const d = [sx / Math.SQRT2, sz / Math.SQRT2], n = [-d[1], d[0]]; // radial, across
+    const at = (c, [r, t], y) => [sx * (c + half) + r * d[0] + t * n[0], y, sz * c + r * d[1] + t * n[1]];
+    g.add(new THREE.Mesh(loft(top.map((q) => at(legTopAt, q, yA1)), foot.map((q) => at(legFootAt, q, 0))), woodV));
+  }
+  return g;
+}
+
+// A closed solid between two convex rings of plan points (same count, same order), flat
+// shaded; UVs: u along the perimeter, v the height, both in metres.
+function loft(upper, lower) {
+  const pos = [], uv = [];
+  const n = upper.length;
+  const cx = upper.reduce((s, q) => s + q[0], 0) / n, cz = upper.reduce((s, q) => s + q[2], 0) / n;
+  const tri = (a, b, c, ua, ub, uc) => {
+    // Wind each triangle so its normal points away from the ring's axis.
+    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0];
+    const mx = (a[0] + b[0] + c[0]) / 3 - cx, my = (a[1] + b[1] + c[1]) / 3 - (upper[0][1] + lower[0][1]) / 2, mz = (a[2] + b[2] + c[2]) / 3 - cz;
+    const out = nx * mx + ny * my + nz * mz > 0;
+    for (const [q, u] of out ? [[a, ua], [b, ub], [c, uc]] : [[a, ua], [c, uc], [b, ub]]) { pos.push(...q); uv.push(...u); }
+  };
+  let u = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const w = Math.hypot(upper[j][0] - upper[i][0], upper[j][2] - upper[i][2]);
+    const a = upper[i], b = upper[j], c = lower[j], e = lower[i];
+    tri(a, b, c, [u, a[1]], [u + w, b[1]], [u + w, c[1]]);
+    tri(a, c, e, [u, a[1]], [u + w, c[1]], [u, e[1]]);
+    u += w;
+  }
+  for (const ring of [upper, lower]) {
+    for (let i = 1; i < n - 1; i++) tri(ring[0], ring[i], ring[i + 1], [ring[0][0], ring[0][2]], [ring[i][0], ring[i][2]], [ring[i + 1][0], ring[i + 1][2]]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
-  'pedal-bin': pedalBin,
+  'pedal-bin': pedalBin, 'moder-table': moderTable,
 };
 
 export function isProcedural(entry) {

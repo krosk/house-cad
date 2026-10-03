@@ -352,5 +352,63 @@
     },
     "source": "procedural: JOYFURNOS double pedal bin 2 x 30 L, cream (Joybuy 100001750045278, no manufacturer 3D model); size from the gallery dimension drawing (image 6a4cad01E11ac9d64: 59 x 62.4 x 36.5 cm, 91 cm lid open), details from the studio renders; sources in the pedal-bin builder",
     "registeredAt": "2026-10-01T00:00:00.000Z"
+  },
+  "habitat-moder-ii-110": {
+    "name": "habitat-moder-ii-110",
+    "article": "910365",
+    "sizeMm": [
+      1100,
+      750,
+      1100
+    ],
+    "procedural": "moder-table",
+    "params": {
+      "woodColor": 14067315,
+      "topEdgeMm": 11,
+      "chamferMm": 15,
+      "apronHMm": 65,
+      "apronOutMm": 310,
+      "leg": {
+        "topAtMm": 313,
+        "footAtMm": 374,
+        "depthTopMm": 93,
+        "depthFootMm": 42,
+        "widthTopMm": 47,
+        "widthFootMm": 22,
+        "faceTopMm": 29,
+        "faceFootMm": 6
+      }
+    },
+    "source": "procedural: Habitat Moder II extendable round dining table, natural oak (Habitat RÉF 910365, no manufacturer 3D model), closed, 110 cm round; sizes from the habitat.fr Dimensions table (110 / 155 x 110 cm, H 75 cm, leaf 45 cm), shape and leg/edge sizes measured on the assembly manual HA833381 (habitat.fr asset 13552185, isometric p. 1), apron from the front photo 13546302; sources in the moder-table builder",
+    "registeredAt": "2026-10-03T00:00:00.000Z"
+  },
+  "habitat-moder-ii-155": {
+    "name": "habitat-moder-ii-155",
+    "article": "910365",
+    "sizeMm": [
+      1550,
+      750,
+      1100
+    ],
+    "procedural": "moder-table",
+    "params": {
+      "woodColor": 14067315,
+      "topEdgeMm": 11,
+      "chamferMm": 15,
+      "apronHMm": 65,
+      "apronOutMm": 310,
+      "leg": {
+        "topAtMm": 313,
+        "footAtMm": 374,
+        "depthTopMm": 93,
+        "depthFootMm": 42,
+        "widthTopMm": 47,
+        "widthFootMm": 22,
+        "faceTopMm": 29,
+        "faceFootMm": 6
+      }
+    },
+    "source": "procedural: Habitat Moder II extendable round dining table, natural oak (Habitat RÉF 910365, no manufacturer 3D model), extended with the 45 cm leaf, 155 x 110 cm; sizes from the habitat.fr Dimensions table (110 / 155 x 110 cm, H 75 cm, leaf 45 cm), shape and leg/edge sizes measured on the assembly manual HA833381 (habitat.fr asset 13552185, isometric p. 1), apron from the front photo 13546302; sources in the moder-table builder",
+    "registeredAt": "2026-10-03T00:00:00.000Z"
   }
 }

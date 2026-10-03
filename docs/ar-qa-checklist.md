@@ -433,6 +433,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] LEFT X on: the 3D models appear and the footprints disappear; LEFT X off: back to footprints
 - [ ] Set `daikin-ctxm15a` on a furniture zone drawn on a wall: it starts with its bottom at 2.0 m (the band pad's foot shows 2.00), back flat to the wall once turned, flap and sensors facing the room at the bottom right; its size looks right against the real wall
 - [ ] Same for `daikin-ftxm60a`: visibly wider (997 mm) and deeper than the CTXM15A
+- [ ] Cycle to `habitat-moder-ii-110`, then `habitat-moder-ii-155`: a 110 cm round footprint, then 155 × 110; with LEFT X on, an oak table 75 cm high, one seam across the round top, two seams and the leaf's fold on the long one, four splayed legs
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
 
 ## Desktop: textures prepared in a worker  ⬜ NEW (2026-10-03) — Chrome-measured, not seen on a device
@@ -441,7 +442,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Open 3D: every finish is textured (no flat colour left), with the Monastère/Lucia grain up close; Realistic still swaps in the Charme/Monastère photos.
 - [ ] iPhone 14: the same (the worker path), or the page fallback with no error.
 - [ ] Phone: the owner's link → ◈ View 3D opens without the canvas crashing (half-size textures); switch floors, toggle Realistic; leave the app and come back (a lost WebGL context would show flat textures).
-- [ ] Furniture (radiators, shower tray, piano, bed) and door leaves show their pictures, not a flat colour; the AR 3D view's finishes and window exterior too.
+- [ ] Furniture (radiators, shower tray, piano, bed, its legs too) and door leaves show their pictures, not a flat colour; the AR 3D view's finishes and window exterior too.
 
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked
 - [ ] **Reverted HUD panels ride the controller** — they sit right when the hand tilts down (s12 revert)

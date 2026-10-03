@@ -277,6 +277,26 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   full product link opens without one. Proven in a scratch browser preview: bounding box
   0.594 × 0.6245 × 0.367 m (the steel frame is 2 mm proud each side); ¾, front and side views beside
   the photos. Not yet seen in AR, View 3D or on device.
+- `habitat-moder-ii-110` and `habitat-moder-ii-155`: Habitat Moder II extendable round dining table,
+  natural oak (Habitat RÉF 910365, assembly manual HA833381), builder `moder-table`. Two entries
+  for the two states the owner asked for: closed 1100 × 750 × 1100 mm, extended with the 45 cm leaf
+  1550 × 750 × 1100 mm (the page's Dimensions table; the manual says "(110+45)x110x75 cm"). The
+  extended top is two half-discs with the leaf between, two seams across and the leaf's fold
+  between them (the leaf is one panel folded in two, manual pp. 10–11); the legs move out with
+  each half. The manual is behind the page's "Notice de montage" button in "Détails du colis &
+  livraison" (a button, not a link: it fetches `habitat.fr/asset/product/13552185`, a PDF that curl
+  downloads). It gives no dimensions, but its p. 1 drawing is a **true isometric** (owner's
+  suggestion, 2026-10-03; the top's ellipse ratio is 0.576 = tan 30°), so lengths read off it hold
+  everywhere at one scale, unlike a perspective photo. Measured there at 600 dpi: the legs are
+  six-sided blades along the diagonal (93 → 42 mm deep, 47 → 22 mm across, a chamfered outer face
+  29 → 6 mm), leaning out 61 mm per axis to feet whose outer edge is under the top's rim; the top
+  edge is 11 mm square plus a 15 mm 45° chamfer. A first version from the front photo had round
+  legs half as splayed. The apron height (65 mm) and position (±310 mm) come from that photo
+  (sources in the builder). Proven in a scratch browser preview: an orthographic isometric render
+  laid over the manual's drawing at the same scale coincides with its outline (top, edge, all
+  three visible legs, the seam); exact bounding boxes 1.100 × 0.7503 × 1.100 and
+  1.550 × 0.7503 × 1.100 m (the seam lines stand 0.3 mm proud); ¾ views beside photos 13546302
+  and 13546298. Not yet seen in AR, View 3D or on device.
 
 ## Rendering
 
