@@ -31,11 +31,20 @@ const stadium = (w, h) => radial((x, y) => {
   return Math.hypot(x, Math.max(0, Math.abs(y) - L)) <= w / 2;
 }, h);
 
-const N = 128; // directions per ring
-const DIRS = Array.from({ length: N }, (_, i) => [Math.cos((i / N) * Math.PI * 2), Math.sin((i / N) * Math.PI * 2)]);
+// Directions per ring, and the detail level for the build in progress (builds are
+// synchronous). Full detail for desktop View 3D. `low` for AR (owner, 2026-10-03: fps fell
+// to 10 in the kitchen once 34 Ground devices were set): an 8 cm plate at 128 directions was
+// ~5 500 triangles, mostly sub-pixel, and 97 % of the AR 3D view's geometry.
+const dirsFor = (n) => Array.from({ length: n }, (_, i) => [Math.cos((i / n) * Math.PI * 2), Math.sin((i / n) * Math.PI * 2)]);
+const DETAIL = {
+  full: { dirs: dirsFor(128), slope: 10, collar: 4, seg: 1 },
+  low: { dirs: dirsFor(48), slope: 4, collar: 2, seg: 0.5 },
+};
+let D = DETAIL.full;
+const segs = (n) => Math.max(8, Math.round(n * D.seg)); // circle/shape segments at this detail
 // A ring: the blend of two outlines (t = 0 → a, 1 → b), at height z(x, y).
 function ring(a, b, t, z) {
-  return DIRS.map(([c, s]) => {
+  return D.dirs.map(([c, s]) => {
     const d = a(c, s) * (1 - t) + b(c, s) * t, x = c * d, y = s * d;
     return [x, y, typeof z === 'function' ? z(x, y) : z];
   });
@@ -43,7 +52,7 @@ function ring(a, b, t, z) {
 // Stitch rings (outer to inner) into one smooth indexed surface; `cap` closes the last
 // ring with a fan to its centre at height cap(0, 0).
 function loft(rings, cap = null) {
-  const pos = [], idx = [];
+  const pos = [], idx = [], N = rings[0].length;
   for (const r of rings) for (const p of r) pos.push(...p);
   for (let k = 0; k + 1 < rings.length; k++) {
     for (let i = 0; i < N; i++) {
@@ -94,12 +103,12 @@ function plate(def, m, g) {
   const outer = roundedSquare(P / 2, pr), edge = roundedSquare(P / 2 - mm(0.8), Math.max(0.001, pr - mm(0.8)));
   const collar = stadium(cw, ch), opening = stadium(rw + 2 * gapW, rh + 2 * gapW);
   const rings = [ring(outer, outer, 0, 0), ring(outer, outer, 0, rim - mm(0.6)), ring(edge, edge, 0, rim)];
-  for (let i = 1; i <= 10; i++) { // pyramid: the rise steepens toward the collar
-    const t = i / 10;
+  for (let i = 1; i <= D.slope; i++) { // pyramid: the rise steepens toward the collar
+    const t = i / D.slope;
     rings.push(ring(edge, collar, t, rim + (collarZ - rim) * (0.6 * t + 0.4 * t * t)));
   }
-  for (let i = 1; i <= 4; i++) { // collar band, easing out at the opening
-    const t = i / 4;
+  for (let i = 1; i <= D.collar; i++) { // collar band, easing out at the opening
+    const t = i / D.collar;
     rings.push(ring(collar, opening, t, collarZ + (openZ - collarZ) * (1 - (1 - t) ** 2)));
   }
   rings.push(ring(opening, opening, 0, openZ - mm(3))); // the opening's wall, into the shadow
@@ -128,7 +137,7 @@ function rockerSwitch(def, m) {
   g.add(new THREE.Mesh(loft([ring(rk, rk, 0, openZ - mm(2.5)),
     ring(rk, rk, 0, (x, y) => face(x, y) - mm(0.9)), ring(rkIn, rkIn, 0, face)]), m.rocker));
   for (const half of [1, -1]) { // each face flat, so its own mesh (no normal smoothing across the fold)
-    const f = new THREE.ShapeGeometry(halfStadium(inW, inH, fold, half), 16);
+    const f = new THREE.ShapeGeometry(halfStadium(inW, inH, fold, half), segs(16));
     const pos = f.attributes.position;
     for (let i = 0; i < pos.count; i++) pos.setZ(i, face(pos.getX(i), pos.getY(i)));
     f.computeVertexNormals();
@@ -149,7 +158,7 @@ function rockerSwitch(def, m) {
     g.add(new THREE.Mesh(split, m.split));
   }
   // The shadow in the gap: the opening's floor.
-  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), 12);
+  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), segs(12));
   floor.translate(0, 0, openZ - mm(2.9));
   g.add(new THREE.Mesh(floor, m.gap));
   return g;
@@ -187,7 +196,7 @@ function flatInsert(def, m) {
   const rk = stadium(rw, rh), rkIn = stadium(inW, inH);
   g.add(new THREE.Mesh(loft([ring(rk, rk, 0, openZ - mm(2.5)), ring(rk, rk, 0, faceZ - mm(0.9)),
     ring(rkIn, rkIn, 0, faceZ)], () => faceZ), m.rocker));
-  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), 12);
+  const floor = new THREE.ShapeGeometry(stadiumShape(rw + 2 * gapW, rh + 2 * gapW), segs(12));
   floor.translate(0, 0, openZ - mm(2.9));
   g.add(new THREE.Mesh(floor, m.gap));
   const mark = (geometry, material, x, y, lift = 0.00005) => {
@@ -203,15 +212,15 @@ function flatInsert(def, m) {
 function socketOutlet(def, m) {
   const { g, mm, mark } = flatInsert(def, m);
   const R = mm(def.socketMm ?? 38.7) / 2;
-  mark(new THREE.RingGeometry(R - mm(0.25), R + mm(0.25), 64), m.gap, 0, 0); // a grey groove
+  mark(new THREE.RingGeometry(R - mm(0.25), R + mm(0.25), segs(64)), m.gap, 0, 0); // a grey groove
   // Pin holes read light grey (shallow, lit inside) with a darker rim on the photos.
   const hole = mm(def.pinHoleMm ?? 5) / 2, dx = mm(def.pinSpacingMm ?? 19) / 2;
   for (const x of [-dx, dx]) {
-    mark(new THREE.RingGeometry(hole - mm(0.5), hole, 32), m.gap, x, 0);
-    mark(new THREE.CircleGeometry(hole - mm(0.5), 32), m.hole, x, 0);
+    mark(new THREE.RingGeometry(hole - mm(0.5), hole, segs(32)), m.gap, x, 0);
+    mark(new THREE.CircleGeometry(hole - mm(0.5), segs(32)), m.hole, x, 0);
   }
   const [ey, ed] = (def.earthMm || [10.5, 5.2]).map(mm);
-  mark(new THREE.CircleGeometry(ed / 2, 32), m.split, 0, ey);
+  mark(new THREE.CircleGeometry(ed / 2, segs(32)), m.split, 0, ey);
   mark(new THREE.CircleGeometry(ed * 0.3, 24), m.pin, 0, ey, 0.0001);
   return g;
 }
@@ -234,11 +243,11 @@ function roundedRect(w, h, r) {
 function rj45Socket(def, m) {
   const { g, mm, faceZ, mark } = flatInsert(def, m);
   const [sx, sy, sd] = (def.screwMm || [-14.1, 5.6, 7.6]).map(mm);
-  mark(new THREE.RingGeometry(sd / 2 - mm(0.35), sd / 2, 40), m.gap, sx, sy);
+  mark(new THREE.RingGeometry(sd / 2 - mm(0.35), sd / 2, segs(40)), m.gap, sx, sy);
   const slot = new THREE.PlaneGeometry(sd * 0.6, mm(0.9)).rotateZ(((def.screwSlotDeg ?? 30) * Math.PI) / 180);
   mark(slot, m.hole, sx, sy);
   const [ix, iy, id] = (def.iconMm || [-4.4, 6.3, 7.6]).map(mm);
-  mark(new THREE.RingGeometry(id / 2 - mm(0.3), id / 2, 40), m.hole, ix, iy);
+  mark(new THREE.RingGeometry(id / 2 - mm(0.3), id / 2, segs(40)), m.hole, ix, iy);
   const [cx, cy, cw, ch] = (def.coverMm || [9.2, -8, 13.5, 17.6]).map(mm);
   const outline = roundedRect(cw, ch, mm(1.5));
   outline.holes.push(new THREE.Path(roundedRect(cw - mm(0.8), ch - mm(0.8), mm(1.1)).getPoints(8).reverse()));
@@ -256,12 +265,17 @@ const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet, 'rj45': rj45So
 // Built once per catalog entry and material kind; callers get a clone that shares the
 // geometry and materials, so they must never dispose them (a baked copy clones first).
 const built = new Map();
-export function buildDeviceProduct(def, { lambert = false } = {}) {
-  const key = `${JSON.stringify(def)}|${lambert}`;
+// `detail`: 'full' (desktop) or 'low' (AR: 48 directions, fewer slope rings; ~1/4 of the
+// triangles, same outline and heights).
+export function buildDeviceProduct(def, { lambert = false, detail = 'full' } = {}) {
+  const key = `${JSON.stringify(def)}|${lambert}|${detail}`;
   if (!built.has(key)) {
-    const g = (DESIGNS[def.design] || rockerSwitch)(def, materialsFor(def, lambert));
-    g.name = def.id || 'device-product';
-    built.set(key, g);
+    D = DETAIL[detail] || DETAIL.full;
+    try {
+      const g = (DESIGNS[def.design] || rockerSwitch)(def, materialsFor(def, lambert));
+      g.name = def.id || 'device-product';
+      built.set(key, g);
+    } finally { D = DETAIL.full; }
   }
   return built.get(key).clone();
 }

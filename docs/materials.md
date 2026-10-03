@@ -648,6 +648,13 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   product only when its surface suits the marker type (`DEVICE_SURFACE`: switch → switch; outlet and
   outlet_appliance → outlet; ethernet → ethernet),
   so a stale id on another type is ignored.
+- **Two detail levels** (`buildDeviceProduct(def, { detail })`). Desktop View 3D builds `full`: the
+  plate lofted from 128 directions × ~19 rings, ~5 100–5 500 triangles per device. AR builds `low`
+  (owner, 2026-10-03: fps fell to 10 in the kitchen after more outlets were set): 48 directions, 4
+  slope and 2 collar rings, circle marks at half their segments, 1 170–1 420 triangles, same outline,
+  heights and bounds (**Proven**, Node). On the owner's Ground floor (34 device products) devices were
+  180k of the AR 3D view's ~190k triangles; `low` makes them ~45k. A new design must use `D.dirs`
+  (through `ring`), `D.slope`/`D.collar` and `segs()` so it follows the level.
 - 3D: View 3D draws the product in place of the standard 8 cm faceplate, at the same placement
   (`wallMarkerPlacements`: flush on the nearest wall face, facing the room); the AR 3D view (LEFT X)
   bakes it in the same way. The builder caches one model per entry and hands out clones sharing its

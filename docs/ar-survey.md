@@ -938,6 +938,11 @@ teleport reticle; no last-active routing remains.
   towel radiator 49 → 3, the piano 27 → 6, same triangles and exact bounds. **Hypothesis:** the
   living room drops back near its old count; unmeasured on the Quest. A new product builder needs
   nothing extra, but a product material created per call (not cached) would not merge across items.
+- **Device products are built at `low` detail in AR** (`docs/materials.md` "Two detail levels"). The
+  owner's fps fell to 10 in the kitchen with 34 Ground device products: they were 97 % of the AR 3D
+  view's triangles (180k of ~190k, Node count of the owner's 2026-10-03 export), mostly sub-pixel,
+  and since the merge they are drawn wherever you look. **Hypothesis:** those triangles were the
+  frame cost; unmeasured (PROJECT · PERF `device` in the 3D list will show it).
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

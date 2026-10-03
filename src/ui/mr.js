@@ -4258,7 +4258,7 @@ export function setupMR(view, project, getFootprint) {
   // A marker's switch product, baked into plan-local world space like the door
   // products (shared geometry is cloned first, so the group's disposal stays safe).
   function deviceProductParts(marker, { def, z }, place) {
-    const g = buildDeviceProduct(def, { lambert: true });
+    const g = buildDeviceProduct(def, { lambert: true, detail: 'low' });
     g.position.set(place ? place.x : marker.x, z, -(place ? place.y : marker.y));
     if (place) g.rotation.y = Math.atan2(place.nx, -place.ny);
     g.updateMatrixWorld(true);
@@ -5642,7 +5642,7 @@ export function setupMR(view, project, getFootprint) {
       if (!def) return none(t(`marker.${marker.type || 'outlet'}`));
       // Device geometry is shared by the builder: never disposed here.
       return objectCard(`dev|${def.id}|${lang}|${unit}`, materialName(def, lang),
-        () => buildDeviceProduct(def, { lambert: true }));
+        () => buildDeviceProduct(def, { lambert: true, detail: 'low' }));
     }
     if (modeId === 'mat_furniture') {
       const rect = matSelDoor || matHoverDoor;
