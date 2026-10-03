@@ -17,6 +17,7 @@ import {
   serializeProject, deserializeInto,
 } from './io/serialize.js';
 import { buildShareUrl, decodeViewFromHash, loadView } from './io/shareView.js';
+import { onTextureProgress } from './ui/textureWorker.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
 import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
@@ -232,21 +233,21 @@ function setDesktop3D(visible) {
   }
 }
 view3dToggle.addEventListener('click', () => setDesktop3D(!app.classList.contains('show-3d')));
-// Finish textures paint in a worker (src/ui/finishTextureWorker.js). Until all are in, the
-// plan stays usable and View 3D waits with a count (owner, 2026-10-03: "work in progress
+// Every texture is prepared in the background (src/ui/textureWorker.js). Until all are in,
+// the plan stays usable and View 3D waits with a count (owner, 2026-10-03: "work in progress
 // → done"), so the 3D view never opens on half-painted floors. Already open (a finish
 // added while in 3D), it stays open and the new finish shows its flat colour until ready.
-view.onFinishProgress = ({ total, done }) => {
+onTextureProgress(({ total, done }) => {
   const waiting = done < total && !app.classList.contains('show-3d');
   view3dToggle.disabled = waiting;
   if (waiting) {
     view3dToggle.textContent = `◈ 3D: textures ${done}/${total}…`;
-    view3dToggle.title = 'Painting the floor and wall finishes; the 3D view opens when they are done';
+    view3dToggle.title = 'Preparing textures in the background; the 3D view opens when they are done';
   } else if (!app.classList.contains('show-3d')) {
     view3dToggle.textContent = '◈ View 3D';
     view3dToggle.title = 'Open the interactive 3D model';
   }
-};
+});
 
 // Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
 // immersive-ar is supported; no effect on the desktop app otherwise. MR renders

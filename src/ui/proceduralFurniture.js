@@ -5,10 +5,11 @@
 // metres, Y up, floor at Y = 0, origin centred in plan, front toward +Z — so placement,
 // rotation, hover highlight and cloning treat it like any downloaded model.
 //
-// Textures are small CanvasTextures drawn here (no network/assets), like the finish
-// textures: stained wood grain, quilted leather, mattress fabric.
+// Textures are small procedural pictures painted in the texture worker (no network/assets;
+// paintedTexture.js): stained wood grain, quilted leather, mattress fabric.
 
 import * as THREE from 'three';
+import { paintedTexture } from './paintedTexture.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -21,19 +22,9 @@ function rng(seed) {
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 }
 
-function canvasTexture(size, draw) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
-}
-
 // Wood with grain running along U (texture x).
-function woodTexture(color) {
-  return canvasTexture(256, (ctx, S) => {
+function paintWood(ctx, S, _h, { color }) {
+  {
     const r = rng(7);
     ctx.fillStyle = css(color);
     ctx.fillRect(0, 0, S, S);
@@ -50,12 +41,12 @@ function woodTexture(color) {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-  });
+  }
 }
 
 // Leather cushion face: soft mottling plus a quilted seam grid (cols × rows panels).
-function leatherTexture(color, cols = 3, rows = 3) {
-  return canvasTexture(256, (ctx, S) => {
+function paintLeather(ctx, S, _h, { color, cols = 3, rows = 3 }) {
+  {
     const r = rng(11);
     ctx.fillStyle = css(color);
     ctx.fillRect(0, 0, S, S);
@@ -75,11 +66,11 @@ function leatherTexture(color, cols = 3, rows = 3) {
     ctx.setLineDash([4, 4]);
     for (let i = 1; i < cols; i++) { const x = (S * i) / cols + 4; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, S); ctx.stroke(); }
     for (let j = 1; j < rows; j++) { const y = (S * j) / rows + 4; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke(); }
-  });
+  }
 }
 
-function fabricTexture(color) {
-  return canvasTexture(128, (ctx, S) => {
+function paintFabric(ctx, S, _h, { color }) {
+  {
     const r = rng(3);
     ctx.fillStyle = css(color);
     ctx.fillRect(0, 0, S, S);
@@ -90,12 +81,12 @@ function fabricTexture(color) {
       ctx.fillRect(i, 0, 1, S);
     }
     ctx.globalAlpha = 1;
-  });
+  }
 }
 
 // Slatted base: light birch slats across the bed width, gaps between.
-function slatTexture(color) {
-  return canvasTexture(128, (ctx, S) => {
+function paintSlat(ctx, S, _h, { color }) {
+  {
     ctx.fillStyle = '#3f3f46';
     ctx.fillRect(0, 0, S, S);
     const n = 4;
@@ -103,8 +94,43 @@ function slatTexture(color) {
       ctx.fillStyle = shade(color, 0.95 + 0.1 * (i % 2));
       ctx.fillRect(0, (S * i) / n + 3, S, S / n - 6);
     }
-  });
+  }
 }
+
+function paintKeys(ctx, S) {
+  ctx.fillStyle = '#f3f1ea';
+  ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = '#9d9a92';
+  for (let i = 1; i < 52; i++) ctx.fillRect((S * i) / 52 - 1, 0, 2, S);
+}
+
+function paintBadge(ctx, s) {
+  ctx.fillStyle = '#b9bcbf'; ctx.fillRect(0, 0, s, s);
+  ctx.fillStyle = '#ffffff'; ctx.font = 'italic bold 34px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ACOVA', s / 2, s / 2 + 2);
+}
+
+// A panel radiator's open top grille: dark fins, light slats, split in two halves.
+function paintGrille(ctx, size, _h, { W, color }) {
+  ctx.fillStyle = '#4a4d50'; ctx.fillRect(0, 0, size, size);
+  const slats = Math.round(W / 0.012);
+  ctx.fillStyle = '#d9dadb';
+  for (let i = 0; i < slats; i++) ctx.fillRect((i + 0.5) / slats * size - 1, 0, 2, size);
+  ctx.fillStyle = css(color);
+  ctx.fillRect(size / 2 - 4, 0, 8, size);                       // centre divider
+  ctx.fillRect(0, 0, 6, size); ctx.fillRect(size - 6, 0, 6, size);  // end caps
+}
+
+// Small textures by name, painted in the texture worker (paintedTexture.js, painters.js).
+export const FURNITURE_PAINTERS = {
+  furnWood: paintWood, furnLeather: paintLeather, furnFabric: paintFabric, furnSlat: paintSlat,
+  furnTrayTop: paintTrayTop, furnKeys: paintKeys, furnBadge: paintBadge, furnGrille: paintGrille,
+};
+const woodTexture = (color) => paintedTexture('furnWood', { color }, 256, 256, { placeholder: color });
+const leatherTexture = (color, cols = 3, rows = 3) => paintedTexture('furnLeather', { color, cols, rows }, 256, 256, { placeholder: color });
+const fabricTexture = (color) => paintedTexture('furnFabric', { color }, 128, 128, { placeholder: color });
+const slatTexture = (color) => paintedTexture('furnSlat', { color }, 128, 128, { placeholder: color });
 
 // A box from p0 to p1 (min/max corners, metres).
 function box(p0, p1, material) {
@@ -288,28 +314,10 @@ function daikinWallUnit(entry) {
   return g;
 }
 
-// Flat resin shower tray (Sensea NEO): a thin slab, drain at the back (−Z) short edge.
-// The top relief is only millimetres deep, so it is drawn on the top face (colour +
-// bump) instead of modelled:
-//   - a fine mineral stone texture (the anti-slip finish);
-//   - a straight step across the width in front of the drain, deepest at the cover and
-//     tapering to nothing near each side (the field slopes down to it);
-//   - the flush drain cover, top corners rounded, bottom edge on the step.
-// Positions are measured on Leroy Merlin's straight top-down photo (docs/furniture.md).
-function showerTray(entry) {
-  const [W, H, D] = (entry.sizeMm || [800, 27, 1200]).map((v) => v / 1000);
-  const p = entry.params || {};
-  const color = p.color ?? 0xf0f0f0;
-  const [coverW, coverD] = p.coverMm || [210, 136];      // drain cover, across × along
-  const coverFrom = p.coverFromEdgeMm ?? 37;              // cover's back edge from the tray edge
-  const stepAt = p.stepFromEdgeMm ?? 171;                  // step line from the drain edge
-  const stepInset = p.stepInsetMm ?? 41;                   // where the step fades, from each side
-  // Top face canvas: 1 px ≈ 1.6 mm, canvas top = the drain edge (−Z).
-  const PX = 512 / (W * 1000);
-  const cw = 512, ch = Math.round(D * 1000 * PX);
-  const c = document.createElement('canvas');
-  c.width = cw; c.height = ch;
-  const ctx = c.getContext('2d');
+// The shower tray's top face (colour, also its bump): stone speckle, the step and the
+// drain cover outline. 1 px ≈ 1.6 mm, canvas top = the drain edge.
+function paintTrayTop(ctx, cw, ch, { W, color, coverW, coverD, coverFrom, stepAt, stepInset }) {
+  const PX = cw / (W * 1000);
   // Stone speckle: per-pixel noise, blurred once by drawing the canvas back over itself.
   const img = ctx.createImageData(cw, ch);
   const base = new THREE.Color(color), r = rng(95043721);
@@ -324,7 +332,7 @@ function showerTray(entry) {
   }
   ctx.putImageData(img, 0, 0);
   ctx.globalAlpha = 0.5;
-  ctx.drawImage(c, 1, 1);
+  ctx.drawImage(ctx.canvas, 1, 1);
   ctx.globalAlpha = 1;
   const mm = (v) => v * PX;
   const cx = cw / 2, cx0 = cx - mm(coverW) / 2, cx1 = cx + mm(coverW) / 2;
@@ -352,8 +360,28 @@ function showerTray(entry) {
   ctx.arcTo(cx1, cy0, cx1, cy0 + cr, cr);
   ctx.lineTo(cx1, cy1);
   ctx.stroke();
-  const map = new THREE.CanvasTexture(c);
-  map.colorSpace = THREE.SRGBColorSpace;
+}
+
+// Flat resin shower tray (Sensea NEO): a thin slab, drain at the back (−Z) short edge.
+// The top relief is only millimetres deep, so it is drawn on the top face (colour +
+// bump) instead of modelled:
+//   - a fine mineral stone texture (the anti-slip finish);
+//   - a straight step across the width in front of the drain, deepest at the cover and
+//     tapering to nothing near each side (the field slopes down to it);
+//   - the flush drain cover, top corners rounded, bottom edge on the step.
+// Positions are measured on Leroy Merlin's straight top-down photo (docs/furniture.md).
+function showerTray(entry) {
+  const [W, H, D] = (entry.sizeMm || [800, 27, 1200]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const color = p.color ?? 0xf0f0f0;
+  const [coverW, coverD] = p.coverMm || [210, 136];      // drain cover, across × along
+  const coverFrom = p.coverFromEdgeMm ?? 37;              // cover's back edge from the tray edge
+  const stepAt = p.stepFromEdgeMm ?? 171;                  // step line from the drain edge
+  const stepInset = p.stepInsetMm ?? 41;                   // where the step fades, from each side
+  // Top face canvas: 1 px ≈ 1.6 mm, canvas top = the drain edge (−Z). Painted in the
+  // texture worker (paintTrayTop).
+  const ch = Math.round(D * 1000 * 512 / (W * 1000));
+  const map = paintedTexture('furnTrayTop', { W, color, coverW, coverD, coverFrom, stepAt, stepInset }, 512, ch, { wrap: THREE.ClampToEdgeWrapping, placeholder: color });
   const top = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.8, roughness: 0.85 });
   const side = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
   const g = new THREE.Group();
@@ -423,13 +451,7 @@ function uprightPiano(entry) {
   // Keys: a white-key slab with the 52 key divisions drawn on top, red felt strip behind,
   // and the 36 black keys merged into one mesh.
   const keyZ0 = zCase + 0.012, keyZ1 = zSlip - 0.004, keyLen = keyZ1 - keyZ0;
-  const keyMap = canvasTexture(1024, (ctx, S) => {
-    ctx.fillStyle = '#f3f1ea';
-    ctx.fillRect(0, 0, S, S);
-    ctx.fillStyle = '#9d9a92';
-    for (let i = 1; i < 52; i++) ctx.fillRect((S * i) / 52 - 1, 0, 2, S);
-  });
-  keyMap.wrapS = keyMap.wrapT = THREE.ClampToEdgeWrapping;
+  const keyMap = paintedTexture('furnKeys', null, 1024, 1024, { wrap: THREE.ClampToEdgeWrapping, placeholder: 0xf3f1ea });
   const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
   const whiteTop = new THREE.MeshStandardMaterial({ map: keyMap, roughness: 0.3 });
   const whites = new THREE.Mesh(new THREE.BoxGeometry(keysW, 0.022, keyLen), [white, white, whiteTop, white, white, white]);
@@ -551,13 +573,7 @@ function towelRadiator(entry) {
   }
 
   // ACOVA badge on the top bar's front, next to the left collector (close-up 3273996).
-  const badge = canvasTexture(128, (ctx, s) => {
-    ctx.fillStyle = '#b9bcbf'; ctx.fillRect(0, 0, s, s);
-    ctx.fillStyle = '#ffffff'; ctx.font = 'italic bold 34px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('ACOVA', s / 2, s / 2 + 2);
-  });
-  badge.wrapS = badge.wrapT = THREE.ClampToEdgeWrapping;
+  const badge = paintedTexture('furnBadge', null, 128, 128, { wrap: THREE.ClampToEdgeWrapping, placeholder: 0xb9bcbf });
   badge.repeat.set(1, 0.34); badge.offset.set(0, 0.33);   // a 3:1 strip of the square canvas
   const bw = 0.036, bh = 0.012;
   const plate = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), new THREE.MeshStandardMaterial({ map: badge, roughness: 0.4 }));
@@ -656,16 +672,7 @@ function panelRadiator(entry) {
   // Top: plain, or an open grille (dark fins, light slats, split in two halves).
   let top = white;
   if (p.topGrille) {
-    const map = canvasTexture(512, (ctx, size) => {
-      ctx.fillStyle = '#4a4d50'; ctx.fillRect(0, 0, size, size);
-      const slats = Math.round(W / 0.012);
-      ctx.fillStyle = '#d9dadb';
-      for (let i = 0; i < slats; i++) ctx.fillRect((i + 0.5) / slats * size - 1, 0, 2, size);
-      ctx.fillStyle = css(p.color ?? 0xf3f3f1);
-      ctx.fillRect(size / 2 - 4, 0, 8, size);                       // centre divider
-      ctx.fillRect(0, 0, 6, size); ctx.fillRect(size - 6, 0, 6, size);  // end caps
-    });
-    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    const map = paintedTexture('furnGrille', { W, color: p.color ?? 0xf3f3f1 }, 512, 512, { wrap: THREE.ClampToEdgeWrapping, placeholder: 0x8a8c8e });
     top = new THREE.MeshStandardMaterial({ map, roughness: 0.5 });
   }
   // Body; its front face is the slot floor.

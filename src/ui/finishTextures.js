@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { pinwheelCells, pinwheelPitch, steppedCells, steppedA, steppedB } from '../core/flooring.js';
 
-// A canvas on the page, or an OffscreenCanvas in the texture worker (finishTextures.worker.js),
+// A canvas on the page, or an OffscreenCanvas in the texture worker (textures.worker.js),
 // so the same painters run off the main thread. Callers set width and height.
 const newCanvas = () => (typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(1, 1));
 const css = (hex) => `#${(hex >>> 0).toString(16).padStart(6, '0')}`;
@@ -1025,14 +1025,14 @@ export function finishBumpTexture(m, anisotropy = 1) {
 
 // Painting a finish takes up to about 2 s of main-thread time (Lucia, Monastère: measured
 // in Chrome on the Steam Deck, 2026-10-03), so View 3D has them painted in a worker
-// (finishTextures.worker.js) and wraps the result here. `finishCanvases` runs in the worker:
+// (textures.worker.js) and wraps the result here. `finishCanvases` runs in the worker:
 // every canvas a finish needs, each with its unit; `finishTexturesFrom` turns them (as
 // page canvases) into the same textures finishTexture/finishBumpTexture return.
-export function finishCanvases(m, { detail = true } = {}) {
+export function finishCanvases(m, { bump = true, detail = true } = {}) {
   const d = m && DETAIL_DESIGNS[m.design] && m.w > 0 && m.h > 0 ? DETAIL_DESIGNS[m.design] : null;
   return {
     map: mapCanvas(m),
-    bump: bumpCanvas(m),
+    bump: bump ? bumpCanvas(m) : null,
     detail: d && detail ? { canvas: detailCanvas(d.size, (m.seed ?? 0) + 97, d.paint) } : null,
   };
 }

@@ -48,6 +48,12 @@ patches fall through the windows at the slider time, house shadow points north a
 shows, walls read neutral in POV. **Not measured:** frame rate (the test tab was hidden, so the
 browser paused rendering). **Hypothesis:** usable on the Deck and the iPhone 14; check fps on both.
 
+- **Background preparation** (owner rule, 2026-10-03): the sky's download, parse and pixel
+  work, and each photo finish's download and atlas, run in the texture worker
+  (`docs/materials.md` "Texture preparation in a worker"). On the page they blocked the main
+  thread for 0.2 s (sky), 2.9 s (Charme) and 0.9 s (Monastère), measured in Chrome on the Steam
+  Deck. The page only wraps the results and builds the PMREM, which needs the GPU.
+
 ## Photo finishes (Realistic only)
 
 `src/ui/photoFinishes.js`: a finish whose catalog id is registered there swaps its procedural texture

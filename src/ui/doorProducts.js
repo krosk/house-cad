@@ -9,6 +9,7 @@
 // architectural meshes and only lifts them by the floor elevation.
 
 import * as THREE from 'three';
+import { paintedTexture } from './paintedTexture.js';
 
 // Defaults (the Ange-Line); a catalog entry may override each: `frameFace`, `frameDepth`,
 // `threshold` (false = none), `roseDrop` (the key rose below the handle), `metalness`,
@@ -115,18 +116,14 @@ function drawPostforme(ctx, W, H, def) {
 
 const DESIGNS = { 'ange-line': drawAngeLine, line: drawLine, postforme: drawPostforme };
 
-// One leaf texture per catalog entry and orientation (mirrored = hinge at canvas x 0).
-const texCache = new Map();
+// One leaf texture per catalog entry and orientation (mirrored = hinge at canvas x 0),
+// painted in the texture worker (paintedTexture.js; painter `doorLeaf` in painters.js).
+export const paintDoorLeaf = (ctx, w, h, { def }) => (DESIGNS[def.design] || drawAngeLine)(ctx, w, h, def);
 function leafTexture(def, mirrored) {
-  const key = `${def.id}|${JSON.stringify(def)}|${mirrored}`;
-  if (texCache.has(key)) return texCache.get(key);
-  const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 512;
-  (DESIGNS[def.design] || drawAngeLine)(canvas.getContext('2d'), 256, 512, def);
-  const t = new THREE.CanvasTexture(canvas);
-  t.colorSpace = THREE.SRGBColorSpace;
-  if (mirrored) { t.wrapS = THREE.RepeatWrapping; t.repeat.x = -1; t.offset.x = 1; }
-  texCache.set(key, t);
+  const t = paintedTexture('doorLeaf', { def }, 256, 512, {
+    wrap: mirrored ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping, variant: mirrored ? 'mirrored' : '', placeholder: def.color ?? 0xf2f2f0,
+  });
+  if (mirrored) { t.repeat.x = -1; t.offset.x = 1; }
   return t;
 }
 

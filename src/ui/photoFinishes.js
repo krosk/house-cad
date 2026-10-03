@@ -3,7 +3,7 @@
 // and never committed (owner rule, 2026-10-03). The procedural design stays the stored
 // form and is used everywhere else (normal View 3D, AR, offline).
 import * as THREE from 'three';
-import { fetchCached } from './realism.js';
+import { fetchCached } from './imageCache.js';
 import { steppedA, steppedB, steppedCells } from '../core/flooring.js';
 
 // Sources: Beaulieu oak charme 118 × 16.4 (Leroy Merlin ref 92245930; catalog entry
@@ -45,31 +45,41 @@ const PHOTOS = {
 
 export const hasPhotoFinish = (def) => !!(def && PHOTOS[def.id]);
 
-const cache = new Map();
+// A page canvas, or an OffscreenCanvas in the finish texture worker. Callers set the size.
+const newCanvas = () => (typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(1, 1));
 
-// → Promise<{ map, bumpMap, plank: [L, W], cells }>: an atlas of the photo's whole
-// planks (one per cell, stacked) for patchPlankMaterial, or rejects.
-export function loadPhotoFinish(def, anisotropy = 1) {
+// Worker side: the atlas as canvases plus plain numbers (structured-clone safe).
+export function photoCanvases(def) {
   const spec = PHOTOS[def.id];
-  if (!cache.has(def.id)) {
-    const p = build(spec, anisotropy, def);
-    p.catch(() => cache.delete(def.id)); // a failed download may be retried later
-    cache.set(def.id, p);
+  if (!spec) return Promise.reject(new Error(`no photo for ${def.id}`));
+  return spec.layout === 'stepped' ? buildTiles(spec, def) : buildPlanks(spec);
+}
+
+// Page side: canvases → { map, bumpMap, plank: [L, W], cells } (planks) or { map, bumpMap,
+// rects, grout } (stepped) for patchPhotoMaterial. An atlas: clamp, cells must not bleed round.
+// The download and the pixel work run in the texture worker (textureWorker.js
+// `loadPhotoFinish`): about 2.9 s of main thread for Charme, 0.9 s for Monastère on the Deck.
+export function photoTextures(atlas, anisotropy) {
+  const map = new THREE.CanvasTexture(atlas.map);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const bumpMap = new THREE.CanvasTexture(atlas.bump);
+  for (const t of [map, bumpMap]) {
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = anisotropy;
   }
-  return cache.get(def.id);
+  if (atlas.layout === 'stepped') {
+    return { layout: 'stepped', map, bumpMap, rects: atlas.rects.map((r) => new THREE.Vector4(...r)), grout: new THREE.Color(atlas.groutHex) };
+  }
+  return { layout: 'planks', map, bumpMap, plank: atlas.plank, cells: atlas.cells };
 }
 
-function build(spec, anisotropy, def) {
-  return spec.layout === 'stepped' ? buildTiles(spec, anisotropy, def) : buildPlanks(spec, anisotropy);
-}
-
-async function buildPlanks(spec, anisotropy) {
+async function buildPlanks(spec) {
   const buffer = await fetchCached(spec.url);
   const image = await createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
   const fit = lightFit(image);
   const g = spec.grooves, cells = spec.planks.length;
   const cellW = 1760, cellH = Math.round(cellW * spec.plank[1] / spec.plank[0]);
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = cellW; canvas.height = cellH * cells;
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
@@ -99,14 +109,7 @@ async function buildPlanks(spec, anisotropy) {
   }
   image.close?.();
   ctx.putImageData(pixels, 0, 0);
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  const bumpMap = new THREE.CanvasTexture(reliefCanvas(pixels));
-  for (const t of [map, bumpMap]) {
-    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; // an atlas: cells must not bleed round
-    t.anisotropy = anisotropy;
-  }
-  return { layout: 'planks', map, bumpMap, plank: spec.plank, cells };
+  return { layout: 'planks', map: canvas, bump: reliefCanvas(pixels), plank: spec.plank, cells };
 }
 
 const FORMAT_ORDER = ['50×50', '30×50', '30×30'];
@@ -114,7 +117,7 @@ const FORMAT_ORDER = ['50×50', '30×50', '30×30'];
 // The tile photos in one atlas (stacked, each the tile's outline box at about 3 px/mm), the
 // white background turned to grout, and a relief map: the tile's outline blurred over
 // about 12 mm (the pillowed edge rolling down to the joint) plus the photo's grain.
-async function buildTiles(spec, anisotropy, def) {
+async function buildTiles(spec, def) {
   const images = await Promise.all(FORMAT_ORDER.map(async (f) => {
     const buffer = await fetchCached(spec.formats[f].url);
     return createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
@@ -126,7 +129,7 @@ async function buildTiles(spec, anisotropy, def) {
   const M = Math.round((def.joint || 0) / 2 * spec.formats['50×50'].px[0] / tileM);
   const W = Math.max(...FORMAT_ORDER.map((f) => spec.formats[f].px[0])) + 2 * M;
   const H = FORMAT_ORDER.reduce((h, f) => h + spec.formats[f].px[1] + 2 * M, 0);
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
@@ -140,8 +143,7 @@ async function buildTiles(spec, anisotropy, def) {
     ctx.drawImage(images[i], x0, y0, x1 - x0 + 1, y1 - y0 + 1, M, y + M, tw, th);
     images[i].close?.();
     // Texture UVs (flipY): u across, v = 1 − canvas y / H.
-    rects.push(new THREE.Vector4(0, 1 - (y + h) / H, w / W, 1 - y / H));
-    rects.at(-1).cell = [0, y, w, h];
+    rects.push({ uv: [0, 1 - (y + h) / H, w / W, 1 - y / H], cell: [0, y, w, h] });
     y += h;
   });
   const pixels = ctx.getImageData(0, 0, W, H);
@@ -168,8 +170,7 @@ async function buildTiles(spec, anisotropy, def) {
     // Outside the drawn cell (the narrower formats) is background too.
     for (let yy = cy; yy < cy + ch; yy++) for (let x = cw; x < W; x++) bg[yy * W + x] = 1;
   }
-  const groutHex = def.grout ?? 0xe6dfcd;
-  const grout = new THREE.Color(groutHex); // linear, for the shader's joint
+  const groutHex = def.grout ?? 0xe6dfcd; // the page makes it a linear THREE.Color for the shader
   const g255 = [(groutHex >> 16) & 255, (groutHex >> 8) & 255, groutHex & 255]; // sRGB bytes, for the canvas
   const mask = new Float32Array(W * H);
   for (let p = 0, i = 0; p < bg.length; p++, i += 4) {
@@ -180,15 +181,7 @@ async function buildTiles(spec, anisotropy, def) {
     for (let c = 0; c < 3; c++) d[i + c] = (d[i + c] * spec.tone[c]) * (1 - t) + g255[c] * t;
   }
   ctx.putImageData(pixels, 0, 0);
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  const bumpMap = new THREE.CanvasTexture(tileReliefCanvas(pixels, mask));
-  for (const t of [map, bumpMap]) {
-    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-    t.anisotropy = anisotropy;
-  }
-  for (const r of rects) delete r.cell;
-  return { layout: 'stepped', map, bumpMap, rects, grout };
+  return { layout: 'stepped', map: canvas, bump: tileReliefCanvas(pixels, mask), rects: rects.map((r) => r.uv), groutHex };
 }
 
 // Height: the outline blurred over about 12 mm (two 18 px boxes at 3 px/mm), so the face
@@ -218,7 +211,7 @@ function tileReliefCanvas({ data, width, height }, mask) {
   const lum = new Float32Array(width * height);
   for (let p = 0, i = 0; p < lum.length; p++, i += 4) lum[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
   const local = box(lum, 3);
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
   const out = ctx.createImageData(width, height);
@@ -234,7 +227,7 @@ function tileReliefCanvas({ data, width, height }, mask) {
 // The photo's lighting falloff: a least-squares quadratic surface of luminance over the
 // image (too smooth to touch per-plank tone). gain(x, y) brings a pixel to the mean.
 function lightFit(image) {
-  const S = 256, c = document.createElement('canvas');
+  const S = 256, c = newCanvas();
   c.width = c.height = S;
   const cx = c.getContext('2d', { willReadFrequently: true });
   cx.drawImage(image, 0, 0, S, S);
@@ -301,7 +294,7 @@ function reliefCanvas({ data, width, height }) {
       blur[y * width + x] = sum / (2 * R + 1);
     }
   }
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
   const out = ctx.createImageData(width, height);

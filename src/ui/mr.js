@@ -27,7 +27,7 @@ import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners }
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces, anchorNear } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
-import { finishTexture } from './finishTextures.js';
+import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
@@ -4177,23 +4177,38 @@ export function setupMR(view, project, getFootprint) {
   };
   const arch3dFinishMats = new Map(); // catalog entry (JSON) → material; never disposed
   // One painted texture per catalog entry, shared by the AR 3D view and the material
-  // card (painting can take a second on the Quest; never twice). Never disposed.
+  // card, painted in the texture worker (textureWorker.js: a finish takes up to 2 s of
+  // main thread, which froze the headset). Promise<Texture|null>; never disposed.
   const finishMaps = new Map();
   function finishMapFor(def) {
     const key = JSON.stringify(def || {});
-    if (!finishMaps.has(key)) finishMaps.set(key, finishTexture(def, 4));
+    if (!finishMaps.has(key)) {
+      const textured = def && def.pattern !== 'paint' && def.w > 0 && def.h > 0;
+      finishMaps.set(key, textured
+        ? paintFinish(def, 4, { bump: false }).then(({ map }) => map).catch((error) => {
+          rlog('finish texture failed', { id: def.id, error: String(error?.message || error) });
+          return null;
+        })
+        : Promise.resolve(null));
+    }
     return finishMaps.get(key);
   }
+  // The finish's flat colour until its texture is in.
   function arch3dFinishMaterial(def) {
     const key = JSON.stringify(def || {});
     let material = arch3dFinishMats.get(key);
     if (!material) {
-      const map = finishMapFor(def);
       material = new THREE.MeshLambertMaterial({
-        color: map ? 0xffffff : (def?.color ?? 0xffffff), map, side: THREE.DoubleSide,
+        color: def?.color ?? 0xffffff, side: THREE.DoubleSide,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       });
       arch3dFinishMats.set(key, material);
+      finishMapFor(def).then((map) => {
+        if (!map) return;
+        material.map = map;
+        material.color.setHex(0xffffff);
+        material.needsUpdate = true;
+      });
     }
     return material;
   }
@@ -5680,11 +5695,11 @@ export function setupMR(view, project, getFootprint) {
     if (!def) return none(t('mode.' + modeId));
     const key = `finish|${JSON.stringify(def)}|${lang}|${unit}`;
     return {
-      key, build: () => ({
+      key, build: () => finishMapFor(def).then((map) => ({
         key, kind: 'finish', title: materialName(def, lang),
-        map: finishMapFor(def), color: def.color, span: swatchSpan(def),
+        map, color: def.color, span: swatchSpan(def),
         barLabel: (len) => `${fmt(len)} ${unitLabel()}`,
-      }),
+      })),
     };
   }
   function updateMaterialCard(time) {

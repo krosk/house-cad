@@ -434,35 +434,66 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
   - not yet seen in the real app, on the phone or on the Quest browser (Hypothesis: the patched
     shader compiles there as it does in desktop Chrome).
 
-## Painting in a worker (View 3D)
+## Texture preparation in a worker
 
-- **Why** (owner, 2026-10-03): once share links carried finishes (session 38), opening the owner's
-  link froze the page, and panning the 2D plan stalled and left smears. Painting the house's 7 textured
-  finishes on the page took about 5.1 s of blocking work (measured in Chrome on the Steam Deck):
-  Lucia 1.9 s, Monastère 1.8 s, terrazzo 0.6 s, Etruria 0.5 s.
-- **How:** View 3D asks `paintFinish(def)` (`src/ui/finishTextureWorker.js`), which has
-  `finishTextures.worker.js` paint the same canvases (`finishCanvases`) on OffscreenCanvas. They come
-  back as ImageBitmaps, are copied onto page canvases (so `flipY` and upload behave exactly as
-  before), and are wrapped by `finishTexturesFrom`.
-  - Meanwhile the finish shows its flat colour. The photo finish (Realistic) and the detail layer
-    attach once the texture is in.
-  - **Owner choice: "work in progress → done".** While textures are pending and the plan is shown,
-    ◈ View 3D is disabled and reads `3D: textures n/N…`. It opens when all are done. If 3D is
-    already open, it stays open.
-  - Without Worker or OffscreenCanvas, or if the worker fails, each finish is painted on the page,
-    one per task.
-  - AR (`mr.js`) still calls `finishTexture` directly.
+- **Owner rule (2026-10-03): everything that is texture preparation runs in the background.**
+  - Why: once share links carried finishes (session 38), opening the owner's link froze the page.
+    The 2D pan stalled and smeared.
+  - Then, with finishes painting in a worker (`2798bc9`), the owner saw the texture count rise while
+    the UI stayed frozen. The Realistic photo floors were still built on the page.
+- **What used to block the main thread** (Chrome on the Steam Deck):
+  - the 7 finishes of the owner's house: about 5.1 s (Lucia 1.9 s, Monastère 1.8 s);
+  - the Charme photo atlas: 2.9 s; Monastère's: 0.9 s;
+  - the sky's HDR parse: 0.2 s;
+  - furniture pictures, repainted on every rebuild (the shower tray's stone 37 ms).
+- **How:**
+  - One module worker, `src/ui/textures.worker.js`, with its page client `src/ui/textureWorker.js`.
+  - Jobs:
+    - `finish`: `finishCanvases`, colour, bump and detail; AR asks for colour only.
+    - `photo`: download plus `photoCanvases` (`photoFinishes.js`).
+    - `sky`: download plus `skyPixels` (`skyPixels.js`), returning half-float arrays.
+    - `paint`: a named painter from `src/ui/painters.js` for the small procedural textures. These
+      are View 3D's default wood and plaster, the exterior behind window glass, door leaves, and
+      furniture (wood, leather, fabric, slats, shower tray, piano keys, badge, radiator grille).
+  - Canvases come back as transferred ImageBitmaps and are copied onto page canvases, so `flipY` and
+    uploads behave as before. The page only wraps them into textures.
+  - **Small textures** (`paintedTexture.js`): the caller gets a texture at once with a 1 px
+    placeholder of the product's colour, and its builder stays synchronous. When the picture
+    arrives, the texture is disposed (the GPU copy was 1 × 1) and refilled. One texture per name,
+    args, size and variant, shared and never disposed, so a rebuild never repaints.
+  - **Finishes:** a finish shows its flat colour until its texture is in, then the detail layer
+    and, in Realistic, the photo attach. AR's finish material does the same, and the AR material
+    card waits for the texture.
+- **Owner choice: "work in progress → done".**
+  - `onTextureProgress` counts every job. While any is pending and the plan is shown, ◈ View 3D is
+    disabled and reads `3D: textures n/N…`; it opens when all are done.
+  - If 3D is already open, it stays open.
+- **Fallback:** without Worker or OffscreenCanvas, or if the worker fails, each job runs on the
+  page, one per task. A finish that fails inside the worker alone is repainted on the page. A
+  download failure rejects as before.
+- **Trap: a module imported by the worker must never import `textureWorker.js`.** Its `new Worker`
+  call would bundle a worker inside the worker. So `photoFinishes.js`, `skyPixels.js`,
+  `imageCache.js`, `painters.js` and the painter modules are worker-safe: no DOM use at load time,
+  and canvases made via `newCanvas()`. `realism.js` and `view3d.js` hold the page sides.
 - **Proven** (Chrome on the Steam Deck, scratch dev server, 2026-10-03):
-  - all 7 finishes painted in 5.2 s with the main thread never blocked over 64 ms (it was 5.1 s
-    blocked);
-  - for 4 of them the worker's pixels equal the page's byte for byte;
-  - for Charme, mosaic, Lucia and terrazzo, the canvas `blur` filter rasterizes slightly differently
-    off the page: channel means within 0.3/255 and spreads within 0.4, worst pixel 28/255;
-  - a synthetic 7-finish link shows `3D: textures 0/7…` on open, then ◈ View 3D when done.
+  - All 7 finishes, both photo atlases and the sky, started at once, finished in 7.9 s. The main
+    thread never blocked for more than 40 ms.
+  - Pixels compared with the page versions:
+    - photo atlases, the sky arrays and 10 of the 11 painter pictures are byte-identical;
+    - the door leaf differs in 0.003 % of bytes (max 7/255);
+    - finishes: 4 identical; for Charme, mosaic, Lucia and terrazzo the canvas `blur` filter
+      rasterizes slightly differently in the worker (channel means within 0.3/255, worst 28/255).
+  - The 13 procedural furniture products build in about 140 ms in total, down from about 280 ms. The
+    rest is geometry.
+  - A synthetic 7-finish link shows the counter, then ◈ View 3D.
 - **Hypothesis:**
-  - the 3D view after the swap looks as before (not seen: the test tab was hidden);
-  - Safari on the iPhone 14 runs the module worker (Safari 15+) and OffscreenCanvas 2D (16.4+);
-  - whether the `blur` filter works there, in the worker or on the page, is unknown.
+  - The 3D view after the swap looks as before; not seen, because the test tab was hidden.
+  - Safari on the iPhone 14 runs the module worker (Safari 15+) and OffscreenCanvas 2D (16.4+),
+    including `ctx.filter` and text.
+  - Painted textures look right in the Quest browser's AR view.
+  - A download that never settles would leave ◈ View 3D disabled; there is no timeout.
+- **Not moved:** GPU work (the sky's PMREM, shader compiles) needs the WebGL context. UI text
+  canvases (AR labels, the material card, the QR code, sheet previews) are drawn on demand.
 
 ## Octagon + tozzetto products
 

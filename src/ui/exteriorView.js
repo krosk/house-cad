@@ -5,6 +5,7 @@
 // so it reads as bright outdoor light whatever the room's lighting.
 
 import * as THREE from 'three';
+import { paintedTexture } from './paintedTexture.js';
 
 const SIZE = 512;
 const HORIZON = 0.58; // from the top of the picture
@@ -20,7 +21,8 @@ function rng(seed) {
   };
 }
 
-function paint(ctx) {
+// Painter (painters.js, run in the texture worker).
+export function paintExterior(ctx) {
   const r = rng(20260927), H = SIZE * HORIZON;
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#8fbfe6');
@@ -61,11 +63,7 @@ let material = null;
 // The shared glass material (cached, never disposed).
 export function exteriorGlassMaterial() {
   if (material) return material;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = SIZE;
-  paint(canvas.getContext('2d'));
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
+  const map = paintedTexture('exterior', null, SIZE, SIZE, { wrap: THREE.ClampToEdgeWrapping, placeholder: 0xb7d3e8 });
   material = new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide });
   return material;
 }

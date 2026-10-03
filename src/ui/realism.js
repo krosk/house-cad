@@ -2,7 +2,7 @@
 // photographed sky for ambient light and reflections, and ambient occlusion. Desktop
 // only; the AR session never uses any of it.
 import * as THREE from 'three';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { loadSkyPixels } from './textureWorker.js';
 
 // The owner's house: Val-de-Marne (94), France (docs/heat-loss.md). North is plan +y
 // (owner, 2026-10-03), so plan (x, y) → world (x, up, -y) puts north at world -Z.
@@ -42,62 +42,17 @@ export const SKY_HDRI = {
   url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr',
   page: 'https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky',
 };
-const IMAGE_CACHE = 'house-cad:images:v1';
-
-export async function fetchCached(url) {
-  const cache = globalThis.caches ? await caches.open(IMAGE_CACHE).catch(() => null) : null;
-  const hit = cache && await cache.match(url);
-  if (hit) return hit.arrayBuffer();
-  const response = await fetch(url, { mode: 'cors' });
-  if (!response.ok) throw new Error(`${response.status} ${url}`);
-  if (cache) await cache.put(url, response.clone()).catch(() => {});
-  return response.arrayBuffer();
-}
-
-// HDRI → { texture (equirect, sun removed), sunAngle }. The photographed sun is found
-// (brightest pixel) and clamped out: the DirectionalLight is the sun, with real shadows,
-// and the sky then only adds soft light. `sunAngle` is the image sun's angle from +Z
-// toward +X, used to turn the sky so its bright side faces the real sun.
+// HDRI → { texture (equirect, sun removed), lightTexture, sunAngle }. The photographed sun
+// is found (brightest pixel) and clamped out: the DirectionalLight is the sun, with real
+// shadows, and the sky then only adds soft light. `sunAngle` is the image sun's angle from
+// +Z toward +X, used to turn the sky so its bright side faces the real sun. The download,
+// parse and pixel work run in the texture worker (textureWorker.js `loadSkyPixels`).
 export async function loadSky(sky = SKY_HDRI) {
-  const buffer = await fetchCached(sky.url);
-  const loader = new RGBELoader().setDataType(THREE.FloatType);
-  const parsed = loader.parse(buffer);
-  const { width, height, data } = parsed;
-  let best = -1, bestU = 0.5;
-  for (let y = 0; y < height / 2; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-      if (lum > best) { best = lum; bestU = (x + 0.5) / width; }
-    }
-  }
-  // Clamp the disc and its glare to the brightest sky level (keeps colour, drops energy).
-  const CLAMP = 8;
-  for (let i = 0; i < data.length; i += 4) {
-    const m = Math.max(data[i], data[i + 1], data[i + 2]);
-    if (m > CLAMP) { const k = CLAMP / m; data[i] *= k; data[i + 1] *= k; data[i + 2] *= k; }
-  }
-  const texture = halfTexture(data, width, height, 1);
-  // Lighting copy, mostly desaturated: a room is lit by sky light bounced off walls and
-  // floors, not by blue straight from the sky (the raw sky turned interiors blue).
-  const lightTexture = halfTexture(data, width, height, 0.3);
-  // three's equirect lookup: u = atan(dir.z, dir.x) / 2π + 0.5.
-  const phi = (bestU - 0.5) * 2 * Math.PI;
-  const sunAngle = Math.atan2(Math.cos(phi), Math.sin(phi)); // atan2(x, z)
-  return { texture, lightTexture, sunAngle };
+  const { width, height, texture, light, sunAngle } = await loadSkyPixels(sky.url);
+  return { texture: halfTexture(texture, width, height), lightTexture: halfTexture(light, width, height), sunAngle };
 }
 
-// Half float: linear filtering of full float textures is optional in WebGL2 (iOS Safari
-// lacks it: Hypothesis), half float filtering is core. `saturation` 1 keeps the colours.
-function halfTexture(data, width, height, saturation) {
-  const half = new Uint16Array(data.length);
-  for (let i = 0; i < data.length; i += 4) {
-    const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-    for (let c = 0; c < 3; c++) {
-      half[i + c] = THREE.DataUtils.toHalfFloat(Math.min(65000, lum + (data[i + c] - lum) * saturation));
-    }
-    half[i + 3] = THREE.DataUtils.toHalfFloat(1);
-  }
+function halfTexture(half, width, height) {
   const texture = new THREE.DataTexture(half, width, height, THREE.RGBAFormat, THREE.HalfFloatType);
   texture.mapping = THREE.EquirectangularReflectionMapping;
   texture.colorSpace = THREE.LinearSRGBColorSpace;

@@ -12,14 +12,15 @@ import { buildDeviceProduct } from './deviceProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { applyFinishDetail } from './finishTextures.js';
-import { paintFinish } from './finishTextureWorker.js';
+import { paintFinish, loadPhotoFinish } from './textureWorker.js';
+import { paintedTexture } from './paintedTexture.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
-import { hasPhotoFinish, loadPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
+import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -31,76 +32,26 @@ const TILT_Q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 const TILT_Z = new THREE.Vector3(0, 0, 1);
 const TILT_Y = new THREE.Vector3(0, 1, 0);
 
-function canvasTexture(size, paint, { repeat = 1, color = true, anisotropy = 1 } = {}) {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  paint(ctx, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+// The default floor wood and wall plaster, painted in the texture worker (painters.js
+// `viewWood` / `viewPlaster`); the flat placeholder colour shows until they arrive.
+function viewTexture(name, size, { repeat = 1, color = true, anisotropy = 1, placeholder } = {}) {
+  const texture = paintedTexture(name, { relief: !color }, size, size, { color, placeholder, variant: `${repeat}` });
   texture.repeat.set(repeat, repeat);
   texture.anisotropy = anisotropy;
-  if (color) texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 
 function woodTextures(anisotropy) {
-  const paint = (ctx, size, relief = false) => {
-    ctx.fillStyle = relief ? '#888' : '#b98550';
-    ctx.fillRect(0, 0, size, size);
-    const rows = 8;
-    const rowH = size / rows;
-    for (let row = 0; row < rows; row++) {
-      const y = row * rowH;
-      const offset = row % 2 ? size * 0.5 : 0;
-      for (let x = -offset; x < size; x += size) {
-        if (!relief) {
-          const shade = 174 + ((row * 23 + Math.round(x)) % 19);
-          ctx.fillStyle = `rgb(${shade},${Math.round(shade * 0.72)},${Math.round(shade * 0.43)})`;
-          ctx.fillRect(x + 1, y + 1, size - 2, rowH - 2);
-        }
-        ctx.strokeStyle = relief ? '#666' : 'rgba(65,37,18,.35)';
-        ctx.lineWidth = relief ? 3 : 1.5;
-        ctx.strokeRect(x, y, size, rowH);
-      }
-      // Long, low-contrast grain follows the board direction.
-      for (let line = 0; line < 5; line++) {
-        const gy = y + ((line * 13 + row * 7) % Math.max(1, rowH - 5)) + 2;
-        ctx.strokeStyle = relief ? 'rgba(150,150,150,.3)' : 'rgba(74,40,18,.12)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let x = 0; x <= size; x += 16) {
-          const wave = Math.sin((x + row * 31 + line * 17) * 0.035) * 2;
-          if (x === 0) ctx.moveTo(x, gy + wave); else ctx.lineTo(x, gy + wave);
-        }
-        ctx.stroke();
-      }
-    }
-  };
   return {
-    map: canvasTexture(512, (ctx, size) => paint(ctx, size), { anisotropy }),
-    bumpMap: canvasTexture(512, (ctx, size) => paint(ctx, size, true), { color: false, anisotropy }),
+    map: viewTexture('viewWood', 512, { anisotropy, placeholder: 0xb98550 }),
+    bumpMap: viewTexture('viewWood', 512, { color: false, anisotropy, placeholder: 0x888888 }),
   };
 }
 
 function plasterTextures(anisotropy) {
-  const paint = (ctx, size, relief = false) => {
-    const image = ctx.createImageData(size, size);
-    for (let i = 0; i < image.data.length; i += 4) {
-      const p = i / 4;
-      // Deterministic fine mottling: enough to catch light without visual noise.
-      const noise = ((p * 73 + Math.floor(p / size) * 151) % 17) - 8;
-      const value = relief ? 128 + noise * 2 : 239 + Math.round(noise * 0.35);
-      image.data[i] = value;
-      image.data[i + 1] = relief ? value : value - 1;
-      image.data[i + 2] = relief ? value : value - 3;
-      image.data[i + 3] = 255;
-    }
-    ctx.putImageData(image, 0, 0);
-  };
   return {
-    map: canvasTexture(256, (ctx, size) => paint(ctx, size), { repeat: 3, anisotropy }),
-    bumpMap: canvasTexture(256, (ctx, size) => paint(ctx, size, true), { repeat: 3, color: false, anisotropy }),
+    map: viewTexture('viewPlaster', 256, { repeat: 3, anisotropy, placeholder: 0xefeeeb }),
+    bumpMap: viewTexture('viewPlaster', 256, { repeat: 3, color: false, anisotropy, placeholder: 0x808080 }),
   };
 }
 
@@ -195,7 +146,6 @@ export class View3D {
     this.sky = null; // { texture, envTexture, sunAngle } once downloaded
     this.composer = null;
     this.onSkyStatus = null; // (text) → main.js shows download/failure state
-    this.onFinishProgress = null; // ({ total, done }) → main.js holds View 3D until done
 
     // Ground grid + subtle floor to catch shadows. Kept as fields so the MR
     // module can hide them during passthrough.
@@ -875,9 +825,9 @@ export class View3D {
 
   // One cached material per catalog entry (keyed by its content, so an edited custom
   // product gets a fresh texture). Never disposed with the per-build geometry.
-  // Its textures are painted in a worker (finishTextureWorker.js): the material shows the
-  // finish's flat colour until they arrive. `finishProgress` counts them so main.js can
-  // hold the 3D view until every finish is ready (owner, 2026-10-03).
+  // Its textures are painted in the texture worker (textureWorker.js): the material shows the
+  // finish's flat colour until they arrive; main.js holds the 3D view until every
+  // background texture job is done (owner, 2026-10-03).
   _finishMaterial(def) {
     this.finishMaterials ??= new Map();
     const key = JSON.stringify(def || {});
@@ -895,7 +845,6 @@ export class View3D {
     if (hasPhotoFinish(def)) material.userData.photoDef = def;
     this.finishMaterials.set(key, material);
     if (!def || def.pattern === 'paint' || !(def.w > 0 && def.h > 0)) return material; // no texture
-    this._finishProgress(1, 0);
     paintFinish(def, anisotropy).then(({ map, bumpMap }) => {
       if (map) {
         material.color.setHex(0xffffff);
@@ -911,17 +860,8 @@ export class View3D {
         material.userData.procedural = { map: material.map, bumpMap: material.bumpMap ?? null, bumpScale: material.bumpScale };
         if (this.realisticEnabled) this._applyPhotoFinish(material);
       }
-    }).catch((error) => console.warn('finish texture failed', def.id, error))
-      .finally(() => this._finishProgress(0, 1));
+    }).catch((error) => console.warn('finish texture failed', def.id, error));
     return material;
-  }
-
-  // { total, done } of finish textures requested so far; onFinishProgress hears every change.
-  _finishProgress(added, done) {
-    this.finishProgress ??= { total: 0, done: 0 };
-    this.finishProgress.total += added;
-    this.finishProgress.done += done;
-    this.onFinishProgress?.({ ...this.finishProgress });
   }
 
   // Realistic swaps a finish's procedural texture for the retailer's photo when one is
@@ -941,11 +881,14 @@ export class View3D {
       return;
     }
     const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    if (material.userData.photoLoading) return;
+    material.userData.photoLoading = true;
     loadPhotoFinish(def, anisotropy).then((photo) => {
       if (!this.realisticEnabled || material.userData.restorePhoto) return;
       Object.assign(material, { map: photo.map, bumpMap: photo.bumpMap, bumpScale: photo.layout === 'stepped' ? 2 : 0.6 });
       material.userData.restorePhoto = patchPhotoMaterial(material, photo);
-    }).catch((error) => console.warn('photo finish failed', def.id, error));
+    }).catch((error) => console.warn('photo finish failed', def.id, error))
+      .finally(() => { material.userData.photoLoading = false; });
   }
 
 
