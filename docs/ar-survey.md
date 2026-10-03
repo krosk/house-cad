@@ -514,7 +514,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   trigger that stops PERF** (owner, 2026-10-03): clipboard writes need a user gesture, and that
   trigger's XR `select` event is one (the same activation the EXPORT LINK copy uses). The HUD header
   ends with `trigger to copy` once a full cycle is ready; the mode label flashes `PERF COPIED` or
-  `PERF COPY FAILED`. **Hypothesis:** the copy works on the Quest; unverified.
+  `PERF COPY FAILED (<error name>)`. **Built at the cycle's end, copied with nothing else first**,
+  like the EXPORT LINK's warmed URL: the first version built the report inside the trigger and the
+  Quest refused it (owner, 2026-10-03: PERF COPY FAILED while LINK copied). No download fallback
+  (owner: "make it work like link"). **Hypothesis:** the work done inside the trigger before
+  `writeText` was the difference; unverified.
 
 ## Localization (`src/core/i18n.js`)
 

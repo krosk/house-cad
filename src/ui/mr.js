@@ -8466,6 +8466,7 @@ export function setupMR(view, project, getFootprint) {
       perf.layers = layers;
       Object.assign(perf, { phase: 0, phaseStart: time });
       perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
+      perf.copyState = ''; perf.reportText = '';
     }
     if (perf.phaseStart < 0) perf.phaseStart = time;
     if (time - perf.phaseStart >= PERF_WINDOW_MS) {
@@ -8475,7 +8476,7 @@ export function setupMR(view, project, getFootprint) {
       perf.samples.delete(name);
       perf.phase = (perf.phase + 1) % layers.length;
       perf.phaseStart = time;
-      if (perf.phase === 0 && !perf.copyState) { perf.copyState = 'trigger to copy'; lastHudAt = -Infinity; }
+      if (perf.phase === 0) perfPrepareReport(); // a full cycle: build the text now, copy on the trigger
     }
     const settled = time - perf.phaseStart >= PERF_SETTLE_MS;
     perf.current = settled ? layers[perf.phase][0] : null;
@@ -8522,7 +8523,7 @@ export function setupMR(view, project, getFootprint) {
     Object.assign(perf, { phase: 0, phaseStart: -1, pending: [], active: false });
     perf.layers = null;
     perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
-    perf.copyState = '';
+    perf.copyState = ''; perf.reportText = '';
     scene.onBeforeRender = perfBeforeRender;
     scene.onAfterRender = perfAfterRender;
   }
@@ -8609,15 +8610,32 @@ export function setupMR(view, project, getFootprint) {
   // Copy it when the PERF trigger stops the sweep: clipboard writes need a user gesture,
   // and the trigger's XR `select` event is one. The HUD header says when a full cycle is
   // ready ('trigger to copy'); the mode label flashes the outcome.
+  // Built at each cycle's end, outside the trigger, like the EXPORT LINK's warmed URL, so
+  // the trigger only calls writeText. A build error shows on the HUD header.
+  function perfPrepareReport() {
+    try {
+      perf.reportText = perfReport();
+      perf.copyState = 'trigger to copy';
+    } catch (error) {
+      perf.copyState = `report error: ${String(error?.message || error).slice(0, 40)}`;
+      rlog('perf report failed', String(error?.stack || error));
+    }
+    lastHudAt = -Infinity;
+  }
+  // On the stop trigger: writeText is the first thing it does, with the text built at
+  // the cycle's end, exactly like the EXPORT LINK copy (owner, 2026-10-03: LINK copies, the
+  // first PERF version, which built the report inside the trigger, failed). A refusal
+  // names the browser's error on the mode label.
   function perfCopy() {
-    const layers = perf.layers || perfLayers();
-    if (!layers.every(([name]) => perf.result.has(name))) return; // no full cycle yet
-    const text = perfReport();
-    rlog('perf report', text);
-    if (!navigator.clipboard?.writeText) { perf.copyState = 'no clipboard'; return; }
+    const text = perf.reportText;
+    if (!text) { perfFlash('PERF NOT READY'); return; }
+    if (!navigator.clipboard?.writeText) { perfFlash('PERF COPY FAILED (no clipboard)'); return; }
     navigator.clipboard.writeText(text)
       .then(() => { perfFlash('PERF COPIED'); rlog('perf copied', { chars: text.length }); })
-      .catch((error) => { perfFlash('PERF COPY FAILED'); rlog('perf copy failed', String(error?.message || error)); });
+      .catch((error) => {
+        perfFlash(`PERF COPY FAILED (${error?.name || 'refused'})`);
+        rlog('perf copy failed', String(error?.message || error));
+      });
   }
   // The mode label shows the copy outcome for 1.6 s, then PERF's own label again.
   let perfFlashTimer = null;
