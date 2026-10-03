@@ -16,15 +16,16 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` | View 3D **Realistic** setting (sun, downloaded sky, AO) and **photo finishes** (Charme, Monastère); owner rule on runtime-downloaded images |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
-| `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
+| `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-03 (session 38)
-**Status:** Proven (git): `origin/main` = `6854420` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-10-03 (session 38, continued after a context compaction)
+**Status:** Proven (git): `origin/main` = `856592c` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
-Session 38's work (share links, View 3D Realistic, photo finishes) is pushed but not yet seen by the
-owner on any device.
+Proven (owner, 2026-10-03, after `856592c`): their link's **3D view now opens on their phone** ("Ok it
+works"); before, it crashed the canvas. The owner opened session 38 links on desktop and phone; the
+rest of session 38 (Realistic fps, photo floors' look) is not yet reported.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
 PERF clipboard report (two reports pasted) and an AR 3D view frame rate the owner accepts (50–80 fps on
@@ -50,6 +51,8 @@ boots straight into passthrough AR):
    finishes**. One floor at a time: a top-down overview (pinch/wheel zoom; a wide house turns 90° on a
    portrait phone) ↔ tap a room for a 1.65 m POV (tap a floor to walk there, Overview button to leave,
    opt-in phone tilt look). Rules in `CLAUDE.md`. **Mesh exports still use the legacy extrusion.**
+   It is built only on demand: ◈ View 3D prepares the model and every texture (in a background
+   worker) behind a loading wheel, then opens; the plan view does no 3D work.
    An opt-in **◑ Realistic** setting adds the real sun for a time of day (north = plan up), a
    downloaded sky, ambient occlusion, and the retailer's own photos on the Charme oak and Monastère
    floors (`docs/realism.md`).
@@ -101,6 +104,27 @@ All owner requests, 2026-10-03.
    `tools/check-share-link.mjs <house.json>` (what a house loses in a link). Both run and reproduce this
    session's numbers.
 6. Answered, no code: the Lucia ivory 30×90 wall tile is already in the catalog.
+7. **Texture work off the main thread** (`2798bc9`, `96e342f`; owner rule: "everything that is texture
+   preparation should be moved to background"). Once links carried finishes, opening the owner's link
+   froze the page and the 2D pan smeared: painting their 7 textured finishes took ~5.1 s of main thread
+   on this Deck, the Realistic photo atlases 2.9 s (Charme) + 0.9 s (Monastère), the sky parse 0.2 s.
+   One module worker (`textures.worker.js`, client `textureWorker.js`) now runs finish, photo, sky and
+   named small-texture `paint` jobs (`painters.js`: View 3D wood/plaster, AR window exterior, door
+   leaves, furniture); `paintedTexture()` hands builders a 1 px placeholder at once. Page fallback one
+   job per task. Proven: all jobs at once, longest main-thread block 40 ms; worker output byte-equal to
+   the page's except the canvas `blur` filter (means within 0.3/255).
+8. **Plan view prepares nothing 3D** (`cc72e0b`, owner's design): the owner still saw the count rise
+   while a pan did nothing and made the counter jump. Now the 3D model is built only while View 3D is
+   shown; ◈ View 3D shows a loading wheel (`Preparing 3D · textures n/N`, `✕ Cancel 3D`) and opens when
+   every job is done; the export mesh is built on export; sky, PMREM, GTAO buffers and default wood/
+   plaster wait for the first build. `· on page` in the count = worker unavailable (diagnostic).
+   Proven on this Deck with a synthetic house; **not** reproduced the owner's stall here (their device's
+   path is still unknown: they never reported whether `· on page` showed).
+9. **Phone memory** (`856592c`): the 3D view of the owner's link crashed the canvas on their phone.
+   Textures' canvases are freed after GPU upload (`freeAfterUpload`), and phones (coarse pointer, short
+   side < 600 px) get half-size finish and photo textures (`TEXTURE_SCALE`). Owner confirmed it works.
+10. **Monastère "missing" from a link:** Proven in Node it was in the link (12.8 m² on Ground room
+    `r65`, same surfaces after decoding). A fresh link was sent; the owner never said what they saw.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -189,6 +213,11 @@ All owner requests, 2026-10-03.
   retailer's photo (or a CC0 Poly Haven asset) may replace it in View 3D **Realistic** only
   (`src/ui/photoFinishes.js`, `docs/product-modelling.md` step 7). Photos used while modelling stay in
   the scratchpad.
+- **Every texture is prepared in the background** (owner, 2026-10-03): never paint a texture on the
+  page from a build path; add a painter to `src/ui/painters.js` + `paintedTexture()`, or a worker job.
+  **The plan view prepares nothing 3D** (owner): View 3D builds and loads behind its wheel on demand.
+  Phones get half-size textures; texture canvases are freed after upload (`docs/materials.md`
+  "Texture preparation in a worker").
 - **North is plan up (+y)**; the site is Val-de-Marne 48.79° N 2.45° E (`SITE` in `realism.js`). The
   owner views the desktop on a Steam Deck and an iPhone 14.
 - **Share links carry everything View 3D draws** (owner, 2026-10-03): furniture, finishes and markers,
@@ -241,6 +270,22 @@ All owner requests, 2026-10-03.
 
 ## Findings / traps worth knowing
 
+- **A module the texture worker imports must never import `textureWorker.js`** (its `new Worker(new
+  URL(…))` would bundle a worker inside the worker). Page sides live in `realism.js`, `view3d.js`,
+  `textureWorker.js`; `photoFinishes.js`, `skyPixels.js`, `imageCache.js`, `painters.js` and the painter
+  modules are worker-safe (no DOM at load; canvases via `newCanvas()`).
+- **A texture freed by `freeAfterUpload` must never upload again** (`needsUpdate`, `dispose()`, or a
+  lost WebGL context would upload its 1 px canvas). Ours upload once and are never disposed; a lost
+  context on a phone would show flat textures until reload (Hypothesis, unseen).
+- **Measuring main-thread stalls in an automation tab:** `longtask` / `long-animation-frame` entries
+  and timers are unreliable once the tab goes hidden; a `MessageChannel` ping loop is not throttled
+  and logs every gap. ◈ View 3D's opener waits on one rAF, so in a hidden tab it stalls at
+  `Preparing 3D…` until a screenshot makes the tab visible. A session-38 claim that the photo atlas
+  build "never blocked over 16 ms" was a bad measurement (it blocked 2.9 s); re-measure, don't trust it.
+- **Profiling without the owner's house in the browser:** generate a synthetic house in Node with the
+  same ingredients (finish ids, door/window products, furniture keys, marker types and products) at
+  invented positions, encode it with `encodeViewToHash`, and open that link (scratchpad `synth.mjs`
+  pattern, session 38).
 - **A photo finish must never be tiled**: a tiled photo repeats every few metres and its wrap seams
   stair-step; cut it into pieces laid by the shader. **Joints/grooves must come from the texture**, not a
   shader branch, or they alias into dashes (both seen in screenshots, session 38).
@@ -375,7 +420,9 @@ All owner requests, 2026-10-03.
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - **Session 38:** `c00e97b` links always carry furniture · `f8e1f35` View 3D Realistic · `fec23b8`
   URL copy failure names its cause · `4c819aa` links carry finishes + markers, QR without · `ade036e`
-  Charme photo planks · `71208e4` Monastère photo tiles · `6854420` photo-finish process + tools.
+  Charme photo planks · `71208e4` Monastère photo tiles · `6854420` photo-finish process + tools ·
+  `2798bc9` finish textures in a worker · `96e342f` every texture in the worker · `cc72e0b` plan view
+  prepares nothing 3D, View 3D loading wheel · `856592c` phones: half-size textures, canvases freed.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
@@ -437,8 +484,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
 | `tools/photo-measure.mjs` | Measure a retailer photo for a photo finish: `rows` (grooves), `joints --grooves …`, `bbox` (tile on white) |
 | `tools/check-share-link.mjs` | What a saved house loses in a share link, and the link length (Node only) |
-| `src/ui/realism.js` | Realistic: `sunPosition`/`sunDirection`, `SITE`, `loadSky` (Poly Haven HDRI, sun clamped), `fetchCached` (Cache Storage `house-cad:images:v1`) |
-| `src/ui/photoFinishes.js` | Photo finishes: `PHOTOS` (with `// Sources:`), plank and stepped-tile atlases, `patchPhotoMaterial` (shader layouts) |
+| `src/ui/realism.js` | Realistic: `sunPosition`/`sunDirection`, `SITE`, `loadSky` (wraps the worker's sky arrays as half-float textures) |
+| `src/ui/skyPixels.js` / `src/ui/imageCache.js` | Worker-safe sky pixel work (HDR parse, sun clamp, half-float arrays) / `fetchCached` (Cache Storage `house-cad:images:v1`) |
+| `src/ui/photoFinishes.js` | Photo finishes: `PHOTOS` (with `// Sources:`), `photoCanvases` (worker side, `scale`), `photoTextures` (page side), `patchPhotoMaterial` (shader layouts) |
+| `src/ui/textureWorker.js` / `src/ui/textures.worker.js` | Texture worker client (`paintFinish`, `loadPhotoFinish`, `loadSkyPixels`, `onTextureProgress`, `TEXTURE_SCALE`, page fallback) / the worker (jobs `finish`, `photo`, `sky`, `paint`) |
+| `src/ui/paintedTexture.js` / `src/ui/painters.js` | Placeholder texture swapped when its picture arrives (`deferred`, `startDeferredTextures`, `freeAfterUpload`) / every named painter the worker runs |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`); used by the AR 3D view and View 3D |
@@ -454,10 +504,13 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
-  - session 38: copy a fresh EXPORT · LINK and open it on desktop (Héméra windows, doors, finishes,
-    lights and device products show?); if the copy fails, the bracketed reason; View 3D **Realistic**
-    on the Steam Deck and the iPhone 14 (fps, sky download, sun slider, the Charme and Monastère
-    photo floors: tone vs the showroom, a repeated Monastère face?);
+  - session 38: their link on the phone: the plan pans freely, ◈ View 3D's wheel (does it show
+    `· on page`?), then switch floors, toggle Realistic, leave the app and come back (flat textures
+    after a lost context?); is Monastère there in the latest link; copy a fresh EXPORT · LINK and open
+    it on desktop (Héméra windows, doors, finishes, lights and device products show?); if the copy
+    fails, the bracketed reason; View 3D **Realistic** on the Steam Deck and the iPhone 14 (fps, sky
+    download, sun slider, the Charme and Monastère photo floors: tone vs the showroom, a repeated
+    Monastère face; half-size textures on the phone acceptable?);
   - session 37: raise the Daikin CTXM15A in PLAN · EDIT (FOOT 230 cm, then ⇄ TOP 250 cm → foot
     2.202 m); outlets/switches up close with LEFT X (low detail: faceted corners?); furniture looks
     matte (Lambert) but right; windows/glass unchanged after the merge;
@@ -541,8 +594,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **Session 38 open:** why the AR URL copy got `NotAllowedError` (same path as the working PERF
   copy); Realistic frame rate on the Deck and iPhone 14 (never measured); iOS half-float sky filtering
   (Hypothesis it works); the Monastère tone and its one-face-per-size variety (the range has 24); a
-  thin light leak seen at one wall joint of the demo house in Realistic; the photo atlas build time on
-  the iPhone.
+  thin light leak seen at one wall joint of the demo house in Realistic; which texture path the
+  owner's devices take (worker or `· on page`) and why their plan stalled while this Deck's did not;
+  whether the phone crash was canvas memory (Hypothesis; fixed by halving + freeing, cause unproven);
+  a WebGL context loss on the phone (freed textures would come back flat); a download that never
+  settles keeps the View 3D wheel waiting (no timeout).
 - **Unwalked, Hypothesis only.** Sessions 32–38: everything in Next step A's first seven bullets.
   Session 37: whether the plan really draws under the 3D view and why (the hide path reads correct);
   what made the 23 vs 82 fps swing; the low-detail device look up close.
