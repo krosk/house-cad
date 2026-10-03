@@ -19,8 +19,8 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-03 (session 38, continued after a context compaction)
-**Status:** Proven (git): `origin/main` = `856592c` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-10-03 (session 38, continued twice after context compactions)
+**Status:** Proven (git): `origin/main` = `780aeeb` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
 Proven (owner, 2026-10-03, after `856592c`): their link's **3D view now opens on their phone** ("Ok it
@@ -125,6 +125,21 @@ All owner requests, 2026-10-03.
    side < 600 px) get half-size finish and photo textures (`TEXTURE_SCALE`). Owner confirmed it works.
 10. **Monastère "missing" from a link:** Proven in Node it was in the link (12.8 m² on Ground room
     `r65`, same surfaces after decoding). A fresh link was sent; the owner never said what they saw.
+11. **View 3D floor panel collapses** (`054aad7`): its "Floors" title toggles it down to one line that
+    still names the shown floor; remembered per device. Proven in Chrome on this Deck; not tried on a
+    phone, where it matters most.
+12. **Habitat Moder II table** (`a57716f`): two catalog entries on one builder `moder-table`, closed
+    110 cm and extended 155 × 110 cm (owner asked for both). Dimensions measured on the assembly
+    manual's isometric cover drawing (HA833381; the page's download is a button that fetches
+    `habitat.fr/asset/product/13552185`): blade legs, 61 mm splay, 11 + 15 mm edge. The first version,
+    from the front photo, had round legs half as splayed; the owner pointed out the drawing is
+    isometric. Proven: an orthographic render overlaid on the drawing coincides. Same commit: the
+    STOCKHOLM bed's legs used a *clone* of a worker-painted texture, which never receives the picture
+    (a regression from item 7); now a `paintedTexture` variant.
+13. **Modelling method** (`780aeeb`, owner): dimension from an isometric manual when one exists
+    (prove the 0.577 ellipse ratio, plan px/mm everywhere, heights × 0.816, overlay an orthographic
+    render); photos are eye perspective (measure only in a known length's plane, or match a
+    perspective camera); the drawing wins. `docs/product-modelling.md` step 2 + the skill.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -422,7 +437,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   URL copy failure names its cause · `4c819aa` links carry finishes + markers, QR without · `ade036e`
   Charme photo planks · `71208e4` Monastère photo tiles · `6854420` photo-finish process + tools ·
   `2798bc9` finish textures in a worker · `96e342f` every texture in the worker · `cc72e0b` plan view
-  prepares nothing 3D, View 3D loading wheel · `856592c` phones: half-size textures, canvases freed.
+  prepares nothing 3D, View 3D loading wheel · `856592c` phones: half-size textures, canvases freed ·
+  `054aad7` collapsible View 3D floor panel · `a57716f` Moder II table + bed texture fix · `780aeeb`
+  modelling from isometric manuals.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
@@ -491,7 +508,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/paintedTexture.js` / `src/ui/painters.js` | Placeholder texture swapped when its picture arrives (`deferred`, `startDeferredTextures`, `freeAfterUpload`) / every named painter the worker runs |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
 | `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
@@ -510,7 +527,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     it on desktop (Héméra windows, doors, finishes, lights and device products show?); if the copy
     fails, the bracketed reason; View 3D **Realistic** on the Steam Deck and the iPhone 14 (fps, sky
     download, sun slider, the Charme and Monastère photo floors: tone vs the showroom, a repeated
-    Monastère face; half-size textures on the phone acceptable?);
+    Monastère face; half-size textures on the phone acceptable?); the View 3D floor panel collapsed
+    on the phone; `habitat-moder-ii-110` / `-155` on a furniture zone (LEFT X and View 3D: legs,
+    seams, colour vs the real table); the STOCKHOLM bed's legs show wood grain, not a flat colour;
   - session 37: raise the Daikin CTXM15A in PLAN · EDIT (FOOT 230 cm, then ⇄ TOP 250 cm → foot
     2.202 m); outlets/switches up close with LEFT X (low detail: faceted corners?); furniture looks
     matte (Lambert) but right; windows/glass unchanged after the merge;
@@ -598,7 +617,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   owner's devices take (worker or `· on page`) and why their plan stalled while this Deck's did not;
   whether the phone crash was canvas memory (Hypothesis; fixed by halving + freeing, cause unproven);
   a WebGL context loss on the phone (freed textures would come back flat); a download that never
-  settles keeps the View 3D wheel waiting (no timeout).
+  settles keeps the View 3D wheel waiting (no timeout). Moder II: the apron size/position and the
+  legs' inner-edge width are photo/guess estimates (the drawing hides them); colour matched by eye.
+ Proven by grep (2026-10-03): no other code clones a texture; objects and materials are cloned,
+  which share the texture and are safe.
 - **Unwalked, Hypothesis only.** Sessions 32–38: everything in Next step A's first seven bullets.
   Session 37: whether the plan really draws under the 3D view and why (the hide path reads correct);
   what made the 23 vs 82 fps swing; the low-detail device look up close.
