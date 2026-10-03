@@ -504,6 +504,17 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (switch/outlet/Ethernet products), `furn` (furniture models) and `plan` (the rest of the plan
   group). One per HUD line, each with its ms and its **draw calls** (both eyes; `renderer.info`
   read in `scene.onAfterRender`). Toggling the 3D view restarts the sweep on the other list.
+  **Clipboard report** (owner, 2026-10-03: "you can pass a lot more detailed information"): after
+  each full cycle the sweep has a plain-text report ready (`perfReport`): build, view, mode, time
+  source, floor, fps and the `time:` CPU split; per layer its cost in ms, calls and triangles, the
+  raw time without it, and its content (meshes, triangles, material kinds); in the 3D view the 40
+  biggest meshes with their layer and material; the floor's counts (zones, markers, device
+  products, dims, finishes, furniture); the renderer (geometries, textures, shader programs), the XR
+  framebuffer size, foveation, frame rate, GPU name and user agent. **It is copied only by the
+  trigger that stops PERF** (owner, 2026-10-03): clipboard writes need a user gesture, and that
+  trigger's XR `select` event is one (the same activation the EXPORT LINK copy uses). The HUD header
+  ends with `trigger to copy` once a full cycle is ready; the mode label flashes `PERF COPIED` or
+  `PERF COPY FAILED`. **Hypothesis:** the copy works on the Quest; unverified.
 
 ## Localization (`src/core/i18n.js`)
 

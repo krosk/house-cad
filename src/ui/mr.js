@@ -8454,7 +8454,7 @@ export function setupMR(view, project, getFootprint) {
   ];
   const perfLayers = () => (arch3dOn ? PERF_LAYERS_3D : PERF_LAYERS);
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
-    ext: null, gl: null, active: false, pending: [], source: 'frame', layers: null, calls: new Map() };
+    ext: null, gl: null, active: false, pending: [], source: 'frame', layers: null, calls: new Map(), tris: new Map() };
   function perfRecord(name, ms) {
     const s = perf.samples.get(name) ?? perf.samples.set(name, { sum: 0, n: 0 }).get(name);
     s.sum += ms; s.n++;
@@ -8465,7 +8465,7 @@ export function setupMR(view, project, getFootprint) {
     if (perf.layers !== layers) { // 3D view toggled: restart the sweep on the other list
       perf.layers = layers;
       Object.assign(perf, { phase: 0, phaseStart: time });
-      perf.samples.clear(); perf.result.clear(); perf.calls.clear();
+      perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
     }
     if (perf.phaseStart < 0) perf.phaseStart = time;
     if (time - perf.phaseStart >= PERF_WINDOW_MS) {
@@ -8475,6 +8475,7 @@ export function setupMR(view, project, getFootprint) {
       perf.samples.delete(name);
       perf.phase = (perf.phase + 1) % layers.length;
       perf.phaseStart = time;
+      if (perf.phase === 0 && !perf.copyState) { perf.copyState = 'trigger to copy'; lastHudAt = -Infinity; }
     }
     const settled = time - perf.phaseStart >= PERF_SETTLE_MS;
     perf.current = settled ? layers[perf.phase][0] : null;
@@ -8502,7 +8503,10 @@ export function setupMR(view, project, getFootprint) {
   }
   function perfAfterRender() {
     // Both eyes are drawn by now: this render's calls, without the swept layer.
-    if (perf.current) perf.calls.set(perf.current, renderer.info.render.calls);
+    if (perf.current) {
+      perf.calls.set(perf.current, renderer.info.render.calls);
+      perf.tris.set(perf.current, renderer.info.render.triangles);
+    }
     for (const o of perf.hidden) o.visible = true;
     perf.hidden = [];
     if (perf.active) {
@@ -8517,7 +8521,8 @@ export function setupMR(view, project, getFootprint) {
     perf.source = perf.ext ? 'gpu' : 'frame';
     Object.assign(perf, { phase: 0, phaseStart: -1, pending: [], active: false });
     perf.layers = null;
-    perf.samples.clear(); perf.result.clear(); perf.calls.clear();
+    perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
+    perf.copyState = '';
     scene.onBeforeRender = perfBeforeRender;
     scene.onAfterRender = perfAfterRender;
   }
@@ -8529,7 +8534,102 @@ export function setupMR(view, project, getFootprint) {
     perf.pending = [];
     perf.gl = null;
   }
+  // The last full cycle as plain text for the clipboard (owner, 2026-10-03): build, view,
+  // time source, then per layer its cost (ms, calls) and the raw time without it.
+  function perfReport() {
+    const layers = perf.layers || perfLayers();
+    const all = perf.result.get('all'), allCalls = perf.calls.get('all'), allTris = perf.tris.get('all');
+    const f1 = (v) => (v != null && Number.isFinite(v) ? v.toFixed(1) : '?');
+    const k = (v) => (v != null ? `${(v / 1000).toFixed(1)}k` : '?');
+    const diff = (a, b) => (a != null && b != null ? a - b : null);
+    const out = [
+      `house-cad PERF ${BUILD_ID} ${new Date().toISOString()}`,
+      `view ${layers === PERF_LAYERS_3D ? '3D' : 'plan'}, mode ${modes[currentMode]?.id}, source ${perf.source}, `
+        + `floor ${project.activeFloor?.name ?? '?'}${allFloorsView ? ' (ALL FLOORS)' : ''}`,
+      `fps ${fpsText}; time ${timeText}`,
+      `all: ${f1(all)} ms, ${allCalls ?? '?'} calls, ${k(allTris)} tris (both eyes)`,
+      '', '## layer: cost (ms, calls, tris) | without it (ms) | content (meshes, tris one pass, materials)',
+    ];
+    for (const [name, objects] of layers.slice(1)) {
+      const t = perf.result.get(name);
+      out.push(`${name}: ${f1(diff(all, t))} ms, ${diff(allCalls, perf.calls.get(name)) ?? '?'} calls, `
+        + `${k(diff(allTris, perf.tris.get(name)))} tris | ${f1(t)} ms | ${perfContent(objects())}`);
+    }
+    // Every object drawn in the 3D view, biggest first.
+    if (layers === PERF_LAYERS_3D) {
+      out.push('', '## 3D meshes: layer, tris, material');
+      const rows = [];
+      const add = (o, layer) => o.traverse((m) => {
+        if (m.isMesh || m.isLine) rows.push([layer, perfTris(m.geometry), perfMatName(m.material)]);
+      });
+      for (const o of arch3dGroup.children) add(o, o.userData.arch3dLayer || '?');
+      for (const o of furnitureGroup.children) add(o, `furn ${o.userData.furnitureId ?? ''}`);
+      rows.sort((a, b) => b[1] - a[1]);
+      for (const [layer, tris, mat] of rows.slice(0, 40)) out.push(`${layer}: ${tris} ${mat}`);
+      if (rows.length > 40) out.push(`… ${rows.length - 40} more`);
+    }
+    // The floor's content.
+    const floor = project.activeFloor;
+    if (floor) {
+      const devices = [...markerProductDraws(project, floor.markers)].filter(([, d]) => d).length;
+      const furn = floor.rectangles.filter((r) => r.kind === 'furniture' && r.article).map((r) => r.article);
+      out.push('', `## floor ${floor.name}: ${floor.rectangles.length} zones, ${floor.markers.length} markers `
+        + `(${devices} device products), ${floor.constraints.length} dims, ${(floor.finishes || []).length} finishes`,
+      `furniture: ${furn.join(', ') || 'none'}`);
+    }
+    // Renderer and headset.
+    const info = renderer.info, gl = renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const layer = renderer.xr.getBaseLayer?.();
+    const session = renderer.xr.getSession?.();
+    out.push('', '## renderer',
+      `memory: ${info.memory.geometries} geometries, ${info.memory.textures} textures; ${info.programs?.length ?? '?'} programs`,
+      `xr: ${layer ? `${layer.framebufferWidth}×${layer.framebufferHeight}` : '?'}, `
+        + `foveation ${renderer.xr.getFoveation?.() ?? '?'}, frameRate ${session?.frameRate ?? '?'}, `
+        + `blend ${session?.environmentBlendMode ?? '?'}, pixelRatio ${renderer.getPixelRatio()}`,
+      `gpu: ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)}`,
+      `ua: ${navigator.userAgent}`);
+    return out.join('\n');
+  }
+  const perfTris = (g) => (!g ? 0 : g.index ? g.index.count / 3 : (g.attributes.position?.count ?? 0) / 3) | 0;
+  const perfMatName = (m) => [].concat(m).map((x) => `${x?.type?.replace(/^Mesh|Material$/g, '') ?? '?'}`
+    + `${x?.map ? '+map' : ''}${x?.transparent ? '+transp' : ''}${x?.side === THREE.DoubleSide ? '+2side' : ''}`).join('/');
+  // Meshes, triangles (one pass, visible or not) and material kinds under some objects.
+  function perfContent(objects) {
+    let meshes = 0, tris = 0;
+    const mats = new Map();
+    for (const root of objects) root.traverse((m) => {
+      if (!m.isMesh && !m.isLine && !m.isSprite) return;
+      meshes++; tris += perfTris(m.geometry);
+      const n = perfMatName(m.material);
+      mats.set(n, (mats.get(n) || 0) + 1);
+    });
+    return `${meshes} meshes, ${tris} tris, ${[...mats].map(([n, c]) => `${c}×${n}`).join(' ')}`;
+  }
+  // Copy it when the PERF trigger stops the sweep: clipboard writes need a user gesture,
+  // and the trigger's XR `select` event is one. The HUD header says when a full cycle is
+  // ready ('trigger to copy'); the mode label flashes the outcome.
+  function perfCopy() {
+    const layers = perf.layers || perfLayers();
+    if (!layers.every(([name]) => perf.result.has(name))) return; // no full cycle yet
+    const text = perfReport();
+    rlog('perf report', text);
+    if (!navigator.clipboard?.writeText) { perf.copyState = 'no clipboard'; return; }
+    navigator.clipboard.writeText(text)
+      .then(() => { perfFlash('PERF COPIED'); rlog('perf copied', { chars: text.length }); })
+      .catch((error) => { perfFlash('PERF COPY FAILED'); rlog('perf copy failed', String(error?.message || error)); });
+  }
+  // The mode label shows the copy outcome for 1.6 s, then PERF's own label again.
+  let perfFlashTimer = null;
+  function perfFlash(msg) {
+    for (const l of labels) l.setText(msg, modes[currentMode].color);
+    clearTimeout(perfFlashTimer);
+    perfFlashTimer = setTimeout(() => {
+      if (modes[currentMode].id === 'perf') applyModeVisual(modeChildLabel('perf'), modes[currentMode].color);
+    }, 1600);
+  }
   function togglePerf() {
+    if (perfEnabled) perfCopy(); // inside the trigger's activation
     perfEnabled = !perfEnabled;
     if (perfEnabled) perfStart(); else perfStop();
     lastHudAt = -Infinity; // show the change on the next frame
@@ -8541,7 +8641,7 @@ export function setupMR(view, project, getFootprint) {
     const layers = perf.layers || perfLayers();
     if (layers === PERF_LAYERS_3D) {
       const allCalls = perf.calls.get('all');
-      const out = [`${perf.source} 3D: all ${all != null ? all.toFixed(1) : '?'} ms ${allCalls ?? '?'} calls [${layers[perf.phase][0]}]`];
+      const out = [`${perf.source} 3D: all ${all != null ? all.toFixed(1) : '?'} ms ${allCalls ?? '?'} calls [${layers[perf.phase][0]}]${perf.copyState ? ` ${perf.copyState}` : ''}`];
       for (const [name] of layers.slice(1)) {
         const t = perf.result.get(name), c = perf.calls.get(name);
         out.push(`${name.padEnd(8)}${all != null && t != null ? (all - t).toFixed(1).padStart(5) : '    ?'} ms`
@@ -8553,7 +8653,7 @@ export function setupMR(view, project, getFootprint) {
       const t = perf.result.get(name);
       return `${name.padEnd(6)} ${all != null && t != null ? (all - t).toFixed(1).padStart(5) : '    ?'}`;
     });
-    const out = [`${perf.source}:  all ${all != null ? all.toFixed(1) : '?'} ms [${layers[perf.phase][0]}]`];
+    const out = [`${perf.source}:  all ${all != null ? all.toFixed(1) : '?'} ms [${layers[perf.phase][0]}]${perf.copyState ? ` ${perf.copyState}` : ''}`];
     for (let i = 0; i < cells.length; i += 2) out.push(cells.slice(i, i + 2).join('  '));
     return out;
   }
