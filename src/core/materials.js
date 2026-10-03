@@ -15,7 +15,7 @@
 //   pack     { pieces } per box, or { area } m² per pack (paint), or { formats: { '50×50': n } }
 //            pieces per box for each format of a pinwheel or stepped layout
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
-//            with `bevel` = long-edge V-bevel width, m; brick: 'handmade-gloss', with a
+//            with `bevel` = long-edge V-bevel width, m; brick or grid: 'handmade-gloss', with a
 //            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
 //            sheet of `mosaic` = [cols, rows] sticks, with a bump map; octagon: 'porcelain-matte',
 //            accent = the tozzetto colour, `grout` = the joint colour; pinwheel/stepped: 'aged-stone',
@@ -81,8 +81,9 @@ export const BUILTIN_MATERIALS = [
     // GoodHome Vernisse wall tile, white gloss, "carreaux anciens" relief (Castorama EAN
     // 5036581063269): 301 × 75.4 mm, 8.5 mm, glazed ceramic, not rectified; 40 tiles =
     // 0.92 m² per box. White tile, white grout (owner); the joint width is an estimate.
-    id: 'tile_vernisse_white', surface: 'wall', pattern: 'brick', design: 'handmade-gloss',
-    w: 0.301, h: 0.0754, joint: 0.003, thickness: 0.0085,
+    // Laid in a straight grid, each tile standing upright (owner, 2026-10-03).
+    id: 'tile_vernisse_white', surface: 'wall', pattern: 'grid', design: 'handmade-gloss', sheets: [16, 4],
+    w: 0.0754, h: 0.301, joint: 0.003, thickness: 0.0085,
     color: 0xf4f4f0, accent: 0xf8f8f5, roughness: 0.12, bumpScale: 3, pack: { pieces: 40 },
     name: { en: 'Vernisse white tile 30×7.5', fr: 'Faïence Vernisse blanc 30×7,5', zh: 'Vernisse 白色墙砖 30×7.5' },
   },

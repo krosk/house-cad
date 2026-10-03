@@ -23,9 +23,10 @@ const DESIGN_ROWS = 10, DESIGN_PER_ROW = 3;
 // Brick-bond tile designs: BRICK_COLS tiles per row, BRICK_ROWS rows, rows offset by half.
 const BRICK_COLS = 4, BRICK_ROWS = 8;
 // Mosaic-sheet designs (grid pattern, piece = one sheet): GRID_SHEETS × GRID_SHEETS sheets
-// (`m.sheets` overrides it: fewer, larger-scale pieces keep small detail sharp).
+// (`m.sheets` overrides it: fewer, larger-scale pieces keep small detail sharp; [cols, rows]
+// for long pieces, so the unit stays near square).
 const GRID_SHEETS = 3;
-const gridSheets = (m) => m.sheets || GRID_SHEETS;
+const gridSheets = (m) => (Array.isArray(m.sheets) ? m.sheets : [m.sheets || GRID_SHEETS, m.sheets || GRID_SHEETS]);
 // Octagon + tozzetto designs: OCT_CELLS × OCT_CELLS octagons (tone varies per tile).
 const OCT_CELLS = 4;
 // Pinwheel designs: PINWHEEL_MODULES × PINWHEEL_MODULES modules of nine tiles (`m.modules`
@@ -55,7 +56,7 @@ function straightUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
-  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [gridSheets(m) * px, gridSheets(m) * py];
+  if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [gridSheets(m)[0] * px, gridSheets(m)[1] * py];
   if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return [OCT_CELLS * px, OCT_CELLS * py];
   if (m.pattern === 'pinwheel') {
     const u = pinwheelPitch(m) * (PINWHEEL_DESIGNS[m.design] ? pinwheelModules(m) : 1);
@@ -528,20 +529,22 @@ function limestoneTile(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.restore();
 }
 
-const GRID_DESIGNS = { 'stone-sticks': stoneStick, terrazzo: terrazzoTile, limestone: limestoneTile };
+const GRID_DESIGNS = {
+  'stone-sticks': stoneStick, terrazzo: terrazzoTile, limestone: limestoneTile, 'handmade-gloss': glossTile,
+};
 
-// Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets, each `m.mosaic` = [cols, rows] sticks,
+// Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets (or `m.sheets`), each `m.mosaic` = [cols, rows] sticks,
 // all on one even pitch: the joint inside a sheet equals the one between sheets, so a laid
 // mosaic shows no sheet edges. Grout is `m.accent` (colour) / low (bump).
 function paintGridDesign(ctx, m, W, H, ppm, bump) {
   const r = rng(m.seed ?? 53);
   const [cols, rows] = m.mosaic || [1, 1];
-  const n = gridSheets(m), jp = (m.joint || 0) * ppm;
-  const cw = W / (n * cols), ch = H / (n * rows); // stick pitch
+  const [nx, ny] = gridSheets(m), jp = (m.joint || 0) * ppm;
+  const cw = W / (nx * cols), ch = H / (ny * rows); // stick pitch
   ctx.fillStyle = bump ? '#5a5a5a' : css(m.accent);
   ctx.fillRect(0, 0, W, H);
-  for (let i = 0; i < n * cols; i++) {
-    for (let k = 0; k < n * rows; k++) {
+  for (let i = 0; i < nx * cols; i++) {
+    for (let k = 0; k < ny * rows; k++) {
       const s = Math.floor(r() * 1e9);
       GRID_DESIGNS[m.design](ctx, m, i * cw + jp / 2, k * ch + jp / 2, cw - jp, ch - jp, ppm, rng(s), bump);
     }

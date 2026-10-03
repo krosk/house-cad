@@ -215,22 +215,28 @@ cut plan.
 - Texture cost: the design canvas is 2048 × 949 px (about 10 MB of GPU memory with mipmaps), four times
   the generic planks. Hypothesis: fine on Quest for one or two such materials; watch PERF in the AR 3D view.
 
-## Wall tile products (a design on a brick-bond material)
+## Wall tile products (a design on a brick-bond or grid material)
 
-Same idea as flooring: a `surface: 'wall'`, `pattern: 'brick'` entry with the published tile size and
-pack (the takeoff counts it), plus a `design` drawn over a 4 tiles × 8 rows unit. A brick design also
+Same idea as flooring: a `surface: 'wall'`, `pattern: 'brick'` or `'grid'` entry with the published tile
+size and pack (the takeoff counts it), plus a `design` drawn over a unit of several tiles (brick: 4 tiles
+× 8 rows; grid: `sheets`). The design also
 has a **bump texture** (`finishBumpTexture`, same unit and seed) that View 3D applies; `bumpScale`
 sets its strength and `edgeWobble` (m) the handmade edge wander.
 
 - `tile_vernisse_white`: GoodHome Vernisse wall tile, white gloss, "carreaux anciens" relief (Castorama,
   EAN 5036581063269, 2026-09-26). From the page: 301 × 75.4 mm, 8.5 mm, glazed ceramic, not rectified;
   40 tiles = 0.92 m² per box (the page's embedded data: `"0.92","m²",…,"count",40`). White tile, white
-  grout (owner). Joint 3 mm and the half-offset layout are estimates from photo **05** (straight-on);
+  grout (owner). Joint 3 mm is an estimate from photo **05** (straight-on);
   the relief from **03** (edge) and **09** (kitchen, raking light). The colour layer is nearly flat
   white; the look comes from the bump (rounded edges, long glaze undulations) and gloss
   (`roughness` 0.12, `bumpScale` 3). Owner: "looks really good".
-  Proven: build; scratch renders beside photos 05 and 09; takeoff of a 2 × 0.6 m splashback = 60 tiles
-  (Node). Not yet seen on a real wall in View 3D or in AR.
+  **Laid in a straight grid, each tile upright** (owner, 2026-10-03; it was a horizontal brick bond):
+  `pattern: 'grid'`, `w` 75.4 × `h` 301 mm, the same `handmade-gloss` design (it is in both the brick
+  and the grid designs). `sheets: [16, 4]` makes the repeat 16 tiles × 4 rows (1.254 × 1.216 m), near
+  square, so the 2048 px canvas keeps the brick unit's resolution (`m.sheets` may be [cols, rows]).
+  Proven: build; scratch render of the colour and bump canvases (2048 × 1985 px, 16 × 4 upright tiles,
+  straight joints); takeoff of a 2 × 0.6 m splashback = 52 tiles (26 columns × 2 rows; Node). Not yet
+  seen on a real wall in View 3D or in AR.
 - **Its look depends on reflections.** Photo 09's character is the room mirrored in a wavy glaze. That
   needs an environment map: View 3D's **✦ Reflections** toggle (below). Without it the tiles show
   their relief but little shine.
