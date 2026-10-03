@@ -440,6 +440,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] ◈ View 3D: a wheel with `Preparing 3D · textures n/N`, then the 3D view opens; `✕ Cancel 3D` while waiting returns to a working plan. Note any `· on page`.
 - [ ] Open 3D: every finish is textured (no flat colour left), with the Monastère/Lucia grain up close; Realistic still swaps in the Charme/Monastère photos.
 - [ ] iPhone 14: the same (the worker path), or the page fallback with no error.
+- [ ] Phone: the owner's link → ◈ View 3D opens without the canvas crashing (half-size textures); switch floors, toggle Realistic; leave the app and come back (a lost WebGL context would show flat textures).
 - [ ] Furniture (radiators, shower tray, piano, bed) and door leaves show their pictures, not a flat colour; the AR 3D view's finishes and window exterior too.
 
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked

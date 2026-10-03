@@ -49,10 +49,12 @@ export const hasPhotoFinish = (def) => !!(def && PHOTOS[def.id]);
 const newCanvas = () => (typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(1, 1));
 
 // Worker side: the atlas as canvases plus plain numbers (structured-clone safe).
-export function photoCanvases(def) {
+// `scale` shrinks the atlas (0.5 on phones, textureWorker.js); the shaders read cells and
+// UV rects, never pixel sizes, so a smaller atlas lays the same floor.
+export function photoCanvases(def, { scale = 1 } = {}) {
   const spec = PHOTOS[def.id];
   if (!spec) return Promise.reject(new Error(`no photo for ${def.id}`));
-  return spec.layout === 'stepped' ? buildTiles(spec, def) : buildPlanks(spec);
+  return spec.layout === 'stepped' ? buildTiles(spec, def, scale) : buildPlanks(spec, scale);
 }
 
 // Page side: canvases → { map, bumpMap, plank: [L, W], cells } (planks) or { map, bumpMap,
@@ -73,12 +75,12 @@ export function photoTextures(atlas, anisotropy) {
   return { layout: 'planks', map, bumpMap, plank: atlas.plank, cells: atlas.cells };
 }
 
-async function buildPlanks(spec) {
+async function buildPlanks(spec, scale = 1) {
   const buffer = await fetchCached(spec.url);
   const image = await createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
   const fit = lightFit(image);
   const g = spec.grooves, cells = spec.planks.length;
-  const cellW = 1760, cellH = Math.round(cellW * spec.plank[1] / spec.plank[0]);
+  const cellW = Math.round(1760 * scale), cellH = Math.round(cellW * spec.plank[1] / spec.plank[0]);
   const canvas = newCanvas();
   canvas.width = cellW; canvas.height = cellH * cells;
   const ctx = canvas.getContext('2d');
@@ -109,7 +111,7 @@ async function buildPlanks(spec) {
   }
   image.close?.();
   ctx.putImageData(pixels, 0, 0);
-  return { layout: 'planks', map: canvas, bump: reliefCanvas(pixels), plank: spec.plank, cells };
+  return { layout: 'planks', map: canvas, bump: reliefCanvas(pixels, scale), plank: spec.plank, cells };
 }
 
 const FORMAT_ORDER = ['50×50', '30×50', '30×30'];
@@ -117,7 +119,7 @@ const FORMAT_ORDER = ['50×50', '30×50', '30×30'];
 // The tile photos in one atlas (stacked, each the tile's outline box at about 3 px/mm), the
 // white background turned to grout, and a relief map: the tile's outline blurred over
 // about 12 mm (the pillowed edge rolling down to the joint) plus the photo's grain.
-async function buildTiles(spec, def) {
+async function buildTiles(spec, def, scale = 1) {
   const images = await Promise.all(FORMAT_ORDER.map(async (f) => {
     const buffer = await fetchCached(spec.formats[f].url);
     return createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
@@ -126,9 +128,10 @@ async function buildTiles(spec, def) {
   // joints come out of the texture with its mip filtering (a joint drawn by the shader
   // aliased into dashes at a distance: seen in a screenshot).
   const tileM = 0.5 - (def.joint || 0); // the 50×50 tile's face (m)
-  const M = Math.round((def.joint || 0) / 2 * spec.formats['50×50'].px[0] / tileM);
-  const W = Math.max(...FORMAT_ORDER.map((f) => spec.formats[f].px[0])) + 2 * M;
-  const H = FORMAT_ORDER.reduce((h, f) => h + spec.formats[f].px[1] + 2 * M, 0);
+  const px = (f) => spec.formats[f].px.map((v) => Math.round(v * scale));
+  const M = Math.round((def.joint || 0) / 2 * px('50×50')[0] / tileM);
+  const W = Math.max(...FORMAT_ORDER.map((f) => px(f)[0])) + 2 * M;
+  const H = FORMAT_ORDER.reduce((h, f) => h + px(f)[1] + 2 * M, 0);
   const canvas = newCanvas();
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -138,7 +141,8 @@ async function buildTiles(spec, def) {
   const rects = [];
   let y = 0;
   FORMAT_ORDER.forEach((f, i) => {
-    const { box: [x0, y0, x1, y1], px: [tw, th] } = spec.formats[f];
+    const { box: [x0, y0, x1, y1] } = spec.formats[f];
+    const [tw, th] = px(f);
     const w = tw + 2 * M, h = th + 2 * M;
     ctx.drawImage(images[i], x0, y0, x1 - x0 + 1, y1 - y0 + 1, M, y + M, tw, th);
     images[i].close?.();
@@ -181,12 +185,12 @@ async function buildTiles(spec, def) {
     for (let c = 0; c < 3; c++) d[i + c] = (d[i + c] * spec.tone[c]) * (1 - t) + g255[c] * t;
   }
   ctx.putImageData(pixels, 0, 0);
-  return { layout: 'stepped', map: canvas, bump: tileReliefCanvas(pixels, mask), rects: rects.map((r) => r.uv), groutHex };
+  return { layout: 'stepped', map: canvas, bump: tileReliefCanvas(pixels, mask, scale), rects: rects.map((r) => r.uv), groutHex };
 }
 
 // Height: the outline blurred over about 12 mm (two 18 px boxes at 3 px/mm), so the face
 // rolls down into the joint, plus a little of the photo's own grain.
-function tileReliefCanvas({ data, width, height }, mask) {
+function tileReliefCanvas({ data, width, height }, mask, scale = 1) {
   const box = (src, R) => {
     const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
     for (let y = 0; y < height; y++) {
@@ -207,7 +211,8 @@ function tileReliefCanvas({ data, width, height }, mask) {
     }
     return out;
   };
-  const pillow = box(box(mask, 18), 18);
+  const R = Math.max(1, Math.round(18 * scale)); // about 6 mm at the atlas's px/mm
+  const pillow = box(box(mask, R), R);
   const lum = new Float32Array(width * height);
   for (let p = 0, i = 0; p < lum.length; p++, i += 4) lum[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
   const local = box(lum, 3);
@@ -275,10 +280,10 @@ function solve(A, b) { // Gaussian elimination, small dense system
 
 // Relief from the photo: luminance minus its local mean (a 9 px box), so grooves, joints,
 // knots and the dark grain lines sit low and the plank faces stay flat.
-function reliefCanvas({ data, width, height }) {
+function reliefCanvas({ data, width, height }, scale = 1) {
   const lum = new Float32Array(width * height);
   for (let p = 0, i = 0; p < lum.length; p++, i += 4) lum[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-  const R = 4, tmp = new Float32Array(lum.length), blur = new Float32Array(lum.length);
+  const R = Math.max(1, Math.round(4 * scale)), tmp = new Float32Array(lum.length), blur = new Float32Array(lum.length);
   const clampX = (x) => Math.min(width - 1, Math.max(0, x)), clampY = (y) => Math.min(height - 1, Math.max(0, y));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {

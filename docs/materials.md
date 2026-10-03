@@ -485,6 +485,27 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
     the wheel counting to 22/23, then opened with every finish drawn: Charme and Monastère photos,
     Etruria, mosaic, terrazzo.
   - **Hypothesis:** on the owner's device the plan pans freely now, whatever the worker path.
+- **Phone memory (owner, 2026-10-03: the 3D view of their link crashed the canvas on the phone).**
+  - Before the fix, the owner's house kept about 300 MB of page canvases: 7 textured finishes with
+    relief maps at 2048 px (16 MB each), plus the photo atlases. The GPU held its own copy of each.
+  - Hypothesis: that crossed the phone browser's memory limit (iOS Safari caps total canvas memory).
+    Not seen on the phone yet.
+  - **Freed after upload** (`freeAfterUpload`, `paintedTexture.js`): once the GPU has a texture,
+    its canvas shrinks to 1 × 1, so the page holds no second copy. A picture shared by several
+    textures is freed once all of them have uploaded, and a later request paints it again.
+    - **Trap:** such a texture must never be uploaded again. That means no `needsUpdate`, no
+      `dispose()`, and a lost WebGL context would bring back only 1 px textures. Our textures upload
+      once and are never disposed.
+  - **Half size on phones** (`TEXTURE_SCALE`, `textureWorker.js`): a coarse pointer and a short side
+    under 600 CSS px (the Steam Deck's is 800). Finish canvases (`finishCanvases` `scale`) and photo
+    atlases (`photoCanvases` `scale`, relief blur radii scaled) are made at half size, 4× less
+    memory. The shaders read cells and UV rects, never pixel sizes.
+  - **Proven** (Chrome on the Steam Deck):
+    - at half scale, finish canvases are exactly half size; the Monastère atlas UV rects are
+      identical and its mean luminance is 203.6 vs 203.5;
+    - with freeing on, the synthetic house's 3D view draws every finish on Ground and Basement, and
+      toggling Realistic off and on still shows the procedural, then the photo floors.
+  - **Hypothesis:** the owner's phone opens the 3D view without crashing.
 - **Fallback:** without Worker or OffscreenCanvas, or if the worker fails, each job runs on the
   page, one per task. A finish that fails inside the worker alone is repainted on the page. A
   download failure rejects as before.

@@ -9,7 +9,14 @@ import { finishCanvases, finishTexturesFrom, hasFinishDetail } from './finishTex
 import { photoCanvases, photoTextures } from './photoFinishes.js';
 import { skyPixels } from './skyPixels.js';
 import { PAINTERS } from './painters.js';
-import { setTexturePainter } from './paintedTexture.js';
+import { setTexturePainter, freeAfterUpload } from './paintedTexture.js';
+
+// Phones get textures at half size (4× less memory): a house's finishes crashed the 3D
+// view on the owner's phone (2026-10-03). A phone: a coarse pointer and a short side under
+// 600 CSS px (the Steam Deck's is 800).
+const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+  && Math.min(screen.width, screen.height) < 600;
+export const TEXTURE_SCALE = PHONE ? 0.5 : 1;
 
 let worker = null;
 let workerBroken = typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined';
@@ -25,8 +32,8 @@ let nextId = 0;
 
 // The same jobs on the page (the fallback): canvases stay page canvases.
 const PAGE_JOBS = {
-  finish: ({ m, bump, detail }) => finishCanvases(m, { bump, detail }),
-  photo: ({ def }) => photoCanvases(def),
+  finish: ({ m, bump, detail, scale }) => finishCanvases(m, { bump, detail, scale }),
+  photo: ({ def, scale }) => photoCanvases(def, { scale }),
   sky: ({ url }) => skyPixels(url),
   paint: ({ name, args, w, h }) => {
     const canvas = document.createElement('canvas');
@@ -137,14 +144,23 @@ setTexturePainter((job) => run({ kind: 'paint', ...job }).then((r) => r.canvas))
 // paints the colour only (AR's Lambert materials ignore relief and detail).
 export function paintFinish(m, anisotropy = 1, { bump = true } = {}) {
   const detail = bump && !hasFinishDetail(m);
-  return run({ kind: 'finish', m, bump, detail }).then((canvases) => finishTexturesFrom(m, canvases, anisotropy));
+  return run({ kind: 'finish', m, bump, detail, scale: TEXTURE_SCALE }).then((canvases) => {
+    const textures = finishTexturesFrom(m, canvases, anisotropy);
+    for (const t of Object.values(textures)) if (t) freeAfterUpload(t);
+    return textures;
+  });
 }
 
 // → Promise of a photo finish's atlas textures (photoFinishes.js), once per finish.
 const photos = new Map();
 export function loadPhotoFinish(def, anisotropy = 1) {
   if (!photos.has(def.id)) {
-    const p = run({ kind: 'photo', def }).then((atlas) => photoTextures(atlas, anisotropy));
+    const p = run({ kind: 'photo', def, scale: TEXTURE_SCALE }).then((atlas) => {
+      const photo = photoTextures(atlas, anisotropy);
+      freeAfterUpload(photo.map);
+      freeAfterUpload(photo.bumpMap);
+      return photo;
+    });
     p.catch(() => photos.delete(def.id)); // a failed download may be retried later
     photos.set(def.id, p);
   }

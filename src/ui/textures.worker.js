@@ -13,8 +13,8 @@ import { skyPixels } from './skyPixels.js';
 import { PAINTERS } from './painters.js';
 
 const JOBS = {
-  finish: ({ m, bump, detail }) => finishCanvases(m, { bump, detail }),
-  photo: ({ def }) => photoCanvases(def),
+  finish: ({ m, bump, detail, scale }) => finishCanvases(m, { bump, detail, scale }),
+  photo: ({ def, scale }) => photoCanvases(def, { scale }),
   sky: ({ url }) => skyPixels(url),
   paint: ({ name, args, w, h }) => {
     const canvas = new OffscreenCanvas(w, h);

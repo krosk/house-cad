@@ -834,7 +834,7 @@ function paintPinwheel(ctx, m, W, H, ppm, bump) {
 const steppedDet = () => { const [ax, ay] = steppedA(), [bx, by] = steppedB(); return ax * by - ay * bx; };
 const steppedPitch = () => Math.sqrt(Math.abs(steppedDet()));
 function steppedCanvas(m, bump) {
-  const N = STEPPED_CELLS, S = 2048, design = PINWHEEL_DESIGNS[m.design];
+  const N = STEPPED_CELLS, S = Math.round(2048 * sizeScale), design = PINWHEEL_DESIGNS[m.design];
   const ppm = (S / N) / steppedPitch(); // draw units per plan metre (area-true)
   const [ax, ay] = steppedA(), [bx, by] = steppedB(), det = steppedDet();
   // plan metres → lattice (s, t): the inverse of [A B]; canvas px = (S/N)·(s, t).
@@ -965,7 +965,7 @@ const withDiagonal = (m, paint) => (m.pattern === 'octagon' && m.diagonal
 
 function unitCanvas(m, paint) {
   const [uw, uh] = patternUnit(m);
-  const ppm = (hasDesign(m) ? 2048 : 512) / Math.max(uw, uh);
+  const ppm = (hasDesign(m) ? 2048 : 512) * sizeScale / Math.max(uw, uh);
   const canvas = newCanvas();
   canvas.width = Math.max(8, Math.round(uw * ppm));
   canvas.height = Math.max(8, Math.round(uh * ppm));
@@ -1028,7 +1028,15 @@ export function finishBumpTexture(m, anisotropy = 1) {
 // (textures.worker.js) and wraps the result here. `finishCanvases` runs in the worker:
 // every canvas a finish needs, each with its unit; `finishTexturesFrom` turns them (as
 // page canvases) into the same textures finishTexture/finishBumpTexture return.
-export function finishCanvases(m, { bump = true, detail = true } = {}) {
+// Texture size factor for this paint: 0.5 on phones (textureWorker.js), so a house with
+// many finishes stays inside the phone browser's canvas and GPU memory. Set for one
+// synchronous finishCanvases call only.
+let sizeScale = 1;
+export function finishCanvases(m, { bump = true, detail = true, scale = 1 } = {}) {
+  sizeScale = scale;
+  try { return paintCanvases(m, { bump, detail }); } finally { sizeScale = 1; }
+}
+function paintCanvases(m, { bump, detail }) {
   const d = m && DETAIL_DESIGNS[m.design] && m.w > 0 && m.h > 0 ? DETAIL_DESIGNS[m.design] : null;
   return {
     map: mapCanvas(m),
