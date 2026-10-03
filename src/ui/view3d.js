@@ -18,6 +18,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
+import { hasPhotoFinish, loadPhotoFinish, patchPlankMaterial } from './photoFinishes.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -776,6 +777,9 @@ export class View3D {
     this._applyShadowState();
     this._applyEnvironment();
     if (this.realisticEnabled) this._applySun();
+    for (const material of this.finishMaterials?.values() || []) {
+      if (material.userData.photoDef) this._applyPhotoFinish(material);
+    }
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._resize();
   }
@@ -888,9 +892,38 @@ export class View3D {
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
     applyFinishDetail(material, def, anisotropy); // sub-mm grain up close (finishTextures.js)
+    if (hasPhotoFinish(def)) {
+      material.userData.photoDef = def;
+      material.userData.procedural = { map: material.map, bumpMap: material.bumpMap ?? null, bumpScale: material.bumpScale };
+      if (this.realisticEnabled) this._applyPhotoFinish(material);
+    }
     this.finishMaterials.set(key, material);
     return material;
   }
+
+  // Realistic swaps a finish's procedural texture for the retailer's photo when one is
+  // registered (src/ui/photoFinishes.js, docs/realism.md); off, or on failure, the
+  // procedural one stays.
+  _applyPhotoFinish(material) {
+    const def = material.userData.photoDef;
+    const procedural = material.userData.procedural;
+    if (!this.realisticEnabled) {
+      if (material.userData.restorePhoto) {
+        material.userData.restorePhoto();
+        material.userData.restorePhoto = null;
+        Object.assign(material, procedural);
+        material.needsUpdate = true;
+      }
+      return;
+    }
+    const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    loadPhotoFinish(def, anisotropy).then((photo) => {
+      if (!this.realisticEnabled || material.userData.restorePhoto) return;
+      Object.assign(material, { map: photo.map, bumpMap: photo.bumpMap, bumpScale: 0.6 });
+      material.userData.restorePhoto = patchPlankMaterial(material, photo);
+    }).catch((error) => console.warn('photo finish failed', def.id, error));
+  }
+
 
   _meshVisible(mesh) {
     const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;

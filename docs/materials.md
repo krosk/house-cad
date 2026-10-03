@@ -206,6 +206,8 @@ cut plan.
   lighting), and the same wood in the M (13 cm) and XL (18.7 cm) widths. Figure: mild per-plank tone,
   fine broken grain, small flames on about half the planks, clusters of pin knots, some larger knots.
   The bevel width (2 mm) is an estimate.
+  In View 3D Realistic the planks come from photo 799228 itself, laid by a shader with no repeat
+  (`docs/realism.md` "Photo finishes").
   Proven: build; scratch browser renders beside photos 799228 and 964334; takeoff of a 5 × 4 m room = 107 planks
   (Node). Not yet seen in View 3D on a real room or in AR.
 - Photos come from `tools/product-images.mjs` (Leroy Merlin via its Chrome snippet: the site runs

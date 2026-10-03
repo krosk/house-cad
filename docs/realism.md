@@ -48,6 +48,29 @@ patches fall through the windows at the slider time, house shadow points north a
 shows, walls read neutral in POV. **Not measured:** frame rate (the test tab was hidden, so the
 browser paused rendering). **Hypothesis:** usable on the Deck and the iPhone 14; check fps on both.
 
+## Photo finishes (Realistic only)
+
+`src/ui/photoFinishes.js`: a finish whose catalog id is registered there swaps its procedural texture
+for the retailer's own photo while Realistic is on (normal View 3D, AR and offline keep the
+procedural design, which stays the stored form). Leroy Merlin's image CDN `media.adeo.com` answers
+`access-control-allow-origin: *` (Proven by curl, 2026-10-03), so no proxy is needed.
+
+- **Beaulieu oak charme** (`oak_beaulieu_charme`): photo 799228, a 3000 px straight top-down render
+  of the laid floor. Measured in Node: 11 full rows between grooves (247.9 px = 164 mm) and each
+  row's butt joints (whole planks 1749–1764 px ≈ 1.18 m; checked on a crop). One whole plank per row
+  is cut out (groove to groove, so turned planks still meet with a full groove), the photo's soft
+  light falloff divided out (least-squares quadratic), and the 11 planks stacked in an atlas with a
+  relief map from the photo's local contrast.
+- **Owner question (2026-10-03): does a photo texture show a pattern repeat?** Tiling the photo
+  did: the same planks every 2 m, and each row's wrap seam drew the same staircase in every tile
+  (seen in a screenshot). So the photo is not tiled: a shader (`patchPlankMaterial`) lays planks from
+  plan UVs (row, random offset per row, random plank of 11, turned 180° half the time), so the floor
+  never repeats and every plank is exactly 1.18 × 0.164 m. `textureGrad` keeps mip levels continuous
+  across plank edges.
+- **Proven** (Chrome on the Steam Deck, local build, demo house): the photo downloads, planks read as
+  long, knotted oak with grooves, no repeat visible in the overview or up close.
+  **Hypothesis:** with only 11 source planks, a distinctive knot can be spotted twice in a large room.
+
 ## Next options (not built)
 
 - **Render button:** path-traced still (`three-gpu-pathtracer`); compatibility with three 0.170 is a
