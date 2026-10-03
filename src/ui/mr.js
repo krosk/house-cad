@@ -5779,14 +5779,18 @@ export function setupMR(view, project, getFootprint) {
   // view): the FURNITURE output layer is a sheet layer, off by default, and once left
   // the owner's AR links without any furniture (2026-10-03).
   let shareUrlCache = null; // { url, markers }
+  let shareUrlError = ''; // why the last precompute failed, shown by URL COPY FAILED
   let shareUrlGeneration = 0;
   let shareUrlTimer = null;
   async function refreshShareUrl(generation, markers) {
     try {
       const url = await buildShareUrl(project, { markers, furniture: true });
-      if (generation === shareUrlGeneration) shareUrlCache = { url, markers };
+      if (generation === shareUrlGeneration) { shareUrlCache = { url, markers }; shareUrlError = ''; }
     } catch (error) {
-      if (generation === shareUrlGeneration) shareUrlCache = null;
+      if (generation === shareUrlGeneration) {
+        shareUrlCache = null;
+        shareUrlError = String(error?.name && error.name !== 'Error' ? error.name : error?.message || error).slice(0, 24);
+      }
       rlog('share URL precompute failed', String(error?.message || error));
     }
   }
@@ -5926,7 +5930,11 @@ export function setupMR(view, project, getFootprint) {
     if (format === 'link') {
       const cached = shareUrlCache?.markers === settings.markerIcons
         ? shareUrlCache.url : null;
-      if (cached && navigator.clipboard?.writeText) {
+      // The flash names the cause (owner, 2026-10-03: "url copy failed" without details).
+      let reason;
+      if (!navigator.clipboard?.writeText) reason = 'no clipboard';
+      else if (!cached) reason = shareUrlError ? `build: ${shareUrlError}` : 'not ready, retry';
+      else {
         try {
           await navigator.clipboard.writeText(cached);
           rlog('share URL copied', { chars: cached.length, markers: settings.markerIcons });
@@ -5934,10 +5942,12 @@ export function setupMR(view, project, getFootprint) {
           return;
         } catch (error) {
           rlog('share URL copy failed', String(error?.message || error));
+          reason = error?.name || 'write';
         }
       }
-      scheduleShareUrlRefresh();
-      sheetFlash('URL COPY FAILED');
+      rlog('share URL copy failed', { reason, chars: cached?.length ?? 0 });
+      if (!cached) scheduleShareUrlRefresh();
+      sheetFlash(`URL COPY FAILED (${reason})`);
       return;
     }
     if (format === 'qr') {
