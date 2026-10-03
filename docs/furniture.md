@@ -46,6 +46,8 @@ optional product draws the 3D.
 - A `furniture` zone gains an optional `article` (a catalog key, IKEA or procedural). The zone keeps
   position, constraints, sheets and DXF; the product supplies the 3D model; the zone's `foot` is the
   mounting height (the catalog `mountZMm` seeds it).
+  In PLAN · EDIT the band pad edits it: with a product, FOOT or TOP moves the whole unit (the
+  product's height is fixed, so TOP sets foot = top − height); without one, both bounds are free.
 - Assigning a product sizes the zone to its footprint (w × d, swapped when turned 90°). Sizing stays
   constraint-first; the owner dimensions its position.
 - A `facing` field picks the front side, like a door's hinge field. A/X turns it (PLAN · EDIT and

@@ -6802,6 +6802,20 @@ export function setupMR(view, project, getFootprint) {
     const val = parseFloat(bandBuffer);
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
     const m = toMeters(val);
+    // A furniture zone carrying a product has the product's fixed height: either bound
+    // moves the whole unit (a wall unit lifted above its old top was rejected before).
+    const productH = selectedRect.kind === 'furniture' && selectedRect.productMm ? selectedRect.productMm[1] / 1000 : 0;
+    if (productH > 0) {
+      const foot = bandField === 'top' ? m - productH : m;
+      if (foot < 0) { rlog('band top rejected (< product height)', { id: selectedRect.id, m }); return; }
+      selectedRect.foot = foot;
+      selectedRect.top = foot + productH;
+      project.touch();
+      buildArch3d(); // the model follows the foot (buildFurniture)
+      rlog('band edit', { id: selectedRect.id, field: bandField, foot: +foot.toFixed(3) });
+      refreshBandPad();
+      return;
+    }
     // Keep the band ordered: field[0] is the lower bound, field[1] the upper.
     const fs = bandFields(selectedRect), i = fs.indexOf(bandField);
     const upper = i === 0 && fs.length > 1 ? selectedRect[fs[1]] : null;
