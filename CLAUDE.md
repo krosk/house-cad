@@ -89,6 +89,8 @@ slab/wall (`finishSurfaces` → `finishGeometries` → `src/ui/finishTextures.js
 patterns are anchored at the plan origin; they are presentation-only and never reach exports.
 In View 3D a design may add a small, densely repeating detail texture for sub-mm grain up close
 (`applyFinishDetail`, `docs/materials.md` "Detail layer"), because the main texture is capped at 2048 px.
+View 3D paints finish textures in a worker (`src/ui/finishTextureWorker.js`, `docs/materials.md` "Painting in a
+worker"): never call `finishTexture` on the page from a rebuild path, since one finish can take 2 s of main thread.
 Each authored `light` marker also derives a warm 3000 K-style PointLight and a small emissive ceiling
 puck in desktop/mobile 3D. Marker position, floor elevation, and floor-relative `z` remain the sole
 authority; the fixture/light are presentation-only.

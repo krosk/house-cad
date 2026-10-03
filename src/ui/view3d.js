@@ -11,7 +11,8 @@ import { buildDoorProduct } from './doorProducts.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
-import { finishTexture, finishBumpTexture, applyFinishDetail } from './finishTextures.js';
+import { applyFinishDetail } from './finishTextures.js';
+import { paintFinish } from './finishTextureWorker.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -194,6 +195,7 @@ export class View3D {
     this.sky = null; // { texture, envTexture, sunAngle } once downloaded
     this.composer = null;
     this.onSkyStatus = null; // (text) → main.js shows download/failure state
+    this.onFinishProgress = null; // ({ total, done }) → main.js holds View 3D until done
 
     // Ground grid + subtle floor to catch shadows. Kept as fields so the MR
     // module can hide them during passthrough.
@@ -873,32 +875,53 @@ export class View3D {
 
   // One cached material per catalog entry (keyed by its content, so an edited custom
   // product gets a fresh texture). Never disposed with the per-build geometry.
+  // Its textures are painted in a worker (finishTextureWorker.js): the material shows the
+  // finish's flat colour until they arrive. `finishProgress` counts them so main.js can
+  // hold the 3D view until every finish is ready (owner, 2026-10-03).
   _finishMaterial(def) {
     this.finishMaterials ??= new Map();
     const key = JSON.stringify(def || {});
     let material = this.finishMaterials.get(key);
     if (material) return material;
     const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-    const map = finishTexture(def, anisotropy);
-    const bumpMap = finishBumpTexture(def, anisotropy);
     material = new THREE.MeshStandardMaterial({
-      color: map ? 0xffffff : (def?.color ?? 0xffffff),
-      map,
-      ...(bumpMap ? { bumpMap, bumpScale: def.bumpScale ?? 1 } : {}),
+      color: def?.color ?? 0xffffff,
       roughness: def?.roughness ?? (def?.pattern === 'stagger' ? 0.72 : def?.pattern === 'paint' ? 0.92 : 0.45),
       metalness: 0,
       side: THREE.DoubleSide,
       // Pull the 2 mm overlay firmly in front of the slab/wall it covers.
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
-    applyFinishDetail(material, def, anisotropy); // sub-mm grain up close (finishTextures.js)
-    if (hasPhotoFinish(def)) {
-      material.userData.photoDef = def;
-      material.userData.procedural = { map: material.map, bumpMap: material.bumpMap ?? null, bumpScale: material.bumpScale };
-      if (this.realisticEnabled) this._applyPhotoFinish(material);
-    }
+    if (hasPhotoFinish(def)) material.userData.photoDef = def;
     this.finishMaterials.set(key, material);
+    if (!def || def.pattern === 'paint' || !(def.w > 0 && def.h > 0)) return material; // no texture
+    this._finishProgress(1, 0);
+    paintFinish(def, anisotropy).then(({ map, bumpMap }) => {
+      if (map) {
+        material.color.setHex(0xffffff);
+        material.map = map;
+      }
+      if (bumpMap) {
+        material.bumpMap = bumpMap;
+        material.bumpScale = def.bumpScale ?? 1;
+      }
+      applyFinishDetail(material, def, anisotropy); // sub-mm grain up close (finishTextures.js)
+      material.needsUpdate = true;
+      if (material.userData.photoDef) {
+        material.userData.procedural = { map: material.map, bumpMap: material.bumpMap ?? null, bumpScale: material.bumpScale };
+        if (this.realisticEnabled) this._applyPhotoFinish(material);
+      }
+    }).catch((error) => console.warn('finish texture failed', def.id, error))
+      .finally(() => this._finishProgress(0, 1));
     return material;
+  }
+
+  // { total, done } of finish textures requested so far; onFinishProgress hears every change.
+  _finishProgress(added, done) {
+    this.finishProgress ??= { total: 0, done: 0 };
+    this.finishProgress.total += added;
+    this.finishProgress.done += done;
+    this.onFinishProgress?.({ ...this.finishProgress });
   }
 
   // Realistic swaps a finish's procedural texture for the retailer's photo when one is
@@ -907,6 +930,7 @@ export class View3D {
   _applyPhotoFinish(material) {
     const def = material.userData.photoDef;
     const procedural = material.userData.procedural;
+    if (!procedural) return; // still painting: applied once the procedural texture is in
     if (!this.realisticEnabled) {
       if (material.userData.restorePhoto) {
         material.userData.restorePhoto();

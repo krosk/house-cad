@@ -10,6 +10,9 @@
 import * as THREE from 'three';
 import { pinwheelCells, pinwheelPitch, steppedCells, steppedA, steppedB } from '../core/flooring.js';
 
+// A canvas on the page, or an OffscreenCanvas in the texture worker (finishTextures.worker.js),
+// so the same painters run off the main thread. Callers set width and height.
+const newCanvas = () => (typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(1, 1));
 const css = (hex) => `#${(hex >>> 0).toString(16).padStart(6, '0')}`;
 const GROUT = 0xcbd5e1;
 
@@ -658,7 +661,7 @@ function stoneField(r, g1, bias, x, y, w, h, { aspect = false } = {}) {
 // Paint a field as soft clouds: `darkHex` at alpha up to aD over smoothstep(d0, d1), `lightHex`
 // up to aL over smoothstep(l0, l1) (l0 > l1: low field = light), from a small canvas scaled up.
 function drawStoneCloud(ctx, { field, nx, ny }, x, y, w, h, darkHex, lightHex, [d0, d1, aD], [l0, l1, aL]) {
-  const layer = document.createElement('canvas');
+  const layer = newCanvas();
   layer.width = nx; layer.height = ny;
   const lx = layer.getContext('2d'), img = lx.createImageData(nx, ny);
   const tan = new THREE.Color(darkHex), lt = new THREE.Color(lightHex);
@@ -837,7 +840,7 @@ function steppedCanvas(m, bump) {
   // plan metres → lattice (s, t): the inverse of [A B]; canvas px = (S/N)·(s, t).
   const k = S / N / ppm;
   const toCanvas = [by / det * k, -ay / det * k, -bx / det * k, ax / det * k]; // a b c d (DOMMatrix order)
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = canvas.height = S;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = bump ? '#5a5a5a' : css(m.grout ?? GROUT);
@@ -867,8 +870,8 @@ function steppedCanvas(m, bump) {
   if (design) grainPass(ctx, S, S, rng(seed + 1), bump ? 0.2 : 0.09);
   return canvas;
 }
-function steppedTexture(m, bump, anisotropy) {
-  const t = new THREE.CanvasTexture(steppedCanvas(m, bump));
+function steppedTexture(canvas, anisotropy) {
+  const t = new THREE.CanvasTexture(canvas);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = anisotropy;
   const [ax, ay] = steppedA(), [bx, by] = steppedB(), det = steppedDet(), N = STEPPED_CELLS;
@@ -941,7 +944,7 @@ function paintUnit(ctx, m, W, H, ppm) {
 // on the plan origin (as in the takeoff, flooring.js) and the tiling has no seams.
 function paintDiagonal(ctx, m, W, H, ppm, paintStraight) {
   const [ux, uy] = straightUnit(m);
-  const src = document.createElement('canvas');
+  const src = newCanvas();
   src.width = Math.max(8, Math.round(ux * ppm));
   src.height = Math.max(8, Math.round(uy * ppm));
   paintStraight(src.getContext('2d'), src.width, src.height, ppm);
@@ -963,7 +966,7 @@ const withDiagonal = (m, paint) => (m.pattern === 'octagon' && m.diagonal
 function unitCanvas(m, paint) {
   const [uw, uh] = patternUnit(m);
   const ppm = (hasDesign(m) ? 2048 : 512) / Math.max(uw, uh);
-  const canvas = document.createElement('canvas');
+  const canvas = newCanvas();
   canvas.width = Math.max(8, Math.round(uw * ppm));
   canvas.height = Math.max(8, Math.round(uh * ppm));
   paint(canvas.getContext('2d'), canvas.width, canvas.height, ppm);
@@ -978,35 +981,66 @@ function repeatTexture({ canvas, uw, uh }, anisotropy) {
   return t;
 }
 
+// The colour canvas: { canvas, uw, uh } (one repeat unit), { canvas, stepped: true } (the
+// stepped lattice), or null for untextured (paint) materials.
+function mapCanvas(m) {
+  if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
+  if (m.pattern === 'stepped') return { canvas: steppedCanvas(m, false), stepped: true };
+  return unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm)));
+}
+
+// The height canvas for designs that have one (same unit and seed as the colour, so the
+// two line up), else null.
+function bumpCanvas(m) {
+  if (m?.pattern === 'octagon' && OCT_DESIGNS[m.design]) {
+    return unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintOctDesign(ctx, m, W, H, ppm, true)));
+  }
+  if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
+    return unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true));
+  }
+  if (m?.pattern === 'pinwheel' && PINWHEEL_DESIGNS[m.design]) {
+    return unitCanvas(m, (ctx, W, H, ppm) => paintPinwheel(ctx, m, W, H, ppm, true));
+  }
+  if (m?.pattern === 'stepped' && PINWHEEL_DESIGNS[m.design]) return { canvas: steppedCanvas(m, true), stepped: true };
+  if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
+  return unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true));
+}
+
+const canvasTexture = (c, anisotropy) => (!c ? null
+  : c.stepped ? steppedTexture(c.canvas, anisotropy) : repeatTexture(c, anisotropy));
+
 // → a CanvasTexture (repeat = 1 / unit size, UVs in plan metres) or null for untextured
 // (paint) materials.
 export function finishTexture(m, anisotropy = 1) {
-  if (!m || m.pattern === 'paint' || !(m.w > 0 && m.h > 0)) return null;
-  if (m.pattern === 'stepped') {
-    const t = steppedTexture(m, false, anisotropy);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }
-  const map = repeatTexture(unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintUnit(ctx, m, W, H, ppm))), anisotropy);
-  map.colorSpace = THREE.SRGBColorSpace;
+  const map = canvasTexture(mapCanvas(m), anisotropy);
+  if (map) map.colorSpace = THREE.SRGBColorSpace;
   return map;
 }
 
-// Height map for designs that have one (same unit and seed as finishTexture, so the two
-// line up), else null. View 3D only: the AR 3D view's Lambert materials ignore it.
+// Height map for designs that have one, else null. View 3D only: the AR 3D view's
+// Lambert materials ignore it.
 export function finishBumpTexture(m, anisotropy = 1) {
-  if (m?.pattern === 'octagon' && OCT_DESIGNS[m.design]) {
-    return repeatTexture(unitCanvas(m, withDiagonal(m, (ctx, W, H, ppm) => paintOctDesign(ctx, m, W, H, ppm, true))), anisotropy);
-  }
-  if (m?.pattern === 'grid' && GRID_DESIGNS[m.design]) {
-    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintGridDesign(ctx, m, W, H, ppm, true)), anisotropy);
-  }
-  if (m?.pattern === 'pinwheel' && PINWHEEL_DESIGNS[m.design]) {
-    return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintPinwheel(ctx, m, W, H, ppm, true)), anisotropy);
-  }
-  if (m?.pattern === 'stepped' && PINWHEEL_DESIGNS[m.design]) return steppedTexture(m, true, anisotropy);
-  if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
-  return repeatTexture(unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true)), anisotropy);
+  return canvasTexture(bumpCanvas(m), anisotropy);
+}
+
+// Painting a finish takes up to about 2 s of main-thread time (Lucia, Monastère: measured
+// in Chrome on the Steam Deck, 2026-10-03), so View 3D has them painted in a worker
+// (finishTextures.worker.js) and wraps the result here. `finishCanvases` runs in the worker:
+// every canvas a finish needs, each with its unit; `finishTexturesFrom` turns them (as
+// page canvases) into the same textures finishTexture/finishBumpTexture return.
+export function finishCanvases(m, { detail = true } = {}) {
+  const d = m && DETAIL_DESIGNS[m.design] && m.w > 0 && m.h > 0 ? DETAIL_DESIGNS[m.design] : null;
+  return {
+    map: mapCanvas(m),
+    bump: bumpCanvas(m),
+    detail: d && detail ? { canvas: detailCanvas(d.size, (m.seed ?? 0) + 97, d.paint) } : null,
+  };
+}
+export function finishTexturesFrom(m, canvases, anisotropy = 1) {
+  const map = canvasTexture(canvases.map, anisotropy);
+  if (map) map.colorSpace = THREE.SRGBColorSpace;
+  if (canvases.detail && !hasFinishDetail(m)) detailCache.set(detailKey(m), detailTexture(canvases.detail.canvas));
+  return { map, bumpMap: canvasTexture(canvases.bump, anisotropy) };
 }
 
 // ---- Detail layer (View 3D) ---------------------------------------------------------
@@ -1021,7 +1055,7 @@ const DETAIL_PX = 512;
 // Draws on a DETAIL_PX canvas where 1 m = ppm px. `dot(x, y, s, v, a)` stamps a soft
 // square of albedo/height value v (0–255) wrapped across the tile edges.
 function detailCanvas(size, seed, paint) {
-  const c = document.createElement('canvas');
+  const c = newCanvas();
   c.width = c.height = DETAIL_PX;
   const ctx = c.getContext('2d'), ppm = DETAIL_PX / size, r = rng(seed);
   const albedo = new Float32Array(DETAIL_PX * DETAIL_PX).fill(128), height = new Float32Array(DETAIL_PX * DETAIL_PX).fill(128);
@@ -1105,15 +1139,21 @@ const DETAIL_DESIGNS = {
 };
 
 const detailCache = new Map();
+const detailKey = (m) => `${m.design}:${m.seed ?? 0}`;
+export const hasFinishDetail = (m) => detailCache.has(detailKey(m)); // already painted
+function detailTexture(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; // data, not colour: no sRGB
+  return t;
+}
 // → { texture, size } for a design that has a detail layer, else null.
 export function finishDetailTexture(m, anisotropy = 1) {
   const d = m && DETAIL_DESIGNS[m.design];
   if (!d || !(m.w > 0 && m.h > 0)) return null;
-  const key = `${m.design}:${m.seed ?? 0}`;
+  const key = detailKey(m);
   let t = detailCache.get(key);
   if (!t) {
-    t = new THREE.CanvasTexture(detailCanvas(d.size, (m.seed ?? 0) + 97, d.paint));
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; // data, not colour: no sRGB
+    t = detailTexture(detailCanvas(d.size, (m.seed ?? 0) + 97, d.paint));
     detailCache.set(key, t);
   }
   t.anisotropy = Math.max(t.anisotropy, anisotropy);

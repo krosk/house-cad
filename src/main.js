@@ -232,6 +232,21 @@ function setDesktop3D(visible) {
   }
 }
 view3dToggle.addEventListener('click', () => setDesktop3D(!app.classList.contains('show-3d')));
+// Finish textures paint in a worker (src/ui/finishTextureWorker.js). Until all are in, the
+// plan stays usable and View 3D waits with a count (owner, 2026-10-03: "work in progress
+// → done"), so the 3D view never opens on half-painted floors. Already open (a finish
+// added while in 3D), it stays open and the new finish shows its flat colour until ready.
+view.onFinishProgress = ({ total, done }) => {
+  const waiting = done < total && !app.classList.contains('show-3d');
+  view3dToggle.disabled = waiting;
+  if (waiting) {
+    view3dToggle.textContent = `◈ 3D: textures ${done}/${total}…`;
+    view3dToggle.title = 'Painting the floor and wall finishes; the 3D view opens when they are done';
+  } else if (!app.classList.contains('show-3d')) {
+    view3dToggle.textContent = '◈ View 3D';
+    view3dToggle.title = 'Open the interactive 3D model';
+  }
+};
 
 // Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
 // immersive-ar is supported; no effect on the desktop app otherwise. MR renders

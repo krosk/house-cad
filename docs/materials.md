@@ -434,6 +434,36 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
   - not yet seen in the real app, on the phone or on the Quest browser (Hypothesis: the patched
     shader compiles there as it does in desktop Chrome).
 
+## Painting in a worker (View 3D)
+
+- **Why** (owner, 2026-10-03): once share links carried finishes (session 38), opening the owner's
+  link froze the page, and panning the 2D plan stalled and left smears. Painting the house's 7 textured
+  finishes on the page took about 5.1 s of blocking work (measured in Chrome on the Steam Deck):
+  Lucia 1.9 s, Monastère 1.8 s, terrazzo 0.6 s, Etruria 0.5 s.
+- **How:** View 3D asks `paintFinish(def)` (`src/ui/finishTextureWorker.js`), which has
+  `finishTextures.worker.js` paint the same canvases (`finishCanvases`) on OffscreenCanvas. They come
+  back as ImageBitmaps, are copied onto page canvases (so `flipY` and upload behave exactly as
+  before), and are wrapped by `finishTexturesFrom`.
+  - Meanwhile the finish shows its flat colour. The photo finish (Realistic) and the detail layer
+    attach once the texture is in.
+  - **Owner choice: "work in progress → done".** While textures are pending and the plan is shown,
+    ◈ View 3D is disabled and reads `3D: textures n/N…`. It opens when all are done. If 3D is
+    already open, it stays open.
+  - Without Worker or OffscreenCanvas, or if the worker fails, each finish is painted on the page,
+    one per task.
+  - AR (`mr.js`) still calls `finishTexture` directly.
+- **Proven** (Chrome on the Steam Deck, scratch dev server, 2026-10-03):
+  - all 7 finishes painted in 5.2 s with the main thread never blocked over 64 ms (it was 5.1 s
+    blocked);
+  - for 4 of them the worker's pixels equal the page's byte for byte;
+  - for Charme, mosaic, Lucia and terrazzo, the canvas `blur` filter rasterizes slightly differently
+    off the page: channel means within 0.3/255 and spreads within 0.4, worst pixel 28/255;
+  - a synthetic 7-finish link shows `3D: textures 0/7…` on open, then ◈ View 3D when done.
+- **Hypothesis:**
+  - the 3D view after the swap looks as before (not seen: the test tab was hidden);
+  - Safari on the iPhone 14 runs the module worker (Safari 15+) and OffscreenCanvas 2D (16.4+);
+  - whether the `blur` filter works there, in the worker or on the page, is unknown.
+
 ## Octagon + tozzetto products
 
 An `octagon` entry with a `design` draws OCT_CELLS × OCT_CELLS (4 × 4) octagons in `color` with a tozzetto
