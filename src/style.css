@@ -254,12 +254,28 @@ body {
   backdrop-filter: blur(4px);
 }
 .view3d-floor-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
   padding: 5px 7px 7px;
   color: var(--muted);
+  font: inherit;
   font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
+/* Collapsed (remembered per device): only the title and the shown floor stay. */
+#view3d-floor-current { display: none; margin-left: auto; color: var(--text); letter-spacing: 0; text-transform: none; }
+#view3d-floor-ctl.collapsed { width: auto; max-width: 176px; }
+#view3d-floor-ctl.collapsed .view3d-floor-title { padding-bottom: 5px; }
+#view3d-floor-ctl.collapsed .cx-caret { transform: rotate(-90deg); }
+#view3d-floor-ctl.collapsed #view3d-floor-current { display: inline; }
+#view3d-floor-ctl.collapsed > :not(.view3d-floor-title) { display: none; }
 #view3d-floor-list {
   display: flex;
   flex-direction: column;

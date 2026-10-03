@@ -212,7 +212,28 @@ function render3DFloorList() {
   for (const floor of [...project.floors].reverse()) {
     addButton(localizedFloorName(floor.name), floor.id, floor.elevation);
   }
+  const shown = project.floors.find((f) => f.id === selected3DFloorId);
+  view3dFloorCurrent.textContent = shown ? localizedFloorName(shown.name) : 'All';
 }
+
+// The View 3D floor panel collapses to its title (remembered per device), so it does not
+// cover the model on a small screen.
+const view3dFloorCurrent = document.getElementById('view3d-floor-current');
+(() => {
+  const panel = document.getElementById('view3d-floor-ctl');
+  const toggle = document.getElementById('view3d-floor-toggle');
+  const KEY = 'house-cad:view3d-floors-collapsed';
+  const apply = (collapsed) => {
+    panel.classList.toggle('collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+  };
+  try { apply(localStorage.getItem(KEY) === '1'); } catch { /* private mode */ }
+  toggle.addEventListener('click', () => {
+    const collapsed = !panel.classList.contains('collapsed');
+    apply(collapsed);
+    try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
+  });
+})();
 
 function setDesktop3D(visible) {
   app.classList.toggle('show-3d', visible);
