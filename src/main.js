@@ -129,6 +129,42 @@ view3dReflections.addEventListener('click', () => setDesktopReflections(!view.re
   setDesktopReflections(saved, false);
 }
 
+// Realistic (docs/realism.md): opt-in and remembered per device like Reflections; the
+// sun time is session-only (today's date, the slider sets the hour). Never project data.
+const REALISTIC_KEY = 'house-cad:view3d-realistic:v1';
+const view3dRealistic = document.getElementById('view3d-realistic');
+const view3dSun = document.getElementById('view3d-sun');
+const view3dSunTime = document.getElementById('view3d-sun-time');
+const view3dSunLabel = document.getElementById('view3d-sun-label');
+const view3dSkyStatus = document.getElementById('view3d-sky-status');
+view.onSkyStatus = (text) => { view3dSkyStatus.textContent = text; view3dSkyStatus.hidden = !text; };
+function setSunHour(hour) {
+  const date = new Date();
+  date.setHours(Math.floor(hour), Math.round((hour % 1) * 60), 0, 0);
+  view3dSunLabel.textContent = `☀ ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  view.setSunDate(date);
+}
+view3dSunTime.addEventListener('input', () => setSunHour(Number(view3dSunTime.value)));
+{
+  const now = new Date();
+  view3dSunTime.value = String(Math.min(22.5, Math.max(4, Math.round((now.getHours() + now.getMinutes() / 60) * 4) / 4)));
+  setSunHour(Number(view3dSunTime.value));
+}
+function setDesktopRealistic(enabled, remember = true) {
+  view.setRealisticEnabled(enabled);
+  view3dRealistic.setAttribute('aria-pressed', String(!!enabled));
+  view3dRealistic.textContent = enabled ? '◐ Realistic' : '◑ Realistic off';
+  view3dSun.hidden = !enabled;
+  if (!enabled) view.onSkyStatus('');
+  if (remember) { try { localStorage.setItem(REALISTIC_KEY, enabled ? '1' : '0'); } catch { /* private mode */ } }
+}
+view3dRealistic.addEventListener('click', () => setDesktopRealistic(!view.realisticEnabled));
+{
+  let saved = false;
+  try { saved = localStorage.getItem(REALISTIC_KEY) === '1'; } catch { /* private mode */ }
+  setDesktopRealistic(saved, false);
+}
+
 // POV controls: the Overview button (a tap in POV walks instead of leaving) and the
 // opt-in phone tilt look, offered on touch devices that report orientation.
 const view3dNav = document.getElementById('view3d-nav');

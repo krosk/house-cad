@@ -22,7 +22,7 @@ Where the result goes:
   "Windows"). Measure the profile faces on straight-on photos, inside and outside, scaled by a known
   part (the handle, about 160 mm).
 
-Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md`).
+Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md`). Images may be downloaded at runtime and cached, never committed (owner, 2026-10-03; `docs/realism.md`).
 
 ## 1. Rule out a manufacturer model first
 

@@ -163,7 +163,7 @@ floor at 0, centred, front +Z), so the AR 3D view and View 3D treat it like a do
 await the catalog first so a procedural key never reaches the proxy. Entries are added to
 `index.json` by hand (the fetch tool only registers rotera models).
 
-**Storage (owner decision, 2026-09-26): code only, no GLB.** The builder plus the catalog entry is the
+**Storage (owner decision, 2026-09-26): code only, no GLB.** (Amended 2026-10-03: images and photo textures may be downloaded at runtime and cached, never committed; `docs/realism.md`.) The builder plus the catalog entry is the
 stored form; an exported GLB would be a second copy that drifts. (Measured for reference: the bed
 exports to a 204 KB uncompressed GLB, 14 meshes, 1,624 triangles.) A model that can't be expressed
 as code (hand-modelled, photo-to-3D) would go in `public/furniture/models/<key>.glb`, which is

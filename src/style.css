@@ -246,7 +246,8 @@ body {
   cursor: pointer;
 }
 #view3d-lighting,
-#view3d-reflections {
+#view3d-reflections,
+#view3d-realistic {
   width: 100%;
   margin-top: 5px;
   padding: 7px 8px;
@@ -260,12 +261,25 @@ body {
   cursor: pointer;
 }
 #view3d-lighting[aria-pressed="true"],
-#view3d-reflections[aria-pressed="true"] {
+#view3d-reflections[aria-pressed="true"],
+#view3d-realistic[aria-pressed="true"] {
   color: #0b1220;
   background: #ffd166;
   border-color: #ffd166;
   font-weight: 600;
 }
+/* Realistic sun time (today; the hour only). */
+.view3d-sun {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.view3d-sun[hidden] { display: none; }
+.view3d-sun input { width: 100%; accent-color: #ffd166; }
+.view3d-sky-status { margin-top: 4px; color: var(--muted); font-size: 11px; }
 #view3d-floor-list button:hover { background: #2c313b; }
 #view3d-floor-list button.active {
   color: #0b1220;

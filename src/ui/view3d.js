@@ -13,6 +13,11 @@ import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { finishTexture, finishBumpTexture, applyFinishDetail } from './finishTextures.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { sunPosition, sunDirection, loadSky } from './realism.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -180,7 +185,14 @@ export class View3D {
     this.sun.shadow.camera.top = s;
     this.sun.shadow.camera.bottom = -s;
     this.scene.add(this.sun);
+    this.scene.add(this.sun.target); // aimed at the house in Realistic (_applySun)
     this.lightingEnabled = false;
+    // Realistic (docs/realism.md): real sun + photographed sky + ambient occlusion.
+    this.realisticEnabled = false;
+    this.sunDate = new Date();
+    this.sky = null; // { texture, envTexture, sunAngle } once downloaded
+    this.composer = null;
+    this.onSkyStatus = null; // (text) → main.js shows download/failure state
 
     // Ground grid + subtle floor to catch shadows. Kept as fields so the MR
     // module can hide them during passthrough.
@@ -378,7 +390,7 @@ export class View3D {
       for (const [partGeometry, material, role] of parts) {
         if (!partGeometry) continue;
         const mesh = new THREE.Mesh(partGeometry, material);
-        mesh.castShadow = role !== 'floor';
+        mesh.castShadow = role !== 'floor' && role !== 'windows'; // glass lets the sun through
         mesh.receiveShadow = true;
         mesh.position.y = elevation || 0;
         mesh.userData.floorId = floorId || null;
@@ -473,6 +485,7 @@ export class View3D {
     this.markerLights.visible = !this.hideMesh;
     this.furnitureModels.visible = !this.hideMesh;
     this._updateLightShadows();
+    if (this.realisticEnabled) this._applySun();
   }
 
   _clearFurniture() {
@@ -705,12 +718,144 @@ export class View3D {
   // marker point lights and every shadow render pass. Fixture meshes remain visible.
   setLightingEnabled(enabled) {
     this.lightingEnabled = !!enabled;
-    this.renderer.shadowMap.enabled = this.lightingEnabled;
-    this.sun.visible = true;
-    this.sun.castShadow = this.lightingEnabled;
-    this.floor.receiveShadow = this.lightingEnabled;
+    this._applyShadowState();
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
+  }
+
+  _applyShadowState() {
+    const shadows = this.lightingEnabled || this.realisticEnabled;
+    this.renderer.shadowMap.enabled = shadows;
+    this.sun.visible = true;
+    this.sun.castShadow = shadows;
+    this.floor.receiveShadow = shadows;
+    this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  // Realistic (docs/realism.md, desktop only): the sun at `sunDate` for the site, with
+  // shadows; a downloaded sky (Poly Haven, CC0, Cache Storage) for ambient light,
+  // reflections and the background; ambient occlusion (GTAO) through a composer.
+  // The XR loop never uses the composer, and mr.js stashes background/environment.
+  setRealisticEnabled(enabled) {
+    this.realisticEnabled = !!enabled;
+    this.renderer.setPixelRatio(this.realisticEnabled ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio);
+    this.grid.visible = !this.realisticEnabled;
+    // Realistic keeps a faint hemisphere as the warm bounce off wooden floors.
+    this.hemi.color.setHex(this.realisticEnabled ? 0xfff6ec : 0xffffff);
+    this.hemi.groundColor.setHex(this.realisticEnabled ? 0x9a7652 : 0x445566);
+    this.renderer.toneMappingExposure = this.realisticEnabled ? 1.0 : 0.9;
+    if (this.realisticEnabled) {
+      this._ensureComposer();
+      if (!this.sky && !this._skyLoading) {
+        this._skyLoading = true;
+        this.onSkyStatus?.('downloading sky…');
+        loadSky().then((sky) => {
+          const pmrem = new THREE.PMREMGenerator(this.renderer);
+          this.sky = { ...sky, envTexture: pmrem.fromEquirectangular(sky.lightTexture).texture };
+          sky.lightTexture.dispose();
+          pmrem.dispose();
+          this.onSkyStatus?.('');
+          this._applyEnvironment();
+          this._applySun();
+        }).catch((error) => {
+          console.warn('sky download failed', error);
+          this.onSkyStatus?.('sky download failed: generated room light');
+        }).finally(() => { this._skyLoading = false; });
+      }
+    } else {
+      this.sun.position.set(12, 20, 8);
+      this.sun.target.position.set(0, 0, 0);
+      this.sun.intensity = 1.6;
+      this.sun.color.set(0xffffff);
+      this.sun.shadow.camera.left = -30; this.sun.shadow.camera.right = 30;
+      this.sun.shadow.camera.top = 30; this.sun.shadow.camera.bottom = -30;
+      this.sun.shadow.camera.near = 0.5; this.sun.shadow.camera.far = 500;
+      this.sun.shadow.camera.updateProjectionMatrix();
+      this.sun.shadow.bias = 0; this.sun.shadow.normalBias = 0;
+    }
+    this._applyShadowState();
+    this._applyEnvironment();
+    if (this.realisticEnabled) this._applySun();
+    for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+    this._resize();
+  }
+
+  setSunDate(date) {
+    this.sunDate = date;
+    if (this.realisticEnabled) this._applySun();
+  }
+
+  _ensureComposer() {
+    if (this.composer) return;
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(this.renderer, target);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const { clientWidth: w, clientHeight: h } = this.container;
+    this.gtaoPass = new GTAOPass(this.scene, this.camera, w, h);
+    this.gtaoPass.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1, thickness: 1, scale: 1, samples: 16 });
+    this.gtaoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+    this.composer.addPass(this.gtaoPass);
+    this.composer.addPass(new OutputPass());
+  }
+
+  // The sky when Realistic has it (the generated room while it downloads or if it
+  // fails), else the opt-in generated room (Reflections), else none.
+  _applyEnvironment() {
+    if (this.renderer.xr.isPresenting) return; // mr.js owns these during a session
+    this._plainBackground ??= this.scene.background?.isColor ? this.scene.background : new THREE.Color(0x1a1d23);
+    if (this.realisticEnabled && this.sky) {
+      this.scene.environment = this.sky.envTexture;
+      this.scene.background = this.sky.texture;
+      this._applySun();
+      return;
+    }
+    const room = this.realisticEnabled || this.reflectionsEnabled;
+    this.scene.environment = room ? this._roomEnvironment() : null;
+    this.scene.background = this._plainBackground;
+    this.scene.environmentIntensity = 0.6;
+    this.scene.environmentRotation.set(0, 0, 0);
+    this.hemi.intensity = this.realisticEnabled ? 0.45 : this.reflectionsEnabled ? 0.35 : 0.9;
+  }
+
+  _roomEnvironment() {
+    if (!this._envTexture) {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      this._envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    return this._envTexture;
+  }
+
+  // Sun direction, colour and strength for `sunDate`; the shadow camera is fitted to the
+  // visible house so a 2048 map keeps about 1 cm texels on a 20 m house.
+  _applySun() {
+    const pos = sunPosition(this.sunDate);
+    const dir = sunDirection(pos);
+    const box = this._visibleBox() || new THREE.Box3(new THREE.Vector3(-5, 0, -5), new THREE.Vector3(5, 3, 5));
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(4, box.getSize(new THREE.Vector3()).length() / 2 + 1);
+    this.sun.position.copy(center).addScaledVector(dir, radius * 2);
+    this.sun.target.position.copy(center);
+    const cam = this.sun.shadow.camera;
+    cam.left = -radius; cam.right = radius; cam.top = radius; cam.bottom = -radius;
+    cam.near = 0.1; cam.far = radius * 4;
+    cam.updateProjectionMatrix();
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.03;
+    const up = Math.sin(pos.elevation);
+    const day = THREE.MathUtils.smoothstep(up, -0.05, 0.25); // dusk → full day
+    this.sun.intensity = 3.2 * THREE.MathUtils.smoothstep(up, 0, 0.15);
+    this.sun.color.setHex(0xffa860).lerp(new THREE.Color(0xfff3e2), THREE.MathUtils.smoothstep(up, 0.05, 0.5));
+    if (this.sky && !this.renderer.xr.isPresenting) {
+      const yaw = Math.atan2(dir.x, dir.z) - this.sky.sunAngle; // turn the sky's bright side to the sun
+      this.scene.environmentRotation.set(0, yaw, 0);
+      this.scene.backgroundRotation.set(0, yaw, 0);
+      this.scene.environmentIntensity = 0.08 + 0.82 * day;
+      this.hemi.intensity = 0.05 + 0.4 * day;
+      this.scene.backgroundIntensity = 0.06 + 0.94 * day;
+    }
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   // Reflections (opt-in per device: some devices struggle): an environment map from
@@ -719,14 +864,7 @@ export class View3D {
   // while it is on. MR clears scene.environment for its session (mr.js).
   setReflectionsEnabled(enabled) {
     this.reflectionsEnabled = !!enabled;
-    if (this.reflectionsEnabled && !this._envTexture) {
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      this._envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-      pmrem.dispose();
-    }
-    this.scene.environment = this.reflectionsEnabled ? this._envTexture : null;
-    this.scene.environmentIntensity = 0.6;
-    this.hemi.intensity = this.reflectionsEnabled ? 0.35 : 0.9;
+    this._applyEnvironment();
   }
 
   // One cached material per catalog entry (keyed by its content, so an edited custom
@@ -757,7 +895,7 @@ export class View3D {
   _meshVisible(mesh) {
     const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
     const role = mesh.userData.architecturalRole;
-    if (role === 'outlines' && this.lightingEnabled) return false;
+    if (role === 'outlines' && (this.lightingEnabled || this.realisticEnabled)) return false;
     return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');
   }
 
@@ -1063,6 +1201,7 @@ export class View3D {
     this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._updateLightShadows();
+    if (this.realisticEnabled) this._applySun(); // refit the sun's shadow to the shown floors
     this.onNavigationChange?.('overview');
   }
 
@@ -1073,6 +1212,10 @@ export class View3D {
     if (!this.renderer.xr.isPresenting && this.navigationMode === 'pov') this.camera.fov = this._fovFor('pov');
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    if (this.composer) {
+      this.composer.setPixelRatio(this.renderer.getPixelRatio());
+      this.composer.setSize(w, h);
+    }
     // Phone rotated while in the overview: re-frame so the turn rule re-applies.
     if (!this.renderer.xr.isPresenting && this.desktopActive && this.navigationMode === 'overview'
         && this.overviewPortrait != null && this.overviewPortrait !== (this.camera.aspect < 1)) {
@@ -1104,6 +1247,7 @@ export class View3D {
       t.js += t1 - t0; t.gl += performance.now() - t1; t.frames++;
       return;
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.realisticEnabled && this.composer && !this.renderer.xr.isPresenting) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 }
