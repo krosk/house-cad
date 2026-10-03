@@ -43,10 +43,16 @@ Input: `$ARGUMENTS` (a product URL, article number(s), or name). If empty, ask t
      (mean and spread), not only by eye.
 
    Ask the owner to compare and correct. Repeat until they are happy.
-6. **Record** (step 6): build, document the entry in `docs/furniture.md` or `docs/materials.md`
+6. **Photo finish (optional, surface finishes)** (step 7): when the retailer has a straight top-down
+   photo and the owner wants the real look in View 3D Realistic, add a `PHOTOS` entry in
+   `src/ui/photoFinishes.js`. Check CORS with curl, measure with `tools/photo-measure.mjs`
+   (rows / joints / bbox), confirm on crops, cut the photo into pieces laid by the shader (never tile
+   it), keep joints in the texture, tone toward the accepted procedural colour. Runtime download only.
+7. **Record** (step 6): build, document the entry in `docs/furniture.md` or `docs/materials.md`
    (sources with image ids, estimates), add a `docs/ar-qa-checklist.md` item. Label every claim Proven
    or Hypothesis (CLAUDE.md). Commit/push only when the owner asks; never stage the owner's house JSON.
 
-Store code only, never a GLB or texture image (owner decision). Keep scratch files, photos and preview
+Store code only, never a GLB or texture image in the repo (owner decision); a photo finish is
+downloaded at runtime (step 7 of the doc). Keep scratch files, photos and preview
 servers in the scratchpad. When done, stop the preview servers **by port** (`ss -ltnp | grep :5190`,
 then `kill <pid>`) and close the browser tabs.

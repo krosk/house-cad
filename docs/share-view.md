@@ -39,7 +39,9 @@ turn]` (trailing defaults dropped), indexes into that floor's rects and a top-le
 owner's own products used by a finish ride in `cm`. Added 2026-10-03 after the owner's link showed no
 Héméra windows (Proven in Node on the owner's file: 28 finishes round-trip identical, 8 windows and 6
 doors restored, link 1 835 → 2 205 chars without markers); older links decode with none. Not
-carried: constraints, the conduit/wire network, control links, circuits. Any of these could be
+carried: constraints, the conduit/wire network, control links, circuits. To see exactly what a given house loses,
+run `node tools/check-share-link.mjs <house.json>` (Node only: it builds the link with the app's code,
+decodes it, and lists every differing field plus the link length with and without markers). Any of these could be
 added as an opt-in layer.
 
 **Compression facts** (for future size work): after gzip, only high-entropy bytes matter. Float

@@ -1019,6 +1019,10 @@ teleport reticle; no last-active routing remains.
   rebuilds overlays manually via `buildPlan()`/`applyPlanMatrix()`, so any model-changing action
   (incl. LOAD, height edits, floor switch) must call them itself. The sole lightweight subscription
   only invalidates/precomputes the clipboard share-link cache so trigger activation is preserved.
+  A refused copy names its cause in the flash (owner, 2026-10-03, after a bare "URL COPY FAILED"):
+  `not ready, retry` (still compressing after an edit), `build: <error>`, `no clipboard`, or the
+  browser's error with `a0/a1` (user activation), `f0/f1` (document focus) and the link size. Any
+  new clipboard action should report the same way.
 - **The solver can produce negative w/h** unless normalized. `edgeCoord` reads raw x/w while
   every picker/highlight reads normalized min/max; the solver write-back normalizes
   (`src/core/constraints.js`). Don't reintroduce a raw negative-size path.

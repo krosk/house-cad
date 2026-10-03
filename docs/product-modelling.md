@@ -128,6 +128,12 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
   `localStorage['house-cad:autosave:v1']` (add zones/finishes/furniture), reload, open View 3D.
 - **Owner review per iteration:** show front + side renders beside the photo views. The bed's first
   version had half-width cushions; the owner caught it by comparing with the front photos.
+- A built app served from `dist/` registers a service worker: before reloading a new local build,
+  unregister it and delete the non-`house-cad:` caches, or the old build keeps loading (the toolbar
+  says UPDATE AVAILABLE).
+- When Chrome reports the automation tab as `hidden`, requestAnimationFrame stops: a frame-rate count
+  reads near 0 and a screenshot can time out after 30 s. Drive the page with `javascript_tool`
+  (click the View 3D button there) and ask the owner for frame rates on their devices.
 - Stop the servers by port: `ss -ltnp | grep :5190` gives the pid, then `kill <pid>`. A plain
   `pkill -f <pattern>` matches its own shell and kills it, and a `pgrep -f` on the scratch folder name
   misses a server started from inside that folder (its command line is just `vite.js --config …`).
@@ -141,8 +147,8 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
   - each photo and document by its retailer id (Leroy Merlin media id, Lapeyre image ref, IKEA id,
     PDF media id), with what was read from it;
   - for each dimension constant: its source, or "estimate" and from what.
-  No stored images (the code-only rule stands): ids and URLs, not copies. The docs entry summarises
-  and points to the code.
+  No stored images: ids and URLs, not copies (a photo may be downloaded at runtime, step 7). The docs
+  entry summarises and points to the code.
 
 - Report numbers you measured: bounding box (`Box3.setFromObject`), and if asked, GLB size via
   `GLTFExporter.parseAsync(obj, {binary: true})` (the bed: 204 KB, 14 meshes, 1,624 triangles).
@@ -150,3 +156,41 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
   on-device item to `docs/ar-qa-checklist.md`.
 - Photo estimates stay Hypothesis until the owner measures the real object (tape measure beats any
   photo).
+
+## 7. Optional: a photo finish for View 3D Realistic (surface finishes)
+
+Owner, 2026-10-03: in Realistic mode a floor/wall finish may use the retailer's own photo,
+**downloaded at runtime and cached, never committed**; the procedural design stays the stored form
+and is what normal View 3D, AR and offline use. Done for the Beaulieu oak charme (planks) and
+Monastère (stepped tiles): `src/ui/photoFinishes.js`, `docs/realism.md` "Photo finishes".
+
+1. **The right photo:** a straight, evenly lit top-down shot: of the laid floor (planks) or of one
+   tile on white (tiles). Room renders are perspective: references only.
+2. **Browser access:** `curl -sI -H "Origin: https://krosk.github.io" <image url>` must answer
+   `access-control-allow-origin: *` (`media.adeo.com` and Poly Haven do). Otherwise it needs the
+   Cloudflare proxy (`tools/ikea-proxy/`), not built for images.
+3. **Measure** the full-size image, copied into the scratchpad, with `tools/photo-measure.mjs`
+   (ffmpeg → raw grey → Node, no image library):
+   - `rows` gives the grooves; drop false rows (a dark knot) and check the pitch against the
+     published width;
+   - `joints --grooves …` gives butt-joint candidates per row; joints are faint, so read the expected
+     ones off a downscaled copy first and keep the candidates near them;
+   - `bbox` gives a tile's box on white.
+   Confirm every number on a crop (`ffmpeg -vf crop=w:h:x:y`, then read the image).
+4. **Sources in the code:** the `PHOTOS` entry carries a `// Sources:` block with the product refs,
+   each photo's media id, and every measured number.
+5. **Never tile the photo.** A tiled 2 m photo repeats every 2 m, and its wrap seams line up in a
+   staircase (owner asked; seen in a screenshot). Cut it into its pieces (one whole plank per row; each
+   tile with its own edge) in an atlas, and lay the pieces in the shader from the plan UVs with a
+   random pick and turn per piece (`patchPhotoMaterial`). Colour and relief read the same piece with
+   `textureGrad`, so mip levels stay continuous across piece edges.
+6. **Joints and grooves come from the texture, never from a shader branch:** a joint drawn by the
+   shader aliased into dashes at a distance (seen in a screenshot). Cut planks groove to groove (half
+   a groove on each long edge, so a turned plank still meets with a full groove); give each tile cell
+   half a joint of grout all round.
+7. **Tone:** compare the photo's mean RGB with the procedural design the owner accepted and tone per
+   channel toward it (the Monastère photos read grey under the sky light). Divide out a soft lighting
+   falloff (least-squares quadratic) when the photo has one.
+8. **Check** in a scratch browser on the demo house with the finish injected (step 5): overview and
+   POV, then record in `docs/realism.md` with Proven / Hypothesis, including the variety limit (how
+   many distinct pieces the photo gives).
