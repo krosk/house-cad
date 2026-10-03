@@ -232,21 +232,59 @@ function setDesktop3D(visible) {
     });
   }
 }
-view3dToggle.addEventListener('click', () => setDesktop3D(!app.classList.contains('show-3d')));
-// Every texture is prepared in the background (src/ui/textureWorker.js). Until all are in,
-// the plan stays usable and View 3D waits with a count (owner, 2026-10-03: "work in progress
-// → done"), so the 3D view never opens on half-painted floors. Already open (a finish
-// added while in 3D), it stays open and the new finish shows its flat colour until ready.
-onTextureProgress(({ total, done }) => {
-  const waiting = done < total && !app.classList.contains('show-3d');
-  view3dToggle.disabled = waiting;
-  if (waiting) {
-    view3dToggle.textContent = `◈ 3D: textures ${done}/${total}…`;
-    view3dToggle.title = 'Preparing textures in the background; the 3D view opens when they are done';
-  } else if (!app.classList.contains('show-3d')) {
-    view3dToggle.textContent = '◈ View 3D';
-    view3dToggle.title = 'Open the interactive 3D model';
+// The 3D model and its textures are built only for the 3D view (owner, 2026-10-03:
+// texture loading disturbed the plan view): nothing 3D runs while the plan is shown.
+// ◈ View 3D builds the model, waits behind a loading wheel until every texture is
+// prepared (src/ui/textureWorker.js), then opens; pressing it again cancels.
+const view3dLoading = document.getElementById('view3d-loading');
+const view3dLoadingText = document.getElementById('view3d-loading-text');
+let opening3D = false;
+let textureProgress = { total: 0, done: 0, onPage: '' };
+let progressWaiter = null;
+onTextureProgress((p) => {
+  textureProgress = p;
+  if (opening3D) showLoading();
+  if (p.done >= p.total) progressWaiter?.();
+});
+function showLoading() {
+  const { total, done, onPage } = textureProgress;
+  view3dLoading.hidden = false;
+  // "on page": the worker is unavailable, so preparing blocks the page (diagnostic).
+  view3dLoadingText.textContent = total > done
+    ? `Preparing 3D · textures ${done}/${total}${onPage ? ' · on page' : ''}`
+    : 'Preparing 3D…';
+  view3dLoadingText.title = onPage ? `Textures prepared on the page: ${onPage}` : '';
+}
+async function open3D() {
+  opening3D = true;
+  view3dToggle.textContent = '✕ Cancel 3D';
+  view3dToggle.title = 'Stop opening the 3D view (textures keep loading)';
+  showLoading();
+  await allowWorkLightPaint(); // paint the wheel before the model build
+  if (!opening3D) return;
+  if (view3dDirty) {
+    try { rebuildView(); } catch (error) { console.error('3D build failed:', error); }
   }
+  if (textureProgress.done < textureProgress.total) {
+    await new Promise((resolve) => { progressWaiter = resolve; });
+    progressWaiter = null;
+  }
+  if (!opening3D) return;
+  opening3D = false;
+  view3dLoading.hidden = true;
+  setDesktop3D(true);
+}
+function cancel3D() {
+  opening3D = false;
+  progressWaiter?.();
+  view3dLoading.hidden = true;
+  view3dToggle.textContent = '◈ View 3D';
+  view3dToggle.title = 'Open the interactive 3D model';
+}
+view3dToggle.addEventListener('click', () => {
+  if (opening3D) cancel3D();
+  else if (app.classList.contains('show-3d')) setDesktop3D(false);
+  else open3D();
 });
 
 // Mixed-reality entry point (Quest 3). Adds an "Enter MR" button only where
@@ -257,10 +295,10 @@ setupMR(view, project, (rectangles = project.rectangles) => computeFootprint(rec
 // Rebuild the 3D model whenever the plan changes. Each floor extrudes
 // independently and stacks at its elevation; export merges the whole stack.
 let firstBuild = true;
-let currentGeometry = null; // merged mesh of all floors, kept for export
-let desktopGeometryDirty = false;
+let view3dDirty = true; // the 3D view's model is stale (built only while shown or opening)
 let rebuildQueued = false;
-function rebuild() {
+function rebuildView() {
+  view3dDirty = false;
   const floorGeos = project.floors.map((f, index) => {
     const doorProducts = doorProductPlacements(f, (id) => materialById(project, id));
     const windowProducts = windowProductPlacements(f, (id) => materialById(project, id));
@@ -294,26 +332,32 @@ function rebuild() {
   view.setGeometry(floorGeos);
   view.setFloorFilter(selected3DFloorId);
   render3DFloorList();
-  // Mesh export deliberately remains on the legacy massing pipeline for now;
-  // architectural viewing is presentation-only until its interpretation has
-  // been walked and accepted.
-  const exportGeos = project.floors.map((f) => ({
-    geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
-    elevation: f.elevation,
-  }));
-  currentGeometry = mergeFloorGeometries(exportGeos);
-  exportGeos.forEach(({ geometry }) => geometry?.dispose());
   if (firstBuild && floorGeos.some((g) => g.floorGeometry || g.wallGeometry)) {
     view.frameModel();
     firstBuild = false;
   }
 }
+// Mesh export deliberately remains on the legacy massing pipeline for now;
+// architectural viewing is presentation-only until its interpretation has
+// been walked and accepted. Built when an export asks for it.
+function exportGeometry() {
+  const exportGeos = project.floors.map((f) => ({
+    geometry: extrudeFootprint(computeFootprint(f.rectangles), f.height),
+    elevation: f.elevation,
+  }));
+  const merged = mergeFloorGeometries(exportGeos);
+  exportGeos.forEach(({ geometry }) => geometry?.dispose());
+  return merged;
+}
+// While the 3D view is shown, a model change rebuilds it; otherwise it is only marked
+// stale and ◈ View 3D rebuilds it on opening.
 function scheduleRebuild() {
+  if (!app.classList.contains('show-3d')) { view3dDirty = true; return; }
   if (rebuildQueued) return;
   rebuildQueued = true;
   withWork('UPDATING MODEL', () => {
     rebuildQueued = false;
-    rebuild(); // reads the latest model, coalescing every change before this turn
+    rebuildView(); // reads the latest model, coalescing every change before this turn
   }).catch((error) => {
     rebuildQueued = false;
     console.error('Model rebuild failed:', error);
@@ -334,15 +378,13 @@ project.onChange(() => {
   // architectural model and legacy export mesh on every on-headset edit causes
   // avoidable main-thread stalls, most visibly when dropping a marker.
   if (view.renderer.xr.isPresenting) {
-    desktopGeometryDirty = true;
+    view3dDirty = true;
     return;
   }
   scheduleRebuild();
 });
 view.renderer.xr.addEventListener('sessionend', () => {
-  if (!desktopGeometryDirty) return;
-  desktopGeometryDirty = false;
-  scheduleRebuild();
+  if (view3dDirty) scheduleRebuild();
 });
 
 // ---- toolbar wiring ----
@@ -815,21 +857,22 @@ fileInput.addEventListener('change', async () => {
   document.addEventListener('click', close); // click-outside dismisses
 
   const EXPORTERS = {
-    stl: () => exportSTL(currentGeometry, 'house.stl'),
-    obj: () => exportOBJ(currentGeometry, 'house.obj'),
-    glb: () => exportGLTF(currentGeometry, 'house.glb'),
+    stl: (geometry) => exportSTL(geometry, 'house.stl'),
+    obj: (geometry) => exportOBJ(geometry, 'house.obj'),
+    glb: (geometry) => exportGLTF(geometry, 'house.glb'),
   };
 
   pop.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', async () => {
       close();
-      if (!currentGeometry) {
+      const geometry = exportGeometry();
+      if (!geometry) {
         sketch.onStatus?.('Nothing to export — the model is empty.');
         return;
       }
       const fmt = b.dataset.fmt;
       try {
-        await EXPORTERS[fmt]();
+        await EXPORTERS[fmt](geometry);
         sketch.onStatus?.(`Exported house.${fmt}`);
       } catch (err) {
         alert(`Export failed:\n${err.message}`);

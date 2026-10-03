@@ -464,10 +464,27 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
   - **Finishes:** a finish shows its flat colour until its texture is in, then the detail layer
     and, in Realistic, the photo attach. AR's finish material does the same, and the AR material
     card waits for the texture.
-- **Owner choice: "work in progress → done".**
-  - `onTextureProgress` counts every job. While any is pending and the plan is shown, ◈ View 3D is
-    disabled and reads `3D: textures n/N…`; it opens when all are done.
-  - If 3D is already open, it stays open.
+- **Owner decision (2026-10-03): the plan view prepares nothing 3D.**
+  - Earlier, the 3D model was rebuilt on every change even in plan view, and its textures were
+    prepared there. The owner saw the texture count rise while panning did nothing; each pan made
+    the counter jump.
+  - Now `main.js` builds the 3D model only while the 3D view is shown. In plan view a change only
+    marks it stale (`view3dDirty`). The STL/OBJ/GLB export mesh is built when an export asks for it.
+  - View 3D defers its default wood and plaster (`paintedTexture(…, { deferred: true })`), its
+    lighting environment, the ambient-occlusion buffers and the Realistic sky to its first model
+    build (`_built`).
+  - **◈ View 3D** shows a loading wheel over the plan with `Preparing 3D · textures n/N`. It builds
+    the model, waits until `onTextureProgress` reports every job done, then opens. The button reads
+    `✕ Cancel 3D` meanwhile; pressing it stays in plan view and the textures keep loading.
+  - `· on page` beside the count means the worker is unavailable, and its tooltip gives the
+    reason. This is a diagnostic, because jobs on the page block it.
+  - When 3D is already open, a change rebuilds it as before, and new textures show their flat
+    colour until ready.
+  - **Proven** (Chrome on the Steam Deck, synthetic house with the owner's ingredients, Realistic
+    on): 3 s in plan view fetched no sky or photo and never showed UPDATING MODEL. View 3D showed
+    the wheel counting to 22/23, then opened with every finish drawn: Charme and Monastère photos,
+    Etruria, mosaic, terrazzo.
+  - **Hypothesis:** on the owner's device the plan pans freely now, whatever the worker path.
 - **Fallback:** without Worker or OffscreenCanvas, or if the worker fails, each job runs on the
   page, one per task. A finish that fails inside the worker alone is repainted on the page. A
   download failure rejects as before.

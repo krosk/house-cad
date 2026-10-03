@@ -51,6 +51,40 @@ body {
   pointer-events: none;
 }
 #work-indicator[hidden] { display: none; }
+/* ◈ View 3D loading: a wheel and the texture count over the plan while the 3D model and
+   its textures are prepared (main.js open3D). The wheel turns on the compositor
+   (transform animation), so it keeps turning even if the page is busy. */
+#view3d-loading {
+  position: fixed;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  color: #e5e7eb;
+  background: rgba(15, 18, 24, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  font-size: 13px;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+#view3d-loading[hidden] { display: none; }
+.view3d-wheel {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.3);
+  border-top-color: #60a5fa;
+  animation: view3d-spin 0.9s linear infinite;
+  will-change: transform;
+}
+@keyframes view3d-spin { to { transform: rotate(360deg); } }
 .work-light {
   width: 9px;
   height: 9px;

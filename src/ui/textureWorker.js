@@ -13,6 +13,13 @@ import { setTexturePainter } from './paintedTexture.js';
 
 let worker = null;
 let workerBroken = typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined';
+// Why the page paints instead of the worker (shown with the View 3D counter), or ''.
+let fallbackReason = workerBroken
+  ? (typeof Worker === 'undefined' ? 'no Worker' : 'no OffscreenCanvas') : '';
+// Jobs the page ran because the worker could not, and the worker's last error.
+let pageJobs = 0;
+let lastJobError = '';
+
 const pending = new Map(); // id → { job, resolve, reject }
 let nextId = 0;
 
@@ -57,6 +64,7 @@ function unpack(value, depth = 0) {
 function fallBack(reason) {
   console.warn('texture worker unavailable, preparing textures on the page:', reason);
   workerBroken = true;
+  fallbackReason = String(reason || 'worker error').slice(0, 60);
   worker?.terminate();
   worker = null;
   for (const [id, { job, resolve, reject }] of pending) {
@@ -78,9 +86,11 @@ function getWorker() {
     if (!entry) return;
     pending.delete(data.id);
     if (!data.error) { entry.resolve(unpack(data.result)); return; }
-    if (entry.job.kind === 'finish') {
-      // A canvas feature missing in this worker: paint that finish on the page.
-      console.warn('texture worker failed', entry.job.m?.id, data.error);
+    if (entry.job.kind === 'finish' || entry.job.kind === 'paint') {
+      // A canvas feature missing in this worker: paint that one on the page.
+      console.warn('texture worker failed', entry.job.m?.id || entry.job.name, data.error);
+      pageJobs += 1;
+      lastJobError = String(data.error).slice(0, 60);
       runOnPage(entry.job).then(entry.resolve, entry.reject);
     } else {
       entry.reject(new Error(data.error)); // a download failure is the same on the page
@@ -90,22 +100,25 @@ function getWorker() {
   return worker;
 }
 
-// { total, done } of every job so far; main.js holds View 3D until done === total.
+// { total, done, onPage } of every job so far (onPage: why jobs run on the page, or '');
+// main.js holds View 3D until done === total and shows onPage beside the count.
 const progress = { total: 0, done: 0 };
 const progressListeners = new Set();
 export function onTextureProgress(fn) {
   progressListeners.add(fn);
-  fn({ ...progress });
+  fn({ ...progress, onPage: onPage() });
 }
+const onPage = () => fallbackReason || (pageJobs ? `${pageJobs} job(s): ${lastJobError}` : '');
 function step(added, done) {
   progress.total += added;
   progress.done += done;
-  for (const fn of progressListeners) fn({ ...progress });
+  for (const fn of progressListeners) fn({ ...progress, onPage: onPage() });
 }
 
 function run(job) {
   step(1, 0);
   const w = getWorker();
+  if (!w) pageJobs += 1;
   const result = w ? new Promise((resolve, reject) => {
     const id = ++nextId;
     pending.set(id, { job, resolve, reject });

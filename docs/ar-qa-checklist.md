@@ -436,10 +436,10 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
 
 ## Desktop: textures prepared in a worker  ⬜ NEW (2026-10-03) — Chrome-measured, not seen on a device
-- [ ] Open a share link with finishes: the plan pans smoothly at once, with no smears; ◈ View 3D reads `3D: textures n/N…`, then turns enabled.
+- [ ] Open a share link with finishes (Realistic on): the plan pans smoothly, no counter, no UPDATING MODEL while in plan view.
+- [ ] ◈ View 3D: a wheel with `Preparing 3D · textures n/N`, then the 3D view opens; `✕ Cancel 3D` while waiting returns to a working plan. Note any `· on page`.
 - [ ] Open 3D: every finish is textured (no flat colour left), with the Monastère/Lucia grain up close; Realistic still swaps in the Charme/Monastère photos.
 - [ ] iPhone 14: the same (the worker path), or the page fallback with no error.
-- [ ] With Realistic on, open the link: the UI stays responsive while the count runs (photo floors and sky included).
 - [ ] Furniture (radiators, shower tray, piano, bed) and door leaves show their pictures, not a flat colour; the AR 3D view's finishes and window exterior too.
 
 ## Cross-cutting / HUD / inputs  ⬜ mostly not explicitly checked

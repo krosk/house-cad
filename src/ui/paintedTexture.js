@@ -14,7 +14,7 @@ export const setTexturePainter = (fn) => { painter = fn; };
 const pictures = new Map();
 const textures = new Map();
 
-export function paintedTexture(name, args, w, h = w, { color = true, wrap = THREE.RepeatWrapping, wrapT = wrap, placeholder = 0xcccccc, variant = '' } = {}) {
+export function paintedTexture(name, args, w, h = w, { color = true, wrap = THREE.RepeatWrapping, wrapT = wrap, placeholder = 0xcccccc, variant = '', deferred = false } = {}) {
   const pictureKey = `${name}|${JSON.stringify(args ?? null)}|${w}x${h}`;
   const key = `${pictureKey}|${color}|${wrap}|${wrapT}|${variant}`;
   if (textures.has(key)) return textures.get(key);
@@ -28,11 +28,24 @@ export function paintedTexture(name, args, w, h = w, { color = true, wrap = THRE
   texture.wrapT = wrapT;
   if (color) texture.colorSpace = THREE.SRGBColorSpace;
   textures.set(key, texture);
-  if (!pictures.has(pictureKey)) pictures.set(pictureKey, painter({ name, args, w, h }));
-  pictures.get(pictureKey).then((canvas) => {
-    texture.dispose(); // the GPU copy was allocated at 1 × 1: reallocate at the real size
-    texture.image = canvas;
-    texture.needsUpdate = true;
-  }).catch((error) => console.warn('texture paint failed', name, error));
+  const start = () => {
+    if (!pictures.has(pictureKey)) pictures.set(pictureKey, painter({ name, args, w, h }));
+    pictures.get(pictureKey).then((canvas) => {
+      texture.dispose(); // the GPU copy was allocated at 1 × 1: reallocate at the real size
+      texture.image = canvas;
+      texture.needsUpdate = true;
+    }).catch((error) => console.warn('texture paint failed', name, error));
+  };
+  if (deferred && deferredStarts) deferredStarts.push(start);
+  else start();
   return texture;
+}
+
+// `deferred` textures (made at startup but only needed in 3D) wait for this call, made
+// by View 3D's first model build, so the plan view prepares nothing (owner, 2026-10-03).
+let deferredStarts = [];
+export function startDeferredTextures() {
+  const starts = deferredStarts;
+  deferredStarts = null;
+  for (const start of starts || []) start();
 }

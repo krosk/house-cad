@@ -13,7 +13,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { MARKER_FACE } from '../core/architectural3d.js';
 import { applyFinishDetail } from './finishTextures.js';
 import { paintFinish, loadPhotoFinish } from './textureWorker.js';
-import { paintedTexture } from './paintedTexture.js';
+import { paintedTexture, startDeferredTextures } from './paintedTexture.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -33,9 +33,10 @@ const TILT_Z = new THREE.Vector3(0, 0, 1);
 const TILT_Y = new THREE.Vector3(0, 1, 0);
 
 // The default floor wood and wall plaster, painted in the texture worker (painters.js
-// `viewWood` / `viewPlaster`); the flat placeholder colour shows until they arrive.
+// `viewWood` / `viewPlaster`) once the 3D model is first built (deferred); the flat
+// placeholder colour shows until they arrive.
 function viewTexture(name, size, { repeat = 1, color = true, anisotropy = 1, placeholder } = {}) {
-  const texture = paintedTexture(name, { relief: !color }, size, size, { color, placeholder, variant: `${repeat}` });
+  const texture = paintedTexture(name, { relief: !color }, size, size, { color, placeholder, variant: `${repeat}`, deferred: true });
   texture.repeat.set(repeat, repeat);
   texture.anisotropy = anisotropy;
   return texture;
@@ -314,6 +315,13 @@ export class View3D {
   // BufferGeometry (treated as one floor at elevation 0). Rebuilds the stacked
   // house group on every model change.
   setGeometry(floors) {
+    if (!this._built) { // first build: start what the plan view never needed
+      this._built = true;
+      startDeferredTextures();
+      if (this.realisticEnabled) this._ensureComposer();
+      this._applyEnvironment();
+      this._loadSky();
+    }
     for (const m of this.house.children) m.geometry.dispose();
     this.house.clear();
     this.markerLights.clear();
@@ -698,23 +706,8 @@ export class View3D {
     this.hemi.groundColor.setHex(this.realisticEnabled ? 0x9a7652 : 0x445566);
     this.renderer.toneMappingExposure = this.realisticEnabled ? 1.0 : 0.9;
     if (this.realisticEnabled) {
-      this._ensureComposer();
-      if (!this.sky && !this._skyLoading) {
-        this._skyLoading = true;
-        this.onSkyStatus?.('downloading sky…');
-        loadSky().then((sky) => {
-          const pmrem = new THREE.PMREMGenerator(this.renderer);
-          this.sky = { ...sky, envTexture: pmrem.fromEquirectangular(sky.lightTexture).texture };
-          sky.lightTexture.dispose();
-          pmrem.dispose();
-          this.onSkyStatus?.('');
-          this._applyEnvironment();
-          this._applySun();
-        }).catch((error) => {
-          console.warn('sky download failed', error);
-          this.onSkyStatus?.('sky download failed: generated room light');
-        }).finally(() => { this._skyLoading = false; });
-      }
+      if (this._built) this._ensureComposer(); // else at the first model build
+      this._loadSky();
     } else {
       this.sun.position.set(12, 20, 8);
       this.sun.target.position.set(0, 0, 0);
@@ -734,6 +727,28 @@ export class View3D {
     }
     for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
     this._resize();
+  }
+
+  // The downloaded sky (Realistic): only once the 3D model has been built, so the plan
+  // view never downloads or prepares it (owner, 2026-10-03).
+  _loadSky() {
+    if (!this.realisticEnabled || !this._built) return;
+    if (!this.sky && !this._skyLoading) {
+      this._skyLoading = true;
+      this.onSkyStatus?.('downloading sky…');
+      loadSky().then((sky) => {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        this.sky = { ...sky, envTexture: pmrem.fromEquirectangular(sky.lightTexture).texture };
+        sky.lightTexture.dispose();
+        pmrem.dispose();
+        this.onSkyStatus?.('');
+        this._applyEnvironment();
+        this._applySun();
+      }).catch((error) => {
+        console.warn('sky download failed', error);
+        this.onSkyStatus?.('sky download failed: generated room light');
+      }).finally(() => { this._skyLoading = false; });
+    }
   }
 
   setSunDate(date) {
@@ -759,6 +774,7 @@ export class View3D {
   // fails), else the opt-in generated room (Reflections), else none.
   _applyEnvironment() {
     if (this.renderer.xr.isPresenting) return; // mr.js owns these during a session
+    if (!this._built) return; // the plan view prepares nothing 3D: applied at the first build
     this._plainBackground ??= this.scene.background?.isColor ? this.scene.background : new THREE.Color(0x1a1d23);
     if (this.realisticEnabled && this.sky) {
       this.scene.environment = this.sky.envTexture;

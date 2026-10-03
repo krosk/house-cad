@@ -110,8 +110,10 @@ Production builds emit an un-precached `version.json` beside `index.html`; `src/
 fetches it with `cache: no-store` plus a timestamp query and compares its complete build id with the
 compiled `__BUILD_ID__`. Desktop shows the state in the toolbar and the AR debug HUD includes it.
 
-While WebXR is presenting, `main.js` defers its hidden architectural/export mesh rebuild until
-`sessionend`; `mr.js` owns live AR rebuilding. Marker creation also skips the dense rectangle solve
+`main.js` builds the desktop architectural 3D model only while the 3D view is shown (owner, 2026-10-03:
+the plan view prepares nothing 3D); otherwise a change marks it stale and ◈ View 3D rebuilds it behind a
+loading wheel until every texture is ready. The legacy export mesh is built when an export asks for it.
+While WebXR is presenting, the desktop rebuild waits until `sessionend`; `mr.js` owns live AR rebuilding. Marker creation also skips the dense rectangle solve
 while retaining marker/node one-way resolution and normal change notification.
 
 Dimensions added in a read-only shared view are tagged `measurement` and bypass `Project._emit()`.
