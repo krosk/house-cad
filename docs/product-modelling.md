@@ -33,20 +33,72 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
 - A product page that 301-redirects to a category is usually discontinued (Hypothesis each time).
 - If a model exists, register it with `tools/fetch-ikea-model.mjs` instead and stop here.
 
-## 2. Collect sources: numbers first, then drawings, then photos
+## 2. Collect sources: numbers, then the isometric manual, then photos
+
+Owner preference (2026-10-03): **dimension from an isometric assembly drawing whenever one exists**,
+and use photos for what the drawing does not show (materials, colour, hidden parts). A photo is a
+perspective: its scale changes with depth, so parts further back or nearer read wrong. On the Moder II
+table the front photo gave round legs half as splayed as the real ones; the manual's isometric drawing
+gave the true blade-shaped legs, and the render laid over it coincided.
 
 | Source | Gives | Example |
 |---|---|---|
 | Spec sheet / listing | overall size, key heights, thicknesses | bed 223 × 172, foot 35, head 92 cm; door leaf 85, frame 80 mm |
-| Assembly instructions PDF | the real part structure | IKEA AA-809121: tapered legs, 2 headboard slats, rails, centre beam |
-| Front view photo | widths, panel layout | the cushions fill the whole width between the posts |
-| Side view photo | depth, angles, stacking | the headboard leans back ~8°; the cushion bottom sits behind the mattress |
-| Real-room photo | material, finish, scale cues | tapered legs, angled joints |
+| Assembly manual, **isometric drawing** | every visible part measured to scale, plus the real part structure | Moder II HA833381 p. 1: legs 93 → 42 mm deep, 61 mm splay, 11 + 15 mm edge |
+| Assembly manual, other pages | part structure, hidden parts, joints | IKEA AA-809121: tapered legs, 2 headboard slats, rails, centre beam |
+| Front / side view photo | what the drawing hides; widths and angles only as estimates | the cushions fill the whole width between the posts; the headboard leans back ~8° |
+| Real-room photo | material, finish, colour, scale cues | tapered legs, angled joints |
+
+- **Find the manual first.** Look for "Notice de montage", "manuel d'instruction", "assembly
+  instructions", "documents" on the product page, including collapsed sections; open every accordion in
+  Chrome, since some sites serve a fuller page to Chrome than to curl. A download *button* is not a link:
+  call `read_network_requests`, click it, and read the request it makes (Habitat:
+  `habitat.fr/asset/product/<id>`), then download that URL with curl. IKEA:
+  `https://www.ikea.com/<cc>/<lang>/assembly_instructions/<name>__AA-<n>_pub.pdf`.
+  Third-party manual sites (manualslib) sit behind bot checks: don't try to pass them.
+
+### Measuring an isometric drawing
+
+1. **Rasterise the vector page** at 600 dpi into the scratchpad: `pdftoppm -r 600 -f <p> -l <p> -png
+   manual.pdf page` (assembly PDFs are vector drawings, so lines stay 1–3 px thick at any resolution).
+   Pick the view of the assembled product with the most parts visible (often the cover).
+2. **Prove it is isometric.** A horizontal circle (a round top, a tube end) draws as an ellipse with
+   minor/major = 0.577 (tan 30°); for a box, horizontal edges run at ±30°. Dimetric or perspective
+   drawings fail this check: then use them for structure only.
+3. **Scale.** The ellipse's major axis (or any known published length along a horizontal direction,
+   divided by its foreshortening) gives *s* px/mm for horizontal lengths, the same everywhere in the
+   drawing; vertical lengths use 0.816 × *s*. A known published height checks it.
+4. **Axes.** Identify the product's axes on the drawing (a seam, an edge, a rail runs along an
+   isometric axis). Screen-horizontal is then the plan diagonal between them, so a corner leg on the
+   left/right is seen in its diagonal depth and one at the front in its width across.
+5. **Measure** with pixel scans: decode with `ffmpeg -i page.png -f rawvideo -pix_fmt gray -`,
+   then list the runs of dark pixels along chosen rows and columns (a few lines of Python or Node): edges of each part at several heights, so tapers and splay come out as
+   rates; positions follow from `u = s · a`, `v = v0 + 0.577 · s · b − 0.816 · s · (z − z0)` (a across,
+   b toward the viewer, z up). Write every number into the builder's `// Sources:` block with its pixel
+   reading.
+6. **Overlay to verify** (step 5): render with an orthographic camera along (±1, 1, 1) at the same
+   px/mm, scale the drawing to it, and multiply the two with the drawing tinted red
+   (`ffmpeg … blend=all_mode=multiply`). Every outline should sit on a red line; mirror the camera
+   if the drawing views the product from the other side.
+
+### Using photos: a perspective (pinhole) camera
+
+Treat a product photo as an ordinary eye perspective: one camera point, straight lines stay
+straight, sizes shrink with distance. So a pixel scale holds only in the plane where it was taken
+(the top's front edge is not the scale of a leg further back), and parallel edges converge.
+- Measure only between points at the **same depth as a known length** (a published width at the
+  same plane), and call the result an estimate.
+- Better, **match the camera**: in the scratch preview, render with a `PerspectiveCamera` and move
+  its position, target and field of view until the published sizes line up with the photo (the
+  top's outline, the floor contact points), then overlay the render on the photo as in step 6
+  above. What still disagrees is a modelling error, not perspective. Studio shots are usually a
+  long lens (a narrow field of view, 15–25°) from about table height.
+- Where a photo and an isometric drawing disagree on a dimension, the drawing wins.
 
 - Web-search summaries can misattribute (one called a bed article a lamp): **trust the page, not the
   summary**.
-- IKEA assembly PDFs download fine: `https://www.ikea.com/<cc>/<lang>/assembly_instructions/<name>__AA-<n>_pub.pdf`.
-  Read the pages with the Read tool (`pages: "1-6"`); page 1 is usually a clean isometric.
+- Read a manual's pages with the Read tool (`pages: "1-6"`) to find the views; page 1 is usually a
+  clean isometric of the assembled product.
 - Record every source (URL) and every number's origin in the doc entry.
 
 ## 3. Getting photos, documents and specs: `tools/product-images.mjs`
@@ -79,6 +131,7 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
 | Lapeyre | `statics-lapeyre.fr/img/catalogue/collMain/…/<ref>_<n>.jpg` (1240 × 900), or `…/zoom1/…/<id>.jpg` on some pages (the LINE door block, 780 × 780); pictos excluded | curl, **these exact headers** (Akamai: another Accept/UA got "Access Denied") |
 | Leroy Merlin | the thumbnail strip (`m-nav-thumbnails__image`) = the gallery, in order: `media.adeo.com/media/<id>/media.<png\|jpg>` (ids come in both formats; the last can be a video poster), downloaded with `?width=1200`; the page's other media ids are menu icons, ads and recommendations. Documents from `data-file-name` links; sibling variants listed from `product-variants__item__picture` | **Chrome only** (DataDome, below); images download fine by curl |
 | Castorama | Scene7 `media.castorama.fr/is/image/Castorama/<slug>~<EAN>_<code>`, only this EAN (from `…/<EAN>_CAFR.prd`); `?wid=1400`. Specs and pack are in the page (tile count sits in its embedded data) | curl |
+| Habitat | gallery `cdn.habitat.fr/thumbnails/product/<p>/<sku>/raw/<n>/<id>.webp` (the generic mode lists them; take `raw`, the full size). The spec table and composition come fully only in Chrome (curl gets an older layout without "Composition & matériaux"). The assembly manual is a **button** ("Télécharger le manuel d'instruction…" under "Détails du colis & livraison"), not a link: watch the network on click, it fetches `habitat.fr/asset/product/<id>` (a PDF; curl downloads it) | curl for images and the PDF; Chrome for the page text |
 | leboncoin | `<script id="__NEXT_DATA__">`: objects with `subject` + `images.urls_large`, filtered by title (`--filter`, default the URL's words) | curl (Node's own fetch gets 403) |
 | other | every absolute image URL minus logos/icons: review by eye | curl |
 
@@ -126,6 +179,9 @@ node tools/product-images.mjs --download --sheet --out <dir> <url>...   # then d
 - Real-app check: a second scratch config with `root` = the project, `server.https: false`,
   another port. In a fresh origin the app seeds a demo house; inject test data into
   `localStorage['house-cad:autosave:v1']` (add zones/finishes/furniture), reload, open View 3D.
+- **Isometric overlay first** when the manual has an isometric drawing (step 2, "Measuring an
+  isometric drawing"): an orthographic render over the drawing at the same scale checks every visible
+  dimension at once. Then match a perspective camera to a photo for the look (step 2, "Using photos").
 - **Owner review per iteration:** show front + side renders beside the photo views. The bed's first
   version had half-width cushions; the owner caught it by comparing with the front photos.
 - A built app served from `dist/` registers a service worker: before reloading a new local build,
