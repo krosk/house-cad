@@ -4,6 +4,7 @@
 // form and is used everywhere else (normal View 3D, AR, offline).
 import * as THREE from 'three';
 import { fetchCached } from './realism.js';
+import { steppedA, steppedB, steppedCells } from '../core/flooring.js';
 
 // Sources: Beaulieu oak charme 118 × 16.4 (Leroy Merlin ref 92245930; catalog entry
 // `oak_beaulieu_charme` in src/core/materials.js, docs/materials.md).
@@ -23,6 +24,23 @@ const PHOTOS = {
       [1195, 2955], [19, 1779], [593, 2355], [1172, 2932], [0, 1755]],
     plank: [1.18, 0.164], // published length × width (m)
   },
+  // Sources: Monastère beige (Leroy Merlin refs 72831325 50×50, 72831311 30×50, 72831304
+  // 30×30; catalog entry `monastere_beige_pinwheel`, docs/materials.md). One straight photo of
+  // a single tile per size, 2000 × 2000 px, the tile on pure white (255). Tile outlines
+  // measured in Node (pixels < 240, 2026-10-03): [x0, y0, x1, y1] below; 50×50 and 30×30 are
+  // square within 0.3 %, the 30×50 photo is landscape at 1.63 : 1 (nominal 1.67). The faces
+  // average RGB 219–225 / 205–213 blue (cool under the sky light); `tone` (per channel) brings
+  // them to the procedural design's greige, which was set darker and warmer toward the
+  // owner's showroom photo (docs/materials.md: base 0xd4cfc3, grey mean 204).
+  monastere_beige_pinwheel: {
+    layout: 'stepped',
+    formats: {
+      '50×50': { url: 'https://media.adeo.com/media/1165024/media.jpg', box: [31, 23, 1971, 1962], px: [1536, 1536] },
+      '30×50': { url: 'https://media.adeo.com/media/989865/media.jpg', box: [45, 416, 1952, 1584], px: [1536, 922] },
+      '30×30': { url: 'https://media.adeo.com/media/1182128/media.jpg', box: [50, 34, 1955, 1945], px: [922, 922] },
+    },
+    tone: [0.95, 0.92, 0.92],
+  },
 };
 
 export const hasPhotoFinish = (def) => !!(def && PHOTOS[def.id]);
@@ -34,14 +52,18 @@ const cache = new Map();
 export function loadPhotoFinish(def, anisotropy = 1) {
   const spec = PHOTOS[def.id];
   if (!cache.has(def.id)) {
-    const p = build(spec, anisotropy);
+    const p = build(spec, anisotropy, def);
     p.catch(() => cache.delete(def.id)); // a failed download may be retried later
     cache.set(def.id, p);
   }
   return cache.get(def.id);
 }
 
-async function build(spec, anisotropy) {
+function build(spec, anisotropy, def) {
+  return spec.layout === 'stepped' ? buildTiles(spec, anisotropy, def) : buildPlanks(spec, anisotropy);
+}
+
+async function buildPlanks(spec, anisotropy) {
   const buffer = await fetchCached(spec.url);
   const image = await createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
   const fit = lightFit(image);
@@ -84,7 +106,129 @@ async function build(spec, anisotropy) {
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; // an atlas: cells must not bleed round
     t.anisotropy = anisotropy;
   }
-  return { map, bumpMap, plank: spec.plank, cells };
+  return { layout: 'planks', map, bumpMap, plank: spec.plank, cells };
+}
+
+const FORMAT_ORDER = ['50×50', '30×50', '30×30'];
+
+// The tile photos in one atlas (stacked, each the tile's outline box at about 3 px/mm), the
+// white background turned to grout, and a relief map: the tile's outline blurred over
+// about 12 mm (the pillowed edge rolling down to the joint) plus the photo's grain.
+async function buildTiles(spec, anisotropy, def) {
+  const images = await Promise.all(FORMAT_ORDER.map(async (f) => {
+    const buffer = await fetchCached(spec.formats[f].url);
+    return createImageBitmap(new Blob([buffer], { type: 'image/jpeg' }));
+  }));
+  // Each atlas cell is the nominal cell: the tile plus half a joint of grout all round, so
+  // joints come out of the texture with its mip filtering (a joint drawn by the shader
+  // aliased into dashes at a distance: seen in a screenshot).
+  const tileM = 0.5 - (def.joint || 0); // the 50×50 tile's face (m)
+  const M = Math.round((def.joint || 0) / 2 * spec.formats['50×50'].px[0] / tileM);
+  const W = Math.max(...FORMAT_ORDER.map((f) => spec.formats[f].px[0])) + 2 * M;
+  const H = FORMAT_ORDER.reduce((h, f) => h + spec.formats[f].px[1] + 2 * M, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  const rects = [];
+  let y = 0;
+  FORMAT_ORDER.forEach((f, i) => {
+    const { box: [x0, y0, x1, y1], px: [tw, th] } = spec.formats[f];
+    const w = tw + 2 * M, h = th + 2 * M;
+    ctx.drawImage(images[i], x0, y0, x1 - x0 + 1, y1 - y0 + 1, M, y + M, tw, th);
+    images[i].close?.();
+    // Texture UVs (flipY): u across, v = 1 − canvas y / H.
+    rects.push(new THREE.Vector4(0, 1 - (y + h) / H, w / W, 1 - y / H));
+    rects.at(-1).cell = [0, y, w, h];
+    y += h;
+  });
+  const pixels = ctx.getImageData(0, 0, W, H);
+  const d = pixels.data;
+  const lum = (i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  // Background = the near-white region connected to each cell's border (flood fill), so
+  // light spots inside a tile stay stone.
+  const bg = new Uint8Array(W * H);
+  for (const r of rects) {
+    const [cx, cy, cw, ch] = r.cell;
+    const stack = [];
+    const push = (x, yy) => {
+      if (x < cx || yy < cy || x >= cx + cw || yy >= cy + ch) return;
+      const p = yy * W + x;
+      if (bg[p] || lum(p * 4) < 238) return;
+      bg[p] = 1; stack.push(p);
+    };
+    for (let x = cx; x < cx + cw; x++) { push(x, cy); push(x, cy + ch - 1); }
+    for (let yy = cy; yy < cy + ch; yy++) { push(cx, yy); push(cx + cw - 1, yy); }
+    while (stack.length) {
+      const p = stack.pop(), x = p % W, yy = (p - x) / W;
+      push(x + 1, yy); push(x - 1, yy); push(x, yy + 1); push(x, yy - 1);
+    }
+    // Outside the drawn cell (the narrower formats) is background too.
+    for (let yy = cy; yy < cy + ch; yy++) for (let x = cw; x < W; x++) bg[yy * W + x] = 1;
+  }
+  const groutHex = def.grout ?? 0xe6dfcd;
+  const grout = new THREE.Color(groutHex); // linear, for the shader's joint
+  const g255 = [(groutHex >> 16) & 255, (groutHex >> 8) & 255, groutHex & 255]; // sRGB bytes, for the canvas
+  const mask = new Float32Array(W * H);
+  for (let p = 0, i = 0; p < bg.length; p++, i += 4) {
+    if (bg[p]) { d[i] = g255[0]; d[i + 1] = g255[1]; d[i + 2] = g255[2]; continue; }
+    mask[p] = 1;
+    // The photo's anti-aliased rim (between stone and white) fades to grout, not white.
+    const l = lum(i), t = Math.min(1, Math.max(0, (l - 228) / 27));
+    for (let c = 0; c < 3; c++) d[i + c] = (d[i + c] * spec.tone[c]) * (1 - t) + g255[c] * t;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const bumpMap = new THREE.CanvasTexture(tileReliefCanvas(pixels, mask));
+  for (const t of [map, bumpMap]) {
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = anisotropy;
+  }
+  for (const r of rects) delete r.cell;
+  return { layout: 'stepped', map, bumpMap, rects, grout };
+}
+
+// Height: the outline blurred over about 12 mm (two 18 px boxes at 3 px/mm), so the face
+// rolls down into the joint, plus a little of the photo's own grain.
+function tileReliefCanvas({ data, width, height }, mask) {
+  const box = (src, R) => {
+    const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+    for (let y = 0; y < height; y++) {
+      let sum = 0;
+      for (let k = -R; k <= R; k++) sum += src[y * width + Math.min(width - 1, Math.max(0, k))];
+      for (let x = 0; x < width; x++) {
+        tmp[y * width + x] = sum / (2 * R + 1);
+        sum += src[y * width + Math.min(width - 1, x + R + 1)] - src[y * width + Math.max(0, x - R)];
+      }
+    }
+    for (let x = 0; x < width; x++) {
+      let sum = 0;
+      for (let k = -R; k <= R; k++) sum += tmp[Math.min(height - 1, Math.max(0, k)) * width + x];
+      for (let y = 0; y < height; y++) {
+        out[y * width + x] = sum / (2 * R + 1);
+        sum += tmp[Math.min(height - 1, y + R + 1) * width + x] - tmp[Math.max(0, y - R) * width + x];
+      }
+    }
+    return out;
+  };
+  const pillow = box(box(mask, 18), 18);
+  const lum = new Float32Array(width * height);
+  for (let p = 0, i = 0; p < lum.length; p++, i += 4) lum[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  const local = box(lum, 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const out = ctx.createImageData(width, height);
+  for (let p = 0, i = 0; p < lum.length; p++, i += 4) {
+    const edge = mask[p] ? Math.min(1, pillow[p] * 2 - 0.0) : 0; // 0 at the joint, 1 well inside
+    const v = Math.max(0, Math.min(255, 40 + 190 * Math.sqrt(Math.max(0, edge)) + (mask[p] ? 1.2 * (lum[p] - local[p]) : 0)));
+    out.data[i] = out.data[i + 1] = out.data[i + 2] = v; out.data[i + 3] = 255;
+  }
+  ctx.putImageData(out, 0, 0);
+  return canvas;
 }
 
 // The photo's lighting falloff: a least-squares quadratic surface of luminance over the
@@ -173,7 +317,11 @@ function reliefCanvas({ data, width, height }) {
 // offset per row, plank index along it, and a random cell and 180° turn per plank, so
 // the floor never repeats. Colour and relief read the same plank (textureGrad keeps the
 // mip level continuous across plank edges). Returns a restore function.
-export function patchPlankMaterial(material, photo) {
+export function patchPhotoMaterial(material, photo) {
+  return photo.layout === 'stepped' ? patchTileMaterial(material, photo) : patchPlankMaterial(material, photo);
+}
+
+function patchPlankMaterial(material, photo) {
   const before = { onBeforeCompile: material.onBeforeCompile, key: material.customProgramCacheKey };
   const uniforms = {
     plankSize: { value: new THREE.Vector2(...photo.plank) },
@@ -204,6 +352,82 @@ vec4 plankSample( sampler2D tex, vec2 uv ) {
         .replace(/texture2D\( bumpMap, ([^)]*?) \)/g, 'plankSample( bumpMap, $1 )'));
   };
   material.customProgramCacheKey = () => 'plank-photo';
+  material.needsUpdate = true;
+  return () => {
+    material.onBeforeCompile = before.onBeforeCompile;
+    material.customProgramCacheKey = before.key;
+    material.needsUpdate = true;
+  };
+}
+
+// Lay the tile photos on the stepped lattice (src/core/flooring.js STEPPED) in the shader:
+// plan UVs (metres, pattern frame) → lattice cell and which of the module's 5 tiles, then that
+// format's photo, turned and mirrored at random per tile (a 30×50 only by 180°, turned 90°
+// first when it stands upright). The joint is grout. Colour and relief read the same tile.
+function patchTileMaterial(material, photo) {
+  const before = { onBeforeCompile: material.onBeforeCompile, key: material.customProgramCacheKey };
+  const cells = steppedCells();
+  const uniforms = {
+    tA: { value: new THREE.Vector2(...steppedA()) },
+    tB: { value: new THREE.Vector2(...steppedB()) },
+    tCell: { value: cells.map((c) => new THREE.Vector4(c.x0, c.y0, c.x1, c.y1)) },
+    tFmt: { value: cells.map((c) => FORMAT_ORDER.indexOf(c.format)) },
+    tRect: { value: photo.rects },
+    tGrout: { value: new THREE.Vector3(photo.grout.r, photo.grout.g, photo.grout.b) },
+  };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = `uniform vec2 tA;
+uniform vec2 tB;
+uniform vec4 tCell[ 5 ];
+uniform float tFmt[ 5 ];
+uniform vec4 tRect[ 3 ];
+uniform vec3 tGrout;
+vec2 tileHash( vec2 p ) {
+	p = vec2( dot( p, vec2( 127.1, 311.7 ) ), dot( p, vec2( 269.5, 183.3 ) ) );
+	return fract( sin( p ) * 43758.5453 );
+}
+vec2 tileTurn( vec2 v, float k ) {
+	if ( k < 0.5 ) return v;
+	if ( k < 1.5 ) return vec2( - v.y, v.x );
+	if ( k < 2.5 ) return - v;
+	return vec2( v.y, - v.x );
+}
+vec4 tileSample( sampler2D tex, vec2 uv, bool height ) {
+	vec2 gx = dFdx( uv ), gy = dFdy( uv );
+	float det = tA.x * tB.y - tA.y * tB.x;
+	vec2 base = floor( vec2( uv.x * tB.y - uv.y * tB.x, tA.x * uv.y - tA.y * uv.x ) / det );
+	vec4 none = height ? vec4( 0.0 ) : vec4( tGrout, 1.0 );
+	for ( int dm = - 1; dm <= 1; dm ++ ) {
+		for ( int dn = - 1; dn <= 1; dn ++ ) {
+			vec2 mn = base + vec2( float( dm ), float( dn ) );
+			vec2 q = uv - mn.x * tA - mn.y * tB;
+			for ( int i = 0; i < 5; i ++ ) {
+				vec4 c = tCell[ i ];
+				if ( q.x < c.x || q.x >= c.z || q.y < c.y || q.y >= c.w ) continue;
+				vec2 size = c.zw - c.xy;
+				vec2 lt = ( q - c.xy ) / size; // the atlas cell includes half a joint all round
+				int f = int( tFmt[ i ] + 0.5 );
+				vec2 h = tileHash( mn * 7.13 + float( i ) * 1.71 );
+				vec2 p = lt - 0.5, dx = gx / size, dy = gy / size;
+				if ( f == 1 && size.y > size.x ) { p = tileTurn( p, 1.0 ); dx = tileTurn( dx, 1.0 ); dy = tileTurn( dy, 1.0 ); }
+				float k = f == 1 ? 2.0 * floor( h.x * 2.0 ) : floor( h.x * 4.0 );
+				p = tileTurn( p, k ); dx = tileTurn( dx, k ); dy = tileTurn( dy, k );
+				if ( h.y < 0.5 ) { p.x = - p.x; dx.x = - dx.x; dy.x = - dy.x; }
+				vec4 r = tRect[ f ];
+				vec2 span = r.zw - r.xy;
+				return textureGrad( tex, r.xy + ( p + 0.5 ) * span, dx * span, dy * span );
+			}
+		}
+	}
+	return none;
+}
+` + shader.fragmentShader
+      .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )', 'tileSample( map, vMapUv, false )'))
+      .replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment
+        .replace(/texture2D\( bumpMap, ([^)]*?) \)/g, 'tileSample( bumpMap, $1, true )'));
+  };
+  material.customProgramCacheKey = () => 'tile-photo';
   material.needsUpdate = true;
   return () => {
     material.onBeforeCompile = before.onBeforeCompile;

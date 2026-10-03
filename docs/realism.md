@@ -71,6 +71,25 @@ procedural design, which stays the stored form). Leroy Merlin's image CDN `media
   long, knotted oak with grooves, no repeat visible in the overview or up close.
   **Hypothesis:** with only 11 source planks, a distinctive knot can be spotted twice in a large room.
 
+- **Monastère beige** (`monastere_beige_pinwheel`, stepped 30/50 layout): the three straight
+  single-tile photos (50×50 media 1165024, 30×50 989865, 30×30 1182128; 2000 px, tile on pure white).
+  Tile outlines measured in Node (50×50 and 30×30 square within 0.3 %, 30×50 at 1.63 : 1). Each tile
+  is cut with its real wavy edge into an atlas cell that also holds half a joint of grout all round;
+  the white background (flood fill from the cell border) becomes the catalog grout `0xe6dfcd`; the
+  faces are toned per channel ([0.95, 0.92, 0.92]) toward the procedural greige the owner accepted
+  (photos average RGB about 222, 222, 208 and read grey under the sky light). Relief: the outline
+  blurred over about 12 mm (the pillowed edge) plus the photo grain. A shader finds the stepped
+  lattice cell and which of the module's 5 tiles a point is in (`src/core/flooring.js` STEPPED), and
+  draws that format's photo turned and mirrored at random (a 30×50 only by 180°, turned 90° when
+  upright).
+  - Trap: a joint drawn by the shader (a branch, not a texture read) aliased into dashed lines at a
+    distance (seen in a screenshot); the joint must come out of the texture so mip filtering covers it.
+  - **Proven** (Chrome on the Steam Deck, local build): the stepped layout draws with the photo
+    faces, clean joints in the overview and up close. **Hypothesis / limits:** one photographed face
+    per size (the range has 24), so the variety is 8 orientations of the 50×50 and 30×30 faces and
+    4 of the 30×50; the tone is a guess toward the showroom look; the detail layer is off while the
+    photo is on.
+
 ## Next options (not built)
 
 - **Render button:** path-traced still (`three-gpu-pathtracer`); compatibility with three 0.170 is a

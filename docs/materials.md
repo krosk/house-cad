@@ -380,6 +380,8 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
   - Hypothesis / unknown:
     - grout colour `0xe6dfcd` and tile brightness, which the owner accepted for now (2026-09-27);
     - not yet seen in the real app's View 3D or in AR.
+  - In View 3D Realistic the faces come from the three tile photos, laid by a shader
+    (`docs/realism.md` "Photo finishes").
 
 ## Stone wall tile products (a design on a grid of tiles)
 

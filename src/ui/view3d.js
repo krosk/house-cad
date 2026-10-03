@@ -18,7 +18,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
-import { hasPhotoFinish, loadPhotoFinish, patchPlankMaterial } from './photoFinishes.js';
+import { hasPhotoFinish, loadPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -919,8 +919,8 @@ export class View3D {
     const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     loadPhotoFinish(def, anisotropy).then((photo) => {
       if (!this.realisticEnabled || material.userData.restorePhoto) return;
-      Object.assign(material, { map: photo.map, bumpMap: photo.bumpMap, bumpScale: 0.6 });
-      material.userData.restorePhoto = patchPlankMaterial(material, photo);
+      Object.assign(material, { map: photo.map, bumpMap: photo.bumpMap, bumpScale: photo.layout === 'stepped' ? 2 : 0.6 });
+      material.userData.restorePhoto = patchPhotoMaterial(material, photo);
     }).catch((error) => console.warn('photo finish failed', def.id, error));
   }
 
