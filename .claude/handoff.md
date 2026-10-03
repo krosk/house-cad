@@ -12,16 +12,19 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/electrical-workflow.md` | Conduit / wire / control-link lanes, derived circuits, owner decisions |
 | `docs/plumbing-workflow.md` | The pipe lane (first slice) and what's deferred |
 | `docs/furniture.md` | IKEA GLB pipeline, CORS proxy, furniture zones + products (the merge), procedural furniture (products with no IKEA model: bed, Daikin units, shower tray, piano, **towel and panel radiators**) |
-| `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access); run by the `/model-product` skill |
+| `docs/product-modelling.md` | How to model a product with no 3D model from specs/drawings/photos (incl. per-retailer photo access; **step 7: a photo finish for View 3D Realistic**); run by the `/model-product` skill |
+| `docs/realism.md` | View 3D **Realistic** setting (sun, downloaded sky, AO) and **photo finishes** (Charme, Monastère); owner rule on runtime-downloaded images |
 | `docs/share-view.md` | View-only share links, `link`/`qr` export, read-only viewer; **parked**: Quest-to-TV live mirror + Steam Deck big-screen viewer (options worked out, not built) |
 | `docs/markers-plan.md` | Marker lane design + roadmap |
 | `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-03 (session 37)
-**Status:** Proven (git): `origin/main` = `637dfd1` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-10-03 (session 38)
+**Status:** Proven (git): `origin/main` = `6854420` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
+Session 38's work (share links, View 3D Realistic, photo finishes) is pushed but not yet seen by the
+owner on any device.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
 PERF clipboard report (two reports pasted) and an AR 3D view frame rate the owner accepts (50–80 fps on
@@ -47,6 +50,9 @@ boots straight into passthrough AR):
    finishes**. One floor at a time: a top-down overview (pinch/wheel zoom; a wide house turns 90° on a
    portrait phone) ↔ tap a room for a 1.65 m POV (tap a floor to walk there, Overview button to leave,
    opt-in phone tilt look). Rules in `CLAUDE.md`. **Mesh exports still use the legacy extrusion.**
+   An opt-in **◑ Realistic** setting adds the real sun for a time of day (north = plan up), a
+   downloaded sky, ambient occlusion, and the retailer's own photos on the Charme oak and Monastère
+   floors (`docs/realism.md`).
 3. **AR survey tool on the Quest** (`src/ui/mr.js`, the only authoring surface on the device).
    Register the house to a real corner, then author at 1:1 with a tape measure: rooms/walls/edges,
    dimensions via a 3D numpad, markers, heights, electrical conduit + wires (electrical or Ethernet)
@@ -62,38 +68,39 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 37
+## What changed in session 38
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Session 36 is folded into "Standing decisions"
-> (its unwalked items stay in Next step A).
+> decisions" or "Findings" and delete this list. Session 37 is folded into "Standing decisions" and
+> "Findings" (its unwalked items stay in Next step A).
 
-All owner requests (they reported the problems from the Quest).
-1. **PLAN · EDIT on a furniture zone with a product** (`1cd1c14`): FOOT or TOP moves the whole unit
-   (product height fixed; TOP sets foot = top − height). Was: a foot above the stale top was silently
-   rejected, so the owner could not raise a Daikin CTXM15A. Build only; not walked.
-2. **AR 3D view draw calls** (`3bb9564`, `src/ui/mergeByMaterial.js`): door, window, finish and device
-   products of a floor are merged into one mesh per shared material; each furniture model is merged
-   the same way. Owner saw ~1000 calls in the furnished living room. Proven (Node): 115 → 9 meshes for
-   3 windows, 10 outlets 100 → 6, same triangles and bounds. Trade-off: merged meshes span the floor,
-   so they are no longer frustum-culled.
-3. **AR furniture uses Lambert copies of its materials** (`1c48801`, `arLambert` in `mr.js`), like
-   every other AR 3D material. Desktop View 3D keeps PBR.
-4. **Device products have a `low` detail level for AR** (`d37f09d`, `buildDeviceProduct(def,
-   { detail })`): 48 directions, fewer slope rings, ~1/4 of the triangles. The owner's fps fell to 10 in
-   the kitchen; Ground's 34 devices were 180k of the 3D view's ~190k triangles. Proven by the owner's
-   PERF report: devices now 44.8k triangles. Desktop keeps `full`.
-5. **PROJECT · PERF in the 3D view** (`1c48801`, `62d6627`, `d00be61`): with LEFT X on, the sweep
-   measures `struct`, `finish`, `doorwin`, `device`, `furn`, `plan` with ms, calls and triangles. After
-   a full sweep a detailed text report is built (`perfReport`: layers, the 40 biggest 3D meshes, floor
-   counts, renderer/XR/GPU) and **the trigger that stops PERF copies it to the clipboard**. Proven:
-   the owner pasted two reports.
-6. **Open, not pursued (owner: fps 50–80 is fine):** the reports show the `plan` layer drawn under
-   the 3D view (90 calls, 58.9k triangles = twice its content), and the same scene ran at 23 then 82 fps
-   minutes apart with the CPU nearly idle. Recorded in `docs/ar-survey.md` with how to resume.
-7. Answered, no code: the Héméra window's two leaves come from the zone's hinge (`both`), not a
-   separate product; the Héméra page links (the window's full URL is only in an old transcript:
-   `https://www.lapeyre.fr/produits/fenetre-pvc-blanc-hemera-sur-mesure-FPC5837268`, unverified).
+All owner requests, 2026-10-03.
+1. **Share links** (`c00e97b`, `4c819aa`): a link (desktop Share view and AR EXPORT · LINK) now always
+   carries furniture products, **surface finishes** (floors, walls, door and window products: floor
+   slot 5 + top-level `m`/`cm`) and **markers**; QR always leaves markers out to fit. The owner's link
+   showed no Héméra windows and no furniture: the AR link followed the sheet FURNITURE layer (off by
+   default) and links carried no finishes. Proven in Node on the owner's file: 28 finishes round-trip,
+   8 windows + 6 doors restored, link 3 993 chars (2 205 without markers). Not yet opened as a real
+   link by the owner.
+2. **URL copy failure** (`fec23b8`, `4c819aa`): the owner hit `URL COPY FAILED (NotAllowedError)` on a
+   path identical to the working PERF copy. The flash now names the cause: `not ready, retry`,
+   `build: …`, `no clipboard`, or the error with `a0/a1` (activation), `f0/f1` (focus) and the size.
+   **Cause still unknown**; the owner said "never mind" and was sent a link built in Node instead.
+3. **View 3D Realistic** (`f8e1f35`, `src/ui/realism.js`): per-device toggle + time slider; sun from a
+   solar ephemeris for Val-de-Marne (Proven against Paris tables), shadows fitted to the shown floors,
+   window panes let the sun through; Poly Haven CC0 sky HDRI downloaded at runtime (its photographed sun
+   clamped out, the lighting copy desaturated: the raw sky turned rooms blue); GTAO through an
+   EffectComposer; pixel ratio capped at 1.5. Proven in Chrome on this Deck (demo house). **Frame rate
+   never measured** (hidden tab).
+4. **Photo finishes** (`ade036e`, `71208e4`, `src/ui/photoFinishes.js`), Realistic only: the Charme oak
+   from Leroy Merlin photo 799228 (11 whole planks laid by a shader, no repeat) and Monastère from its
+   three single-tile photos (stepped lattice in the shader, real wavy edges, grout baked in the atlas).
+   Owner asked whether a photo shows a repeat: tiling it did, hence the piece-by-piece layout.
+5. **Process recorded** (`6854420`): `docs/product-modelling.md` step 7 + the `model-product` skill step
+   for photo finishes; `tools/photo-measure.mjs` (rows / joints / bbox from a photo via ffmpeg) and
+   `tools/check-share-link.mjs <house.json>` (what a house loses in a link). Both run and reproduce this
+   session's numbers.
+6. Answered, no code: the Lucia ivory 30×90 wall tile is already in the catalog.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -104,6 +111,9 @@ All owner requests (they reported the problems from the Quest).
   CONDUIT · EDIT `LENGTH` / `RUN`; ACOVA and De'Longhi radiators and the JOYFURNOS bin as procedural
   furniture (`docs/furniture.md`). Stairs stay circulation, not rooms, in heat loss (owner: "No need
   yet" to merge them).
+- **Session 37 features (folded):** PLAN · EDIT FOOT/TOP move a furniture product as a unit; PROJECT ·
+  PERF sweeps the AR 3D view's layers and the stop trigger copies a full report (ask the owner to paste
+  it). The plan possibly drawn under the AR 3D view is parked (Next step D′).
 - **AR 3D view geometry budget** (session 37): products are merged per material
   (`mergeByMaterial.js`), so **a product material must be cached per entry** (not created per call)
   to merge across items; device products are built at `detail: 'low'` in AR (a new design must use
@@ -174,8 +184,16 @@ All owner requests (they reported the problems from the Quest).
 - **Catalog entries for the owner's real products replace generic placeholders** when the owner says
   so (`octagon_200` removed for Etruria). A saved finish naming a removed id shows as no material:
   every `materialById` caller handles null.
-- **Product textures are procedural too** (seeded canvas, no stored images); photos are references
-  only and stay in the session scratchpad.
+- **Images: downloaded at runtime and cached, never committed** (owner, 2026-10-03, amending "code
+  only"). Procedural code stays the stored form and what AR, normal View 3D and offline use; the
+  retailer's photo (or a CC0 Poly Haven asset) may replace it in View 3D **Realistic** only
+  (`src/ui/photoFinishes.js`, `docs/product-modelling.md` step 7). Photos used while modelling stay in
+  the scratchpad.
+- **North is plan up (+y)**; the site is Val-de-Marne 48.79° N 2.45° E (`SITE` in `realism.js`). The
+  owner views the desktop on a Steam Deck and an iPhone 14.
+- **Share links carry everything View 3D draws** (owner, 2026-10-03): furniture, finishes and markers,
+  regardless of the AR sheet layers; QR without markers. What a link still drops (constraints, control
+  links, conduits/wires, pipes, heat settings, R/U): `node tools/check-share-link.mjs <house.json>`.
 - **View 3D reflections are on demand, per device** (owner: some devices struggle): off by default,
   `localStorage`, never in project/share data, and **cleared for AR sessions** (Quest cost). AR
   reflections were asked about, not built: `docs/materials.md` lists what they would need.
@@ -223,6 +241,11 @@ All owner requests (they reported the problems from the Quest).
 
 ## Findings / traps worth knowing
 
+- **A photo finish must never be tiled**: a tiled photo repeats every few metres and its wrap seams
+  stair-step; cut it into pieces laid by the shader. **Joints/grooves must come from the texture**, not a
+  shader branch, or they alias into dashes (both seen in screenshots, session 38).
+- **When Chrome reports the automation tab `hidden`**, rAF stops: fps counts read ~0 and screenshots
+  can time out. Drive the page with `javascript_tool`; get fps from the owner.
 - **Clipboard writes in AR need a user gesture and almost no work before them.** EXPORT LINK and the
   PERF report both build their text beforehand and call `writeText` first thing in the trigger's XR
   `select` handler. The first PERF version built its report inside the trigger and the Quest refused
@@ -307,8 +330,11 @@ All owner requests (they reported the problems from the Quest).
 - **Leroy Merlin sibling articles** (other sizes of a range) aren't linked from the page. Their refs sit
   near each other: `HEAD` the same URL slug with neighbouring refs from inside the Chrome tab (found the
   Monastère 30×50, 72831311, that way).
-- **The owner's house view link with markers on (~3.1k chars) doesn't fit a QR**; share the text `link`
-  instead (`docs/share-view.md`).
+- **The owner's house view link with markers and finishes (~4.0k chars) doesn't fit a QR** (about
+  2 950); share the text `link` instead, which is why QR now drops markers.
+- **Héméra two-leaf windows** come from the zone's hinge (`both`), not a separate product. The window
+  page URL is only in an old transcript (`https://www.lapeyre.fr/produits/fenetre-pvc-blanc-hemera-sur-mesure-FPC5837268`,
+  unverified).
 - **Deploy check:** `curl -s https://krosk.github.io/house-cad/version.json` (the commit it serves).
   The unauthenticated Actions API rate-limits quickly, and there is no `gh` CLI here.
 - **Splitting mixed hunks into separate commits:** `git apply --cached --unidiff-zero` misplaces pure
@@ -347,6 +373,9 @@ All owner requests (they reported the problems from the Quest).
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 38:** `c00e97b` links always carry furniture · `f8e1f35` View 3D Realistic · `fec23b8`
+  URL copy failure names its cause · `4c819aa` links carry finishes + markers, QR without · `ade036e`
+  Charme photo planks · `71208e4` Monastère photo tiles · `6854420` photo-finish process + tools.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
@@ -395,7 +424,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 |---|---|
 | `src/ui/mr.js` | The whole AR session: modes, HUD + PERF sweep, batched overlays (labels, markers, conduit, wires), numpads, grip-drag, conduit pen, export |
 | `src/ui/view3d.js` | Three.js renderer shared by AR and the desktop 3D viewer (overview/POV camera, pinch, walk, tilt); `_animate` feeds the HUD's `time:` split |
-| `src/io/shareView.js` | View-link payload (compact positional schema; marker slot 4 height flag, slot 5 product) |
+| `src/io/shareView.js` | View-link payload (compact positional schema; marker slot 4 height flag, slot 5 product; floor slot 5 finishes) |
 | `src/core/architectural3d.js` | Plan → slabs/walls/openings/stairs + `wallMarkerPlacements()` (pure, Node-testable) |
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
@@ -406,6 +435,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/materials.js` / `src/core/flooring.js` | Finish catalog; takeoff, regions, wall faces (pure, Node-testable) |
 | `src/ui/finishTextures.js` | Canvas pattern textures shared by View 3D and the AR 3D view; product `design`s per pattern (`DESIGNS` stagger, `BRICK_DESIGNS`, `GRID_DESIGNS` mosaic/terrazzo/limestone, `OCT_DESIGNS`, `PINWHEEL_DESIGNS`), their bump maps, the shared stone cloud helpers (`stoneField`, `drawStoneCloud`) and the View 3D detail layer (`DETAIL_DESIGNS`, `applyFinishDetail`) |
 | `tools/product-images.mjs` | Per-retailer product photo extraction (`--snippet` for Chrome-only sites) |
+| `tools/photo-measure.mjs` | Measure a retailer photo for a photo finish: `rows` (grooves), `joints --grooves …`, `bbox` (tile on white) |
+| `tools/check-share-link.mjs` | What a saved house loses in a share link, and the link length (Node only) |
+| `src/ui/realism.js` | Realistic: `sunPosition`/`sunDirection`, `SITE`, `loadSky` (Poly Haven HDRI, sun clamped), `fetchCached` (Cache Storage `house-cad:images:v1`) |
+| `src/ui/photoFinishes.js` | Photo finishes: `PHOTOS` (with `// Sources:`), plank and stepped-tile atlases, `patchPhotoMaterial` (shader layouts) |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`); used by the AR 3D view and View 3D |
@@ -421,6 +454,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 38: copy a fresh EXPORT · LINK and open it on desktop (Héméra windows, doors, finishes,
+    lights and device products show?); if the copy fails, the bracketed reason; View 3D **Realistic**
+    on the Steam Deck and the iPhone 14 (fps, sky download, sun slider, the Charme and Monastère
+    photo floors: tone vs the showroom, a repeated Monastère face?);
   - session 37: raise the Daikin CTXM15A in PLAN · EDIT (FOOT 230 cm, then ⇄ TOP 250 cm → foot
     2.202 m); outlets/switches up close with LEFT X (low detail: faceted corners?); furniture looks
     matte (Lambert) but right; windows/glass unchanged after the merge;
@@ -463,10 +500,15 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - ~~**B — Build the furniture merge**~~ — done in session 32 (`e9ace98`), plus FURNISH removed at the
   owner's request. Remaining small gaps (not asked for): desktop product picker, desktop
   "dimension removed" message, the notch in the desktop 2D sketch.
-- **B′ — More products** as the owner names them: run `/model-product <link>`; a real manufacturer
+- **B′ — More products** as the owner names them: run `/model-product <link>` (step 7 adds a photo
+  finish when a straight top-down photo exists); a real manufacturer
   model is always checked first. Offered, not asked for: detail designs for terrazzo, the mosaic and
   the oak; a desktop quantity table (per room and size: tiles, cut, m², boxes); a wastage margin; the
   Lucia leaf decor tile.
+- **B⁗″ — Realistic, next options** (offered, not asked for; `docs/realism.md`): a path-traced
+  **Render** button (`three-gpu-pathtracer`, three 0.170 compatibility unknown); Poly Haven PBR
+  textures for plaster/wood/concrete; photo finishes for more products (Lucia, Vernisse, Etruria…);
+  bloom on light pucks.
 - **B‴ — Quest-to-TV mirror / Steam Deck viewer:** parked by the owner. If resumed, start from
   `docs/share-view.md` "Parked" (first step: a ping-only page pair on the Deck).
 - **B″ — Materials phase 4:** the owner's own products entered in AR (numpad: size, joint, pack) into
@@ -496,7 +538,12 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Sessions 32–37: everything in Next step A's first six bullets.
+- **Session 38 open:** why the AR URL copy got `NotAllowedError` (same path as the working PERF
+  copy); Realistic frame rate on the Deck and iPhone 14 (never measured); iOS half-float sky filtering
+  (Hypothesis it works); the Monastère tone and its one-face-per-size variety (the range has 24); a
+  thin light leak seen at one wall joint of the demo house in Realistic; the photo atlas build time on
+  the iPhone.
+- **Unwalked, Hypothesis only.** Sessions 32–38: everything in Next step A's first seven bullets.
   Session 37: whether the plan really draws under the 3D view and why (the hide path reads correct);
   what made the 23 vs 82 fps swing; the low-detail device look up close.
   Session 36 heat loss: every default without an owner answer (bare wall R 0.25, slab R 0.15, window
