@@ -5775,13 +5775,16 @@ export function setupMR(view, project, getFootprint) {
   // Building the compressed view URL is asynchronous, so keep the current variant
   // warm instead of awaiting compression after the trigger. Project change events
   // invalidate ONLY this cache; AR visuals still rebuild explicitly elsewhere.
-  let shareUrlCache = null; // { url, markers, furniture }
+  // Furniture products always ride in a link (docs/share-view.md, like desktop Share
+  // view): the FURNITURE output layer is a sheet layer, off by default, and once left
+  // the owner's AR links without any furniture (2026-10-03).
+  let shareUrlCache = null; // { url, markers }
   let shareUrlGeneration = 0;
   let shareUrlTimer = null;
-  async function refreshShareUrl(generation, markers, furniture) {
+  async function refreshShareUrl(generation, markers) {
     try {
-      const url = await buildShareUrl(project, { markers, furniture });
-      if (generation === shareUrlGeneration) shareUrlCache = { url, markers, furniture };
+      const url = await buildShareUrl(project, { markers, furniture: true });
+      if (generation === shareUrlGeneration) shareUrlCache = { url, markers };
     } catch (error) {
       if (generation === shareUrlGeneration) shareUrlCache = null;
       rlog('share URL precompute failed', String(error?.message || error));
@@ -5792,9 +5795,8 @@ export function setupMR(view, project, getFootprint) {
     const generation = ++shareUrlGeneration;
     const settings = getOutputSettings();
     const markers = settings.markerIcons;
-    const furniture = settings.furniture;
     clearTimeout(shareUrlTimer);
-    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers, furniture), 0);
+    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers), 0);
   }
   project.onChange(scheduleShareUrlRefresh);
   scheduleShareUrlRefresh();
@@ -5923,7 +5925,7 @@ export function setupMR(view, project, getFootprint) {
     // substitutes a file. QR independently creates and delivers its PNG.
     if (format === 'link') {
       const cached = shareUrlCache?.markers === settings.markerIcons
-        && shareUrlCache?.furniture === settings.furniture ? shareUrlCache.url : null;
+        ? shareUrlCache.url : null;
       if (cached && navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(cached);
@@ -5943,10 +5945,10 @@ export function setupMR(view, project, getFootprint) {
       let blob;
       try {
         const cached = shareUrlCache?.markers === settings.markerIcons
-          && shareUrlCache?.furniture === settings.furniture ? shareUrlCache.url : null;
+          ? shareUrlCache.url : null;
         url = cached || await buildShareUrl(project, {
           markers: settings.markerIcons,
-          furniture: settings.furniture,
+          furniture: true,
         });
         blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
       } catch (error) {

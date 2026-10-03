@@ -449,4 +449,4 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 ## Harder / accuracy (do last)
 - [ ] Anchor drift over a multi-room, multi-floor house stays acceptable
 - [ ] Upper/basement overlay heights match reality (only as good as the typed storey heights)
-</content>
+- [ ] EXPORT · LINK with the FURNITURE layer off: open the copied link on desktop; View 3D shows the furniture products (2026-10-03 fix)

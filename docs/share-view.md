@@ -21,8 +21,10 @@ ground index, never shipped. The bytes are `deflate-raw` via `CompressionStream`
 A one-letter codec tag (`z` deflate, `u` identity) falls back to identity where compression
 streams are missing. Decoding a `z` link needs `DecompressionStream` in the viewer's browser.
 
-What a view carries: massing, aperture bands and orientation, **furniture products (default
-on)**: a FURNITURE zone's `facing` rides after `climb` in its compact rect, then an index into the
+What a view carries: massing, aperture bands and orientation, **furniture products (always, from
+both desktop Share view and AR EXPORT LINK/QR)**. AR used to follow the sheet FURNITURE layer, which
+is off by default, so the owner's AR links carried no products and View 3D showed none (owner,
+2026-10-03; Proven by decoding the link: empty `a`). Encoding: a FURNITURE zone's `facing` rides after `climb` in its compact rect, then an index into the
 `a` article list (`docs/furniture.md` "merge"); links made before the merge carried free-placed
 items in floor slot 4, which still decode and migrate to zones. And **markers (opt-in)**, because large marker sets eat the QR capacity margin. Markers
 keep their device product (`marker.product`, `docs/materials.md` "Switches"): the ids are listed
