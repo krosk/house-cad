@@ -26,10 +26,19 @@ both desktop Share view and AR EXPORT LINK/QR)**. AR used to follow the sheet FU
 is off by default, so the owner's AR links carried no products and View 3D showed none (owner,
 2026-10-03; Proven by decoding the link: empty `a`). Encoding: a FURNITURE zone's `facing` rides after `climb` in its compact rect, then an index into the
 `a` article list (`docs/furniture.md` "merge"); links made before the merge carried free-placed
-items in floor slot 4, which still decode and migrate to zones. And **markers (opt-in)**, because large marker sets eat the QR capacity margin. Markers
+items in floor slot 4, which still decode and migrate to zones. And **markers: always in a LINK (desktop Share view and AR EXPORT · LINK), never in a QR**
+(owner, 2026-10-03): they are the view's ceiling lights and switch/outlet products, and the owner's
+house with markers is about 4 000 chars, past QR capacity (about 2 950). The AR sheet layers
+(MARKER ICONS, FURNITURE) no longer change a link. Markers
 keep their device product (`marker.product`, `docs/materials.md` "Switches"): the ids are listed
 once in `p` and a marker's optional slot 5 indexes it (slot 4 is the height flag, written as 0 when
-only a product needs the slot), so links made before products still decode. Not
+only a product needs the slot), so links made before products still decode. **Surface finishes
+(always)**: floor/wall finishes and the door and window products, which are finishes on their zones
+(`docs/materials.md`). Floor slot 5 holds `[rectIndex, materialIndex, edge, anchorRectIndex, corner,
+turn]` (trailing defaults dropped), indexes into that floor's rects and a top-level `m` id list; the
+owner's own products used by a finish ride in `cm`. Added 2026-10-03 after the owner's link showed no
+Héméra windows (Proven in Node on the owner's file: 28 finishes round-trip identical, 8 windows and 6
+doors restored, link 1 835 → 2 205 chars without markers); older links decode with none. Not
 carried: constraints, the conduit/wire network, control links, circuits. Any of these could be
 added as an opt-in layer.
 

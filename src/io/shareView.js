@@ -31,6 +31,12 @@ const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3)
 // into `a`.
 const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top', 'climb', 'facing'];
 const ARTICLE_SLOT = 6 + APERTURE_KEYS.length;
+// Surface finishes (floors, walls, door and window products: docs/materials.md) ride in
+// floor slot 5 as [rectIndex, materialIndex, edge, anchorRectIndex, corner, turn], trailing
+// defaults dropped; indexes are into that floor's rects and the top-level `m` id list.
+// Links made before finishes stop at slot 3/4 and decode with none.
+const EDGES = ['left', 'right', 'bottom', 'top'];
+const CORNERS = ['bl', 'br', 'tl', 'tr'];
 
 // Project → compact view object. Furniture products are compact enough to include by
 // default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
@@ -48,6 +54,9 @@ export function serializeView(project, { markers = false, furniture = true } = {
   const furnitureArticles = furniture
     ? [...new Set(project.floors.flatMap((f) => f.rectangles.filter((r) => r.article).map((r) => r.article)))]
     : [];
+  const finishMaterials = [...new Set(project.floors.flatMap((f) => (f.finishes || []).map((x) => x.material)))];
+  // The owner's own products (project.materials) travel with the link when used.
+  const customMaterials = (project.materials || []).filter((m) => finishMaterials.includes(m.id));
   return {
     app: VIEW_APP,
     v: VIEW_SCHEMA,
@@ -59,6 +68,8 @@ export function serializeView(project, { markers = false, furniture = true } = {
     t: markerTypes,
     ...(productIds.length ? { p: productIds } : {}),
     a: furnitureArticles,
+    ...(finishMaterials.length ? { m: finishMaterials } : {}),
+    ...(customMaterials.length ? { cm: customMaterials.map((m) => ({ ...m })) } : {}),
     // Positional arrays keep a large marker set within QR version 40 after deflate.
     // version 40 even after deflate. Trailing defaults are removed before encoding.
     f: project.floors.map((f) => {
@@ -79,8 +90,22 @@ export function serializeView(project, { markers = false, furniture = true } = {
           return mk;
         })
         : [];
-      // v2 fixes both optional lanes at stable indices: markers=3, (old) furniture=4.
-      return [f.name, mm(f.height), rects, floorMarkers];
+      const rectIndex = new Map(f.rectangles.map((r, i) => [r.id, i]));
+      const finishes = (f.finishes || []).flatMap((x) => {
+        const ri = rectIndex.get(x.target?.rect);
+        if (ri == null) return [];
+        const fc = [ri, finishMaterials.indexOf(x.material),
+          x.target.edge ? EDGES.indexOf(x.target.edge) : null,
+          x.anchor ? rectIndex.get(x.anchor.rect) ?? null : null,
+          x.anchor ? CORNERS.indexOf(x.anchor.corner) : null,
+          x.turn ? 1 : null];
+        while (fc.length > 2 && fc.at(-1) == null) fc.pop();
+        return [fc];
+      });
+      // v2 fixes the optional lanes at stable indices: markers=3, (old) furniture=4, finishes=5.
+      return finishes.length
+        ? [f.name, mm(f.height), rects, floorMarkers, [], finishes]
+        : [f.name, mm(f.height), rects, floorMarkers];
     }),
   };
 }
@@ -110,26 +135,44 @@ export function loadView(project, view) {
       x: item[1], y: item[2], z: item[3] || 0, rotationY: item[4] || 0,
       ...(item[5] ? { name: item[5] } : {}),
     })),
-  }));
-  const floors = sourceFloors.map((f, i) => ({
-    id: `f${i + 1}`,
-    name: f.name || `Floor ${i + 1}`,
-    height: typeof f.height === 'number' ? f.height : 2.8,
-    rectangles: (f.rects || []).map((rc) => ({
-      id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
-      op: rc.op || 'add', kind: rc.kind || 'room',
-      sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
-      article: rc.article, facing: rc.facing,
+    finishes: (f[5] || []).map((x) => ({
+      rect: x[0], material: view.m?.[x[1]],
+      edge: EDGES[x[2]] ?? null, anchorRect: x[3] ?? null, corner: CORNERS[x[4]] ?? null, turn: x[5] === 1,
     })),
-    constraints: [], // a view carries no parametric relationships (solver is a no-op)
-    markers: (f.markers || []).map((m) => ({
-      id: `m${++mid}`, type: m.t || 'outlet', x: m.x, y: m.y, z: m.z,
-      ...(m.d ? { zDatum: 'floor' } : {}),
-      ...(m.product ? { product: m.product } : {}),
-    })),
-    electricalLinks: [],
-    furniture: f.furniture, // a pre-merge link's items; deserializeInto turns them into zones
   }));
+  const floors = sourceFloors.map((f, i) => {
+    const firstRect = rid; // this floor's rects get ids r(firstRect+1)… in order
+    const rectId = (index) => (Number.isInteger(index) && index >= 0 && index < (f.rects || []).length
+      ? `r${firstRect + index + 1}` : null);
+    return {
+      id: `f${i + 1}`,
+      name: f.name || `Floor ${i + 1}`,
+      height: typeof f.height === 'number' ? f.height : 2.8,
+      rectangles: (f.rects || []).map((rc) => ({
+        id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
+        op: rc.op || 'add', kind: rc.kind || 'room',
+        sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
+        article: rc.article, facing: rc.facing,
+      })),
+      constraints: [], // a view carries no parametric relationships (solver is a no-op)
+      markers: (f.markers || []).map((m) => ({
+        id: `m${++mid}`, type: m.t || 'outlet', x: m.x, y: m.y, z: m.z,
+        ...(m.d ? { zDatum: 'floor' } : {}),
+        ...(m.product ? { product: m.product } : {}),
+      })),
+      electricalLinks: [],
+      furniture: f.furniture, // a pre-merge link's items; deserializeInto turns them into zones
+      finishes: f.finishes.flatMap((x) => {
+        const rect = rectId(x.rect);
+        if (!rect || typeof x.material !== 'string') return [];
+        const out = { target: x.edge ? { rect, edge: x.edge } : { rect }, material: x.material };
+        const anchor = rectId(x.anchorRect);
+        if (anchor && x.corner) out.anchor = { rect: anchor, corner: x.corner };
+        if (x.turn) out.turn = true;
+        return [out];
+      }),
+    };
+  });
   if (!floors.length) throw new Error('View link has no floors.');
   const groundIndex = view.g;
   const activeIndex = view.i;
@@ -139,6 +182,7 @@ export function loadView(project, view) {
     app: 'house-cad', version: FILE_VERSION,
     groundFloorId: floors[gi].id, activeFloorId: floors[ai].id,
     floors, conduitNodes: [], conduitSegments: [], wires: [],
+    materials: Array.isArray(view.cm) ? view.cm : [],
   });
 }
 

@@ -5775,17 +5775,18 @@ export function setupMR(view, project, getFootprint) {
   // Building the compressed view URL is asynchronous, so keep the current variant
   // warm instead of awaiting compression after the trigger. Project change events
   // invalidate ONLY this cache; AR visuals still rebuild explicitly elsewhere.
-  // Furniture products always ride in a link (docs/share-view.md, like desktop Share
-  // view): the FURNITURE output layer is a sheet layer, off by default, and once left
-  // the owner's AR links without any furniture (2026-10-03).
-  let shareUrlCache = null; // { url, markers }
+  // A link always carries furniture, finishes and markers (docs/share-view.md, owner
+  // 2026-10-03): the sheet layers (FURNITURE off, MARKER ICONS) once left the owner's
+  // links without furniture, and markers are the view's lights and device products.
+  // QR leaves markers out to fit its capacity.
+  let shareUrlCache = null; // { url }
   let shareUrlError = ''; // why the last precompute failed, shown by URL COPY FAILED
   let shareUrlGeneration = 0;
   let shareUrlTimer = null;
-  async function refreshShareUrl(generation, markers) {
+  async function refreshShareUrl(generation) {
     try {
-      const url = await buildShareUrl(project, { markers, furniture: true });
-      if (generation === shareUrlGeneration) { shareUrlCache = { url, markers }; shareUrlError = ''; }
+      const url = await buildShareUrl(project, { markers: true, furniture: true });
+      if (generation === shareUrlGeneration) { shareUrlCache = { url }; shareUrlError = ''; }
     } catch (error) {
       if (generation === shareUrlGeneration) {
         shareUrlCache = null;
@@ -5797,10 +5798,8 @@ export function setupMR(view, project, getFootprint) {
   function scheduleShareUrlRefresh() {
     shareUrlCache = null;
     const generation = ++shareUrlGeneration;
-    const settings = getOutputSettings();
-    const markers = settings.markerIcons;
     clearTimeout(shareUrlTimer);
-    shareUrlTimer = setTimeout(() => refreshShareUrl(generation, markers), 0);
+    shareUrlTimer = setTimeout(() => refreshShareUrl(generation), 0);
   }
   project.onChange(scheduleShareUrlRefresh);
   scheduleShareUrlRefresh();
@@ -5928,8 +5927,7 @@ export function setupMR(view, project, getFootprint) {
     // cache so writeText starts inside the trigger activation; it never silently
     // substitutes a file. QR independently creates and delivers its PNG.
     if (format === 'link') {
-      const cached = shareUrlCache?.markers === settings.markerIcons
-        ? shareUrlCache.url : null;
+      const cached = shareUrlCache?.url || null;
       // The flash names the cause (owner, 2026-10-03: "url copy failed" without details).
       let reason;
       if (!navigator.clipboard?.writeText) reason = 'no clipboard';
@@ -5937,12 +5935,15 @@ export function setupMR(view, project, getFootprint) {
       else {
         try {
           await navigator.clipboard.writeText(cached);
-          rlog('share URL copied', { chars: cached.length, markers: settings.markerIcons });
+          rlog('share URL copied', { chars: cached.length });
           sheetFlash('URL COPIED');
           return;
         } catch (error) {
           rlog('share URL copy failed', String(error?.message || error));
-          reason = error?.name || 'write';
+          // Activation and focus are what the browser checks before a clipboard write.
+          const act = navigator.userActivation?.isActive ? 1 : 0;
+          const focus = document.hasFocus() ? 1 : 0;
+          reason = `${error?.name || 'write'} a${act} f${focus} ${Math.round(cached.length / 1000)}k`;
         }
       }
       rlog('share URL copy failed', { reason, chars: cached?.length ?? 0 });
@@ -5954,12 +5955,7 @@ export function setupMR(view, project, getFootprint) {
       let url;
       let blob;
       try {
-        const cached = shareUrlCache?.markers === settings.markerIcons
-          ? shareUrlCache.url : null;
-        url = cached || await buildShareUrl(project, {
-          markers: settings.markerIcons,
-          furniture: true,
-        });
+        url = await buildShareUrl(project, { markers: false, furniture: true });
         blob = await qrToPngBlob(url, { scale: 8, margin: 4 });
       } catch (error) {
         rlog('qr generation failed', String(error?.message || error));
@@ -5969,7 +5965,7 @@ export function setupMR(view, project, getFootprint) {
       if (!blob) { sheetFlash('QR FAILED · TOO LARGE'); rlog('qr too large', { chars: url.length }); return; }
       const name = exportFileName(f, 'qr.png');
       const result = await deliverExport(name, blob, 'image/png');
-      rlog('qr share', { name, chars: url.length, markers: settings.markerIcons, ok: result.ok, delivery: result.delivery });
+      rlog('qr share', { name, chars: url.length, ok: result.ok, delivery: result.delivery });
       sheetFlash(result.ok ? `${result.delivery === 'share' ? '↗' : '⬇'} ${name}` : 'QR EXPORT FAILED');
       return;
     }
@@ -7782,8 +7778,7 @@ export function setupMR(view, project, getFootprint) {
   // Output preferences are device-local. Every change repaints the options panel
   // and the left-controller sheet immediately; the authored project is untouched.
   onOutputSettingsChange(() => {
-    sheetDirty = true;
-    scheduleShareUrlRefresh(); // marker-icons/furniture toggles change the view payload
+    sheetDirty = true; // (a link's payload ignores these layers: always full)
     if (exportMenu.group.visible) redrawExportMenu();
     if (sheetPanel.group.visible) redrawSheet();
   });

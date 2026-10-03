@@ -751,10 +751,10 @@ document.getElementById('save').addEventListener('click', () => {
 });
 
 // Copy a view-only 3D link: solved geometry in the URL fragment, no server, not editable.
-// Architecture + furniture by default; markers remain opt-in to keep the link QR-able.
+// Architecture, finishes, furniture and markers (lights, device products): docs/share-view.md.
 document.getElementById('share-view').addEventListener('click', async () => {
   try {
-    const url = await buildShareUrl(project, { markers: false });
+    const url = await buildShareUrl(project, { markers: true });
     let copied = false;
     try { await navigator.clipboard?.writeText(url); copied = true; } catch { /* clipboard blocked */ }
     const kb = (new Blob([url]).size / 1024).toFixed(1);
