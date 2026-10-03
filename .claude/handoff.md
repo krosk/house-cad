@@ -18,13 +18,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | Surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-01 (session 36)
-**Status:** Proven (git): `origin/main` = `c2f6e0b` plus this handoff's commit, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (curl, at handoff
-time): the live `version.json` serves `c2f6e0b`, so everything from sessions 35–36 is published.
+**Date:** 2026-10-03 (session 37)
+**Status:** Proven (git): `origin/main` = `637dfd1` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
+PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
-FURNISH's removal (session 32) and the floor pattern **start corner** (session 33). Everything else from
-sessions 30–36 is verified by build, Node or a scratch/desktop browser only (Next step A).
+FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
+PERF clipboard report (two reports pasted) and an AR 3D view frame rate the owner accepts (50–80 fps on
+Ground with 33 device products). Everything else from sessions 30–37 is verified by build, Node or a
+scratch/desktop browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
 
@@ -60,46 +62,52 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 36
+## What changed in session 37
 
 > Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Session 35 is folded into the sections below (its
-> unwalked items stay in Next step A).
+> decisions" or "Findings" and delete this list. Session 36 is folded into "Standing decisions"
+> (its unwalked items stay in Next step A).
 
-All owner requests; build-verified, none walked on the Quest yet (Next step A).
-1. **CONDUIT · EDIT shows a selected conduit's length** (`e08eb59`): `LENGTH` (the segment, 3D) and,
-   when it is part of a longer run, `RUN <len> (<n>)`: the run continues through bare junctions with
-   exactly two segments, stops at a device, branch or end; a loop counts once (`conduitRunLength` in
-   `core/conduit.js`). Proven in Node. Text only: the run is not highlighted (offered, not asked for).
-2. **Radiators as procedural furniture** (wall-mounted, `mountZMm` seeds the zone's foot, like Daikin):
-   - `542e46f` ACOVA Angora towel radiators 133.2 and 172.8 cm (builder `towel-radiator`, bar groups in
-     `params.rows`);
-   - `084709f` + `8824dc3` De'Longhi EASY panel radiators, builder `panel-radiator`: vertical 50 × 180,
-     50 × 200, 60 × 200 (type 21, 7 cm), horizontal 90 × 60 and 120 × 60 (double panel, 10 cm, top
-     grille, side ports). Slots on a **33.3 mm pitch** (measured), counted on studio renders or straight photos.
-   Sources in each builder's `// Sources:` block; entries in `docs/furniture.md`. Proven: scratch
-   previews (bounding boxes = the spec sizes). Mount heights (220 mm ACOVA from its manual minimum,
-   150 mm De'Longhi, a guess) are Hypothesis.
-3. **Room heat loss** (`99d0cd9`, `a2084e2`; design + defaults + owner answers in
-   `docs/heat-loss.md`): a simplified EN 12831 in `src/core/heatLoss.js` (pure, Node-testable), per
-   connected ROOM component. A new AR group **HEATING** (owner: "a master category"): **PIPE** (moved
-   from MARKER, id `marker_pipe` unchanged), **HEAT LOSS** (room watts on the plan, settings panel this
-   floor / whole house, aimed room's breakdown) and **R / U** (id `heat_r`: each INSULATION zone's R
-   and each window/door's own U on the plan, typed on the numpad; the R also on the PLAN · EDIT band
-   pad). Openings store **U** (label Uw), not R, on purpose. Settings are project data
-   (`project.heat`, `floor.heat`, zone `rValue` / `uValue`, only keys set). Proven: build, production
-   build loads with no console errors, Node on the owner's file (save/reload, one room by hand, window
-   U 2.8 doubles the window part). No desktop UI (not asked).
-4. **Stairs start at their floor** (`c2f6e0b`, owner): a stair zone holds only its own steps, rising
-   (UP) or descending (DOWN) from its floor at a fixed **18 cm riser**; count = run / 25 cm going
-   (the going is a Hypothesis). Was: every zone climbed the full storey. Proven in Node (the owner's
-   split flights add to 2.88 m for 2.95 m). AR 3D view and View 3D share it.
-5. **JOYFURNOS double pedal bin** (`51b0968`, builder `pedal-bin`, Joybuy 100001750045278): size from
-   the gallery dimension drawing; `tools/product-images.mjs` learned Joybuy (Chrome-only).
+All owner requests (they reported the problems from the Quest).
+1. **PLAN · EDIT on a furniture zone with a product** (`1cd1c14`): FOOT or TOP moves the whole unit
+   (product height fixed; TOP sets foot = top − height). Was: a foot above the stale top was silently
+   rejected, so the owner could not raise a Daikin CTXM15A. Build only; not walked.
+2. **AR 3D view draw calls** (`3bb9564`, `src/ui/mergeByMaterial.js`): door, window, finish and device
+   products of a floor are merged into one mesh per shared material; each furniture model is merged
+   the same way. Owner saw ~1000 calls in the furnished living room. Proven (Node): 115 → 9 meshes for
+   3 windows, 10 outlets 100 → 6, same triangles and bounds. Trade-off: merged meshes span the floor,
+   so they are no longer frustum-culled.
+3. **AR furniture uses Lambert copies of its materials** (`1c48801`, `arLambert` in `mr.js`), like
+   every other AR 3D material. Desktop View 3D keeps PBR.
+4. **Device products have a `low` detail level for AR** (`d37f09d`, `buildDeviceProduct(def,
+   { detail })`): 48 directions, fewer slope rings, ~1/4 of the triangles. The owner's fps fell to 10 in
+   the kitchen; Ground's 34 devices were 180k of the 3D view's ~190k triangles. Proven by the owner's
+   PERF report: devices now 44.8k triangles. Desktop keeps `full`.
+5. **PROJECT · PERF in the 3D view** (`1c48801`, `62d6627`, `d00be61`): with LEFT X on, the sweep
+   measures `struct`, `finish`, `doorwin`, `device`, `furn`, `plan` with ms, calls and triangles. After
+   a full sweep a detailed text report is built (`perfReport`: layers, the 40 biggest 3D meshes, floor
+   counts, renderer/XR/GPU) and **the trigger that stops PERF copies it to the clipboard**. Proven:
+   the owner pasted two reports.
+6. **Open, not pursued (owner: fps 50–80 is fine):** the reports show the `plan` layer drawn under
+   the 3D view (90 calls, 58.9k triangles = twice its content), and the same scene ran at 23 then 82 fps
+   minutes apart with the CPU nearly idle. Recorded in `docs/ar-survey.md` with how to resume.
+7. Answered, no code: the Héméra window's two leaves come from the zone's hinge (`both`), not a
+   separate product; the Héméra page links (the window's full URL is only in an old transcript:
+   `https://www.lapeyre.fr/produits/fenetre-pvc-blanc-hemera-sur-mesure-FPC5837268`, unverified).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
 - **Label every claim Proven or Hypothesis** (`CLAUDE.md` top rule), in reports, commit bodies, docs.
+- **Session 36 features (folded):** the AR group **HEATING** = PIPE (id `marker_pipe`) + HEAT LOSS +
+  R / U (`docs/heat-loss.md`: simplified EN 12831, settings are project data, openings store U);
+  stairs hold only their own steps from their floor at an 18 cm riser (going 25 cm, a Hypothesis);
+  CONDUIT · EDIT `LENGTH` / `RUN`; ACOVA and De'Longhi radiators and the JOYFURNOS bin as procedural
+  furniture (`docs/furniture.md`). Stairs stay circulation, not rooms, in heat loss (owner: "No need
+  yet" to merge them).
+- **AR 3D view geometry budget** (session 37): products are merged per material
+  (`mergeByMaterial.js`), so **a product material must be cached per entry** (not created per call)
+  to merge across items; device products are built at `detail: 'low'` in AR (a new design must use
+  `D.dirs` / `D.slope` / `D.collar` / `segs()`); AR furniture is Lambert. Desktop is untouched.
 - **Git:** commit + push directly on `main`, only when asked. **Every push publishes** (Pages
   auto-deploy). Non-trivial commits need a **descriptive body**. Stage by explicit path, never
   `git add -A`.
@@ -215,6 +223,18 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
 
 ## Findings / traps worth knowing
 
+- **Clipboard writes in AR need a user gesture and almost no work before them.** EXPORT LINK and the
+  PERF report both build their text beforehand and call `writeText` first thing in the trigger's XR
+  `select` handler. The first PERF version built its report inside the trigger and the Quest refused
+  it (`PERF COPY FAILED`); prebuilding fixed it (Proven: the owner pasted the reports). The owner
+  rejected a download fallback.
+- **The Quest browser has no GPU timer:** PERF's source reads `frame` (Proven, owner's reports), so
+  per-layer ms are frame-interval differences and noisy. Per-layer **calls and triangles are exact**:
+  calls = meshes × materials × 2 eyes (no multiview). Ask the owner to paste the report (stop trigger)
+  rather than read the HUD.
+- **AR frame rate swings with the headset's state:** identical content ran at 23 fps then 82 fps
+  minutes apart with js 0.6 ms and render 2.7 ms (Proven, two reports). Compare runs only back to back.
+
 - **`mr.js` does NOT subscribe to `project.onChange`.** AR model changes must call the rebuild by hand
   (`buildPlan()`, `buildConduits()`, `buildRoutedWires()`, …). Wire picking deliberately uses the legs
   cached by the last `buildRoutedWires` (it picks what is drawn).
@@ -327,6 +347,9 @@ All owner requests; build-verified, none walked on the Quest yet (Next step A).
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
+- **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
+  material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
+  `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
 - **Session 36:** `542e46f` ACOVA towel radiators · `e08eb59` conduit length readout · `084709f`
   De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
@@ -348,8 +371,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - Earlier sessions: see `git log`.
 
 **Never stage** `Document from Alexis He.json` (untracked): it is the owner's real 3-storey house (rev 9,
-47 wires) and the read-only Node fixture for almost every check. A newer export (rev 12, double
-switches merged) came as an upload in session 34 and is not in the repo; ask the owner if needed.
+47 wires) and the read-only Node fixture for almost every check. Newer exports are not in the repo: session 37's upload (rev 14, 2026-10-03: 33
+device products and the Daikin units on Ground/Upper, 85 wires) came only as a chat upload; ask the
+owner for a fresh export when a check needs current data.
 
 ## Resuming from a clean checkout
 
@@ -386,7 +410,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
 | `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
-| `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry, clones share geometry |
+| `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
+| `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware; `buildSliding` for the Néva) from `windowProductPlacements` |
 | `src/ui/exteriorView.js` | The AR 3D view's opaque glass material (procedural daylight exterior) |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
@@ -396,6 +421,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 37: raise the Daikin CTXM15A in PLAN · EDIT (FOOT 230 cm, then ⇄ TOP 250 cm → foot
+    2.202 m); outlets/switches up close with LEFT X (low detail: faceted corners?); furniture looks
+    matte (Lambert) but right; windows/glass unchanged after the merge;
   - session 36: HEATING (PIPE still works after the move; HEAT LOSS: set the Basement unheated first,
     it defaults to heated, then the attic R; R / U: the 3 linings' R and the windows' Uw; panel
     height, labels vs dims overlap); the stairs in LEFT X (treads from the floor, 25 cm going vs the
@@ -456,6 +484,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   and pack on the card, the AR 3D view on the target (option 3 already exists as LEFT X).
 - **C — Conduit-drawing speed-ups:** height snap + "ceiling run" toggle, straight runs, one-press drop
   from a device, snap-to-wall + auto-pin. The owner decides priority.
+- **D′ — AR 3D view: the plan drawn under it** (session 37 reports), parked by the owner (fps 50–80
+  is fine). Resume per `docs/ar-survey.md` "Open: the plan may still be drawn under the AR 3D view".
 - **D — Remaining AR per-object layers**, only if a mode drops frames (adjacent-floor spheres, pipes,
   furniture, control links). Measure with PERF first.
 - ~~Draw stacked markers apart in AR~~ — rejected: the floor icon, pick, dims and sheet all use the
@@ -466,7 +496,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
-- **Unwalked, Hypothesis only.** Sessions 32–36: everything in Next step A's first five bullets.
+- **Unwalked, Hypothesis only.** Sessions 32–37: everything in Next step A's first six bullets.
+  Session 37: whether the plan really draws under the 3D view and why (the hide path reads correct);
+  what made the 23 vs 82 fps swing; the low-detail device look up close.
   Session 36 heat loss: every default without an owner answer (bare wall R 0.25, slab R 0.15, window
   U 1.4, door U 2.0, λ 0.04 for the 3 linings until their R is set, basement 6 °C); Node totals with
   defaults (Ground 11.7 kW, Upper 8.4 kW; 8.8 / 4.6 with attic R 7) are not checked against any real
@@ -489,7 +521,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   section, wheel Ø and wall gap; the exterior picture's horizon sits at the same pane fraction for every
   window. Session 30:
   - everything in Next step A;
-  - frame cost of the AR 3D view (Lambert walls + textures; opaque walls may hide the real room);
+  - ~~frame cost of the AR 3D view~~ measured in session 37 (owner: 50–80 fps on Ground, accepted);
   - whether MARKER · CHECK's 1-px pins read, and whether ~100 rings hold frame rate;
   - the readout pill (4 lines, 6 at a tighter pitch since session 32) and its legibility;
   - how the textures look in a browser;
@@ -523,8 +555,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   with markers, labels, conduits and wires since the batching, and reported them working.
 - **Why 168 per-marker canvas textures cost ~47 ms** is unexplained. The batching fixed it; the
   mechanism is a Hypothesis (per-texture handling in the Quest browser).
-- **`EXT_disjoint_timer_query_webgl2` on the Quest:** the owner's PERF line prefix (`gpu:` vs
-  `frame:`) was not reported, so it is unknown whether the numbers were GPU time or frame intervals.
+- ~~Is `EXT_disjoint_timer_query_webgl2` on the Quest?~~ No: the session 37 reports read `source
+  frame` (OculusBrowser 152, Adreno 740), so every PERF ms is a frame interval.
 - `docs/ar-qa-checklist.md` is stale for most work since s16.
 - **Data oddities in the owner's house:** cameras m174/m183 have `z = 0`; doors r77/r120 are drawn
   wider than their opening.
