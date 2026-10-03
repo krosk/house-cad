@@ -18,6 +18,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
+import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from '../core/model.js';
@@ -4033,8 +4034,9 @@ export function setupMR(view, project, getFootprint) {
 
   // Give each instance its OWN materials (textures stay shared) so the hover/selected
   // emissive highlight applies per item, not to every clone of the same article.
+  // Its meshes are first merged per material (mergeByMaterial.js: draw calls per eye).
   function instantiateFurniture(src) {
-    const inst = src.clone();
+    const inst = mergeObjectByMaterial(src.clone());
     inst.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
@@ -4077,7 +4079,11 @@ export function setupMR(view, project, getFootprint) {
     furnitureKey = '';
     for (const child of [...furnitureGroup.children]) {
       furnitureGroup.remove(child);
-      child.traverse?.((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.()); });
+      child.traverse?.((o) => {
+        if (!o.isMesh) return;
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose?.());
+        if (o.userData.ownGeometry) o.geometry.dispose(); // merged copies (template geometry is shared)
+      });
     }
     for (const child of [...furniturePlanGroup.children]) {
       furniturePlanGroup.remove(child);
@@ -4212,8 +4218,8 @@ export function setupMR(view, project, getFootprint) {
         ...[...markerProductDraws(project, floor.markers)].filter(([, d]) => d)
           .flatMap(([id, d]) => deviceProductParts(floor.markers.find((m) => m.id === id), d, a.markerPlacements?.get(id))),
       ];
-      for (const [geometry, material] of parts) {
-        if (!geometry) continue;
+      // One mesh per material: products are many small meshes, drawn once per eye.
+      for (const [geometry, material] of mergePartsByMaterial(parts)) {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.y = y;
         arch3dGroup.add(mesh);

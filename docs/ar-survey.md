@@ -923,6 +923,15 @@ teleport reticle; no last-active routing remains.
   PERF measured the per-marker Sprite + floor Mesh (168 CanvasTextures for 84 markers) at ~47 ms of GPU
   per frame on the owner's ground floor; after batching, the owner reports ~90 fps with the whole floor
   in view, and >80 fps in `MARKER · WIRE`. The floor fills/strips were never the problem.
+- **AR 3D view products are merged per material** (`src/ui/mergeByMaterial.js`). The owner saw the
+  `draw:` line jump from ~150 to ~1000 calls facing the furnished living room (2026-10-03). Products
+  are many small meshes: a Héméra window 25–43, an Ovalis outlet 10, a towel radiator 39–49, the
+  piano 27. `buildArch3d` merges every door, window, finish and device product of the floor into one
+  mesh per shared (cached) material, and `instantiateFurniture` merges each furniture model the same
+  way. **Proven** (Node, 2026-10-03): 3 window products 115 → 9 meshes, 10 outlets 100 → 6, the
+  towel radiator 49 → 3, the piano 27 → 6, same triangles and exact bounds. **Hypothesis:** the
+  living room drops back near its old count; unmeasured on the Quest. A new product builder needs
+  nothing extra, but a product material created per call (not cached) would not merge across items.
 - **Never add an AR overlay layer as one Mesh/Sprite per item.** Use the existing batch patterns:
   - dim + Z-dim labels: `addDimLabelBatch`, an atlas of 256x64 slots plus `makeBillboardMaterial`;
   - markers: `makeMarkerBatch`, a type+ring glyph atlas, one billboard mesh + one flat mesh;
