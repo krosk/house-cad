@@ -20,8 +20,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-04 (session 38, continued three times after context compactions)
-**Status:** Proven (git): `origin/main` = `2352c66` plus this handoff's commit, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
+**Status:** Proven (git): `origin/main` = `1a25943` plus this handoff's commit, nothing unpushed; the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
+output): the headset app holds `1a25943` for its next launch; the headset autosave holds the slabs and
+the IKEA kitchen (items 17–20), not yet looked at by the owner. Proven (`am broadcast`
+result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
+normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
 Proven (owner, 2026-10-03, after `856592c`): their link's **3D view now opens on their phone** ("Ok it
 works"); before, it crashed the canvas. The owner opened session 38 links on desktop and phone; the
@@ -180,6 +184,41 @@ All owner requests, 2026-10-03.
       (same model). Takeoff: 320 Lucia tiles = 64 boxes house-wide, incl. the entrance's `r57` face.
     - Open: which French door is the quote's Sw 0.51 one (Hypothesis: `r111`; the two Sw 0.47 ones cost
       €93 more, maybe acoustic glass, both on the x ≈ −4.8 façade).
+17. **Headset editing as a procedure** (`fa10818`): `docs/headset-data.md`, skill `quest-edit`,
+    `tools/quest-storage.mjs` (backup / read / write with a `--base` guard) and `tools/house-query.mjs`
+    (openings, rooms-with, takeoff, diff). Every write since went through them (Proven).
+18. **Slab thickness** (`b5a55f2`; owner: "my ceiling is indeed 2700", 2.95 was typed only to stack
+    the floors). `floor.slab`; the room height is `ceilingHeight(floor)` = height − slab
+    (`src/core/storey.js`) for walls, ceilings, finishes, takeoff, heat loss, ceiling routes, new
+    lights; stacking and stairs keep `height`. AR LEVEL: SWAP toggles storey ↔ slab. Written to the
+    headset (owner's values): Basement 2.27 / 0.22, Ground 2.95 / 0.25, Upper 2.70 → 2.95 / 0.25.
+    Node on that copy: Lucia 320 → 300 tiles, Vernisse 1030 → 927, heat loss Basement 7629 → 6982 W,
+    Ground 9861 → 9277 W.
+19. **Headset app updated after every deploy** (`4ae38b3`, owner: "record this as an automatic
+    update if the headset is reachable"): `quest-storage.mjs update-app` makes the app's service
+    worker take the live build (the browser shares it), so the next launch opens it. Rule in `CLAUDE.md`
+    (Git workflow). Proven: ran after `4ae38b3`, `e2f6f7a`, `1a25943`.
+20. **IKEA kitchen** (`e2f6f7a`, `1a25943`; owner's IKEA Kitchen Planner PDF "Maison 2", 37 pages):
+    16 `metod-*` products (planner units 1–14, worktops A/B), each assembled in
+    `src/ui/kitchenUnits.js` from IKEA's own rotera part models (owner chose them over procedural);
+    `docs/furniture.md` "IKEA kitchen units". Owner rulings: ASPUDDEN (no model) → their framed fronts
+    605.950.50 / 005.950.48 painted white; generic oven/microwave; two worktop zones; IKEA dims are
+    to the tile faces (8 mm allowance); m126 behind wall cabinet r163 is a supply outlet for the
+    cabinet lights and stays. Written to the headset: Ground r153–r168, the owner's placeholders
+    r134, r141–r145 and their 24 dims removed (owner). Proven: scratch renders of every unit and the
+    whole kitchen; placement solves with no conflict. The tap first sat 96 mm in the wall (its GLB
+    origin is the bbox centre, base 110 mm behind), fixed in `1a25943`.
+21. **Heat loss: wall layers and walls in the earth** (owner, 2026-10-04; `docs/heat-loss.md`):
+    - An exterior wall is its drawn WALL + INSULATION zones, and their R add up. Where no WALL zone is
+      drawn, a placeholder wall stands in. Settings: undrawn depth 0.20 m and wall λ 0.8, replacing
+      the bare wall R 0.25.
+    - One earth level for the house (owner): walls below it lose to the ground (ISO 13370 basement
+      wall).
+    - Proven (Node on the headset copy): Ground 9277 → 9240 W, Upper 8374 → 8329 W, Basement at
+      earth 0 → 2856 W.
+    - Open: the 7 cm wall `r112` now raises the kitchen room's loss by about 160 W. Is it really the
+      outer wall? The owner's real earth level is also still unknown.
+    - Not seen on the Quest.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -494,7 +533,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `2798bc9` finish textures in a worker · `96e342f` every texture in the worker · `cc72e0b` plan view
   prepares nothing 3D, View 3D loading wheel · `856592c` phones: half-size textures, canvases freed ·
   `054aad7` collapsible View 3D floor panel · `a57716f` Moder II table + bed texture fix · `780aeeb`
-  modelling from isometric manuals · `2352c66` Vernisse straight grid, tiles upright.
+  modelling from isometric manuals · `2352c66` Vernisse straight grid, tiles upright · `afcdd90`
+  half-wall finishes (sides + cap) · `fa10818` headset editing tools + skill · `b5a55f2` slab
+  thickness · `4ae38b3` `update-app` · `e2f6f7a` IKEA kitchen units · `1a25943` kitchen tap placement.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
@@ -518,10 +559,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `4cad922` Monastère, Lucia, detail layer · `9a82898` open doors in View 3D.
 - Earlier sessions: see `git log`.
 
-**Never stage** `Document from Alexis He.json` (untracked): it is the owner's real 3-storey house (rev 9,
-47 wires) and the read-only Node fixture for almost every check. Newer exports are not in the repo: session 37's upload (rev 14, 2026-10-03: 33
-device products and the Daikin units on Ground/Upper, 85 wires) came only as a chat upload; ask the
-owner for a fresh export when a check needs current data.
+**Never stage** `Document from Alexis He.json` (untracked): the owner's house at rev 9, a read-only Node
+fixture only. The current plan is the **headset autosave** (read it with `quest-storage.mjs read`,
+`docs/headset-data.md`); scratchpad copies are session-local.
 
 ## Resuming from a clean checkout
 
@@ -574,6 +614,19 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Next step
 
+**Session 39 has no Quest** (owner, 2026-10-04). So:
+- A waits.
+- Do not read or write the headset.
+- After a push, skip `update-app` and say so.
+- The kitchen and the slabs can still be checked off the headset, in View 3D, through the share link
+  the owner got in session 38. It is the headset copy as of the kitchen write, before the tap fix:
+  the tap is drawn by code, so a reload of that link shows the fixed tap. Hypothesis: the link still
+  opens; prove it when the owner opens it.
+- Never put that link or the plan into the repo: it encodes the owner's house.
+- `Document from Alexis He.json` is older (rev 9) and has neither the slabs nor the kitchen.
+- Off-headset work that needs no plan edit: B′, the worktop seams around the sink (offered, not
+  asked for), or what the owner raises from the link.
+
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
   - session 38, IKEA kitchen (`e2f6f7a`; written to the headset autosave 2026-10-04, read back
@@ -581,8 +634,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     left and bottom walls, 8 mm tile allowance); the placeholders r134, r141–r145 and their 24
     dimensions removed (owner). In LEFT X / View 3D: every unit loads, matches the planner's front
     views, worktop at 92 cm, wall cabinets 148–248; light m126 behind wall cabinet r163 is deliberate
-    (owner: a supply outlet for the cabinet lights, stays); pedal bin r150 and the De'Longhi r151 kept. If wrong: the pre-kitchen autosave is the
-    scratchpad's `kitchen-base.json` (= the slab write);
+    (owner: a supply outlet for the cabinet lights, stays); pedal bin r150 and the De'Longhi r151 kept. If wrong: undo by
+    re-applying the edit in reverse (the session-local scratchpad backup is gone in a new session);
   - session 38, slabs (`b5a55f2`; written to the headset autosave 2026-10-04, read back identical; the
     app's precache already holds that build): LEVEL shows Basement 2.27 / slab 0.22, Ground 2.95 / 0.25,
     Upper 2.95 (was 2.70) / 0.25; ⇄ SLAB on the numpad; LEFT X walls and the painted ceiling at 2.05 /
@@ -687,6 +740,14 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Known open questions
 
+- **Session 38 kitchen / slab open:** every unit on device (load time, frame rate with 16 assembled
+  zones, ~2.5 MB of parts); the 60-high ASPUDDEN stand-ins (60x80 model scaled, frame rails a quarter
+  thinner; the 60x60 808.595.049 has no model); pulls follow the drawings (14 bars, 11 knobs) not the
+  list (7 + 6); plinth 40 mm behind the fronts and no legs (Hypotheses); faint seams in worktop A where
+  four scaled slices meet around the sink (offered to smooth); the planner's far-end room shape differs
+  from the plan (right wall 3183 vs 3060, notch 1033 × 919 vs 1120 × 1060), not acted on; a Ground light
+  marker at z 3.80 (above the 2.95 storey) never identified; the AR slab pad and the lowered ceilings
+  never seen on device.
 - **Session 38 open:** why the AR URL copy got `NotAllowedError` (same path as the working PERF
   copy); Realistic frame rate on the Deck and iPhone 14 (never measured); iOS half-float sky filtering
   (Hypothesis it works); the Monastère tone and its one-face-per-size variety (the range has 24); a
