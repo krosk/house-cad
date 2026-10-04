@@ -233,9 +233,14 @@ function glossTile(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.save();
   path(); ctx.clip();
   if (bump) {
-    ctx.fillStyle = '#b4b4b4';
+    // The glaze is thin in the centre and thick along the edges (owner, 2026-10-04): a
+    // lower, calmer centre rising into a raised rim, then the rounded edge below.
+    // The face is darker (thinner) than the edges everywhere: its gentle ripples stay
+    // within ±12 of its level (156), below the white rim.
+    ctx.fillStyle = '#9c9c9c';
     ctx.fillRect(x, y, w, h);
-    ripples('#ffffff', '#6a6a6a', 0.35);
+    ripples('#a8a8a8', '#909090', 0.7 * (m.centreRelief ?? 0.5) * 2);
+    glazeRim(ctx, path, x, y, w, h, (m.edgeBand ?? 0.005) * ppm, r);
     // Rounded edge: a blurred dark rim just inside the outline.
     ctx.filter = `blur(${Math.max(1, 0.0015 * ppm)}px)`;
     ctx.strokeStyle = '#5a5a5a';
@@ -257,6 +262,44 @@ function glossTile(ctx, m, x, y, w, h, ppm, r, bump) {
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+  // The clip's anti-aliased outline pixels keep part of every layer drawn inside, the white
+  // rim included, so they stood brighter than both the joint and the rounded edge: a
+  // one-pixel ridge that glints under gloss (owner, 2026-10-04: "white pixels at the very
+  // edge"). Seal the outline crisply at joint height.
+  if (bump) {
+    ctx.strokeStyle = '#5a5a5a';
+    ctx.lineWidth = Math.max(2, 0.0012 * ppm);
+    path(); ctx.stroke();
+  }
+}
+
+// The tile's raised edge (bump only; owner, 2026-10-04): the body is thicker at its edges
+// than in its centre, so the height map is white along the edges and darker over the face.
+// The white stays within `band` px of the edge (it never eats into the face) and is uneven
+// along it: a base rim, then overlapping blurred swells, some white, some whiter. The
+// caller has clipped to the tile.
+function glazeRim(ctx, path, x, y, w, h, band, r) {
+  ctx.filter = `blur(${Math.max(1, band * 0.75)}px)`; // a soft fall from the rim to the face
+  ctx.strokeStyle = '#dcdcdc';
+  ctx.lineWidth = band * 1.6; // half of it falls inside the clip
+  path(); ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  const side = (x0, y0, dx, dy, len, nx, ny) => {
+    const n = Math.max(2, Math.round(len / (band * 5)));
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5 + (r() - 0.5) * 0.5) / n;
+      const along = (len / n) * (0.5 + r() * 0.6), across = band * (0.5 + r() * 0.5);
+      ctx.globalAlpha = r() * 0.85;
+      ctx.beginPath(); // centred on the edge: only its inner half shows
+      ctx.ellipse(x0 + dx * len * t, y0 + dy * len * t,
+        along * Math.abs(dx) + across * Math.abs(nx), along * Math.abs(dy) + across * Math.abs(ny), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  side(x, y, 1, 0, w, 0, 1); side(x, y + h, 1, 0, w, 0, -1);
+  side(x, y, 0, 1, h, 1, 0); side(x + w, y, 0, 1, h, -1, 0);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
 }
 
 const BRICK_DESIGNS = { 'handmade-gloss': glossTile };
@@ -972,7 +1015,11 @@ function unitCanvas(m, paint) {
   const canvas = newCanvas();
   canvas.width = Math.max(8, Math.round(uw * ppm));
   canvas.height = Math.max(8, Math.round(uh * ppm));
-  paint(canvas.getContext('2d'), canvas.width, canvas.height, ppm);
+  // Software rasterising (willReadFrequently): Chrome's GPU canvas painted blurred, clipped
+  // shapes wrong (Proven 2026-10-04, Vernisse's height map in Chrome on the Deck: one row's
+  // tiles lost their bottom 15 mm to the joint; the software path drew it right), and it was
+  // no faster for these textures (Vernisse 1.9 s vs 2.0 s).
+  paint(canvas.getContext('2d', { willReadFrequently: true }), canvas.width, canvas.height, ppm);
   return { canvas, uw, uh };
 }
 

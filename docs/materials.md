@@ -248,6 +248,26 @@ sets its strength and `edgeWobble` (m) the handmade edge wander.
   Proven: build; scratch render of the colour and bump canvases (2048 × 1985 px, 16 × 4 upright tiles,
   straight joints); takeoff of a 2 × 0.6 m splashback = 52 tiles (26 columns × 2 rows; Node). Not yet
   seen on a real wall in View 3D or in AR.
+  **Raised edges, thinner face** (owner, 2026-10-04): the tile body is thicker at its edges than over
+  its face, and unevenly so. "Thick" means the tile's thickness, not a band that eats into the face:
+  in the height map, white shades at the edges, darker over the face, and the edges "sometimes white
+  or whiter, but only limited to the edge". `glazeRim` draws a white rim within `edgeBand` of the
+  edge (default 5 mm) with overlapping blurred swells of varying whiteness along it, blurred by 0.75 × the band so it falls softly into the face (owner: "soften the transition from edge to center"). The face sits
+  lower (156) with gentle ripples kept within ±12 (`centreRelief`, default 0.5), so it never rises to
+  the rim. Rejected tries, same day: alternating raised/low blobs along the edges ("quite ugly"), and
+  a 13–16 mm ramp that ate into the face. Proven: scratch renders of the height map and a raking-light
+  patch; owner on the soft version: "Ok this one is great". Hypothesis: it reads the same in View 3D on a real wall and on the Quest.
+  **White pixels at the very edge** (owner, same day), two causes, both fixed:
+  - **The outline pixel:** the clip's anti-aliased outline pixels kept part of every layer drawn
+    inside, the white rim included, so they stood brighter than both the joint and the rounded edge.
+    That one-pixel ridge glinted under gloss. The outline is now sealed at joint height after each
+    tile.
+  - **Chrome's GPU canvas** painted blurred, clipped shapes wrong: one row's tiles lost their bottom
+    15 mm to the joint (a 30 px joint instead of 5), with stray lines. The published version had it
+    too, at 11 px.
+
+  Proven (scratch preview, Chrome on the Deck): with both fixes, every horizontal joint is 5–7 px and
+  the height map has no one-pixel spike (88 before).
 - **Its look depends on reflections.** Photo 09's character is the room mirrored in a wavy glaze. That
   needs an environment map: View 3D's **✦ Reflections** toggle (below). Without it the tiles show
   their relief but little shine.
@@ -452,6 +472,19 @@ plan (y up), so y is flipped there and the top view matches the spec's drawing.
     shader compiles there as it does in desktop Chrome).
 
 ## Texture preparation in a worker
+
+- **Finish canvases rasterise in software** (`unitCanvas`: `getContext('2d', { willReadFrequently:
+  true })`, 2026-10-04).
+  - Proven (Chrome on the Deck, same code and seed, deterministic over runs): the GPU-accelerated
+    canvas drew Vernisse's height map with one row's tiles cut short by 15 mm (a 30 px joint instead
+    of 5); the software path drew it right.
+  - Proven: the software path was no slower (Vernisse 1.9 vs 2.0 s; the other designs equal or
+    faster).
+  - Hypothesis, not proven: Chrome's GPU canvas mishandles a `filter: blur()` drawn inside a clip on
+    a large (2048 px) canvas, most likely the bounds of the off-screen layer it blurs in. A minimal
+    repro (one clipped, blurred stroke on a 2048 px canvas, GPU vs software) would prove it.
+  - Unknown: whether the Quest Browser's or a phone's GPU path does the same; the software path
+    avoids the question.
 
 - **Owner rule (2026-10-03): everything that is texture preparation runs in the background.**
   - Why: once share links carried finishes (session 38), opening the owner's link froze the page.

@@ -81,7 +81,9 @@ export const BUILTIN_MATERIALS = [
     // GoodHome Vernisse wall tile, white gloss, "carreaux anciens" relief (Castorama EAN
     // 5036581063269): 301 × 75.4 mm, 8.5 mm, glazed ceramic, not rectified; 40 tiles =
     // 0.92 m² per box. White tile, white grout (owner); the joint width is an estimate.
-    // Laid in a straight grid, each tile standing upright (owner, 2026-10-03).
+    // Laid in a straight grid, each tile standing upright (owner, 2026-10-03). The body is
+    // thicker at its edges than over its face, unevenly (owner, 2026-10-04): edgeBand /
+    // centreRelief in finishTextures.js glossTile (defaults 5 mm, 0.5).
     id: 'tile_vernisse_white', surface: 'wall', pattern: 'grid', design: 'handmade-gloss', sheets: [16, 4],
     w: 0.0754, h: 0.301, joint: 0.003, thickness: 0.0085,
     color: 0xf4f4f0, accent: 0xf8f8f5, roughness: 0.12, bumpScale: 3, pack: { pieces: 40 },
