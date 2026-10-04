@@ -576,6 +576,13 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 38, IKEA kitchen (`e2f6f7a`; written to the headset autosave 2026-10-04, read back
+    identical): Ground r153–r168 = the planner's units 1–14 + worktops A/B (`metod-*`, pinned to r65's
+    left and bottom walls, 8 mm tile allowance); the placeholders r134, r141–r145 and their 24
+    dimensions removed (owner). In LEFT X / View 3D: every unit loads, matches the planner's front
+    views, worktop at 92 cm, wall cabinets 148–248; light m126 behind wall cabinet r163 is deliberate
+    (owner: a supply outlet for the cabinet lights, stays); pedal bin r150 and the De'Longhi r151 kept. If wrong: the pre-kitchen autosave is the
+    scratchpad's `kitchen-base.json` (= the slab write);
   - session 38, slabs (`b5a55f2`; written to the headset autosave 2026-10-04, read back identical; the
     app's precache already holds that build): LEVEL shows Basement 2.27 / slab 0.22, Ground 2.95 / 0.25,
     Upper 2.95 (was 2.70) / 0.25; ⇄ SLAB on the numpad; LEFT X walls and the painted ceiling at 2.05 /

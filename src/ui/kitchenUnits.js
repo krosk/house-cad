@@ -183,7 +183,9 @@ export const KITCHEN_UNITS = {
     return [
       top(-L, c0, -D, D), top(c1, L, -D, D), top(c0, c1, -D, z0), top(c0, c1, z1, D),
       { a: '80377843', at: [sx, 38 + 3 - 202, (z0 + z1) / 2] },
-      { a: '50602305', at: [sx, 38, -D + 44] },
+      // The tap's origin is its bbox centre; its base (≈ 60 mm across) is 110 mm behind it, the
+      // spout reaching forward: base centred on the 88 mm strip behind the cut-out, 14 mm off the wall.
+      { a: '50602305', at: [sx, 38, -D + 44 + 110] },
     ];
   } },
   // Worktop B, along the cooktop wall: 1540 × 635 (planner p. 34: 2175 − 635).
