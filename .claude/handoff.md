@@ -173,17 +173,20 @@ All owner requests, 2026-10-03.
     - Then (owner): furniture zone `r152` on Ground, `habitat-moder-ii-155` (extended), `facing` 90 so
       the long side runs along y, centred under light `m12` in the living room `r59` (plan x 0.815–1.915,
       y 1.685–3.235); no dimensions. Written and read back the same way.
-    - Then (owner): Lucia ivory 30×90 on every bathroom wall prepared (Ground `r62` 4 faces + `r107`
-      left/right/bottom; Upper `r86` 4 faces; bathrooms = the rooms holding a Sensea Neo tray) and
-      the half wall `r139`'s room side + top. **Not yet written** at the time of this note: the
-      headset was asleep, and the half-wall targets need item 16 deployed first (a pre-16 app loads
-      `edge: 'cap'` as an edgeless target, i.e. a product on the half wall). Prepared files:
-      scratchpad `autosave-lucia.json` (room faces) / `autosave-lucia-hw.json` (+ half wall), both
-      based on the autosave as written with the table; re-read the headset first.
+    - Then (owner): Lucia ivory 30×90 on every bathroom wall (bathrooms = the rooms holding a Sensea
+      Neo tray): Ground `r62` 4 faces + `r107` left/right/bottom, Upper `r86` 4 faces, and the half
+      wall `r139`'s room side + top (`cap`, item 16, written after `0727fab` deployed). Written and
+      read back byte-identical (Proven), on top of the autosave the app had re-saved in solved form
+      (same model). Takeoff: 320 Lucia tiles = 64 boxes house-wide, incl. the entrance's `r57` face.
     - Open: which French door is the quote's Sw 0.51 one (Hypothesis: `r111`; the two Sw 0.47 ones cost
       €93 more, maybe acoustic glass, both on the x ≈ −4.8 façade).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
+
+- **The owner's house is now edited directly on the headset** (owner, 2026-10-04: "we will keep
+  continue modify the house via direct edit"): changes they ask for go into the headset autosave
+  through the `quest-edit` skill (`docs/headset-data.md`), not into a Deck export. The Deck's
+  `Document from Alexis He.json` (rev 9) is stale for current-state questions; read the headset.
 
 - **Label every claim Proven or Hypothesis** (`CLAUDE.md` top rule), in reports, commit bodies, docs.
 - **Session 36 features (folded):** the AR group **HEATING** = PIPE (id `marker_pipe`) + HEAT LOSS +
@@ -376,10 +379,6 @@ All owner requests, 2026-10-03.
 - **The APK always opens `/house-cad/?ar=1`**, so URL switches (`?perf`, `#view=`) can't reach it.
   AR diagnostics need an in-menu toggle. It has no 2D view (exit = quit), but it shares
   `localStorage` with the Quest Browser, so the 2D page is the on-device import/export path.
-- **Reading the headset's live state without touching it:** `adb forward tcp:9333
-  localabstract:chrome_devtools_remote`, list pages at `http://127.0.0.1:9333/json/list`, then run a
-  CDP `Runtime.evaluate` over the page's WebSocket (Node 20 needs `--experimental-websocket`). Use it
-  **read-only** unless the owner explicitly asks for a write; their slots/autosave are the real survey.
 - **Never run `adb shell pm clear com.krosk.housecad`** casually: it wipes the owner's autosave and
   save slots too. To pick up a new build, relaunch the APK and check the HUD `update:` line.
   adb is at `~/Android/Sdk/platform-tools/adb` or `~/.bubblewrap/android_sdk/platform-tools/adb`; both
@@ -387,11 +386,10 @@ All owner requests, 2026-10-03.
   on (an empty `adb devices` first can just be early or the headset asleep). If the Quest forgot the
   pairing: the sibling project's `../quest-mcp-test/.claude/skills/quest-connect/SKILL.md` (pair via
   QRookie's Flatpak adb; pairing and connection ports differ).
-- **Reading or writing house-cad storage on the headset** (session 38): `DOMStorage` needs a frame of
-  the origin, and the Quest Browser refuses `/json/new`, so `Page.navigate` an existing tab to
-  `https://krosk.github.io/house-cad/version.json` (same origin, no app code runs, the autosave is not
-  touched), then `Runtime.evaluate` on `localStorage`. Back up every `house-cad:*` key first; write only
-  with the AR app closed and no 2D house-cad tab open (it would autosave its older copy); read back.
+- **Reading or editing the owner's plan on the headset:** `docs/headset-data.md` (skill `quest-edit`,
+  tools `tools/quest-storage.mjs` + `tools/house-query.mjs`). Traps: the browser must be the app in
+  front of the wearer or DevTools calls hang; write only with the AR app closed, after a backup, on
+  the owner's yes; the app re-saves edits in solved form (diff, don't byte-compare).
 - **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
   curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
   of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
