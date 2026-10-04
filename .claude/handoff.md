@@ -20,9 +20,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-04 (session 38, continued three times after context compactions)
-**Status:** Proven (git): `origin/main` = `1a25943` plus this handoff's commit, nothing unpushed; the
+**Status:** Proven (git): `origin/main` = `e13576d` plus this handoff's commits, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
-output): the headset app holds `1a25943` for its next launch; the headset autosave holds the slabs and
+output): the headset app holds `1a25943` for its next launch (`e13576d`, heat loss, not yet installed: no Quest); the headset autosave holds the slabs and
 the IKEA kitchen (items 17–20), not yet looked at by the owner. Proven (`am broadcast`
 result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
 normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
@@ -535,7 +535,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `054aad7` collapsible View 3D floor panel · `a57716f` Moder II table + bed texture fix · `780aeeb`
   modelling from isometric manuals · `2352c66` Vernisse straight grid, tiles upright · `afcdd90`
   half-wall finishes (sides + cap) · `fa10818` headset editing tools + skill · `b5a55f2` slab
-  thickness · `4ae38b3` `update-app` · `e2f6f7a` IKEA kitchen units · `1a25943` kitchen tap placement.
+  thickness · `4ae38b3` `update-app` · `e2f6f7a` IKEA kitchen units · `1a25943` kitchen tap placement · `e13576d` heat-loss wall layers + earth level.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
