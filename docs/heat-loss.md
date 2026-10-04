@@ -27,6 +27,21 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
   and ignored. Wall height = the room height, storey height − slab (`ceilingHeight`; `docs/product-intent.md`
   multi-floor); the room volume uses it too.
+- **Walls in the earth** (owner, 2026-10-04: one earth level for the house, for now): the HEAT LOSS
+  setting **Earth level** is the outside ground's height from the ground floor's floor level (+ up,
+  default 0). On every floor, the part of each exterior wall below it loses to the ground instead of
+  the air, as a basement wall in ISO 13370:
+  `U_bw = 2λ/(π z) · (1 + 0.5 d_t/(d_t + z)) · ln(z/d_w + 1)`, z = the floor's depth below the earth,
+  d_w = λ(0.17 + R_wall) with R_wall the same layers as above, d_t = undrawn wall depth +
+  λ(0.17 + slab R + added floor R + 0.04), λ = 2.0 W/mK (clay or silt, the standard's default). It
+  loses `A · U_bw · fg1 · (T_room − T_annual_mean)`, like the slab on earth. An opening's band is cut
+  out of the buried part only where it reaches below the earth. Not modelled: a sloping site (a level
+  per side), groundwater, and a heated room's partition to an unheated basement below the earth.
+  **Proven** (Node on the headset copy, 2026-10-04; Basement still heated as stored): earth below
+  the house = the previous figures (Basement 6982 W); earth 0 → Basement 2856 W with 77.3 m² of
+  walls in earth, Ground and Upper unchanged; −1 m → Basement 4539 W; +0.5 m → Ground 8685 W.
+  U_bw = 0.90 W/m²K at 2 m deep for R 0.25 (Hypothesis: within the usual 0.8–1.2 for an uninsulated
+  basement wall; a professional study would prove it). **Open:** the owner's real earth level.
 - **Openings:** WINDOW / DOOR / SLIDING / GARAGE zones on an exterior edge are cut out of the wall
   area (width × their sill/head band) and counted at their own U: the zone's `uValue` (owner,
   2026-10-01: each window carries its own, typed from its label's Uw / Ud in HEATING · R / U), else the
@@ -37,6 +52,14 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
 
 ## Insulation layers
 
+- **An exterior wall is its layers** (owner, 2026-10-04): at each point along the edge, every WALL
+  and INSULATION zone just inside the edge or within 0.6 m beyond it is a layer, and their R add up.
+  A layer with no R typed uses its drawn depth across the wall / λ: the wall λ (default 0.8, so 20 cm
+  → R 0.25, about concrete block) or the insulation λ (0.04). **Where no WALL zone is drawn, a
+  placeholder wall stands in** (default 20 cm at the wall λ), added to any insulation there. So drawing
+  the real wall, with its depth or R, replaces the placeholder at that spot. Interpretation of the
+  owner's rule, to confirm if exterior insulation is ever drawn without its wall: insulation alone
+  still gets the placeholder (it needs a wall behind it).
 - An INSULATION zone **inside** a room rect is an interior lining (all of them in the owner's house,
   2026-10-01). One drawn **outside** (within 0.6 m of the edge) is exterior insulation: owner
   decision 2026-10-01, draw exterior insulation as zones. Both may cover the same wall: R values add.
@@ -47,8 +70,14 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
 - Each zone carries its R (from the product label), or λ with the zone's drawn depth as thickness.
 - Thermal bridges: interior lining R × 0.85 (cut by slabs, partitions, rails); exterior R × 0.95.
 - Partial coverage splits the wall into pieces, each with its own U (area-weighted sum).
-- The masonry's thickness is not drawn (the shell is inferred), so its R is a project setting
-  (e.g. concrete block 20 cm ≈ 0.23).
+- A WALL zone's R is typed in HEATING · R / U like an insulation's (e.g. the wall's build-up from a
+  survey); the masonry material is unknown, so the default λ is a Hypothesis.
+- **Proven** (Node on the headset copy of 2026-10-04, against the previous fixed bare-wall R 0.25,
+  which the placeholder reproduces): Basement 6982 W unchanged, Ground 9277 → 9240 W, Upper 8374 →
+  8329 W. The 25 cm wall `r135` behind the kitchen lowers it (R 0.31); the **7 cm wall `r112`** on an
+  exterior edge of the kitchen's room raises it by about 160 W, as it now stands for the whole wall
+  there (R 0.09). **Hypothesis:** r112 is a partition or a lining, not the outer wall; if so, give it
+  its real R, or the outer wall behind it a WALL zone.
 
 ## The owner's house (owner answers, 2026-10-01)
 
@@ -79,7 +108,9 @@ zone's `rValue`; additive, no FILE_VERSION bump); defaults in `src/core/heatLoss
 | annual mean °C | 12 | Paris area (ground losses only; not in the panel) |
 | indoor °C | 19 | EN 12831 living rooms (one value for every room) |
 | air changes /h | 0.5 | owner: single-flow VMC |
-| bare wall R | 0.25 | Hypothesis: masonry unknown (owner knows thickness, not material) |
+| earth level | 0 m | from the ground floor's floor level; Hypothesis until the owner measures it |
+| undrawn wall depth | 0.20 m | placeholder where no WALL zone is drawn (owner, 2026-10-04) |
+| wall λ (no R) | 0.8 W/mK | Hypothesis: masonry unknown (owner knows thickness, not material); 20 cm → R 0.25 |
 | window / door U | 1.4 / 2.0 | Hypothesis: recent double glazing / ordinary door |
 | bare slab R | 0.15 | Hypothesis: owner does not know the slab construction |
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
@@ -105,4 +136,4 @@ depend on the unknown wall, slab and lining R. Unverified on the Quest.
   a ~1 m attic, so it fits).
 - Thermal bridges are a fixed derating of the insulation, not linear ψ values.
 
-Open: the masonry material, slab construction, attic R once blown, and the R of the existing linings.
+Open: the earth level, the masonry material, slab construction, attic R once blown, and the R of the existing linings.

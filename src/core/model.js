@@ -189,9 +189,9 @@ export class Rectangle {
       if (article != null && article !== '') this.article = String(article);
       if (Array.isArray(productMm) && productMm.length === 3 && productMm.every((v) => v > 0)) this.productMm = [...productMm];
       if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
-    } else if (this.kind === 'insulation') {
-      // Thermal resistance R (m²K/W) from the product label, for the heat-loss
-      // calculation (docs/heat-loss.md); absent = drawn depth / the project's λ.
+    } else if (this.kind === 'insulation' || this.kind === 'wall') {
+      // Thermal resistance R (m²K/W) from the product label or the wall's build-up, for
+      // the heat-loss calculation (docs/heat-loss.md); absent = drawn depth / the project's λ.
       if (Number.isFinite(rValue) && rValue >= 0) this.rValue = rValue;
     } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
@@ -207,7 +207,7 @@ export class Rectangle {
   setKind(kind) {
     if (kind === 'stairs') kind = 'stairs_up';
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
-    if (this.kind !== 'insulation') delete this.rValue;
+    if (this.kind !== 'insulation' && this.kind !== 'wall') delete this.rValue;
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];

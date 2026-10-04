@@ -326,12 +326,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **HEATING · HEAT LOSS** (`id: heat`; method and defaults in `docs/heat-loss.md`) — every heated room
   of the active floor shows its loss in W at its largest rect's centre. A panel holds THIS FLOOR
   (heated, unheated temperature, added floor and attic R) and WHOLE HOUSE settings (design outdoor /
-  indoor °C, air changes, bare wall R, window and door U, bare slab R, λ for an insulation zone with no
-  R). Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
+  indoor °C, air changes, the undrawn wall's depth, λ for a wall with no R, window and door U, bare
+  slab R, the earth level outside (from the ground floor's floor level; walls below it lose to the
+  ground), λ for an insulation zone with no R). The room breakdown adds `walls in earth` m² when any. Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
   default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
   broken down by surface. Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
-- **HEATING · R / U** (`id: heat_r`) — every INSULATION zone of the active floor shows its R
-  (m²K/W; grey `≈` = drawn depth / λ) and every WINDOW / SLIDING / DOOR / GARAGE zone its U (W/m²K, the
+- **HEATING · R / U** (`id: heat_r`) — every WALL and INSULATION zone of the active floor shows its R
+  (m²K/W; grey `≈` = drawn depth / the wall or insulation λ) and every WINDOW / SLIDING / DOOR / GARAGE zone its U (W/m²K, the
   label's Uw / Ud; grey `≈` = the project's Window or Door U); orange = typed. The readout names the
   aimed zone's value and its source. Trigger on a zone opens the numpad: ENTER sets it (an empty ENTER
   or CLEAR returns to the default). An insulation R can also be typed on the PLAN · EDIT band pad.

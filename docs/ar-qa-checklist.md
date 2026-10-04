@@ -413,6 +413,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Ray on a row + thumbstick up/down steps it; labels and TOTAL update at once; trigger resets a value to its default (grey) and toggles HEATED
 - [ ] Basement HEATED → no: its rooms lose their labels, and Ground's floor watts drop (slab over an unheated floor)
 - [ ] Attic insulation R 7 on Ground/Upper cuts the ceiling part strongly (Node: Ground 12.1 → 8.8 kW)
+- [ ] (2026-10-04) WALL zones show `R ≈x` in R / U too (r135 ≈0.31, r112 ≈0.09) and take a typed R; HEAT LOSS settings show the undrawn wall depth (0.20 m) and wall λ (0.80) instead of bare wall R; Ground ≈ 9240 W, Upper ≈ 8329 W (Node, with Basement heated as stored)
+- [ ] (2026-10-04) HEAT LOSS · Earth level (default 0.00 m): the Basement's rooms show `walls in earth` m² (Node: Basement 2856 W at 0, 6982 W with the earth below the house); stepping it up past 0 lowers Ground's watts (Node +0.5 m: 9240 → 8685 W)
 - [ ] R / U: each insulation zone shows `R ≈x` (grey) or `R x` (orange), each window/door `U ≈1.4` / `U ≈2.0` or its typed U; trigger opens the numpad, ENTER sets it, CLEAR / empty ENTER clears it; HEAT LOSS watts follow (Node: 5 Ground windows at U 2.8 → their part 336 → 672 W)
 - [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W) too; a room's `area:` HUD line adds its watts
 - [ ] Settings survive SAVE/LOAD and an APK relaunch (project data, autosaved)

@@ -42,7 +42,7 @@ function serializeRect(r) {
   if (r.article !== undefined) out.article = r.article;
   if (r.productMm !== undefined) out.productMm = [...r.productMm];
   if (r.facing !== undefined) out.facing = r.facing;
-  if (r.rValue !== undefined) out.rValue = r.rValue; // insulation R (docs/heat-loss.md)
+  if (r.rValue !== undefined) out.rValue = r.rValue; // wall / insulation R (docs/heat-loss.md)
   if (r.uValue !== undefined) out.uValue = r.uValue; // window/door U (docs/heat-loss.md)
   return out;
 }

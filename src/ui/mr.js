@@ -51,7 +51,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind } from '../core/heatLoss.js';
+import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, layerLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -839,9 +839,10 @@ export function setupMR(view, project, getFootprint) {
         ctx.fillStyle = '#e6edf3'; ctx.font = '22px sans-serif';
         const p = room.parts;
         ctx.fillText(`${t('heat.walls')} ${w(p.wall)} · ${t('heat.openings')} ${w(p.opening)} · ${t('heat.air')} ${w(p.air)}`, 30, ROOM_Y + 70);
-        ctx.fillText(`${t('heat.floorPart')} ${w(p.floor)} · ${t('heat.ceilingPart')} ${w(p.ceiling)}`, 30, ROOM_Y + 104);
+        const d = room.detail; // walls in the earth: a share of the walls' watts and area
+        ctx.fillText(`${t('heat.floorPart')} ${w(p.floor)} · ${t('heat.ceilingPart')} ${w(p.ceiling)}`
+          + (d.earthArea > 0.05 ? ` · ${t('heat.inEarth')} ${d.earthArea.toFixed(1)} m²` : ''), 30, ROOM_Y + 104);
         ctx.fillStyle = '#aab4c0'; ctx.font = '20px sans-serif';
-        const d = room.detail;
         ctx.fillText(`${t('heat.extWall')} ${d.wallArea.toFixed(1)} m² (${t('heat.insulated')} ${d.insulatedArea.toFixed(1)}) · ${t('heat.openings')} ${d.openingArea.toFixed(1)} m²`, 30, ROOM_Y + 134);
       }
       tex.needsUpdate = true;
@@ -1112,10 +1113,12 @@ export function setupMR(view, project, getFootprint) {
     { key: 'tOut', step: 1, min: -25, max: 10, unit: '°C' },
     { key: 'tRoom', step: 1, min: 10, max: 28, unit: '°C' },
     { key: 'ach', step: 0.1, min: 0, max: 3 },
-    { key: 'wallR', step: 0.05, min: 0, max: 5, r: true },
+    { key: 'wallDepth', step: 0.01, min: 0.05, max: 1, unit: 'm' },
+    { key: 'wallLambda', step: 0.05, min: 0.05, max: 3 },
     { key: 'windowU', step: 0.1, min: 0.5, max: 6, u: true },
     { key: 'doorU', step: 0.1, min: 0.5, max: 6, u: true },
     { key: 'slabR', step: 0.05, min: 0, max: 5, r: true },
+    { key: 'earth', step: 0.05, min: -6, max: 6, unit: 'm' },
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
   ];
   const heatMenu = makeHeatMenu(HEAT_ROWS);
@@ -1876,24 +1879,25 @@ export function setupMR(view, project, getFootprint) {
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
 
-  // HEATING · R / U: the thermal value each zone carries (core/heatLoss.js): an
-  // INSULATION zone's R (m²K/W; default its drawn depth / λ), an opening's U (W/m²K; default
-  // the project's window or door U). Field name, typed value and default per zone.
+  // HEATING · R / U: the thermal value each zone carries (core/heatLoss.js): a WALL or
+  // INSULATION zone's R (m²K/W; default its drawn depth / the masonry's or insulation's λ),
+  // an opening's U (W/m²K; default the project's window or door U). Field name, typed value
+  // and default per zone.
   function thermalOf(zone) {
-    const s = heatSettings(project);
-    if (zoneKindOf(zone) === 'insulation') {
-      const b = zone.bounds, depth = Math.min(b.x1 - b.x0, b.y1 - b.y0);
-      return { field: 'rValue', sym: 'R', value: zone.rValue, def: depth / s.lambda, depth, lambda: s.lambda };
+    const s = heatSettings(project), kind = zoneKindOf(zone);
+    if (LAYER_KINDS.has(kind)) {
+      const b = zone.bounds, depth = Math.min(b.x1 - b.x0, b.y1 - b.y0), lambda = layerLambda(kind, s);
+      return { field: 'rValue', sym: 'R', value: zone.rValue, def: depth / lambda, depth, lambda };
     }
     const glazed = isGlazedKind(zoneKindOf(zone));
     return { field: 'uValue', sym: 'U', value: zone.uValue, def: glazed ? s.windowU : s.doorU, glazed };
   }
-  const isThermalZone = (r) => zoneKindOf(r) === 'insulation' || OPENING_KINDS.has(zoneKindOf(r));
+  const isThermalZone = (r) => LAYER_KINDS.has(zoneKindOf(r)) || OPENING_KINDS.has(zoneKindOf(r));
   // Each zone's value at its centre: orange when typed from a label, grey "≈" = default.
   function addZoneRLabels(floor) {
     const labels = floor.rectangles.filter(isThermalZone).map((z) => {
       const b = z.bounds, th = thermalOf(z), set = th.value != null;
-      return makeDimLabel(`${th.sym} ${set ? th.value : `≈${th.def.toFixed(1)}`}`, set ? '#fb923c' : '#aab4c0',
+      return makeDimLabel(`${th.sym} ${set ? th.value : `≈${th.def.toFixed(th.def < 1 ? 2 : 1)}`}`, set ? '#fb923c' : '#aab4c0',
         (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
     });
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
