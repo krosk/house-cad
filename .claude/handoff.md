@@ -19,11 +19,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-04 (session 38, continued three times after context compactions)
-**Status:** Proven (git): `origin/main` = `e13576d` plus this handoff's commits, nothing unpushed; the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
-output): the headset app holds `1a25943` for its next launch (`e13576d`, heat loss, not yet installed: no Quest); the headset autosave holds the slabs and
-the IKEA kitchen (items 17–20), not yet looked at by the owner. Proven (`am broadcast`
+**Date:** 2026-10-04 (session 38, continued five times after context compactions; the Quest came back late in it)
+**Status:** Proven (git): everything is pushed in one commit after `f857b41` (item 24: heat-loss
+overlap rule + per-zone λ); the tree is clean apart from the owner's untracked `Document from Alexis
+He.json`. Proven (`update-app` output, 2026-10-04 evening): the headset app holds `f857b41` (items
+21–23) for its next launch; item 24's build is not yet installed (run `update-app` with the browser in
+front of the wearer). The headset autosave holds the slabs, the IKEA kitchen and the owner's own
+later edits (item 24), plus five Ground dimensions re-added by us (item 24). Proven (`am broadcast`
 result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
 normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
@@ -219,6 +221,29 @@ All owner requests, 2026-10-03.
     - Open: the 7 cm wall `r112` now raises the kitchen room's loss by about 160 W. Is it really the
       outer wall? The owner's real earth level is also still unknown.
     - Not seen on the Quest.
+22. **Conflicting dimensions: suspects** (`d87eb21`; owner: "identify the other constraints that
+    cause the conflict, so that I can verify systematically which one is wrong";
+    `docs/ar-survey.md` "Conflicting dimensions"):
+    - How it works: `src/core/conflicts.js` splits each axis into loop blocks. A suspect is a
+      dimension whose removal alone makes its block agree, and it comes with the value the other
+      dimensions imply for it.
+    - The owner's rule: 0 mm dimensions are certain. They are never suspects and never listed.
+    - AR: a refused entry (`!CONFLICT`) is diagnosed before its rollback, as is any aimed red value.
+      The pill shows `#k stored → implied`, and pink `#k` tags mark the suspects on the plan.
+    - Node: `tools/house-query.mjs conflicts <house>`.
+    - Proven (Node, on the headset copy): adding 15 mm to each dimension in turn, the altered one was
+      a suspect in all 57 conflicting cases (lists of 1–7).
+    - Not seen on the Quest; the desktop shows no suspects.
+    - The owner's own conflicting survey value was never read: no Quest.
+23. **Vernisse relief, and finish textures painted in software** (`f857b41`; `docs/materials.md`
+    Vernisse and "Texture preparation in a worker"):
+    - The owner's rule: the tile body is thicker at the edges than over its face, unevenly. It is a
+      white rim within 5 mm of the edge, falling softly into a darker face. The owner: "Ok this one
+      is great".
+    - Rejected: blobs along the edges ("quite ugly"), and a wide ramp that ate into the face.
+    - Edge glints fixed: the anti-aliased outline pixel is now sealed at joint height.
+    - Chrome's GPU canvas cut one row's tiles short, so `unitCanvas` now paints every designed finish
+      in software. Proven no slower. Only Vernisse was re-checked; the GPU cause is a Hypothesis.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -524,6 +549,28 @@ All owner requests, 2026-10-03.
 - **Latent:** `~/house-cad-apk/app/src/main/res/values/strings.xml` lacks `appName`/`launcherName` —
   add them before the next `bubblewrap build`.
 
+24. **Quest back; deleted dimensions re-added; heat-loss layers** (owner, 2026-10-04 evening):
+    - The owner had deleted five Ground y dimensions on the headset while hunting a conflict
+      (c220 r55 height 4400, c224, c238, c370, c753), then asked to put them back. Diffed by id
+      against the plan written that morning; added back to the headset's current plan, nothing else
+      changed (backup `quest-backup-20261004-2149`, scratchpad, gone next session). Proven: written
+      with the `--base` guard and read back identical; with them back the solver and
+      `diagnoseConflicts` find **no conflict**, so the owner's new survey value (refused, never
+      saved) is what conflicts; it was not given to us. Restoring c220 moves r55 and 38 other Ground
+      zones (and 54 markers) 15.8 mm in y; the owner's new walls r170–r174 and room r175 have no y
+      dimension and stay put (owner chose "write as is": re-align them by hand).
+    - **Overlapping layers: the larger R prevails** (owner rule; `layerStack` in
+      `src/core/heatLoss.js`, `docs/heat-loss.md`). Interpretation (Hypothesis, to confirm): layer zones
+      overlapping across the wall's depth, compared on R per metre.
+    - **R or λ per zone** (owner: "a dual option"): `rect.lambda` (W/mK) beside `rValue`, exclusive;
+      SWAP on the AR numpad toggles. Build + Node only; not tried on the headset.
+    - Owner's living-room lining is polystyrene + 13 mm plaster, label R not yet given (parked by the
+      owner); the depth-derived R (≈4.5) overstates it if the label is about 0.9 (Node: +560 W).
+    - Proven (`adb`): adb is at `~/Android/Sdk/platform-tools/adb`, not on PATH. `update-app` needs
+      `adb forward tcp:9333 localabstract:chrome_devtools_remote` and the browser in front of the
+      wearer; `am start -a android.intent.action.VIEW -d <url> com.oculus.browser` opens the page but
+      a headset nobody wears still times out (`Page.enable`).
+
 ## Commits
 
 All pushed, all with descriptive bodies. Doc-only commits are omitted.
@@ -542,6 +589,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - **Session 36:** `542e46f` ACOVA towel radiators · `e08eb59` conduit length readout · `084709f`
   De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
+- **Session 38, later:** `e13576d` heat-loss wall layers + earth level · `d87eb21` conflict suspects ·
+  `f857b41` Vernisse edges + software-painted finish textures · the next commit: heat-loss overlapping
+  layers (larger R prevails) + R or λ per zone.
 - **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
   grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
   card.
@@ -614,18 +664,18 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Next step
 
-**Session 39 has no Quest** (owner, 2026-10-04). So:
-- A waits.
-- Do not read or write the headset.
-- After a push, skip `update-app` and say so.
-- The kitchen and the slabs can still be checked off the headset, in View 3D, through the share link
-  the owner got in session 38. It is the headset copy as of the kitchen write, before the tap fix:
-  the tap is drawn by code, so a reload of that link shows the fixed tap. Hypothesis: the link still
-  opens; prove it when the owner opens it.
-- Never put that link or the plan into the repo: it encodes the owner's house.
-- `Document from Alexis He.json` is older (rev 9) and has neither the slabs nor the kitchen.
-- Off-headset work that needs no plan edit: B′, the worktop seams around the sink (offered, not
-  asked for), or what the owner raises from the link.
+~~**Session 39 has no Quest**~~ (superseded: the Quest came back at the end of session 38; ask the
+owner each session whether it is available).
+
+- **First, with the Quest:**
+  - Run `update-app` (browser in front of the wearer) so item 24's build is installed.
+  - The owner re-enters the conflicting survey value; the refusal lists suspects (item 22). Or they
+    give the two edges + value and we run `diagnoseConflicts` on a fresh read.
+  - Re-align r170–r175 to the walls that moved 15.8 mm (item 24), owner's call.
+  - HEATING · R / U: the ⇄ λ toggle, and the label R of the living-room lining (item 24).
+- **Off the headset:** Vernisse and the other designed finishes in View 3D Realistic after the switch
+  to software painting (item 23; Hypothesis: they look the same or cleaner).
+- Never put the owner's share link or plan into the repo: it encodes the owner's house.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
@@ -739,6 +789,15 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - ~~Ray-picking wires in 3D~~ — the owner said floor-projection picking works.
 
 ## Known open questions
+
+- **Session 38, later:**
+  - The GPU-canvas glitch's cause is unproven (a minimal repro would settle it), and the Quest's and
+    the phone's GPU paths are untested; the software path avoids both questions.
+  - Conflict suspects: a single loop can't single out its wrong member; there is no desktop UI.
+  - Heat loss: `r112` (7 cm, on an exterior edge) and the real earth level are unknown.
+  - Heat loss: the overlap rule's reading (layer over layer, R per metre) awaits the owner's
+    confirmation; Ground ceilings with no room above lose ~3300 W at bare R 0.06 (no roof R set;
+    Hypothesis: too high); every floor, Basement included, is set heated.
 
 - **Session 38 kitchen / slab open:** every unit on device (load time, frame rate with 16 assembled
   zones, ~2.5 MB of parts); the 60-high ASPUDDEN stand-ins (60x80 model scaled, frame rails a quarter

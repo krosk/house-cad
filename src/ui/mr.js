@@ -52,7 +52,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, layerLambda } from '../core/heatLoss.js';
+import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -1928,14 +1928,15 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // HEATING · R / U: the thermal value each zone carries (core/heatLoss.js): a WALL or
-  // INSULATION zone's R (m²K/W; default its drawn depth / the masonry's or insulation's λ),
-  // an opening's U (W/m²K; default the project's window or door U). Field name, typed value
-  // and default per zone.
+  // INSULATION zone's R (m²K/W) typed, or its λ (W/mK) typed (R = drawn depth / λ), else
+  // the masonry's or insulation's project λ; an opening's U (W/m²K; default the project's
+  // window or door U). Field name, typed value and default per zone; `lambdaSet` = λ typed.
   function thermalOf(zone) {
     const s = heatSettings(project), kind = zoneKindOf(zone);
     if (LAYER_KINDS.has(kind)) {
-      const b = zone.bounds, depth = Math.min(b.x1 - b.x0, b.y1 - b.y0), lambda = layerLambda(kind, s);
-      return { field: 'rValue', sym: 'R', value: zone.rValue, def: depth / lambda, depth, lambda };
+      const b = zone.bounds, depth = Math.min(b.x1 - b.x0, b.y1 - b.y0), lambda = zoneLambda(zone, s);
+      return { field: 'rValue', sym: 'R', value: zone.rValue, def: depth / lambda, depth, lambda,
+        lambdaSet: zone.rValue == null && zone.lambda != null };
     }
     const glazed = isGlazedKind(zoneKindOf(zone));
     return { field: 'uValue', sym: 'U', value: zone.uValue, def: glazed ? s.windowU : s.doorU, glazed };
@@ -1944,8 +1945,10 @@ export function setupMR(view, project, getFootprint) {
   // Each zone's value at its centre: orange when typed from a label, grey "≈" = default.
   function addZoneRLabels(floor) {
     const labels = floor.rectangles.filter(isThermalZone).map((z) => {
-      const b = z.bounds, th = thermalOf(z), set = th.value != null;
-      return makeDimLabel(`${th.sym} ${set ? th.value : `≈${th.def.toFixed(th.def < 1 ? 2 : 1)}`}`, set ? '#fb923c' : '#aab4c0',
+      const b = z.bounds, th = thermalOf(z), set = th.value != null || th.lambdaSet;
+      const text = th.value != null ? `${th.sym} ${th.value}` : th.lambdaSet ? `λ ${th.lambda}`
+        : `${th.sym} ≈${th.def.toFixed(th.def < 1 ? 2 : 1)}`;
+      return makeDimLabel(text, set ? '#fb923c' : '#aab4c0',
         (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
     });
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
@@ -4541,6 +4544,7 @@ export function setupMR(view, project, getFootprint) {
   let hoverHeatRow = null, prevHoverHeatRow = null; // HEAT LOSS panel row under the ray
   // HEAT LOSS: the INSULATION zone under the reticle / selected for typing its R.
   let heatHoverZone = null, heatSelZone = null, heatRBuffer = '', heatRPristine = true;
+  let heatRField = 'rValue'; // the pad types a layer's R or its λ (SWAP toggles)
   let hoverExportAction = null;     // output toggle or explicit export button under the ray
   let prevHoverExportAction = null;
   let slotFlash = null;     // transient panel title after a save/load ("SAVED 3"), cleared on next hover change
@@ -6323,22 +6327,31 @@ export function setupMR(view, project, getFootprint) {
     const th = thermalOf(zone), name = `${t(`mode.${zoneKindOf(zone)}`)} · ${th.sym}`;
     if (th.value != null) return [`${name} ${th.value}`, t('heat.rSet'), t('heat.rEdit')];
     return [`${name} ${th.def.toFixed(2)}`, th.sym === 'R'
-      ? `${t('heat.rFromDepth')} ${Math.round(th.depth * 1000)} mm / λ ${th.lambda}`
+      ? (th.lambdaSet ? `${Math.round(th.depth * 1000)} mm / λ ${th.lambda} (${t('heat.lSet')})`
+        : `${t('heat.rFromDepth')} ${Math.round(th.depth * 1000)} mm / λ ${th.lambda}`)
       : t(th.glazed ? 'heat.uDefaultWindow' : 'heat.uDefaultDoor'), t('heat.rEdit')];
   }
   const redrawHeatMenu = () => heatMenu.draw('#fb923c', hoverHeatRow, project.activeFloor.name,
     floorHeatTotal(), heatRowValues(), heatHoverRoom);
 
   // Typing a zone's R: the settings panel steps aside for the numpad (both sit in front
-  // of you). ENTER sets it and closes; CLEAR R (the DEL cell) returns to depth / λ.
+  // of you). ENTER sets it and closes; CLEAR R (the DEL cell) returns to the project λ.
+  // A layer types either its R or its λ (SWAP toggles; setting one clears the other).
+  const heatRIsLayer = () => heatSelZone && thermalOf(heatSelZone).sym === 'R';
   const heatRTitle = () => heatSelZone
-    ? `${t(`mode.${zoneKindOf(heatSelZone)}`)} · ${t(thermalOf(heatSelZone).sym === 'R' ? 'heat.rValue' : 'heat.uValue')}` : '';
-  const redrawHeatRPad = () => numpad.draw(heatRTitle(), heatRBuffer, hoverKey, null, t('heat.clear'));
-  function openHeatRPad(zone) {
-    heatSelZone = zone;
-    const v = thermalOf(zone).value;
+    ? `${t(`mode.${zoneKindOf(heatSelZone)}`)} · ${t(!heatRIsLayer() ? 'heat.uValue'
+      : heatRField === 'lambda' ? 'heat.lambda' : 'heat.rValue')}` : '';
+  const redrawHeatRPad = () => numpad.draw(heatRTitle(), heatRBuffer, hoverKey,
+    heatRIsLayer() ? `⇄ ${heatRField === 'lambda' ? 'R' : 'λ'}` : null, t('heat.clear'));
+  const heatRLoad = () => {
+    const v = heatRIsLayer() ? heatSelZone[heatRField] : thermalOf(heatSelZone).value;
     heatRBuffer = v != null ? String(v) : '';
     heatRPristine = true;
+  };
+  function openHeatRPad(zone) {
+    heatSelZone = zone;
+    heatRField = thermalOf(zone).lambdaSet ? 'lambda' : 'rValue';
+    heatRLoad();
     placePanel(numpad.group);
     numpad.group.visible = true;
     redrawHeatRPad();
@@ -6348,7 +6361,8 @@ export function setupMR(view, project, getFootprint) {
     deactivateNumpad();
   }
   function setZoneR(zone, r) {
-    const { field } = thermalOf(zone);
+    const layer = thermalOf(zone).sym === 'R', field = layer ? heatRField : 'uValue';
+    if (layer) { delete zone.rValue; delete zone.lambda; } // R or λ, never both
     if (r == null) delete zone[field]; else zone[field] = r;
     project.touch(); // autosave
     rlog('thermal value', { id: zone.id, field, value: zone[field] ?? null });
@@ -6358,13 +6372,14 @@ export function setupMR(view, project, getFootprint) {
     if (k === 'enter') {
       const r = parseFloat(heatRBuffer);
       if (heatRBuffer.trim() === '') setZoneR(heatSelZone, null);
-      else if (Number.isFinite(r) && (thermalOf(heatSelZone).sym === 'R' ? r >= 0 && r <= 20 : r > 0 && r <= 8)) setZoneR(heatSelZone, r);
+      else if (Number.isFinite(r) && (!heatRIsLayer() ? r > 0 && r <= 8
+        : heatRField === 'lambda' ? r >= 0.005 && r <= 5 : r >= 0 && r <= 20)) setZoneR(heatSelZone, r);
       else return;
       closeHeatRPad();
       return;
     }
     if (k === 'del') { setZoneR(heatSelZone, null); closeHeatRPad(); return; }
-    if (k === 'swap') return;
+    if (k === 'swap') { if (heatRIsLayer()) { heatRField = heatRField === 'lambda' ? 'rValue' : 'lambda'; heatRLoad(); redrawHeatRPad(); } return; }
     if (heatRPristine && k !== 'back') heatRBuffer = '';
     heatRPristine = false;
     if (k === 'back') heatRBuffer = heatRBuffer.slice(0, -1);
@@ -6883,12 +6898,14 @@ export function setupMR(view, project, getFootprint) {
   //   • furniture placeholders — solid body band [foot, top] (both bounds).
   // Bounds are always [lower, upper] in field order; the commit keeps them ordered.
   // Aperture hinge/swing stay on A/X rotate; B/Y deletes the whole zone.
-  // An INSULATION zone reuses the pad for its thermal resistance R (docs/heat-loss.md),
-  // a plain number, not a length; an empty ENTER clears it (back to depth / λ).
-  const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue'] : verticalBandFields(rect));
+  // An INSULATION zone reuses the pad for its thermal resistance R or its λ
+  // (docs/heat-loss.md), plain numbers, not lengths; setting one clears the other, an
+  // empty ENTER clears it (back to depth / the project λ).
+  const THERMAL_FIELDS = new Set(['rValue', 'lambda']);
+  const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue', 'lambda'] : verticalBandFields(rect));
   const rectHasBand = (rect) => bandFields(rect).length > 0;
   // Field labels are namespaced by which band the field belongs to.
-  const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue')
+  const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambda')
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
   const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
@@ -6906,14 +6923,15 @@ export function setupMR(view, project, getFootprint) {
     const fs = bandFields(selectedRect);
     if (!fs.includes(bandField)) bandField = fs[0]; // clamp after a retype
     bandBuffer = !selectedRect ? ''
-      : bandField === 'rValue' ? (selectedRect.rValue != null ? String(selectedRect.rValue) : '')
+      : THERMAL_FIELDS.has(bandField) ? (selectedRect[bandField] != null ? String(selectedRect[bandField]) : '')
       : fmt(selectedRect[bandField] ?? 0);
     bandPristine = true;
     redrawBandPad();
   }
 
   function activateBandPad() {
-    bandField = bandFields(selectedRect)[0] || 'sill'; // door/garage/sliding open on HEAD
+    bandField = selectedRect?.kind === 'insulation' && selectedRect.rValue == null && selectedRect.lambda != null
+      ? 'lambda' : bandFields(selectedRect)[0] || 'sill'; // door/garage/sliding open on HEAD
     placePanel(numpad.group);
     numpad.group.visible = true;
     refreshBandPad();
@@ -6938,13 +6956,15 @@ export function setupMR(view, project, getFootprint) {
 
   function commitBandField() {
     if (!rectHasBand(selectedRect)) return;
-    if (bandField === 'rValue') {
-      const r = parseFloat(bandBuffer);
-      if (bandBuffer.trim() === '') delete selectedRect.rValue;
-      else if (Number.isFinite(r) && r >= 0) selectedRect.rValue = r;
-      else return;
+    if (THERMAL_FIELDS.has(bandField)) {
+      const r = parseFloat(bandBuffer), lambda = bandField === 'lambda';
+      if (bandBuffer.trim() === '') delete selectedRect[bandField];
+      else if (Number.isFinite(r) && (lambda ? r >= 0.005 && r <= 5 : r >= 0)) {
+        delete selectedRect.rValue; delete selectedRect.lambda; // R or λ, never both
+        selectedRect[bandField] = r;
+      } else return;
       project.touch(); // autosave; the heat labels/HUD recompute from the project
-      rlog('insulation R', { id: selectedRect.id, r: selectedRect.rValue ?? null });
+      rlog('insulation R', { id: selectedRect.id, r: selectedRect.rValue ?? null, lambda: selectedRect.lambda ?? null });
       refreshBandPad();
       return;
     }

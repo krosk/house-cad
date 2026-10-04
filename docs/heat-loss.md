@@ -63,11 +63,28 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
 - An INSULATION zone **inside** a room rect is an interior lining (all of them in the owner's house,
   2026-10-01). One drawn **outside** (within 0.6 m of the edge) is exterior insulation: owner
   decision 2026-10-01, draw exterior insulation as zones. Both may cover the same wall: R values add.
+- **Overlapping layers: the larger R prevails** (owner, 2026-10-04: "if rooms and walls overlap, the
+  layer with the biggest R prevails"). Where two layer zones cover the same depth across the wall (an
+  insulation drawn over a wall zone, a wall drawn twice), that depth counts once, for the layer whose R
+  there is the larger; each layer's R is spread evenly over its drawn depth, so a layer partly
+  overlapped keeps the R of its free part. Layers side by side across the depth still add.
+  Interpretation to confirm: the rule read as layer over layer, compared on derated R per metre.
+  **Proven** (Node, `layerStack` in `src/core/heatLoss.js`, 2026-10-04): 20 cm wall R 0.25 with 10 cm
+  insulation R 2.5 inside its depth → 2.625 (not 2.75); on the plan written this morning nothing
+  overlaps (Basement 2856, Ground 9240, Upper 8329 W unchanged); `r135` drawn twice gave Ground 8809 W
+  before (counted twice) and 9240 W now.
 - **Proven** (read `zoneColors.js`, `geometry2d.js`, `architectural3d.js`, 2026-10-01): INSULATION is a
   subtract zone, so one outside every room changes no room area and no exported massing; View 3D
   draws it as solid wall wherever it is. **Hypothesis:** outside a wall thicker than the inferred
   12 cm shell it floats with a visible gap (cosmetic); a WALL zone for the real wall would close it.
-- Each zone carries its R (from the product label), or λ with the zone's drawn depth as thickness.
+- Each zone carries its R (from the product label), **or its own λ** (owner, 2026-10-04: "a dual
+  option: to enter R, or to enter lambda"), R = drawn depth / λ; neither = the project's wall or
+  insulation λ. Setting one clears the other (a file with both uses R). R is absolute, the product's
+  at its thickness; λ is per metre, so a typed λ follows the drawn depth. For a lining of polystyrene +
+  13 mm plaster, the label R usually covers the polystyrene only; the plaster adds ≈ 0.05, negligible,
+  but a depth-derived R counts the plaster as insulation (13 mm / 0.04 ≈ 0.33), so type the label R.
+  **Proven** (Node on the headset plan, 2026-10-04): R 0.9 on every insulation zone instead of depth /
+  0.04 (R 4.5–5.25) → living room r55+r58+r59 3567 → 3922 W, Upper r88+r90 3546 → 3751 W.
 - Thermal bridges: interior lining R × 0.85 (cut by slabs, partitions, rails); exterior R × 0.95.
 - Partial coverage splits the wall into pieces, each with its own U (area-weighted sum).
 - A WALL zone's R is typed in HEATING · R / U like an insulation's (e.g. the wall's build-up from a
@@ -100,7 +117,7 @@ Ground 73.2 m², Upper 40.9 m²; 54.0 m² of Ground is over Basement, 39.2 m² o
 ## Settings: all editable in AR (owner, 2026-10-01: "make it configurable in app")
 
 Stored as project data, only the keys the owner set (`project.heat`, `floor.heat`, an insulation
-zone's `rValue`; additive, no FILE_VERSION bump); defaults in `src/core/heatLoss.js`.
+zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/core/heatLoss.js`.
 
 | Setting | Default | Source |
 |---|---|---|

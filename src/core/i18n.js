@@ -528,6 +528,8 @@ const STRINGS = {
   'heat.uDefaultDoor': { en: 'default: project Door U', fr: 'défaut : U porte du projet', zh: '默认：项目门 U' },
   'heat.aimZone':  { en: 'Aim at a wall, insulation, window or door', fr: 'Visez un mur, un isolant, une fenêtre ou une porte', zh: '指向墙、保温区、窗或门' },
   'heat.rValue':   { en: 'R (m²K/W)', fr: 'R (m²K/W)', zh: 'R (m²K/W)' },
+  'heat.lambda':   { en: 'λ (W/mK)', fr: 'λ (W/mK)', zh: 'λ (W/mK)' },
+  'heat.lSet':     { en: 'from the typed λ', fr: 'λ saisi', zh: '由输入的 λ' },
   'conduit.editSeg':  { en: 'CONDUIT SELECTED · B DELETE', fr: 'GAINE SÉLECTIONNÉE · B SUPPR', zh: '已选择管段 · B 删除' },
 };
 

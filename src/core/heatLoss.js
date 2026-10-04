@@ -8,7 +8,8 @@
 // Exterior walls: a room edge with no other room or stair of the same floor within
 // PROBE_M beyond it. Its layers: every WALL or INSULATION zone just inside the edge
 // (an interior lining) or crossed by the outward probe (drawn outside the room; owner
-// decisions 2026-10-01 and 2026-10-04). Their R add up; where no WALL zone is drawn, a
+// decisions 2026-10-01 and 2026-10-04). Their R add up (where two overlap, that depth
+// counts once, at the larger R); where no WALL zone is drawn, a
 // placeholder wall `wallDepth` thick stands in for the masonry. Below the earth level
 // (one for the house) a wall loses to the ground instead, as a basement wall (ISO 13370). Floor and ceiling are split by overlap with the
 // rooms of the floors below/above (floors are ordered bottom → top).
@@ -84,11 +85,39 @@ const contains = (b, x, y) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1;
 export const LAYER_KINDS = new Set(['wall', 'insulation']);
 // A layer's λ when it has no R: the masonry's or the insulation's.
 export const layerLambda = (kind, s) => (kind === 'wall' ? s.wallLambda : s.lambda);
-// A layer's R: authored `rValue`, else its depth across the wall / λ.
+// A layer's own λ: typed on the zone (`lambda`), else the project's for its kind.
+export const zoneLambda = (rect, s) => (Number.isFinite(rect.lambda) && rect.lambda > 0
+  ? rect.lambda : layerLambda(zoneKind(rect), s));
+// A layer's R: authored `rValue`, else its depth across the wall / its λ.
 function zoneR(rect, nx, s) {
   if (Number.isFinite(rect.rValue) && rect.rValue >= 0) return rect.rValue;
   const b = rect.bounds;
-  return (nx ? b.x1 - b.x0 : b.y1 - b.y0) / layerLambda(zoneKind(rect), s);
+  return (nx ? b.x1 - b.x0 : b.y1 - b.y0) / zoneLambda(rect, s);
+}
+
+// The R of a wall's layers in series. Where layers overlap across the wall's depth, that
+// stretch counts once, at the larger R (owner, 2026-10-04): each layer's R spreads evenly
+// over its depth, and the overlap keeps the layer whose share there is the larger.
+// `cuts`: [{ lo, hi (m across the wall), rz (its derated R), wall }].
+export function layerStack(cuts) {
+  let r = 0, insulated = false;
+  const walled = cuts.some((c) => c.wall);
+  const thin = cuts.filter((c) => c.hi - c.lo < EPS), deep = cuts.filter((c) => c.hi - c.lo >= EPS);
+  for (const c of thin) { r += c.rz; if (!c.wall) insulated = true; }
+  const ends = [...new Set(deep.flatMap((c) => [c.lo, c.hi]))].sort((a, b) => a - b);
+  for (let i = 0; i < ends.length - 1; i++) {
+    const lo = ends[i], hi = ends[i + 1], mid = (lo + hi) / 2;
+    let best = null, bestR = -1;
+    for (const c of deep) {
+      if (mid <= c.lo || mid >= c.hi) continue;
+      const per = c.rz / (c.hi - c.lo);
+      if (per > bestR) { bestR = per; best = c; }
+    }
+    if (!best) continue;
+    r += bestR * (hi - lo);
+    if (!best.wall) insulated = true;
+  }
+  return { r, insulated, walled };
 }
 
 // ISO 13370 basement wall: the U of a wall buried z m deep (the floor's depth below the
@@ -126,16 +155,19 @@ function wallLoss(floor, comp, s, fh, dT) {
           const px = mx + nx * PROBE_M, py = my + ny * PROBE_M;
           const sx = mx + nx * 1e-4, sy = my + ny * 1e-4;
           if (others.some((b) => hitsSegment(b, sx, sy, px, py))) continue; // heated both sides
-          let r = 0, insulated = false, walled = false;
+          const cuts = [];
           for (const z of layers) {
             const b = z.bounds, wall = zoneKind(z) === 'wall';
             const inner = contains(b, mx - nx * 0.005, my - ny * 0.005);
             if (!inner && !hitsSegment(b, sx, sy, px, py)) continue;
             // Thermal bridges derate insulation only: a lining more (cut by slabs and
             // partitions) than insulation outside (it wraps the junctions).
-            r += zoneR(z, nx, s) * (wall ? 1 : inner ? DERATE_INTERIOR : DERATE_EXTERIOR);
-            if (wall) walled = true; else insulated = true;
+            const rz = zoneR(z, nx, s) * (wall ? 1 : inner ? DERATE_INTERIOR : DERATE_EXTERIOR);
+            // Its depth across the wall, outward from the edge.
+            const e0 = nx ? (b.x0 - mx) * nx : (b.y0 - my) * ny, e1 = nx ? (b.x1 - mx) * nx : (b.y1 - my) * ny;
+            cuts.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), rz, wall });
           }
+          let { r, insulated, walled } = layerStack(cuts);
           if (!walled) r += s.wallDepth / s.wallLambda; // the placeholder masonry
           const u = 1 / (RS_WALL + r);
           let openH = 0, openU = 0, openSill = 0;

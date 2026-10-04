@@ -153,7 +153,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, uValue } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -191,8 +191,10 @@ export class Rectangle {
       if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
     } else if (this.kind === 'insulation' || this.kind === 'wall') {
       // Thermal resistance R (m²K/W) from the product label or the wall's build-up, for
-      // the heat-loss calculation (docs/heat-loss.md); absent = drawn depth / the project's λ.
+      // the heat-loss calculation (docs/heat-loss.md); or its material's conductivity λ
+      // (W/mK), R = drawn depth / λ. One or the other (R wins); neither = the project's λ.
       if (Number.isFinite(rValue) && rValue >= 0) this.rValue = rValue;
+      else if (Number.isFinite(lambda) && lambda > 0) this.lambda = lambda;
     } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
@@ -207,7 +209,7 @@ export class Rectangle {
   setKind(kind) {
     if (kind === 'stairs') kind = 'stairs_up';
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
-    if (this.kind !== 'insulation' && this.kind !== 'wall') delete this.rValue;
+    if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];

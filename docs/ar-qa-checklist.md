@@ -422,6 +422,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] (2026-10-04) WALL zones show `R ≈x` in R / U too (r135 ≈0.31, r112 ≈0.09) and take a typed R; HEAT LOSS settings show the undrawn wall depth (0.20 m) and wall λ (0.80) instead of bare wall R; Ground ≈ 9240 W, Upper ≈ 8329 W (Node, with Basement heated as stored)
 - [ ] (2026-10-04) HEAT LOSS · Earth level (default 0.00 m): the Basement's rooms show `walls in earth` m² (Node: Basement 2856 W at 0, 6982 W with the earth below the house); stepping it up past 0 lowers Ground's watts (Node +0.5 m: 9240 → 8685 W)
 - [ ] R / U: each insulation zone shows `R ≈x` (grey) or `R x` (orange), each window/door `U ≈1.4` / `U ≈2.0` or its typed U; trigger opens the numpad, ENTER sets it, CLEAR / empty ENTER clears it; HEAT LOSS watts follow (Node: 5 Ground windows at U 2.8 → their part 336 → 672 W)
+- [ ] (2026-10-04) R / U: SWAP shows `⇄ λ`; type 0.032 → label `λ 0.032` (orange), readout `… mm / λ 0.032 (from the typed λ)`; SWAP back to R shows empty, typing R clears the λ; same on an insulation zone's PLAN · EDIT pad. Overlapping layer zones count once, at the larger R (Node: r135 drawn twice → Ground unchanged)
 - [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W) too; a room's `area:` HUD line adds its watts
 - [ ] Settings survive SAVE/LOAD and an APK relaunch (project data, autosaved)
 - [ ] Not offered in ALL FLOORS

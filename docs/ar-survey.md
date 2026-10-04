@@ -335,7 +335,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (m²K/W; grey `≈` = drawn depth / the wall or insulation λ) and every WINDOW / SLIDING / DOOR / GARAGE zone its U (W/m²K, the
   label's Uw / Ud; grey `≈` = the project's Window or Door U); orange = typed. The readout names the
   aimed zone's value and its source. Trigger on a zone opens the numpad: ENTER sets it (an empty ENTER
-  or CLEAR returns to the default). An insulation R can also be typed on the PLAN · EDIT band pad.
+  or CLEAR returns to the default). A WALL or INSULATION zone takes its R **or its λ** (W/mK; R =
+  drawn depth / λ): the SWAP cell (`⇄ λ` / `⇄ R`) switches field, setting one clears the other, and the
+  pad opens on the one set; a typed λ labels the zone `λ x` in orange. An insulation R or λ can also be
+  typed on the PLAN · EDIT band pad (same SWAP toggle).
   Not offered in ALL FLOORS.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan

@@ -43,6 +43,7 @@ function serializeRect(r) {
   if (r.productMm !== undefined) out.productMm = [...r.productMm];
   if (r.facing !== undefined) out.facing = r.facing;
   if (r.rValue !== undefined) out.rValue = r.rValue; // wall / insulation R (docs/heat-loss.md)
+  if (r.lambda !== undefined) out.lambda = r.lambda; // or its λ (W/mK), R = depth / λ
   if (r.uValue !== undefined) out.uValue = r.uValue; // window/door U (docs/heat-loss.md)
   return out;
 }
@@ -50,7 +51,7 @@ function serializeRect(r) {
 const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
   hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
-  article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, uValue: r.uValue,
+  article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, lambda: r.lambda, uValue: r.uValue,
 });
 function serializeConstraint(c) {
   return {
