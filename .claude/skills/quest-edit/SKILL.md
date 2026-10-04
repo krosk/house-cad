@@ -19,7 +19,10 @@ it. Requested change: `$ARGUMENTS` (if empty, ask the owner what to change).
 5. **Show the owner the change list and get an explicit yes**, with the AR app closed and no house-cad
    2D page open. Then `quest-storage.mjs write <edited> --base <read>`; it refuses if the headset copy
    changed. If it did, re-read, re-apply, re-check.
-6. **Finish**: `automation_disable` if you sent `prox_close` (unless the owner wants the headset kept
+6. **After a push that deploys**: once `version.json` shows the commit, run
+   `quest-storage.mjs update-app` if the headset is reachable ("Waiting for a deploy, then updating the
+   headset app"); if not, say so and skip it.
+7. **Finish**: `automation_disable` if you sent `prox_close` (unless the owner wants the headset kept
    awake), and record what the owner should verify in `.claude/handoff.md` (Next step A).
    Label every claim Proven or Hypothesis (CLAUDE.md).
 

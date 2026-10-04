@@ -244,6 +244,8 @@ Static Vite app → GitHub Pages. `vite.config.js` uses a relative `base` for pr
 ## Git workflow
 
 Commit and push **directly on `main`** — do **not** create feature branches. (Still only commit/push when the user asks.) Because pushing `main` triggers the Pages deploy above, **every push publishes** — call that out when relevant.
+After a push, wait for `version.json` to show the commit, then **update the headset app if the Quest is
+reachable** (`tools/quest-storage.mjs update-app`, `docs/headset-data.md`); when it isn't, skip it and say so.
 
 For every non-trivial commit, include a descriptive commit body. Use it to record information and
 intent that cannot be readily derived from the diff: the user-facing reason for the change,

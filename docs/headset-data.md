@@ -96,8 +96,28 @@ The owner's Lapeyre quote (PDF, H × W per line, Uw, Sw):
   its own sides and `cap` (`docs/materials.md`).
 - Check with `takeoff`, then `diff`, then write as above.
 
-## Waiting for a deploy
+## Waiting for a deploy, then updating the headset app
 
 Pushing main deploys Pages in a minute or two. Poll `https://krosk.github.io/house-cad/version.json?t=<now>`
 until its `commit` is the pushed one (a background loop with `curl`, 15 s apart; `gh` is not installed).
-The AR app updates on its next launch(es); its HUD `update:` line shows the build.
+
+**Then update the headset app automatically when the headset is reachable** (owner, 2026-10-04):
+
+```bash
+adb devices -l                                   # the Quest listed?
+adb forward tcp:9333 localabstract:chrome_devtools_remote
+node --experimental-websocket tools/quest-storage.mjs update-app
+```
+
+The AR app is a PWA served from its service worker's precache, which is why it used to need a launch
+to download a new build and another to run it. The browser shares that service worker, so a browser
+tab on the origin can call `registration.update()`. `update-app` does that, then waits until the
+precache holds the live `assets/index-*.js`; the next app launch opens the new build. It touches no
+`house-cad:*` key (no plan data). Proven 2026-10-04: after `b5a55f2` deployed, the precache went from
+`index-COeH9U4m.js` to the live `index-DwP4V2UA.js` with the service worker active (done by hand; the
+command then reported "already installed"; its install path has not yet run as a command).
+
+It needs the same conditions as a read (Connecting above): the Quest on adb and a browser tab that
+answers. **It will not always be reachable** (asleep, off the network, browser not in front): then
+skip it, say so, and tell the owner the app updates over its next launch or two. Confirm on the HUD's
+`update:` line either way.

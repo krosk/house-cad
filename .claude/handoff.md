@@ -330,6 +330,8 @@ All owner requests, 2026-10-03.
 
 ## Findings / traps worth knowing
 
+- **After every deploy, update the headset app if reachable**: `quest-storage.mjs update-app` makes the
+  app's service worker take the live build, so the next launch opens it (`docs/headset-data.md`).
 - **`floor.height` is floor-to-floor; the room height is `ceilingHeight(floor)` = height − slab**
   (owner, 2026-10-04; `docs/product-intent.md` multi-floor). Use `ceilingHeight` for anything that
   means the room (walls, ceiling, finishes, heat loss); `height` only for stacking and stairs.
@@ -574,6 +576,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 38, slabs (`b5a55f2`; written to the headset autosave 2026-10-04, read back identical; the
+    app's precache already holds that build): LEVEL shows Basement 2.27 / slab 0.22, Ground 2.95 / 0.25,
+    Upper 2.95 (was 2.70) / 0.25; ⇄ SLAB on the numpad; LEFT X walls and the painted ceiling at 2.05 /
+    2.70 / 2.70; the house readout 60 Lucia boxes (was 64). If wrong: slot 4 is the plan before
+    today's edits; the pre-slab autosave is in the scratchpad backup;
   - session 38, the Lapeyre quote edit (item 15): in AR, every quoted opening at its new size and
     height (upstairs heads 2.43, French doors and Néva 2.27, door 2.25, basement window sill 1.50); the
     kept end of each re-pinned opening (`r109`, `r110`, `r114`, `r115` keep the top, `r111` the bottom)

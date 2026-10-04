@@ -16,6 +16,11 @@
 //       re-reads the autosave, refuses unless it is byte-identical to --base (what the edit
 //       started from), writes <file>, reads it back. Only with the owner's explicit yes,
 //       the AR app closed and no house-cad 2D page open (it would autosave over it).
+//   node --experimental-websocket tools/quest-storage.mjs update-app
+//       makes the headset's installed app take the build Pages serves now: asks its service
+//       worker to update, then waits until the precache holds the live index-*.js. The next
+//       launch opens the new build (no relaunch to download it first). Touches no house-cad:*
+//       key. Run after every deploy when the headset is reachable (docs/headset-data.md).
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -47,7 +52,7 @@ function connect(ws) {
     sock.send(JSON.stringify({ id: i, method, params }));
   });
   const evaluate = async (expression) => {
-    const r = await call('Runtime.evaluate', { expression, returnByValue: true });
+    const r = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     if (r.error || r.result.exceptionDetails) throw new Error(JSON.stringify(r.error || r.result.exceptionDetails));
     return r.result.result.value;
   };
@@ -103,8 +108,28 @@ try {
     console.log(back === text ? `written and read back identical (${text.length} chars)` : 'MISMATCH after write');
     tab.close();
     if (back !== text) process.exit(1);
+  } else if (cmd === 'update-app') {
+    const html = await fetch(`${ORIGIN}/house-cad/?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.text());
+    const live = html.match(/assets\/index-[\w-]+\.js/)?.[0];
+    const version = await fetch(`${ORIGIN}/house-cad/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json());
+    if (!live) die('no index-*.js in the live index.html');
+    const tab = await originTab();
+    const cached = () => tab.evaluate(`(async () => { const c = await caches.open('workbox-precache-v2-${ORIGIN}/house-cad/');
+      return (await c.keys()).map((r) => r.url).filter((u) => u.includes('/assets/index-') && u.endsWith('.js')).join(' '); })()`);
+    if ((await cached()).includes(live)) {
+      console.log(`already installed: ${version.build} (${live})`);
+    } else {
+      // Fire the update without awaiting it: install downloads the whole precache, longer than a call's timeout.
+      await tab.evaluate("navigator.serviceWorker.getRegistration('/house-cad/').then((r) => { if (r) r.update(); return !!r; })")
+        || die('no service worker registered: the app was never opened in this browser profile');
+      let ok = false;
+      for (let i = 0; i < 30 && !ok; i++) { await new Promise((r) => setTimeout(r, 3000)); ok = (await cached()).includes(live); }
+      if (!ok) die(`update not installed after 90 s (live ${live}; cached ${await cached()})`);
+      console.log(`installed ${version.build} (${live}); the next app launch opens it`);
+    }
+    tab.close();
   } else {
-    die('usage: quest-storage.mjs backup <dir> | read <out> [key] | write <file> --base <file>');
+    die('usage: quest-storage.mjs backup <dir> | read <out> [key] | write <file> --base <file> | update-app');
   }
 } catch (error) {
   die(String(error.message || error));
