@@ -639,6 +639,16 @@ export function finishGeometries(surfaces) {
   for (const wall of surfaces?.walls || []) {
     const b = bucket('walls', wall.material);
     const { face } = wall;
+    if (face.cap) { // a half wall's top: (u = along it, v = across) at its height
+      for (const r of wall.boxes) {
+        const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+        const at = (u, v) => (face.alongX ? [u, face.z + FINISH_LIFT, -v] : [v, face.z + FINISH_LIFT, -u]);
+        const corners = pts.map(([u, v]) => at(u, v));
+        // Wound to face up either way (u along y mirrors the quad).
+        quad(b, face.alongX ? corners : [...corners].reverse(), face.alongX ? pts : [...pts].reverse(), [0, 1, 0]);
+      }
+      continue;
+    }
     for (const r of wall.boxes) { // (u = along, v = height) boxes
       // The finished surface may sit past a lining: each box carries its inset.
       const n = face.at + face.inward * ((r.inset || 0) + FINISH_LIFT);

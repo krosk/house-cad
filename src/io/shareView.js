@@ -35,7 +35,7 @@ const ARTICLE_SLOT = 6 + APERTURE_KEYS.length;
 // floor slot 5 as [rectIndex, materialIndex, edge, anchorRectIndex, corner, turn], trailing
 // defaults dropped; indexes are into that floor's rects and the top-level `m` id list.
 // Links made before finishes stop at slot 3/4 and decode with none.
-const EDGES = ['left', 'right', 'bottom', 'top'];
+const EDGES = ['left', 'right', 'bottom', 'top', 'cap']; // 'cap': a half wall's top (appended: old indices hold)
 const CORNERS = ['bl', 'br', 'tl', 'tr'];
 
 // Project → compact view object. Furniture products are compact enough to include by

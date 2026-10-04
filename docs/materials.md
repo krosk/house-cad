@@ -135,8 +135,17 @@ later `herringbone`. `pack` is pieces per box or m² per box.
     - a half wall in the wall line (outside the room area) cuts the face above its sill;
     - a half wall standing *inside* a room is a free-standing low wall: it cuts no face, and the 3D
       wall behind it stays full height (owner, 2026-09-27: Ground r139 against the 7 cm gap wall to
-      r106 had been opened above 1.1 m); known gap: the part of the face below it stays counted,
-      hidden inside the half wall;
+      r106 had been opened above 1.1 m);
+    - **a half wall inside a room takes wall finishes itself** (owner, 2026-10-04: "the half wall top
+      needs to get it too"): each side facing the room (`edge` left|right|bottom|top, exposed where
+      1 cm in front of it is room floor, not a wall, lining or another half wall) from the floor to
+      its top (`sill`, default 1.1 m), and its top as `edge: 'cap'` (one box, u along its long side so
+      a tile's width runs along it). A room face it stands against (within 3 cm of the finished
+      surface) loses the hidden band, floor to its top, over its length. `flooring.js`
+      `halfWallFace` / `halfWallCap`; AR WALL mode picks its sides like a room face and its top when
+      aimed inside its footprint (more than 5 cm from a side). Proven (Node, owner's Ground bathroom,
+      Lucia): r107's back face 3.10 → 1.94 m², the side faces lose 0.22 m² each, the half wall adds
+      1.155 m² (front) + 0.21 m² (top, 4 tiles); its back and ends have no exposed segment;
   - a doorway belongs to a room within 5 cm, and an opening pierces a face when it sits within
     45 cm behind it.
 - Always show the naive `area ÷ piece + waste%` beside the laid-out count. Round packs up **once per

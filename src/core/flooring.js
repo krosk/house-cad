@@ -8,6 +8,8 @@
 //   wall finish   { target: { rect, edge }, material }   → that room rect edge, seen
 //                                                         from inside, on the room boundary
 // `edge` is left|right|bottom|top, the same vocabulary dimension constraints use.
+//   half wall     { target: { rect, edge }, material }   → a side of a half wall standing
+//                 { target: { rect, edge: 'cap' } }        inside a room, or its top (`cap`)
 //
 // Continuity (owner decisions): every pattern is anchored at the plan origin, so equal
 // materials line up everywhere, unless a floor region names its own start corner
@@ -32,6 +34,8 @@ const TOUCH = 0.05;
 // How far behind a wall face an opening zone may sit and still pierce it.
 const FACE_DEPTH = 0.45;
 export const EDGES = ['left', 'right', 'bottom', 'top'];
+// The top of a half wall, as a finish target edge (owner, 2026-10-04: tiled like its sides).
+export const CAP = 'cap';
 
 // ---- rect-set regions ----------------------------------------------------------
 // A region is a list of disjoint axis-aligned boxes. Built by coordinate compression:
@@ -622,20 +626,81 @@ function insetSegments(floor, vertical, at, inward, segments) {
   return out;
 }
 
+// ---- half walls standing inside a room ---------------------------------------
+// A half wall inside a room is a free-standing low wall (architectural3d.js): its sides
+// facing the room and its top take wall finishes like a room face (owner, 2026-10-04),
+// and the room faces it stands against are hidden below its top.
+const roomBoxesOf = (floor) => (floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.bounds);
+const inRoomsAt = (rooms, b) => {
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  return rooms.some((q) => cx > q.x0 && cx < q.x1 && cy > q.y0 && cy < q.y1);
+};
+export function isInRoomHalfWall(floor, rect) {
+  return !!rect && zoneKind(rect) === 'halfwall' && inRoomsAt(roomBoxesOf(floor), rect.bounds);
+}
+export function inRoomHalfWalls(floor) {
+  const rooms = roomBoxesOf(floor);
+  return (floor.rectangles || []).filter((r) => zoneKind(r) === 'halfwall' && inRoomsAt(rooms, r.bounds));
+}
+// Its height: the opening band starts at `sill` (architectural3d.js openingBand).
+export const halfWallTop = (floor, rect) => Math.min(rect.sill ?? 1.1, floor.height || 2.8);
+
+// A side of an in-room half wall as a face (edgeFace's shape: `inward` points away from
+// the half wall, into the room). Exposed where just in front of it is room floor, not a
+// wall, lining or another half wall; a side against a wall has no segments.
+export function halfWallFace(floor, rect, edge) {
+  const b = rect.bounds;
+  const vertical = edge === 'left' || edge === 'right';
+  const at = edge === 'left' ? b.x0 : edge === 'right' ? b.x1 : edge === 'bottom' ? b.y0 : b.y1;
+  const inward = edge === 'left' || edge === 'bottom' ? -1 : 1;
+  const lo = vertical ? b.y0 : b.x0, hi = vertical ? b.y1 : b.x1;
+  const rooms = roomBoxesOf(floor);
+  const blockers = (floor.rectangles || []).filter((r) => r !== rect
+    && ['wall', 'insulation', 'halfwall'].includes(zoneKind(r))).map((r) => r.bounds);
+  const cuts = new Set([lo, hi]);
+  for (const q of [...rooms, ...blockers]) {
+    for (const v of vertical ? [q.y0, q.y1] : [q.x0, q.x1]) if (v > lo && v < hi) cuts.add(v);
+  }
+  const C = [...cuts].sort((p, q) => p - q);
+  const probe = at + inward * 0.01; // 1 cm in front of the side
+  const segments = [];
+  for (let i = 0; i < C.length - 1; i++) {
+    const m = (C[i] + C[i + 1]) / 2;
+    const px = vertical ? probe : m, py = vertical ? m : probe;
+    if (!rooms.some((q) => within(q, px, py)) || blockers.some((q) => within(q, px, py))) continue;
+    const last = segments[segments.length - 1];
+    if (last && Math.abs(last.b - C[i]) <= EPS) last.b = C[i + 1]; else segments.push({ a: C[i], b: C[i + 1], inset: 0 });
+  }
+  return { vertical, at, inward, segments, halfWall: true };
+}
+
+// The top of an in-room half wall: one box with u along its long side (so a tile's
+// width runs along it, as on a face) and v across; `alongX` says which plan axis u is.
+export function halfWallCap(floor, rect) {
+  const b = rect.bounds;
+  const alongX = b.x1 - b.x0 >= b.y1 - b.y0;
+  const box = alongX ? { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 } : { x0: b.y0, x1: b.y1, y0: b.x0, y1: b.x1 };
+  return { face: { cap: true, alongX, z: halfWallTop(floor, rect) }, boxes: [box] };
+}
+
 // A wall face as (u, v) boxes: u = plan coordinate along the edge (global origin),
-// v = height above the floor. Door/window openings piercing the face are excluded.
+// v = height above the floor. Door/window openings piercing the face are excluded, and
+// so is the part hidden behind an in-room half wall standing against it. A half wall's
+// own side runs from the floor to its top; its `cap` is halfWallCap.
 export function wallFaceBoxes(floor, rect, edge) {
+  if (zoneKind(rect) === 'halfwall') {
+    if (edge === CAP) return halfWallCap(floor, rect);
+    const face = halfWallFace(floor, rect, edge), top = halfWallTop(floor, rect);
+    return { face, boxes: face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: top, inset: 0 })) };
+  }
   const face = edgeFace(floor, rect, edge);
   const H = floor.height || 2.8;
   const include = face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: H }));
   const exclude = [];
   // A half wall standing inside a room is a free-standing low wall, not a gap in the
   // wall mass: it opens no face (as in architecturalWallBoxes).
-  const rooms = (floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.bounds);
-  const inRoom = (b) => {
-    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
-    return rooms.some((q) => cx > q.x0 && cx < q.x1 && cy > q.y0 && cy < q.y1);
-  };
+  const rooms = roomBoxesOf(floor);
+  const inRoom = (b) => inRoomsAt(rooms, b);
   for (const r of floor.rectangles || []) {
     if (!OPENING_KINDS.has(zoneKind(r))) continue;
     const rb = r.bounds;
@@ -649,6 +714,16 @@ export function wallFaceBoxes(floor, rect, edge) {
     const sill = r.sill || 0, head = r.head == null ? H : Math.min(H, r.head);
     if (head - sill > EPS) exclude.push({ x0: u0, x1: u1, y0: sill, y1: head });
   }
+  // Hidden behind an in-room half wall whose side touches the finished surface (within
+  // 3 cm): from the floor to its top, over its length along the face.
+  for (const r of inRoomHalfWalls(floor)) {
+    const rb = r.bounds;
+    const near = face.inward > 0 ? (face.vertical ? rb.x0 : rb.y0) : (face.vertical ? rb.x1 : rb.y1);
+    const [u0, u1] = face.vertical ? [rb.y0, rb.y1] : [rb.x0, rb.x1];
+    const touches = face.segments.some((sg) => Math.min(sg.b, u1) - Math.max(sg.a, u0) > EPS
+      && Math.abs(near - (face.at + face.inward * sg.inset)) <= 0.03);
+    if (touches) exclude.push({ x0: u0, x1: u1, y0: 0, y1: halfWallTop(floor, r) });
+  }
   // Per segment, so each box keeps its segment's lining `inset` (regionBoxes would
   // merge neighbouring segments that sit at different depths).
   const boxes = include.flatMap((inc, i) =>
@@ -658,8 +733,13 @@ export function wallFaceBoxes(floor, rect, edge) {
 
 // Geometry-only view of one floor's finishes for the 3D view: no piece counting
 // (that runs per model change on desktop; the texture does not need it).
+// A wall-finish target rect: a room, or a half wall standing inside one.
+const wallTargetIds = (floor) => new Set([
+  ...(floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id),
+  ...inRoomHalfWalls(floor).map((r) => r.id),
+]);
 export function finishSurfaces(project, floor) {
-  const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
+  const roomIds = wallTargetIds(floor);
   const floors = floorRegions(project, floor, { count: false })
     .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: r.alongX, patternTurn: r.patternTurn,
       frameOffset: r.frameOffset }));
@@ -676,7 +756,7 @@ export function finishSurfaces(project, floor) {
 export function materialTakeoff(project) {
   const regions = [], walls = [];
   for (const floor of project.floors || []) {
-    const roomIds = new Set((floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id));
+    const roomIds = wallTargetIds(floor);
     regions.push(...floorRegions(project, floor));
     for (const f of floor.finishes || []) {
       if (!f.target?.edge || !roomIds.has(f.target.rect)) continue;

@@ -154,7 +154,8 @@ function loadFinishes(list, rectIds = null) {
   return (Array.isArray(list) ? list : []).flatMap((f) => {
     const rect = rectIds ? rectIds.get(f?.target?.rect) : f?.target?.rect;
     if (typeof rect !== 'string' || typeof f.material !== 'string') return [];
-    const edge = ['left', 'right', 'bottom', 'top'].includes(f.target.edge) ? f.target.edge : null;
+    // 'cap' = the top of an in-room half wall (flooring.js CAP).
+    const edge = ['left', 'right', 'bottom', 'top', 'cap'].includes(f.target.edge) ? f.target.edge : null;
     const out = { target: edge ? { rect, edge } : { rect }, material: f.material };
     // Floor pattern start corner (docs/materials.md "Pattern start corner").
     const anchorRect = rectIds ? rectIds.get(f.anchor?.rect) : f.anchor?.rect;

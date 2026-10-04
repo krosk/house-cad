@@ -25,7 +25,7 @@ import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
-import { materialTakeoff, edgeFace, regionBoxes, EDGES, finishSurfaces, anchorNear } from '../core/flooring.js';
+import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
@@ -3463,11 +3463,11 @@ export function setupMR(view, project, getFootprint) {
     }
   }
   // A strip just inside a wall face, `d0..d1` metres from it (plan boxes).
-  const faceStrip = (f, d0, d1) => f.face.segments.map((s) => {
+  const faceStrip = (f, d0, d1) => (f.face.cap ? [f.rect.bounds] : f.face.segments.map((s) => {
     const n0 = f.face.at + f.face.inward * (s.inset + d0), n1 = f.face.at + f.face.inward * (s.inset + d1);
     const [lo, hi] = [Math.min(n0, n1), Math.max(n0, n1)];
     return f.face.vertical ? { x0: lo, x1: hi, y0: s.a, y1: s.b } : { x0: s.a, x1: s.b, y0: lo, y1: hi };
-  });
+  }));
   // A material badge: a 6 cm swatch disc in the material's colour inside a white ring,
   // flat on the floor at plan (x, y). Batched into the one material mesh (triangles).
   const BADGE_SEGS = 20;
@@ -3511,6 +3511,14 @@ export function setupMR(view, project, getFootprint) {
         }
       }
     }
+    // A half wall standing inside a room: its sides facing the room and its top (`cap`).
+    for (const rect of inRoomHalfWalls(floor)) {
+      for (const edge of EDGES) {
+        const face = halfWallFace(floor, rect, edge);
+        if (face.segments.length) matFaces.push({ rect, edge, face, comp: null });
+      }
+      matFaces.push({ rect, edge: CAP, face: { cap: true, segments: [] }, comp: null });
+    }
     matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'window', 'furniture'].includes(zoneKindOf(r)));
     // A target that has a material shows one small swatch badge at the centre of its plan
     // box, not a coloured fill (owner, 2026-09-27: full overlays made the plan hard to read).
@@ -3546,6 +3554,7 @@ export function setupMR(view, project, getFootprint) {
     for (const f of matFaces) {
       const id = faceMaterialId(f);
       if (!id) continue;
+      if (f.face.cap) { matBadge(arr, colors, ...centre(f.rect.bounds), colorOf(id)); continue; }
       const seg = f.face.segments.reduce((m, sg) => (sg.b - sg.a > m.b - m.a ? sg : m));
       const u = (seg.a + seg.b) / 2, n = f.face.at + f.face.inward * (seg.inset + 0.12);
       matBadge(arr, colors, f.face.vertical ? n : u, f.face.vertical ? u : n, colorOf(id));
@@ -3598,6 +3607,13 @@ export function setupMR(view, project, getFootprint) {
   function matFaceAt(px, py) {
     let best = null, bestD = 0.6;
     for (const f of matFaces) {
+      // A half wall's top: aimed at from above, it counts as 5 cm away, so a face
+      // (its sides, the wall behind) still wins within 5 cm of it.
+      if (f.face.cap) {
+        const b = f.rect.bounds;
+        if (px > b.x0 && px < b.x1 && py > b.y0 && py < b.y1 && 0.05 < bestD) { bestD = 0.05; best = f; }
+        continue;
+      }
       const n = f.face.vertical ? px : py, u = f.face.vertical ? py : px;
       const seg = f.face.segments.find((s) => u >= s.a - 0.05 && u <= s.b + 0.05);
       if (!seg) continue;
