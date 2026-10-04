@@ -663,6 +663,43 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
   only the anchor changes) — do not "fix" the AR flip back to it.
 - A conflicting size is refused: `commitEntry`/flip count solver conflicts before/after and roll
   back if the count rose; numpad shows `!CONFLICT`, pair stays.
+
+### Conflicting dimensions: which one is wrong? (owner, 2026-10-04)
+
+The owner's need: "identify the other constraints that cause the conflict, so that I can verify
+systematically which one is wrong". `src/core/conflicts.js` `diagnoseConflicts(floor)`:
+- **The model:** on each axis the plan's dimensions are a graph (a node per rect edge plus the origin,
+  an arc per dimension). A conflict is a loop whose values don't add up. The graph is split into loop
+  blocks (biconnected components), so two wrong dimensions in two separate loops are diagnosed apart.
+- **Suspects:** each dimension of a conflicting block whose removal alone makes the whole block
+  agree. Each comes with the value the others imply for it. **Remeasure the suspects: the wrong one
+  is the one whose tape reading matches its implied value, not its stored value.** No suspect means
+  at least two dimensions are wrong.
+- **0 mm dimensions are beyond doubt** (owner, 2026-10-04: shared walls, alignments): they still link
+  their edges in the loops, but are never suspects and are not listed (less noise). A value typed
+  over a 0 mm one is no longer 0, so it stays a suspect.
+- A single loop can't tell its members apart: all of them are suspects. A cross-check dimension that
+  closes a second loop narrows the list.
+- Same inputs as the structure solve: no furniture dimensions, marker or node pins, or measurements.
+- **In AR:** aiming at a red value, or the numpad's `!CONFLICT` after a refused entry or flip (the
+  refused value is diagnosed before it is rolled back), puts on the pill:
+  - the value and how far off the loop is;
+  - `n to remeasure`;
+  - up to four lines `#k stored → implied` (yellow = the aimed or typed dimension itself), then a
+    `+n` line;
+  - every suspect's label tagged `#k` in pink on the plan.
+  The RLOG line `dim conflict suspects` records the refused case.
+- **In Node:** `tools/house-query.mjs conflicts <house>` prints every block, its suspects with their
+  edges, and the dimensions cleared as consistent.
+- **Proven** (Node on the owner's headset copy of 2026-10-04):
+  - Adding 15 mm to each dimension in turn turned dimensions red in 57 cases (Basement 5, Ground 36,
+    Upper 16). In every one, the changed dimension was among the suspects; lists held 1–7 with the
+    0 mm dimensions left out (1–9 before).
+  - Example: c215 0 → 15 mm makes a 14-dimension y block with 3 suspects (c219, c458, c215); the 11
+    others are cleared (8 listed; the 0 mm ones are left out).
+  - Replaying the refused entry through the model API gives the same three, and the rollback leaves
+    no conflict.
+  - **Hypothesis:** the pill and tags render as described; unverified on the Quest.
 - **DEL** removes the pair's constraint and closes the pad; for a NEW pair with no constraint
   yet, DEL cancels the in-progress definition and closes the pad (both resolve to "clear + back
   to ref-pick").

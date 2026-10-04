@@ -406,6 +406,12 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Basement STAIRS UP (7 treads to 1.26 m) + Ground STAIRS DOWN (5 treads to −0.90 m) match the real basement stair
 - [ ] Tread depth (25 cm assumed) against the real treads; the same treads in desktop View 3D
 
+## Conflicting dimensions: suspects  ⬜ NEW (2026-10-04) — Node-verified only
+- [ ] PLAN · DIMS: type a value that conflicts → `!CONFLICT`; the pill shows `<value> · off by <x>`, `n to remeasure`, `#1…#4 stored → implied` (the typed one yellow), and pink `#k` tags sit on the suspects' labels
+- [ ] Aim at a red value (if one is stored): the same pill and tags; aiming away removes the tags
+- [ ] Remeasure the suspects: the wrong one reads its implied value; correcting it clears the red
+- [ ] Two wrong dimensions in one loop: `2+ dims wrong`, no tags
+
 ## HEATING · PIPE / HEAT LOSS / R / U  ⬜ NEW (2026-10-01) — build + Node-verified only
 - [ ] The HEATING group follows MARKER in the mode cycle: PIPE (moved from MARKER), HEAT LOSS, R / U; PIPE works as before
 - [ ] Entering it shows each heated room's watts (orange) on the active plan; leaving removes them

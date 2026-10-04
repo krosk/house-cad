@@ -127,6 +127,8 @@ The key insight: because every rectangle edge is axis-aligned, each edge is a si
 - Weights: `W_HARD=1e4` (constraints must hold), `W_STAY=1` (each edge pulls toward its current value → minimal movement), `W_ANCHOR=50` (the first-picked edge `a` of a dimension holds), `W_DRAG=300` (a rectangle flagged `_dragging` wins, so the rest yields).
 - A distance constraint stores an **ordered** pair `a`,`b` and a **signed** `value = coord(b) − coord(a)`. Order matters: it sets the sign, locks which side `b` is on, and picks the anchor (`a` holds, `b` moves). `swapConstraint()` reverses it. `setConstraintMagnitude()` preserves the sign. This signedness is deliberate — it keeps the system linear and the solution unique.
 - Conflicts are detected post-solve via residual > 1 mm and flagged on `c.conflict` (shown red).
+  `src/core/conflicts.js` names the suspects (each dimension whose removal alone resolves the loop,
+  with the value the others imply; `docs/ar-survey.md` "Conflicting dimensions").
 - **Furniture zones are solved one-way, after the structure** (`solveFurniture`): walls never move
   for furniture, a product fixes its zone's size, and an over-specified furniture dimension is
   **deleted, never flagged** (logged on `project.removedDims`; not while a rect is `_dragging`).

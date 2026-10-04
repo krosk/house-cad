@@ -11,11 +11,14 @@
 //       material: net m², pieces; then the house total (packs rounded once)
 //   node tools/house-query.mjs diff <before> <after>    conflicts, deleted dimensions, and every
 //       zone / marker / conduit node whose solved position, band or U value changed
+//   node tools/house-query.mjs conflicts <house>        each conflicting loop block: its dimensions
+//       and the suspects (one of them alone wrong), stored → the value the others imply
 import fs from 'node:fs';
 import { Project } from '../src/core/model.js';
 import { deserializeInto, validateProjectData } from '../src/io/serialize.js';
 import { connectedRoomComponents } from '../src/core/geometry2d.js';
 import { materialTakeoff } from '../src/core/flooring.js';
+import { diagnoseConflicts, isCertain } from '../src/core/conflicts.js';
 
 const load = (file) => {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -29,7 +32,26 @@ const box = (b) => `x ${b.x0.toFixed(2)}…${b.x1.toFixed(2)} y ${b.y0.toFixed(2
 const inside = (b, x, y) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1;
 const [cmd, a, b] = process.argv.slice(2);
 
-if (cmd === 'openings' && a) {
+if (cmd === 'conflicts' && a) {
+  const p = load(a);
+  const end = (ep) => (ep.rect === '__origin__' ? 'origin' : `${ep.rect}.${ep.edge}`);
+  for (const f of p.floors) {
+    const found = diagnoseConflicts(f);
+    console.log(`\n== ${f.name}: ${found.length ? `${found.length} conflicting block(s)` : 'no conflict'}`);
+    for (const g of found) {
+      console.log(`${g.axis} block, ${g.ids.size} dims, off by ${mm(g.worst)} mm: ${g.suspects.length
+        ? `${g.suspects.length} suspect(s)` : 'no single suspect (2+ dims wrong)'}`);
+      const byId = new Map(f.constraints.map((c) => [c.id, c]));
+      for (const s of g.suspects) {
+        const c = byId.get(s.id);
+        console.log(`  ${s.id.padEnd(6)} ${end(c.a)} → ${end(c.b)}: ${mm(Math.abs(s.value))} mm, others say ${mm(Math.abs(s.implied))} (${s.delta > 0 ? '+' : ''}${mm(s.delta)})`);
+      }
+      // 0 mm dimensions are beyond doubt: never suspects, not listed (owner, 2026-10-04).
+      const others = [...g.ids].filter((id) => !g.suspects.some((s) => s.id === id) && !isCertain(byId.get(id)));
+      if (others.length) console.log(`  consistent elsewhere: ${others.join(' ')}`);
+    }
+  }
+} else if (cmd === 'openings' && a) {
   const p = load(a);
   for (const f of p.floors) {
     console.log(`\n== ${f.name}`);

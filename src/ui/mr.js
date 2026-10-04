@@ -31,6 +31,7 @@ import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windo
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
+import { diagnoseConflicts } from '../core/conflicts.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
@@ -1339,6 +1340,53 @@ export function setupMR(view, project, getFootprint) {
   // Dimension value labels currently in the plan, for ray-hover pick (their value
   // is echoed big on the controller). Rebuilt with the plan each edit.
   let dimSprites = [];
+
+  // Conflicting dimensions (core/conflicts.js, docs/ar-survey.md "Conflicting
+  // dimensions"): aiming at a red value lists its loop block's SUSPECTS on the pill, each
+  // stored → the value the other dimensions imply, and tags their labels #1, #2… on the plan.
+  const CONFLICT_SHOWN = 4; // pill lines; every suspect is tagged on the plan
+  let conflictDiag = null; // diagnoseConflicts(active floor), dropped on every plan build
+  let conflictTags = [], conflictTagsKey = null, conflictTagsSprites = null;
+  function conflictBlockOf(cId) {
+    conflictDiag ??= diagnoseConflicts(project.activeFloor);
+    return conflictDiag.find((g) => g.ids.has(cId)) || null;
+  }
+  function showConflictTags(block) {
+    const key = block ? [...block.ids].join() : null;
+    if (key === conflictTagsKey && conflictTagsSprites === dimSprites
+      && conflictTags.every((m) => m.parent === planGroup)) return;
+    for (const m of conflictTags) { m.parent?.remove(m); m.geometry.dispose(); }
+    conflictTags = []; conflictTagsKey = key; conflictTagsSprites = dimSprites;
+    if (!block) return;
+    const tags = block.suspects.map((s, i) => {
+      const sprite = dimSprites.find((d) => d.userData.cId === s.id);
+      return sprite && makeDimLabel(`#${i + 1}`, '#f0abfc', sprite.position.x, -sprite.position.z + 0.045);
+    }).filter(Boolean);
+    if (tags.length) conflictTags = addDimLabelBatch(tags, planGroup, 31);
+  }
+  // A refused value (PLAN DIMS !CONFLICT): diagnose the plan as it would be with it,
+  // before the caller rolls it back.
+  function noteRefusedConflict(c) {
+    const block = diagnoseConflicts(project.activeFloor).find((g) => g.ids.has(c.id)) || null;
+    refusedConflict = block ? { c: { id: c.id, value: c.value }, block } : null;
+    rlog('dim conflict suspects', { id: c.id, worst: block && +block.worst.toFixed(4),
+      suspects: block?.suspects.map((x) => `${x.id} ${+x.value.toFixed(4)}→${+x.implied.toFixed(4)}`) ?? [] });
+  }
+  // The pill lines for an aimed red dimension, or null.
+  function conflictLines(c, block) {
+    if (!block) return null;
+    const len = (v) => `${fmt(Math.abs(v))}`;
+    const lines = [[`${len(c.value)} ${unitLabel()} · ${t('conflict.off')} ${len(block.worst)}`, 0xff5c5c]];
+    if (!block.suspects.length) lines.push([t('conflict.several'), 0xffe14d]);
+    else {
+      lines.push([`${block.suspects.length} ${t('conflict.suspects')}`, 0xf0abfc]);
+      block.suspects.slice(0, CONFLICT_SHOWN).forEach((s, i) => lines.push([
+        `#${i + 1} ${len(s.value)} → ${len(s.implied)}`, s.id === c.id ? 0xffe14d : 0xf0abfc]));
+      const more = block.suspects.length - CONFLICT_SHOWN;
+      if (more > 0) lines.push([`+${more} (#${CONFLICT_SHOWN + 1}…#${block.suspects.length})`, 0xf0abfc]);
+    }
+    return lines;
+  }
 
   // Every planGroup child produced by the active-floor buildDimensions pass (dashed
   // line meshes + value sprites). Tracked so a dim grip-drag can rebuild ONLY the
@@ -4173,6 +4221,7 @@ export function setupMR(view, project, getFootprint) {
   // expensive 2048px raster refresh during continuous grip drags.
   function buildPlan(withDims = true) {
     sheetDirty = true;
+    conflictDiag = null; // the plan changed: re-diagnose on the next aim at a red dimension
     // A loaded slot or file may hold furniture zones migrated from the old placed items
     // (no size yet): size them from the catalog before drawing. Emits only if one changed.
     if (furnitureCatalogLoaded) project.applyFurnitureCatalog(furnitureCatalog);
@@ -4473,6 +4522,7 @@ export function setupMR(view, project, getFootprint) {
   let dimBuffer = '';       // typed digits (prefilled with the current value when editing)
   let editingId = null;     // id of the constraint being edited (if it already existed)
   let dimConflict = false;  // last commit was refused (would over-constrain); shown on the numpad, cleared on next key
+  let refusedConflict = null; // { c: {id, value}, block }: that refused value's suspects (read while dimConflict)
   let translateTargets = { x: null, y: null }; // rigid TRANSLATE target per axis: {ref,value}
   let translateEdge = null; // edge currently awaiting its desired origin coordinate
   let translateBuffer = '';
@@ -5010,7 +5060,9 @@ export function setupMR(view, project, getFootprint) {
     project.setConstraintMagnitude(c.id, meters); // preserves side (sign); re-solves + notifies
     if (conflictCount() > before) {
       // This size can't hold alongside the existing constraints. Refuse it: undo so
-      // the model stays consistent, and keep the pair on-screen for a retry.
+      // the model stays consistent, and keep the pair on-screen for a retry. First note
+      // which dimensions it disagrees with (the pill lists them while !CONFLICT shows).
+      noteRefusedConflict(c);
       if (existing) project.setConstraintMagnitude(c.id, Math.abs(prevValue)); // restore old value
       else project.removeConstraint(c.id);                                     // drop the just-made one
       dimConflict = true;
@@ -6964,6 +7016,7 @@ export function setupMR(view, project, getFootprint) {
     const before = conflictCount();
     project.flipConstraintSide(c.id); // move ref B to the other side of ref A
     if (conflictCount() > before) {
+      noteRefusedConflict(c);
       project.flipConstraintSide(c.id); // undo — the flip can't hold
       dimConflict = true; redrawNumpad();
       rlog('dim flip refused (conflict)', { id: c.id });
@@ -9029,6 +9082,11 @@ export function setupMR(view, project, getFootprint) {
     // mode breadcrumbs remain fixed while thumbstick-y changes this separate label.
     const hovSprite = pickDimLabel(editCtl);
     const hovDim = hovSprite?.userData.dimText ?? null;
+    const hovC = hovSprite ? project.constraints.find((k) => k.id === hovSprite.userData.cId) : null;
+    const hovConflict = hovC?.conflict ? conflictBlockOf(hovC.id) : null;
+    const refused = dimConflict && dimRefA && dimRefB ? refusedConflict : null;
+    showConflictTags(refused?.block ?? hovConflict);
+    const conflictReadout = refused ? conflictLines(refused.c, refused.block) : conflictLines(hovC, hovConflict);
     const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
@@ -9094,7 +9152,8 @@ export function setupMR(view, project, getFootprint) {
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const mergeHint = modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)
       ? `\n${t('marker.mergePair')}` : '';
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || hovDim;
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus
+      || (conflictReadout ? conflictReadout.map(([text]) => text).join('\n') : hovDim);
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
       : matStatus ? matColors
@@ -9104,7 +9163,8 @@ export function setupMR(view, project, getFootprint) {
         : wireLengths ? [wireTypeColor(selectedRoutedWire), wireTypeColor(selectedRoutedWire),
           wireTypeColor({ type: wireLengths.otherType })]
         : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
-      : exportStatus ? C_EXPORT : heatRStatus ? 0xfb923c : 0x38bdf8;
+      : exportStatus ? C_EXPORT : heatRStatus ? 0xfb923c
+      : conflictReadout ? conflictReadout.map(([, color]) => color) : 0x38bdf8;
     // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
     // In WIRE, a grip cycle of 2+ devices/wires shows the target's `i/n` there instead
     // (it covers a stack too: stacked devices are all in that cycle).

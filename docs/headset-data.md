@@ -65,6 +65,8 @@ re-imposes the constraints on load. Then:
 - `rooms-with <house> <re>`: rooms identified by what they hold (the bathrooms are the rooms holding a
   `sensea` shower tray); rooms have no names.
 - `takeoff <house> <materialId>`: m² and pieces per wall face and floor region, and the house's packs.
+- `conflicts <house>`: each conflicting loop of dimensions and its suspects, the stored value against
+  the value the other dimensions imply (`docs/ar-survey.md` "Conflicting dimensions").
 
 New fields that the deployed app doesn't know yet (e.g. a finish `edge: 'cap'` before `afcdd90`)
 must wait until Pages serves the build (`version.json` shows its commit) and the app has updated, or
