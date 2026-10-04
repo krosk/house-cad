@@ -14,6 +14,7 @@
 import polygonClipping from 'polygon-clipping';
 import { computeFootprint, connectedRoomComponents, multiPolygonArea } from './geometry2d.js';
 import { zoneKind } from './zoneColors.js';
+import { ceilingHeight } from './storey.js';
 
 // Project settings (`project.heat`), each overridable. Defaults for the owner's house
 // (docs/heat-loss.md, owner answers 2026-10-01):
@@ -82,7 +83,7 @@ function zoneR(rect, nx, s) {
 
 function wallLoss(floor, comp, s, dT) {
   const out = { wall: 0, opening: 0, wallArea: 0, openingArea: 0, insulated: 0 };
-  const H = floor.height;
+  const H = ceilingHeight(floor); // the room's walls, below the slab
   const others = floor.rectangles.filter((r) => SPACE_KINDS.has(zoneKind(r)) && !comp.ids.has(r.id))
     .map((r) => r.bounds);
   const insulation = floor.rectangles.filter((r) => zoneKind(r) === 'insulation');
@@ -156,7 +157,7 @@ function splitByNeighbour(foot, neighbour) {
  */
 export function floorHeatLoss(project, floor) {
   const s = heatSettings(project), fh = floorHeat(floor);
-  if (!fh.heated || !(floor?.height > 0)) return [];
+  if (!fh.heated || !(ceilingHeight(floor) > 0)) return [];
   const i = project.floors.indexOf(floor);
   const below = project.floors[i - 1] || null, above = project.floors[i + 1] || null;
   const gi = project.floors.findIndex((f) => f.id === project.groundFloorId);
@@ -181,7 +182,7 @@ export function floorHeatLoss(project, floor) {
     const uCeiling = 1 / (RS_CEILING + s.ceilingR + fh.ceilingR);
     const ceilingW = up.unheated * (1 / (RS_CEILING + s.slabR + aboveH.floorR)) * dT * b(up.temp ?? s.tOut)
       + up.none * uCeiling * dT;
-    const volume = comp.area * floor.height;
+    const volume = comp.area * ceilingHeight(floor);
     const air = 0.34 * s.ach * volume * dT;
     const parts = { wall: w.wall, opening: w.opening, floor: floorW, ceiling: ceilingW, air };
     return {

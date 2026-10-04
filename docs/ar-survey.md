@@ -782,8 +782,10 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
 - **LEVEL mode**: **thumbstick up/down switches** the active floor (`switchFloor`, no wrap), with
   a read-only **ALL FLOORS** pseudo-level immediately above the top storey. Real floors reuse the
   DIMS numpad for storey height; **ENTER** calls `project.setHeight` and re-stacks elevations.
-  Heights are entered **by hand** — Quest can't measure the vertical offset. The pad's SWAP/DEL
-  keys are inert. Labels read `LEVEL · <FloorName>` or `LEVEL · ALL FLOORS`.
+  Heights are entered **by hand** — Quest can't measure the vertical offset. **SWAP** switches the
+  field to the floor's **slab** thickness (owner, 2026-10-04) and back; ENTER on it calls
+  `project.setSlab` (0 ≤ slab < storey height), which lowers the ceiling and moves no floor. DEL is
+  inert. Labels read `LEVEL · <FloorName>` or `LEVEL · ALL FLOORS`.
 - **ALL FLOORS** renders every floor's footprint, edge state, dimensions, and markers at its
   derived elevation around the shared ground origin. It leaves `activeFloorId` unchanged and hides
   the height pad. Architecture, marker placement, dimensions, and furniture remain read-only, but

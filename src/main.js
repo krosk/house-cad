@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, Rectangle, furnitureProductPlacements } from './core/model.js';
+import { Project, Rectangle, furnitureProductPlacements, ceilingHeight } from './core/model.js';
 import { loadFurnitureCatalog } from './ui/furnitureCatalog.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
@@ -340,7 +340,7 @@ function rebuildView() {
     elevation: f.elevation,
     floorId: f.id,
     name: f.name,
-    height: f.height,
+    height: ceilingHeight(f), // a light with no height sits at the ceiling
     markers: f.markers,
     // Switch products replace the standard faceplate (docs/materials.md "Switches").
     markerProducts: markerProductDraws(project, f.markers),

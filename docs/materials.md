@@ -132,6 +132,8 @@ later `herringbone`. `pack` is pieces per box or m² per box.
     - a lining that reaches deeper than it runs along the edge is the corner end of the neighbouring
       wall's lining, so that stretch is hidden and dropped;
     - an edge onto a stairwell is open (no wall), as in `architecturalWallBoxes`;
+    - a face runs up to the ceiling, storey height − slab (`ceilingHeight`, `docs/product-intent.md`
+      multi-floor), not to the storey height;
     - a half wall in the wall line (outside the room area) cuts the face above its sill;
     - a half wall standing *inside* a room is a free-standing low wall: it cuts no face, and the 3D
       wall behind it stays full height (owner, 2026-09-27: Ground r139 against the 7 cm gap wall to

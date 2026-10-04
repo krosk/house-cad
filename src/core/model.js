@@ -14,6 +14,7 @@ import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, 
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
 import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
+export { ceilingHeight } from './storey.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -284,12 +285,12 @@ export class Rectangle {
 }
 
 // A storey: an independent plan (its own rectangles + constraints) with its own
-// wall height. All floors share the SAME plan origin (0,0) — the surveyed corner
+// storey height and slab. All floors share the SAME plan origin (0,0) — the surveyed corner
 // — so corners stack by construction and 2D underlays line up for free.
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, elevation = 0, heat = null } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, slab = 0, elevation = 0, heat = null } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -314,7 +315,10 @@ export class Floor {
     // {rect} = the floor of that rect's connected ROOM component; {rect, edge} = that
     // room edge's wall face. Never solved; quantities derive in src/core/flooring.js.
     this.finishes = finishes;
-    this.height = height; // storey height, meters
+    this.height = height; // storey height (floor to floor), meters: the floors stack on it
+    // Thickness of the slab above this storey's ceiling (m): the ceiling is at height − slab
+    // (ceilingHeight). Owner, 2026-10-04: the house's 2.95 storeys are 2.70 rooms + 0.25 slab.
+    this.slab = slab;
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
     // Heat-loss settings of this storey (heated or not, added slab/attic insulation),
     // only the keys set; defaults in src/core/heatLoss.js FLOOR_HEAT_DEFAULTS.
@@ -421,7 +425,7 @@ export class Project {
   _snapToGrid() {
     const snap = (o, keys) => { for (const k of keys) if (typeof o[k] === 'number') o[k] = snapM(o[k]); };
     for (const f of this.floors) {
-      snap(f, ['height']);
+      snap(f, ['height', 'slab']);
       for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top']);
       for (const c of f.constraints) snap(c, ['value']);
       for (const m of f.markers || []) snap(m, ['x', 'y', 'z']);
@@ -470,7 +474,7 @@ export class Project {
   addFloor({ refId = this.activeFloorId, above = true, name } = {}) {
     const ri = Math.max(0, this.floors.findIndex((f) => f.id === refId));
     const ref = this.floors[ri];
-    const floor = new Floor({ name: name || 'Floor', height: ref ? ref.height : 2.8 });
+    const floor = new Floor({ name: name || 'Floor', height: ref ? ref.height : 2.8, slab: ref?.slab || 0 });
     this.floors.splice(above ? ri + 1 : ri, 0, floor);
     this.activeFloorId = floor.id;
     this._emit();
@@ -1228,7 +1232,18 @@ export class Project {
 
   setHeight(h) {
     this.height = Math.max(0.01, h);
+    const f = this.activeFloor;
+    if ((f.slab || 0) >= f.height) f.slab = 0; // a slab never fills the storey
     this._emit();
+  }
+
+  // The active floor's slab thickness (the ceiling drops, the storey height and the stacking hold).
+  setSlab(s) {
+    const f = this.activeFloor;
+    if (!(s >= 0) || s >= f.height) return false;
+    f.slab = s;
+    this._emit();
+    return true;
   }
 
   // Call after mutating a rectangle in place (e.g. moving it).

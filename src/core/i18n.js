@@ -395,6 +395,10 @@ const STRINGS = {
   // --- LEVEL height pad title -------------------------------------------------
   'level.base':        { en: 'base', fr: 'base', zh: '标高' },
   'level.storeyHeight': { en: 'storey height', fr: 'hauteur d’étage', zh: '层高' },
+  'level.slab':        { en: 'slab', fr: 'dalle', zh: '楼板' },
+  'level.ceiling':     { en: 'ceiling', fr: 'plafond', zh: '净高' },
+  'key.slab':          { en: '⇄ SLAB', fr: '⇄ DALLE', zh: '⇄ 楼板' },
+  'key.storey':        { en: '⇄ STOREY', fr: '⇄ ÉTAGE', zh: '⇄ 层高' },
 
   // --- LANG menu title --------------------------------------------------------
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },

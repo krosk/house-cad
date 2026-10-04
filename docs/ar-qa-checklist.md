@@ -124,7 +124,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Label reads `LEVEL · <FloorName>`; pad title shows the floor's base elevation
 - [ ] Stacking: editing **Ground** height lifts **Upper**; editing **Basement** height drops Basement
 - [ ] Editing the topmost floor's own height moves nothing (expected)
-- [ ] SWAP/DEL keys are inert here
+- [ ] DEL is inert here
+- [ ] **SWAP** (`⇄ SLAB` / `⇄ STOREY`) switches the field: the slab title reads `<Floor>  ceiling 2.7 m  ·  slab`, prefilled with the slab; ENTER on 0.25 lowers the walls and the painted ceiling (LEFT X) to 2.70 while Upper stays where it was; 0 is accepted, a slab ≥ the storey height is refused
+- [ ] A new light marker lands at the ceiling (2.70 on Ground with a 0.25 slab), not at 2.95
 
 ## SETUP · TELEPORT (`teleport`)  ⬜ NEW — build-verified only
 - [ ] Pointer reticle tracks the active floor

@@ -21,6 +21,7 @@
 import { connectedRoomComponents } from './geometry2d.js';
 import { zoneKind } from './zoneColors.js';
 import { materialById } from './materials.js';
+import { ceilingHeight } from './storey.js';
 
 const EPS = 1e-6;
 // Door-family zones a floor runs through (full-height openings).
@@ -643,7 +644,7 @@ export function inRoomHalfWalls(floor) {
   return (floor.rectangles || []).filter((r) => zoneKind(r) === 'halfwall' && inRoomsAt(rooms, r.bounds));
 }
 // Its height: the opening band starts at `sill` (architectural3d.js openingBand).
-export const halfWallTop = (floor, rect) => Math.min(rect.sill ?? 1.1, floor.height || 2.8);
+export const halfWallTop = (floor, rect) => Math.min(rect.sill ?? 1.1, ceilingHeight(floor, 2.8));
 
 // A side of an in-room half wall as a face (edgeFace's shape: `inward` points away from
 // the half wall, into the room). Exposed where just in front of it is room floor, not a
@@ -694,7 +695,7 @@ export function wallFaceBoxes(floor, rect, edge) {
     return { face, boxes: face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: top, inset: 0 })) };
   }
   const face = edgeFace(floor, rect, edge);
-  const H = floor.height || 2.8;
+  const H = ceilingHeight(floor, 2.8); // up to the ceiling, not the storey height
   const include = face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: H }));
   const exclude = [];
   // A half wall standing inside a room is a free-standing low wall, not a gap in the

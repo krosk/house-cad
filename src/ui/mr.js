@@ -21,7 +21,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
-import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements } from '../core/model.js';
+import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
@@ -4486,6 +4486,7 @@ export function setupMR(view, project, getFootprint) {
   let overwriteSlot = null; // occupied SAVE slot armed for a required second trigger
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
   let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
+  let levelField = 'height'; // LEVEL pad field: 'height' (storey, floor to floor) or 'slab' (SWAP toggles)
 
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
   // (x, 0, -y), and planGroup adds anchorYaw + planYaw + planPos; worldToLocal inverts all
@@ -5203,20 +5204,27 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // ---- LEVEL: per-storey height, entered by hand (Quest can't measure the vertical
-  // offset between floors). Reuses the DIMS numpad; the SWAP/DEL keys have no role here.
+  // offset between floors). Reuses the DIMS numpad; DEL has no role here. SWAP switches the
+  // field between the storey height (floor to floor) and the slab thickness above the
+  // ceiling (owner, 2026-10-04): the ceiling is height − slab (ceilingHeight).
   // Thumbstick-y cycles real floors plus the read-only overview (see pollModeCycle);
-  // a real floor's height re-stacks every floor above it.
+  // a real floor's height re-stacks every floor above it; its slab only lowers its ceiling.
   const levelTitle = () => {
     if (allFloorsView) return t('mode.all_floors');
     const f = project.activeFloor;
+    if (levelField === 'slab') {
+      return `${f.name}  ${t('level.ceiling')} ${fmt(ceilingHeight(f))} ${unitLabel()}  ·  ${t('level.slab')}`;
+    }
     return `${f.name}  ${t('level.base')} ${fmt(f.elevation)} ${unitLabel()}  ·  ${t('level.storeyHeight')}`;
   };
-  const redrawLevelPad = () => numpad.draw(levelTitle(), levelBuffer, hoverKey);
+  const redrawLevelPad = () => numpad.draw(levelTitle(), levelBuffer, hoverKey,
+    t(levelField === 'slab' ? 'key.storey' : 'key.slab'));
 
-  // Prefill the field with the active floor's current height (without re-parking the
-  // panel) — used on enter and after cycling to another floor.
+  // Prefill the field with the active floor's current height or slab (without re-parking
+  // the panel) — used on enter, after SWAP and after cycling to another floor.
   function refreshLevelPad() {
-    levelBuffer = fmt(project.activeFloor.height);
+    const f = project.activeFloor;
+    levelBuffer = fmt(levelField === 'slab' ? (f.slab || 0) : f.height);
     levelPristine = true;
     redrawLevelPad();
   }
@@ -5231,6 +5239,14 @@ export function setupMR(view, project, getFootprint) {
   function commitLevelHeight() {
     if (allFloorsView) return;
     const val = parseFloat(levelBuffer);
+    if (levelField === 'slab') {
+      // 0 is allowed (no slab); a slab never fills the storey (setSlab refuses it).
+      if (!Number.isFinite(val) || val < 0 || !project.setSlab(toMeters(val))) return;
+      rlog('floor slab set', { floor: project.activeFloor.name, m: +toMeters(val).toFixed(3) });
+      buildPlan(); // walls and ceiling drop; elevations hold
+      refreshLevelPad();
+      return;
+    }
     if (!Number.isFinite(val) || val <= 0) return; // a storey must have positive height
     project.setHeight(toMeters(val)); // sets the active floor's height, re-solves + re-stacks elevations
     rlog('floor height set', { floor: project.activeFloor.name, m: +toMeters(val).toFixed(3) });
@@ -5241,7 +5257,8 @@ export function setupMR(view, project, getFootprint) {
   function pressLevelKey(k) {
     if (allFloorsView) return;
     if (k === 'enter') { commitLevelHeight(); return; }
-    if (k === 'swap' || k === 'del') return; // not used when entering a height
+    if (k === 'swap') { levelField = levelField === 'slab' ? 'height' : 'slab'; refreshLevelPad(); return; }
+    if (k === 'del') return; // not used when entering a height
     if (levelPristine && k !== 'back') levelBuffer = '';
     levelPristine = false;
     if (k === 'back') levelBuffer = levelBuffer.slice(0, -1);
@@ -7192,7 +7209,7 @@ export function setupMR(view, project, getFootprint) {
         const { px, py } = worldToPlan(pos);
         // Lights live on the ceiling (unreachable to tip-capture), so default their z to
         // the storey height; other fixtures capture z from the controller tip height.
-        const z = currentMarkerType === 'light' ? project.height : Math.max(0, pos.y - overlayY());
+        const z = currentMarkerType === 'light' ? ceilingHeight(project.activeFloor) : Math.max(0, pos.y - overlayY());
         const m = project.addMarker({ type: currentMarkerType, x: px, y: py, z });
         buildPlan(); applyPlanMatrix();
         rlog('marker drop', { id: m.id, type: m.type, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });

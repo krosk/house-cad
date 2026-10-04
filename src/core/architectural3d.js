@@ -10,6 +10,7 @@ import { computeFootprint } from './geometry2d.js';
 import { extrudeFootprint } from './extrude.js';
 import { zoneKind, stairClimb } from './zoneColors.js';
 import { resolveApertureOrient } from './apertureGlyph.js';
+import { ceilingHeight } from './storey.js';
 
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
@@ -219,7 +220,7 @@ function splitWallByOpenings(source, storeyHeight, openings) {
 // Pure box description, exported so architectural interpretation can be verified
 // in Node without constructing a WebGL renderer.
 export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKNESS } = {}) {
-  const height = Math.max(0, floor?.height || 0);
+  const height = ceilingHeight(floor);
   if (height <= EPS) return [];
   const rectangles = floor?.rectangles || [];
   const rooms = rectangles.filter((rect) => zoneKind(rect) === 'room' && validBounds(rect.bounds));
@@ -375,7 +376,7 @@ function openDoorLeafBoxes(rect, z0, z1) {
 }
 
 function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}) {
-  const height = Math.max(0, floor?.height || 0);
+  const height = ceilingHeight(floor);
   const doors = [];
   const windows = [];
   for (const rect of floor?.rectangles || []) {
@@ -469,7 +470,7 @@ export function wallMarkerPlacements(floor, wallBoxes = architecturalWallBoxes(f
   for (const marker of floor?.markers || []) {
     if (marker.type === 'light') continue;
     const mx = Number(marker.x) || 0, my = Number(marker.y) || 0;
-    const z = clipped(Number.isFinite(marker.z) ? marker.z : 1.1, 0.01, Math.max(0.01, (floor?.height || 2.5) - 0.01));
+    const z = clipped(Number.isFinite(marker.z) ? marker.z : 1.1, 0.01, Math.max(0.01, ceilingHeight(floor, 2.5) - 0.01));
     const candidates = [];
     for (const w of wallBoxes) {
       if (z < w.z0 || z > w.z1) continue;
@@ -504,10 +505,10 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const floorGeometry = extrudeFootprint(roomFootprint, slabThickness);
   if (floorGeometry) floorGeometry.translate(0, -slabThickness, 0); // finished floor remains at local Y=0
   // Reuse the exact room footprint for an overhead slab. Its underside is at
-  // the authored storey height; View3D only reveals it in first-person mode so
+  // the ceiling (storey height − slab, ceilingHeight); View3D only reveals it in first-person mode so
   // the exterior orbit remains an unobstructed architectural overview.
   const ceilingGeometry = floorGeometry?.clone() || null;
-  if (ceilingGeometry) ceilingGeometry.translate(0, (floor?.height || 0) + slabThickness, 0);
+  if (ceilingGeometry) ceilingGeometry.translate(0, ceilingHeight(floor) + slabThickness, 0);
   const wallBoxes = architecturalWallBoxes(floor, opts);
   const wallGeometry = boxesGeometry(wallBoxes);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
@@ -530,7 +531,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
 // = plan −y for a door along X; plan +x for a door along Y, turned +90°).
 export function doorProductPlacements(floor, materialOf) {
   const out = [];
-  const height = Math.max(0, floor?.height || 0);
+  const height = ceilingHeight(floor);
   for (const f of floor?.finishes || []) {
     if (f.target?.edge) continue;
     const rect = (floor.rectangles || []).find((r) => r.id === f.target?.rect);
@@ -563,7 +564,7 @@ export function doorProductPlacements(floor, materialOf) {
 // zone, falls in a ROOM rect; when both or neither do, the zone's swing side.
 export function windowProductPlacements(floor, materialOf) {
   const out = [];
-  const height = Math.max(0, floor?.height || 0);
+  const height = ceilingHeight(floor);
   const rooms = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'room' && validBounds(r.bounds));
   const inRoom = (x, y) => rooms.some((r) => {
     const b = r.bounds;

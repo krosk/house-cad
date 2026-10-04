@@ -25,7 +25,8 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
 
 - **Walls:** a room edge with no other room of the same floor within 0.6 m beyond it is exterior.
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
-  and ignored. Wall height = floor height.
+  and ignored. Wall height = the room height, storey height − slab (`ceilingHeight`; `docs/product-intent.md`
+  multi-floor); the room volume uses it too.
 - **Openings:** WINDOW / DOOR / SLIDING / GARAGE zones on an exterior edge are cut out of the wall
   area (width × their sill/head band) and counted at their own U: the zone's `uValue` (owner,
   2026-10-01: each window carries its own, typed from its label's Uw / Ud in HEATING · R / U), else the

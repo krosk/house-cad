@@ -330,6 +330,10 @@ All owner requests, 2026-10-03.
 
 ## Findings / traps worth knowing
 
+- **`floor.height` is floor-to-floor; the room height is `ceilingHeight(floor)` = height − slab**
+  (owner, 2026-10-04; `docs/product-intent.md` multi-floor). Use `ceilingHeight` for anything that
+  means the room (walls, ceiling, finishes, heat loss); `height` only for stacking and stairs.
+
 - **A module the texture worker imports must never import `textureWorker.js`** (its `new Worker(new
   URL(…))` would bundle a worker inside the worker). Page sides live in `realism.js`, `view3d.js`,
   `textureWorker.js`; `photoFinishes.js`, `skyPixels.js`, `imageCache.js`, `painters.js` and the painter

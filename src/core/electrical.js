@@ -6,6 +6,8 @@
 // (As-built runs are now modeled as wires routed over the conduit network — see
 // src/core/conduit.js — which reuses segmentSurface below for classification.)
 
+import { ceilingHeight } from './storey.js';
+
 // Switch fixtures: a single rocker, or a double switch as ONE marker (owner, 2026-09-28)
 // whose control links each name the rocker that drives the light (`link.rocker`, 1 or 2;
 // absent = 1). Rocker 1 is the LEFT one facing the switch, 2 the RIGHT; the UI and the
@@ -38,7 +40,7 @@ export function electricalRoutePoints(floor, link) {
   const { from, to } = endpoints;
   const start = { x: from.x, y: from.y, z: from.z || 0 };
   const end = { x: to.x, y: to.y, z: to.z || 0 };
-  const ceiling = Math.max(Number(floor.height) || 0, start.z, end.z);
+  const ceiling = Math.max(ceilingHeight(floor), start.z, end.z); // under the slab
   return [
     start,
     { x: start.x, y: start.y, z: ceiling },
@@ -52,9 +54,11 @@ const PLANE_TOL = 0.25;  // proximity to a storey's ceiling/floor plane
 
 // Storey bands in ABSOLUTE world Z, one per floor, sorted bottom→top. Used to classify
 // whole-house conduit runs: a run whose two ends fall in different storeys is a riser.
+// `ceil` is the storey's ceiling (below its slab), where a ceiling run sits.
 export function storeyBands(project) {
   return (project?.floors || [])
-    .map((f) => ({ lo: f.elevation || 0, hi: (f.elevation || 0) + (Number(f.height) || 0) }))
+    .map((f) => ({ lo: f.elevation || 0, hi: (f.elevation || 0) + (Number(f.height) || 0),
+      ceil: (f.elevation || 0) + ceilingHeight(f) }))
     .sort((a, b) => a.lo - b.lo);
 }
 
@@ -80,7 +84,7 @@ export function segmentSurface(a, b, bands = []) {
     const avgZ = (az + bz) / 2;
     const band = bands.find((bd) => avgZ >= bd.lo - PLANE_TOL && avgZ <= bd.hi + PLANE_TOL) || bands[bandIndex(avgZ, bands)];
     if (band) {
-      if (level && avgZ >= band.hi - PLANE_TOL) return 'ceiling';
+      if (level && avgZ >= (band.ceil ?? band.hi) - PLANE_TOL) return 'ceiling';
       if (level && avgZ <= band.lo + PLANE_TOL) return 'floor';
     }
   }

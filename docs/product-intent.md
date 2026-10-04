@@ -94,6 +94,15 @@ ray; the editor is **not** rebuilt as a separate 3D system.
   to its own elevation, and **RECAL** corrects drift when walking between floors.
 - Storey heights are **typed by hand**; the Quest cannot measure the vertical offset between
   storeys.
+- **A floor has a storey height and a slab** (owner, 2026-10-04). `height` is floor to floor: the
+  floors stack on it and stairs climb it. `slab` is the slab thickness above that floor's ceiling, so
+  the room height is `ceilingHeight(floor)` = height − slab (`src/core/storey.js`). Walls, the 3D/AR
+  ceiling, wall finishes and their takeoff, heat loss (wall area, volume), switch→light ceiling routes,
+  ceiling conduit runs and a new light's default height use the ceiling. Set in AR LEVEL (SWAP on the
+  numpad). Owner's house: Ground and Upper 2.70 rooms + 0.25 slab (2.95 storeys), Basement 2.05 room in
+  a 2.27 storey (slab 0.22). Before the slab existed, the owner typed 2.95 as Ground's height to make
+  the floors stack, and everything drew and counted to 2.95. Exports (STL/OBJ/GLB massing) still use
+  the storey height.
 - `Project.rectangles/constraints/height` are **getters onto the active floor** (a facade), so
   consumers didn't need rewriting. Don't reintroduce raw fields.
 

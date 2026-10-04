@@ -102,7 +102,9 @@ export function serializeView(project, { markers = false, furniture = true } = {
         while (fc.length > 2 && fc.at(-1) == null) fc.pop();
         return [fc];
       });
-      // v2 fixes the optional lanes at stable indices: markers=3, (old) furniture=4, finishes=5.
+      // v2 fixes the optional lanes at stable indices: markers=3, (old) furniture=4, finishes=5,
+      // slab=6 (appended 2026-10-04; an older viewer ignores it and draws storey-high walls).
+      if (f.slab > 0) return [f.name, mm(f.height), rects, floorMarkers, [], finishes, mm(f.slab)];
       return finishes.length
         ? [f.name, mm(f.height), rects, floorMarkers, [], finishes]
         : [f.name, mm(f.height), rects, floorMarkers];
@@ -119,7 +121,7 @@ export function loadView(project, view) {
   }
   let rid = 0, mid = 0; // fresh local ids; compact payload carries no ids
   const sourceFloors = view.f.map((f) => ({
-    name: f[0], height: f[1],
+    name: f[0], height: f[1], slab: f[6],
     rects: (f[2] || []).map((r) => ({
       x: r[0], y: r[1], w: r[2], h: r[3], op: r[4] === 1 ? 'subtract' : 'add',
       kind: view.k?.[r[5]] || 'room',
@@ -148,6 +150,7 @@ export function loadView(project, view) {
       id: `f${i + 1}`,
       name: f.name || `Floor ${i + 1}`,
       height: typeof f.height === 'number' ? f.height : 2.8,
+      slab: typeof f.slab === 'number' ? f.slab : 0,
       rectangles: (f.rects || []).map((rc) => ({
         id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
         op: rc.op || 'add', kind: rc.kind || 'room',

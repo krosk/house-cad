@@ -131,6 +131,7 @@ export function serializeFloor(f) {
     id: f.id,
     name: f.name,
     height: f.height,
+    slab: f.slab || 0, // slab above the ceiling (ceiling = height − slab); older apps ignore it
     rectangles: f.rectangles.map(serializeRect),
     constraints: f.constraints.filter((c) => !c.measurement).map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
@@ -467,6 +468,7 @@ export function deserializeInto(project, data) {
     id: f.id, // undefined for legacy → Floor mints one
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
+    slab: typeof f.slab === 'number' && f.slab >= 0 && f.slab < (f.height ?? 2.8) ? f.slab : 0,
     rectangles: (f.rectangles || []).map((r) => new Rectangle({ id: r.id, ...rectFields(r) })),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({
