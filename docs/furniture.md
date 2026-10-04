@@ -298,7 +298,36 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   1.550 × 0.7503 × 1.100 m (the seam lines stand 0.3 mm proud); ¾ views beside photos 13546302
   and 13546298. Not yet seen in AR, View 3D or on device.
 
-## Rendering
+## IKEA kitchen units assembled from part models (2026-10-04)
+
+The owner's IKEA Kitchen Planner design "Maison 2" (METOD carcasses, SINARP oak fronts, ASPUDDEN
+white wall doors, SÄLJAN worktop) is modelled unit by unit: one catalog entry `metod-<id>` per
+planner unit (1–14) plus the two worktop pieces, each on one FURNITURE zone (owner: one zone per
+unit; IKEA's own models, "the outer shell"). An entry carries `kitchen: <id>`; `src/ui/kitchenUnits.js`
+lists that unit's parts (rotera articles with a position, rotation, scale; plain boxes where none
+exists) and assembles them into one source scene, which both loaders (View 3D, AR) then treat like
+any model. Parts load by bare article id through the same proxy and device cache, so a part shared
+by several units downloads once (26 articles, about 2.5 MB).
+
+- **Conventions found in the GLBs (Proven, bounding boxes and renders):** metres, floor at y = 0,
+  centred in x and z, front toward +z (so `facing` 0 = front toward plan −y, 90 → plan +x, 180 →
+  plan +y). Fronts are 17 mm thick, carcasses 802 high. **Wall cabinets and the METOD top cabinet
+  are modelled lying on their backs, front up (+y)**; they are stood up with +90° about x. Pulls lie
+  with their standoff up and get the same turn. The corner carcass has its door opening at −x and
+  the blind part (with a 75 mm filler stub) at +x; it is mirrored for this corner.
+- **No model:** the ASPUDDEN doors (all sizes) and the FÖRBÄTTRA panel. Owner's stand-ins: framed
+  fronts of one range, 605.950.50 (60x80) and 005.950.48 (60x40), painted matt white and scaled; the
+  60x60 of that range (808.595.049) has no model either, so 60-high doors scale the 60x80 (frame rails
+  about a quarter thinner). FÖRBÄTTRA is a white 12 mm board. Oven and microwave: generic boxes
+  (owner), none being in the planner's list.
+- **Layout source:** the planner's front, top and worktop views; every dimension and its source page
+  is in the `// Sources:` block of `kitchenUnits.js`. Worktops are slices of the 2460 SÄLJAN model
+  scaled to each piece (the stone figure stretches a little), cut around the HAVSEN sink.
+- **Hypotheses:** plinth 40 mm behind the carcass front; the pulls follow the drawings, which show
+  more pulls than the article list; legs are not drawn (behind the plinth).
+- **Placement in the owner's house:** the planner measures from the tile faces (owner), taken as
+  8 mm proud on the tiled left and back walls of the kitchen (Ground r65/r106).
+
 
 - **AR** (`mr.js`): `furnitureGroup` under `planGroup` (rides plan yaw and floor elevation). Plan
   `(x, y)` → group-local `(x, z, -y)`. **The models show only with the AR 3D view on (LEFT X)**

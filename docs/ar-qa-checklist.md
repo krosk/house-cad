@@ -442,6 +442,13 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Cycle to `habitat-moder-ii-110`, then `habitat-moder-ii-155`: a 110 cm round footprint, then 155 × 110; with LEFT X on, an oak table 75 cm high, one seam across the round top, two seams and the leaf's fold on the long one, four splayed legs
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
 
+## IKEA kitchen units (`metod-*`)  ⬜ NEW (2026-10-04) — scratch-render verified only
+
+- [ ] With LEFT X on, every unit loads (no grey placeholder box left after a few seconds online; offline after one visit)
+- [ ] The units read as the planner's front views: tall unit with oven/microwave gap, drawer stacks 40/20/20, corner door on the open part, sink + tap, dishwasher door, end panels, white framed wall doors with knobs at the 10|11 and 12|13 junctions
+- [ ] Worktop top at 92 cm, wall cabinets 148–248 cm; nothing floats or sinks; no gap between worktop A and B
+- [ ] View 3D shows the same; frame rate acceptable on the Quest with all 16 zones
+
 ## Desktop: textures prepared in a worker  ⬜ NEW (2026-10-03) — Chrome-measured, not seen on a device
 - [ ] Open a share link with finishes (Realistic on): the plan pans smoothly, no counter, no UPDATING MODEL while in plan view.
 - [ ] ◈ View 3D: a wheel with `Preparing 3D · textures n/N`, then the 3D view opens; `✕ Cancel 3D` while waiting returns to a working plan. Note any `· on page`.

@@ -410,5 +410,150 @@
     },
     "source": "procedural: Habitat Moder II extendable round dining table, natural oak (Habitat RÉF 910365, no manufacturer 3D model), extended with the 45 cm leaf, 155 x 110 cm; sizes from the habitat.fr Dimensions table (110 / 155 x 110 cm, H 75 cm, leaf 45 cm), shape and leg/edge sizes measured on the assembly manual HA833381 (habitat.fr asset 13552185, isometric p. 1), apron from the front photo 13546302; sources in the moder-table builder",
     "registeredAt": "2026-10-03T00:00:00.000Z"
+  },
+  "metod-filler-57": {
+    "name": "metod-filler-57",
+    "sizeMm": [
+      57,
+      2480,
+      620
+    ],
+    "kitchen": "filler-57",
+    "source": "IKEA METOD unit 1 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): filler strip 5.7 cm (SINARP); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-tall-oven-735": {
+    "name": "metod-tall-oven-735",
+    "sizeMm": [
+      613,
+      2480,
+      620
+    ],
+    "kitchen": "tall-oven-735",
+    "source": "IKEA METOD unit 2 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): tall unit, oven + microwave 60 (ME/MA 735); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-base-30-pullout-219": {
+    "name": "metod-base-30-pullout-219",
+    "sizeMm": [
+      300,
+      882,
+      620
+    ],
+    "kitchen": "base-30-pullout-219",
+    "source": "IKEA METOD unit 3 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): base 30, pull-out (ME 219); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-base-60-cooktop-431": {
+    "name": "metod-base-60-cooktop-431",
+    "sizeMm": [
+      600,
+      882,
+      620
+    ],
+    "kitchen": "base-60-cooktop-431",
+    "source": "IKEA METOD unit 4 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): base 60, cooktop drawers (ME/MA 431); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-base-60-drawers-145": {
+    "name": "metod-base-60-drawers-145",
+    "sizeMm": [
+      600,
+      882,
+      620
+    ],
+    "kitchen": "base-60-drawers-145",
+    "source": "IKEA METOD unit 5 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): base 60, drawers (ME/MA 145); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-corner-128-189": {
+    "name": "metod-corner-128-189",
+    "sizeMm": [
+      1275,
+      882,
+      620
+    ],
+    "kitchen": "corner-128-189",
+    "source": "IKEA METOD unit 6 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): corner base 128 (ME 189); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-base-60-sink-196": {
+    "name": "metod-base-60-sink-196",
+    "sizeMm": [
+      600,
+      882,
+      620
+    ],
+    "kitchen": "base-60-sink-196",
+    "source": "IKEA METOD unit 7 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): base 60, sink drawers (ME/MA 196); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-dishwasher-60-1002": {
+    "name": "metod-dishwasher-60-1002",
+    "sizeMm": [
+      600,
+      882,
+      620
+    ],
+    "kitchen": "dishwasher-60-1002",
+    "source": "IKEA METOD unit 8 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): TORSBODA dishwasher 60 (ME 1002); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-base-40-baskets-104": {
+    "name": "metod-base-40-baskets-104",
+    "sizeMm": [
+      413,
+      882,
+      620
+    ],
+    "kitchen": "base-40-baskets-104",
+    "source": "IKEA METOD unit 9 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): base 40, wire baskets + end panel (ME 104); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-wall-60-313-r": {
+    "name": "metod-wall-60-313-r",
+    "sizeMm": [
+      600,
+      1000,
+      395
+    ],
+    "mountZMm": 1480,
+    "kitchen": "wall-60-313-r",
+    "source": "IKEA METOD unit 10/12 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): wall 60x100, knobs right (ME 313); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-wall-60-313-l": {
+    "name": "metod-wall-60-313-l",
+    "sizeMm": [
+      600,
+      1000,
+      395
+    ],
+    "mountZMm": 1480,
+    "kitchen": "wall-60-313-l",
+    "source": "IKEA METOD unit 11/13 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): wall 60x100, knobs left (ME 313); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-wall-40-312": {
+    "name": "metod-wall-40-312",
+    "sizeMm": [
+      412,
+      1000,
+      395
+    ],
+    "mountZMm": 1480,
+    "kitchen": "wall-40-312",
+    "source": "IKEA METOD unit 14 of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): wall 40x100 + end panel (ME 312); assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-worktop-a-2903-sink": {
+    "name": "metod-worktop-a-2903-sink",
+    "sizeMm": [
+      2903,
+      38,
+      635
+    ],
+    "mountZMm": 882,
+    "kitchen": "worktop-a-2903-sink",
+    "source": "IKEA METOD unit A of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): SÄLJAN worktop 290 + HAVSEN sink + TAKSJÖN tap; assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "metod-worktop-b-1540": {
+    "name": "metod-worktop-b-1540",
+    "sizeMm": [
+      1540,
+      38,
+      635
+    ],
+    "mountZMm": 882,
+    "kitchen": "worktop-b-1540",
+    "source": "IKEA METOD unit B of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): SÄLJAN worktop 154; assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
   }
 }

@@ -16,6 +16,7 @@ import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js';
+import { assembleKitchenUnit, isKitchenUnit } from './kitchenUnits.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
@@ -4020,6 +4021,12 @@ export function setupMR(view, project, getFootprint) {
       const scene = buildProceduralFurniture(entry);
       furnitureSrc.set(article, scene);
       return scene;
+    }
+    if (isKitchenUnit(entry)) { // IKEA part models assembled by code (src/ui/kitchenUnits.js)
+      const pending = assembleKitchenUnit(entry, loadFurnitureSource)
+        .then((scene) => { furnitureSrc.set(article, scene); return scene; });
+      furniturePending.set(article, pending);
+      try { return await pending; } finally { furniturePending.delete(article); }
     }
     const url = furnitureUrl(article);
     if (!url) throw new Error('no VITE_IKEA_PROXY');

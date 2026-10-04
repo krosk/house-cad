@@ -114,8 +114,8 @@ to download a new build and another to run it. The browser shares that service w
 tab on the origin can call `registration.update()`. `update-app` does that, then waits until the
 precache holds the live `assets/index-*.js`; the next app launch opens the new build. It touches no
 `house-cad:*` key (no plan data). Proven 2026-10-04: after `b5a55f2` deployed, the precache went from
-`index-COeH9U4m.js` to the live `index-DwP4V2UA.js` with the service worker active (done by hand; the
-command then reported "already installed"; its install path has not yet run as a command).
+`index-COeH9U4m.js` to the live `index-DwP4V2UA.js` with the service worker active (by hand); after
+`4ae38b3` deployed, the command itself installed `index-6DJNLGKr.js` in under 90 s.
 
 It needs the same conditions as a read (Connecting above): the Quest on adb and a browser tab that
 answers. **It will not always be reachable** (asleep, off the network, browser not in front): then
