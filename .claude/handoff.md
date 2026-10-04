@@ -19,8 +19,8 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-03 (session 38, continued twice after context compactions)
-**Status:** Proven (git): `origin/main` = `780aeeb` plus this handoff's commit, nothing unpushed; the
+**Date:** 2026-10-04 (session 38, continued three times after context compactions)
+**Status:** Proven (git): `origin/main` = `2352c66` plus this handoff's commit, nothing unpushed; the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (the owner's
 PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
 Proven (owner, 2026-10-03, after `856592c`): their link's **3D view now opens on their phone** ("Ok it
@@ -140,6 +140,48 @@ All owner requests, 2026-10-03.
     (prove the 0.577 ellipse ratio, plan px/mm everywhere, heights × 0.816, overlay an orthographic
     render); photos are eye perspective (measure only in a known length's plane, or match a
     perspective camera); the drawing wins. `docs/product-modelling.md` step 2 + the skill.
+16. **Half walls inside a room take wall finishes** (owner: Lucia on the bathroom half wall, "the half
+    wall top needs to get it too"; uncommitted when noted): its room-facing sides and its top
+    (`edge: 'cap'`) are finish targets in the takeoff, the 3D overlays and AR WALL picking, and the
+    room face behind it drops the hidden band (was a known overcount). `docs/materials.md` (Quantities
+    limits). Proven: build; Node on the owner's Ground bathroom (numbers in the doc); save and share
+    link keep all five targets. Not seen in View 3D or AR.
+14. **Vernisse tile laid as a straight grid, tiles upright** (`2352c66`, owner): `pattern: 'grid'`,
+    75.4 × 301 mm, `sheets: [16, 4]` (a grid's `sheets` may now be [cols, rows]). Proven: build,
+    scratch render of the colour and bump canvases, takeoff 52 tiles on a 2 × 0.6 m splashback.
+15. **The owner's Lapeyre window quote applied to the headset autosave** (owner, 2026-10-04; no repo
+    change). The quote (PDF upload, dated 2026-08-01) lists Héméra PVC windows / French doors (Uw 1.2),
+    a Néva sliding bay (Uw 1.5) and an Ange-Line entry door (no U given), each with H × W. The headset
+    autosave (rev 14, newer than the Deck's `Document from Alexis He.json` rev 9) already carried the
+    owner's products on every quoted opening, which confirmed the quote → zone mapping. Owner rules:
+    the quote is the correct size; extra height goes to a higher head; one end pin is removed where
+    both ends were pinned. Written over CDP and read back byte-identical (Proven); save slots untouched
+    (slot 4 = the pre-edit rev 14). Pre-edit backup of all 11 `house-cad:*` keys:
+    scratchpad `quest-backup-20261004-0009/` (session-local; not durable). Changes, checked in Node
+    (no conflicts, no dimension deleted, nothing else moved):
+    - Uw 1.2 on `r80`, `r108`, `r111`, `r110` (Ground), `r113`–`r115` (Upper), `r146` (Basement); 1.5 on
+      `r109`.
+    - Heads: Ground French doors `r80`/`r108`/`r111` + Néva `r109` 2.28 → 2.27; entry door `r81`
+      2.10 → 2.25; Upper `r113`–`r115` 2.28 → 2.43 (1390 tall, sill 1.04 kept).
+    - Basement `r146` = the quote's 620 × 1260 two-leaf window: sill 1.50 (owner's placeholder), head
+      2.12, `hinge: both`, Héméra product added, widened 30 mm each side (`c1091` −1.52, `c1088` 1.70).
+    - Widths to the quote: `r81` 960 (`c270`), `r108` 1550 (`c371`), `r109` 2400 (`c860` removed,
+      `c1111`), `r110` 660 (`c990` removed, `c1191` added), `r111` 1550 (`c379` removed, `c1192` from the
+      bottom end), `r114` 1250 (`c392` removed, `c1193`), `r115` 1450 (`c396` removed, `c1194`).
+    - Side effect: markers pinned to a moved edge followed it: `m212`, `m213` 5 cm (with `r108`'s
+      bottom end), `m7` 1 cm (with `r81`).
+    - Then (owner): furniture zone `r152` on Ground, `habitat-moder-ii-155` (extended), `facing` 90 so
+      the long side runs along y, centred under light `m12` in the living room `r59` (plan x 0.815–1.915,
+      y 1.685–3.235); no dimensions. Written and read back the same way.
+    - Then (owner): Lucia ivory 30×90 on every bathroom wall prepared (Ground `r62` 4 faces + `r107`
+      left/right/bottom; Upper `r86` 4 faces; bathrooms = the rooms holding a Sensea Neo tray) and
+      the half wall `r139`'s room side + top. **Not yet written** at the time of this note: the
+      headset was asleep, and the half-wall targets need item 16 deployed first (a pre-16 app loads
+      `edge: 'cap'` as an edgeless target, i.e. a product on the half wall). Prepared files:
+      scratchpad `autosave-lucia.json` (room faces) / `autosave-lucia-hw.json` (+ half wall), both
+      based on the autosave as written with the table; re-read the headset first.
+    - Open: which French door is the quote's Sw 0.51 one (Hypothesis: `r111`; the two Sw 0.47 ones cost
+      €93 more, maybe acoustic glass, both on the x ≈ −4.8 façade).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -340,7 +382,16 @@ All owner requests, 2026-10-03.
   **read-only** unless the owner explicitly asks for a write; their slots/autosave are the real survey.
 - **Never run `adb shell pm clear com.krosk.housecad`** casually: it wipes the owner's autosave and
   save slots too. To pick up a new build, relaunch the APK and check the HUD `update:` line.
-  adb is at `~/Android/Sdk/platform-tools/adb`; the headset has been connected over wireless adb.
+  adb is at `~/Android/Sdk/platform-tools/adb` or `~/.bubblewrap/android_sdk/platform-tools/adb`; both
+  talk to one adb server, which finds the already-paired Quest over mDNS once Wireless debugging is
+  on (an empty `adb devices` first can just be early or the headset asleep). If the Quest forgot the
+  pairing: the sibling project's `../quest-mcp-test/.claude/skills/quest-connect/SKILL.md` (pair via
+  QRookie's Flatpak adb; pairing and connection ports differ).
+- **Reading or writing house-cad storage on the headset** (session 38): `DOMStorage` needs a frame of
+  the origin, and the Quest Browser refuses `/json/new`, so `Page.navigate` an existing tab to
+  `https://krosk.github.io/house-cad/version.json` (same origin, no app code runs, the autosave is not
+  touched), then `Runtime.evaluate` on `localStorage`. Back up every `house-cad:*` key first; write only
+  with the AR app closed and no 2D house-cad tab open (it would autosave its older copy); read back.
 - **Retailer pages fight scripts:** Leroy Merlin = DataDome (Chrome only), Lapeyre = Akamai (exact
   curl headers), leboncoin rejects Node's fetch (curl passes). `tools/product-images.mjs` encodes all
   of it; a new site starts in its generic mode. Look at every gallery image, not just the first.
@@ -439,7 +490,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `2798bc9` finish textures in a worker · `96e342f` every texture in the worker · `cc72e0b` plan view
   prepares nothing 3D, View 3D loading wheel · `856592c` phones: half-size textures, canvases freed ·
   `054aad7` collapsible View 3D floor panel · `a57716f` Moder II table + bed texture fix · `780aeeb`
-  modelling from isometric manuals.
+  modelling from isometric manuals · `2352c66` Vernisse straight grid, tiles upright.
 - **Session 37:** `1cd1c14` furniture FOOT/TOP move the unit · `3bb9564` merge AR products per
   material · `1c48801` PERF 3D-view sweep + Lambert furniture · `d37f09d` low-detail AR devices ·
   `62d6627` PERF clipboard report · `d00be61` report prebuilt, copied like LINK.
@@ -521,6 +572,16 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
   for each). Newest first:
+  - session 38, the Lapeyre quote edit (item 15): in AR, every quoted opening at its new size and
+    height (upstairs heads 2.43, French doors and Néva 2.27, door 2.25, basement window sill 1.50); the
+    kept end of each re-pinned opening (`r109`, `r110`, `r114`, `r115` keep the top, `r111` the bottom)
+    is the end the owner measured; `m212`/`m213` (moved 5 cm) and `m7` (1 cm) are still right, else
+    re-pin them to the wall; HEATING R / U shows the Uw; nothing else moved; the Moder table `r152`
+    under the living-room light `m12` (LEFT X: size, turned along the Néva wall); once written, Lucia
+    on both bathrooms' walls and the half wall `r139` (side + top) in LEFT X, and the house readout
+    (64 boxes counted with the entrance's existing Lucia face: generous, cut pieces count whole). If wrong: load slot 4
+    (pre-edit). Then ask which French door has the Sw 0.51 glass. The Vernisse tile on a wall: upright,
+    straight grid;
   - session 38: their link on the phone: the plan pans freely, ◈ View 3D's wheel (does it show
     `· on page`?), then switch floors, toggle Realistic, leave the app and come back (flat textures
     after a lost context?); is Monastère there in the latest link; copy a fresh EXPORT · LINK and open
