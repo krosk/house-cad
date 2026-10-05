@@ -144,6 +144,7 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | window / door U | 1.4 / 2.0 | Hypothesis: recent double glazing / ordinary door |
 | bare slab R | 0.15 | owner (2026-10-05): concrete slab about 20 cm → R ≈ 0.09 (0.20 / λ 2.3, reinforced; Hypothesis: reinforcement assumed, 0.11 if plain at λ 1.75); to type in the AR panel, the default stays generic |
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
+| radiator water ΔT | 50 K | EN 442 rating; Hypothesis for the owner's system (heaters only) |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
 ## Recesses: a window's reveal through a thick wall (owner, 2026-10-05)
@@ -170,17 +171,35 @@ between sill and head; the outer wall beside the window stays solid.
 Owner's walls: meulière with exterior insulation, windows at the indoor face, the opening going
 through the wall and the insulation. Around the frame heat bypasses both the window and the
 insulation: a linear thermal bridge, **ψ · edge length · ΔT**, added to the room's openings. It
-applies to an opening (WINDOW / SLIDING / DOOR / GARAGE) whose zone reaches into an exterior INSULATION
-layer at that column; the length is its sill and head along those columns plus its two jambs (once per
-opening). **Reveal ψ (ext. insul.)** is a project setting, default 0.4 W/mK (**Hypothesis:** typical
+applies to an opening (WINDOW / SLIDING / DOOR / GARAGE) with exterior INSULATION at its columns or
+within 30 cm of them along the wall (`REVEAL_NEAR_M`): the opening need not be drawn into the
+insulation, and insulation drawn stopping at the opening still counts (an opening always goes through
+it). The length is its sill and head along its columns plus its two jambs, once per opening. First
+version (`0078f1b`) required the window zone to reach into the insulation; the owner's switch showed
+no change on the headset (2026-10-05), so that test was dropped. **Reveal ψ (ext. insul.)** is a project setting, default 0.4 W/mK (**Hypothesis:** typical
 when the insulation is not returned into the reveal, 0.3–0.5); the what-if **Reveals insulated**
 switch uses 0.08 (`RETURNED_REVEAL_PSI`; Hypothesis: insulation returned 2–3 cm into the reveal). An
-opening drawn only through the wall (not into the insulation) gets none. A RECESS is not needed for
+opening in a wall with no exterior insulation gets none. A RECESS is not needed for
 this; one with the window's footprint and band changes nothing (the window owns its band).
 **Proven** (Node, made-up 4 m room, 45 cm meulière + 10 cm outdoor insulation R 2.5, 1.2 × 1.2 m window):
-4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W), 10 W with the reveals insulated, 0 with the
-window stopping at the wall or no outdoor insulation. The owner's local file (older than the headset
+4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W) whether the window stops at the wall face,
+goes into the insulation, or the insulation is drawn in two pieces stopping at it; 10 W with the
+reveals insulated; 0 with no outdoor insulation. The owner's local file (older than the headset
 plan) has no opening into outdoor insulation: 0 W.
+
+## Heaters: what the radiators give (owner, 2026-10-05)
+
+Owner: "display the heaters contributions as well as a separate category"; radiators are FURNITURE
+zones with a radiator product. A catalog entry's **`powerW`** (`public/furniture/index.json`, the rated
+output from the retailer's spec, EN 442 at ΔT 50 K) counts for the room holding the zone's centre
+(`roomHeaters`). It is scaled to the project's **Radiator water ΔT** (mean water − room, default 50) by
+the usual exponent 1.3: at 30 K a radiator gives about half (0.51). **Hypothesis:** 50 K suits a boiler
+at 70–80 °C; a heat pump or condensing boiler at 45–55 °C is nearer 25–35 K. HEAT LOSS shows the
+heaters as their own category, never mixed with the losses: each room's plan label `<loss> W · rad.
+<heaters> W`, the room breakdown's HEATERS line (W, count, % of its loss; green when they cover it,
+red when not), and this floor's line under the title. HEATER zones and radiator markers carry no
+power (not counted). **Proven** (Node): a 4 × 4 m room losing 4685 W with the 50 × 200 EASY (1730 W):
+1730 W at ΔT 50, 891 W at 30. The owner's local file has no radiator product.
 
 ## What if: is the insulation worth it? (owner, 2026-10-05)
 

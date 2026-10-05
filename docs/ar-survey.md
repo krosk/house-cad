@@ -348,7 +348,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (heated, unheated temperature, added floor and attic R) and WHOLE HOUSE settings (design outdoor /
   indoor °C, air changes, the undrawn wall's depth, λ for a wall with no R, window and door U, bare
   slab R, the earth level outside (from the ground floor's floor level; walls below it lose to the
-  ground), λ for an insulation zone with no R, reveal ψ, degree-days). The room breakdown adds `walls in earth` m² when any. Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
+  ground), λ for an insulation zone with no R, reveal ψ, radiator water ΔT, degree-days). Heaters (radiator products) show as their own category: on each room's label, in the room breakdown and for the floor under the title. The room breakdown adds `walls in earth` m² when any. Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
   default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
   broken down by surface. Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
   **Heat map** (owner, 2026-10-04): one colour scale in W/m² (blue 0, yellow 50, red 100+, grey = no

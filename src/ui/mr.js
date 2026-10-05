@@ -52,7 +52,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { floorHeatLoss, houseHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
+import { floorHeatLoss, houseHeatLoss, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -767,8 +767,14 @@ export function setupMR(view, project, getFootprint) {
   // PROJECT · HEAT LOSS settings panel (docs/heat-loss.md): a title with the active
   // floor's total, then one row per setting (`rows`, see HEAT_ROWS), grouped under
   // THIS FLOOR / WHOLE HOUSE headers. A row is aimed with the ray; the caller changes it.
+  // "HEATERS 1 730 W (2) · 144 % of the loss" (none: "no heater with a known power").
+  function heaterLine(h, lossW) {
+    if (!h.count) return t('heat.noHeaters');
+    const pct = lossW > 0 ? ` · ${Math.round(100 * h.watts / lossW)} % ${t('heat.ofLoss')}` : '';
+    return `${t('heat.heaters')} ${Math.round(h.watts).toLocaleString('fr-FR')} W (${h.count})${pct}`;
+  }
   function makeHeatMenu(rows) {
-    const W = 512, TITLE_H = 196, HEAD_H = 44, ROW_H = 50;
+    const W = 512, TITLE_H = 232, HEAD_H = 44, ROW_H = 50;
     const layout = [];
     let y = TITLE_H;
     const section = (row) => (row.whatIf ? 'heat.whatIf' : row.floor ? 'heat.floor' : 'heat.project');
@@ -776,7 +782,7 @@ export function setupMR(view, project, getFootprint) {
       if (i === 0 || section(rows[i - 1]) !== section(row)) { layout.push({ head: section(row), y }); y += HEAD_H; }
       layout.push({ row, y }); y += ROW_H;
     });
-    const ROOM_Y = y + 10, ROOM_H = 150; // the room under the reticle: watts by surface
+    const ROOM_Y = y + 10, ROOM_H = 184; // the room under the reticle: watts by surface, then its heaters
     const H = ROOM_Y + ROOM_H + 14;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -796,7 +802,8 @@ export function setupMR(view, project, getFootprint) {
     }
     // values: key → { text, set (authored, not the default), dim (inactive) }.
     // house: { now: {watts, kwh}, full: {watts, kwh} | null (nothing taken away) }.
-    function draw(accent, hoverKey, floorName, totalW, values, room, zoneLines = null, house = null) {
+    // heat: this floor's heaters { watts, count } | null.
+    function draw(accent, hoverKey, floorName, totalW, values, room, zoneLines = null, house = null, heat = null) {
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.96)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 24); ctx.fill();
@@ -807,6 +814,11 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillText(floorName, 26, 88);
       ctx.textAlign = 'right'; ctx.fillStyle = accent;
       ctx.fillText(totalW == null ? '—' : `${t('heat.total')} ${Math.round(totalW)} W`, W - 26, 88);
+      if (heat) { // this floor's heaters against its loss (roomHeaters)
+        ctx.textAlign = 'left'; ctx.font = 'bold 22px sans-serif';
+        ctx.fillStyle = heat.watts >= (totalW ?? 0) ? '#4ade80' : '#f87171';
+        ctx.fillText(heaterLine(heat, totalW), 26, 206);
+      }
       if (house) { // the whole house, and what the "what if" rows add to it
         const n = (v) => Math.round(v).toLocaleString('fr-FR');
         ctx.textAlign = 'left'; ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = '#e6edf3';
@@ -863,6 +875,11 @@ export function setupMR(view, project, getFootprint) {
           + (d.earthArea > 0.05 ? ` · ${t('heat.inEarth')} ${d.earthArea.toFixed(1)} m²` : ''), 30, ROOM_Y + 104);
         ctx.fillStyle = '#aab4c0'; ctx.font = '20px sans-serif';
         ctx.fillText(`${t('heat.extWall')} ${d.wallArea.toFixed(1)} m² (${t('heat.insulated')} ${d.insulatedArea.toFixed(1)}) · ${t('heat.openings')} ${d.openingArea.toFixed(1)} m²`, 30, ROOM_Y + 134);
+        if (room.heaters) { // a separate category: what the room's radiators give
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillStyle = room.heaters.watts >= room.total ? '#4ade80' : '#f87171';
+          ctx.fillText(heaterLine(room.heaters, room.total), 30, ROOM_Y + 168);
+        }
       }
       tex.needsUpdate = true;
     }
@@ -1228,6 +1245,7 @@ export function setupMR(view, project, getFootprint) {
     { key: 'earth', step: 0.05, min: -6, max: 6, unit: 'm' },
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
     { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
+    { key: 'radiatorDT', step: 5, min: 10, max: 60, unit: 'K' },
     { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
   const heatMenu = makeHeatMenu(HEAT_ROWS);
@@ -2124,13 +2142,16 @@ export function setupMR(view, project, getFootprint) {
   function addHeatLabels(floor) {
     const area = (r) => Math.abs(r.w * r.h);
     heatRooms = floorHeatLoss(project, floor, heatWithout);
+    roomHeaters(project, floor, heatRooms, (a) => furnitureCatalog[a]?.powerW)
+      .forEach((h, i) => { heatRooms[i].heaters = h; });
     heatHouse = { now: houseTotal(heatWithout),
       full: Object.values(heatWithout).some(Boolean) ? houseTotal({}) : null };
     heatHoverRoom = heatHoverCol = heatHoverPiece = null;
     addHeatMap();
     const labels = heatRooms.map((room) => {
       const big = room.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m)).bounds;
-      return makeDimLabel(`${Math.round(room.total)} W`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
+      const hw = room.heaters?.count ? ` · ${t('heat.radShort')} ${Math.round(room.heaters.watts)} W` : '';
+      return makeDimLabel(`${Math.round(room.total)} W${hw}`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
     });
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
@@ -4372,7 +4393,11 @@ export function setupMR(view, project, getFootprint) {
   // is routed to the proxy.
   let furnitureCatalogLoaded = false;
   const furnitureCatalogReady = loadFurnitureCatalog()
-    .then((c) => { furnitureCatalog = c; furnitureCatalogLoaded = true; });
+    .then((c) => {
+      furnitureCatalog = c; furnitureCatalogLoaded = true;
+      // HEAT LOSS shown before the catalog arrived: its heaters (powerW) need it.
+      if (heatLabels === 'w') { buildPlan(); applyPlanMatrix(); redrawHeatMenu(); }
+    });
 
   // A lit box at the model's real footprint, sitting on the floor (min.y = 0). Shown
   // when no proxy is configured, a fetch fails, or the model isn't decoded yet — so the
@@ -6668,8 +6693,12 @@ export function setupMR(view, project, getFootprint) {
         : `${t('heat.rFromDepth')} ${Math.round(th.depth * 1000)} mm / λ ${th.lambda}`)
       : t(th.glazed ? 'heat.uDefaultWindow' : 'heat.uDefaultDoor'), t('heat.rEdit')];
   }
+  const floorHeaters = () => {
+    const hs = heatRooms.map((r) => r.heaters).filter(Boolean);
+    return { watts: hs.reduce((a, h) => a + h.watts, 0), count: hs.reduce((a, h) => a + h.count, 0) };
+  };
   const redrawHeatMenu = () => heatMenu.draw('#fb923c', hoverHeatRow, project.activeFloor.name,
-    floorHeatTotal(), heatRowValues(), heatHoverRoom, null, heatHouse);
+    floorHeatTotal(), heatRowValues(), heatHoverRoom, null, heatHouse, floorHeaters());
 
   // Typing a zone's R: the settings panel steps aside for the numpad (both sit in front
   // of you). ENTER sets it and closes; CLEAR R (the DEL cell) returns to the project λ.

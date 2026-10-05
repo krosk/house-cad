@@ -151,6 +151,7 @@
   "acova-angora-1332x500": {
     "name": "acova-angora-1332x500",
     "article": "69044605",
+    "powerW": 615,
     "sizeMm": [
       500,
       1332,
@@ -183,6 +184,7 @@
   "acova-angora-1728x500": {
     "name": "acova-angora-1728x500",
     "article": "69044626",
+    "powerW": 795,
     "sizeMm": [
       500,
       1728,
@@ -215,6 +217,7 @@
   "delonghi-easy-vertical-500x2000": {
     "name": "delonghi-easy-vertical-500x2000",
     "article": "82273209",
+    "powerW": 1730,
     "sizeMm": [
       500,
       2000,
@@ -236,6 +239,7 @@
   "delonghi-easy-vertical-600x2000": {
     "name": "delonghi-easy-vertical-600x2000",
     "article": "82273211",
+    "powerW": 2076,
     "sizeMm": [
       600,
       2000,
@@ -257,6 +261,7 @@
   "delonghi-easy-horizontal-900x600": {
     "name": "delonghi-easy-horizontal-900x600",
     "article": "88144739",
+    "powerW": 1448,
     "sizeMm": [
       900,
       600,
@@ -280,6 +285,7 @@
   "delonghi-easy-vertical-500x1800": {
     "name": "delonghi-easy-vertical-500x1800",
     "article": "82273208",
+    "powerW": 1601,
     "sizeMm": [
       500,
       1800,
@@ -301,6 +307,7 @@
   "delonghi-easy-horizontal-1200x600": {
     "name": "delonghi-easy-horizontal-1200x600",
     "article": "82273196",
+    "powerW": 1930,
     "sizeMm": [
       1200,
       600,

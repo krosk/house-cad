@@ -236,6 +236,9 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   floor clearance. The full source list is in the builder's `// Sources:` block. Proven in a scratch
   browser preview (bounding boxes 0.500 × 1.344 × 0.089 and 0.500 × 1.740 × 0.089 m, the vent adds
   12 mm; ¾, front and side views beside the photos); not yet seen in AR, View 3D or on device.
+- Every radiator entry carries **`powerW`**, its rated output from the retailer's spec (EN 442, ΔT 50 K),
+  which HEAT LOSS counts as the room's heaters (`docs/heat-loss.md` "Heaters"). A new radiator entry
+  needs it.
 - De'Longhi EASY hot-water panel radiators, white gloss, builder `panel-radiator` (no manufacturer 3D
   model). A body whose front has deep vertical slots inside a flat border, the slot floor drawn darker
   to stand in for the shadow inside the slots; hidden brackets set the wall gap (`sizeMm` depth includes

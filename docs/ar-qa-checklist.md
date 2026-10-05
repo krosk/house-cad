@@ -412,6 +412,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] A window drawn through the outdoor insulation: the room's openings rise (≈ 10 W per metre of edge at ψ 0.4); Reveals insulated → yes gives a green saving line
 - [ ] Reload: the switches are back to yes; the panel still fits in view (it grew by four rows)
 
+## HEAT LOSS · heaters  ⬜ NEW (2026-10-05) — Node-verified only
+- [ ] A room with a radiator product reads `<loss> W · rad. <W> W`; its breakdown shows HEATERS (green when ≥ the loss)
+- [ ] The floor's heaters line under the title; Radiator water ΔT 30 → the heaters roughly halve
+- [ ] A window in a wall with outdoor insulation: Reveals insulated → yes gives a green saving line (it showed none on `0078f1b`)
+
 ## OUTDOOR room (veranda)  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] PLAN · EDIT: select the veranda room, A/X → TYPE reads `OUTDOOR ROOM`; A/X again → `ROOM`
 - [ ] HEAT LOSS: the veranda shows no watts; the kitchen's wall to it now loses heat; the EDIT area of the veranda and the kitchen are separate
