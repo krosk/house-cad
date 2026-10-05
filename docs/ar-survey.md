@@ -686,6 +686,13 @@ value; **0 m is valid** (edge↔origin lock, adjacent edge↔edge); negatives re
 
 ### Conflicting dimensions: which one is wrong? (owner, 2026-10-04)
 
+**Warning signs** (owner, 2026-10-05: "a more obvious indicator for the conflict constraints ... at eye
+level, not on the floor"): every dimension the solver flags (`c.conflict`, red) on the active floor gets a
+yellow ⚠ sign 1.55 m above the floor, 22 cm, drawn through everything, on a red stem down to its value
+label. Built with the dimensions, so it follows a label drag and disappears once the loop agrees. A
+commit the solver refuses is rolled back, so nothing stays flagged: while its refusal shows, each
+suspect gets the same sign with its number (`1`, `2`… as `#1`, `#2` in the readout) on a pink stem.
+
 The owner's need: "identify the other constraints that cause the conflict, so that I can verify
 systematically which one is wrong". `src/core/conflicts.js` `diagnoseConflicts(floor)`:
 - **The model:** on each axis the plan's dimensions are a graph (a node per rect edge plus the origin,

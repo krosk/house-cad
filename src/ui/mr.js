@@ -1355,7 +1355,7 @@ export function setupMR(view, project, getFootprint) {
     const key = block ? [...block.ids].join() : null;
     if (key === conflictTagsKey && conflictTagsSprites === dimSprites
       && conflictTags.every((m) => m.parent === planGroup)) return;
-    for (const m of conflictTags) { m.parent?.remove(m); m.geometry.dispose(); }
+    for (const m of conflictTags) { m.parent?.remove(m); m.geometry.dispose(); if (m.isSprite) m.material.dispose(); }
     conflictTags = []; conflictTagsKey = key; conflictTagsSprites = dimSprites;
     if (!block) return;
     const tags = block.suspects.map((s, i) => {
@@ -1363,6 +1363,11 @@ export function setupMR(view, project, getFootprint) {
       return sprite && makeDimLabel(`#${i + 1}`, '#f0abfc', sprite.position.x, -sprite.position.z + 0.045);
     }).filter(Boolean);
     if (tags.length) conflictTags = addDimLabelBatch(tags, planGroup, 31);
+    // ...and at eye level: a numbered sign over each suspect, its number as in the readout.
+    block.suspects.forEach((s, i) => {
+      const sprite = dimSprites.find((d) => d.userData.cId === s.id);
+      if (sprite) conflictTags.push(...conflictSign(sprite.position, String(i + 1), 0xf0abfc));
+    });
   }
   // A refused value (PLAN DIMS !CONFLICT): diagnose the plan as it would be with it,
   // before the caller rolls it back.
@@ -1730,6 +1735,54 @@ export function setupMR(view, project, getFootprint) {
       if (selectable) dimObjects.push(s);
     }
     for (const mesh of addDimLabelBatch(floorDimSprites, planGroup)) if (selectable) dimObjects.push(mesh);
+    // A warning sign at eye level over every conflicting dimension (owner, 2026-10-05: "a
+    // more obvious indicator ... at eye level, not on the floor"), on a red stem down to
+    // its value label. Active floor only; drawn through everything.
+    if (selectable) {
+      for (const sp of floorDimSprites) {
+        const c = floor.constraints.find((k) => k.id === sp.userData.cId);
+        if (!c?.conflict) continue;
+        dimObjects.push(...conflictSign(sp.position, '!', 0xff5c5c, elevation));
+      }
+    }
+  }
+
+  // The conflict warning sign (buildDimensions; showConflictTags): a red-bordered yellow
+  // triangle with "!" (a flagged dimension) or a suspect's number, each text painted once;
+  // each sign has its own material over the shared texture.
+  const CONFLICT_SIGN_Y = 1.55, CONFLICT_SIGN_M = 0.22; // m above the floor, sign size
+  const conflictStemMats = new Map(); // stem colour → material
+  const conflictSignTex = new Map();  // sign text → texture
+  // A sign over the label at `pos` (planGroup-local), added to planGroup: [sign, stem].
+  function conflictSign(pos, text, stemColor, elevation = 0) {
+    const top = elevation + CONFLICT_SIGN_Y;
+    const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: conflictSignTexture(text), depthTest: false, transparent: true }));
+    sign.scale.set(CONFLICT_SIGN_M, CONFLICT_SIGN_M, 1);
+    sign.position.set(pos.x, top, pos.z);
+    sign.renderOrder = 30;
+    if (!conflictStemMats.has(stemColor)) conflictStemMats.set(stemColor,
+      new THREE.LineBasicMaterial({ color: stemColor, depthTest: false, transparent: true, opacity: 0.7 }));
+    const stem = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(pos.x, pos.y, pos.z), new THREE.Vector3(pos.x, top - CONFLICT_SIGN_M * 0.45, pos.z)]),
+      conflictStemMats.get(stemColor));
+    stem.renderOrder = 29;
+    planGroup.add(sign, stem);
+    return [sign, stem];
+  }
+  function conflictSignTexture(text) {
+    if (conflictSignTex.has(text)) return conflictSignTex.get(text);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const g = cv.getContext('2d');
+    g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(64, 10); g.lineTo(120, 112); g.lineTo(8, 112); g.closePath();
+    g.fillStyle = '#ffd60a'; g.fill();
+    g.lineWidth = 10; g.strokeStyle = '#ff3b30'; g.stroke();
+    g.fillStyle = '#111'; g.font = 'bold 72px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, 64, 76);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    conflictSignTex.set(text, tex);
+    return tex;
   }
 
   // Rebuild ONLY the active floor's dimensions in place — the cheap path for a live
@@ -1741,6 +1794,7 @@ export function setupMR(view, project, getFootprint) {
     for (const o of dimObjects) {
       planGroup.remove(o);
       o.geometry?.dispose(); // label batches share their atlas page material — never dispose it here
+      if (o.isSprite) o.material.dispose(); // a conflict sign's own material (its texture is shared)
     }
     dimObjects = [];
     buildDimensions(project.activeFloor);
