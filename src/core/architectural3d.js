@@ -18,7 +18,7 @@ const EPS = 1e-7;
 // Solid wall material in 3D. INSULATION is an interior lining authored over the room
 // edge (markers are pinned to its inner face), so it renders as wall too; without it
 // the room read 18–21 cm too deep and lining-mounted outlets had no surface.
-const WALL_ZONE_KINDS = new Set(['wall', 'insulation', 'door', 'passage', 'garage', 'window', 'halfwall', 'sliding']);
+const WALL_ZONE_KINDS = new Set(['wall', 'insulation', 'door', 'passage', 'garage', 'window', 'halfwall', 'sliding', 'recess']);
 
 const validBounds = (b) => b && b.x1 - b.x0 > EPS && b.y1 - b.y0 > EPS;
 const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -35,7 +35,7 @@ function openingBand(rect, storeyHeight) {
   if (kind === 'door' || kind === 'passage' || kind === 'garage' || kind === 'sliding') {
     return [0, clipped(rect.head ?? 2.1, 0, storeyHeight)];
   }
-  if (kind === 'window') {
+  if (kind === 'window' || kind === 'recess') {
     return [
       clipped(rect.sill ?? 0.9, 0, storeyHeight),
       clipped(rect.head ?? 2.1, 0, storeyHeight),
@@ -263,7 +263,8 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
   const openings = rectangles.flatMap((rect) => {
     const band = openingBand(rect, height);
     if (!band || !validBounds(rect.bounds)) return [];
-    const bounds = zoneKind(rect) === 'halfwall' && insideRoom(rect.bounds)
+    // A recess is the reveal itself: it cuts its own footprint, never through the wall.
+    const bounds = (zoneKind(rect) === 'halfwall' && insideRoom(rect.bounds)) || zoneKind(rect) === 'recess'
       ? rect.bounds : piercedBounds(rect.bounds, sources);
     return [{ rect, bounds, z0: band[0], z1: band[1] }];
   });

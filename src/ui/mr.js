@@ -1850,7 +1850,7 @@ export function setupMR(view, project, getFootprint) {
     const byKind = new Map();
     for (const r of floor.rectangles) {
       const k = zoneKind(r);
-      if (!isAperture(k) && !isStairs(k)) continue;
+      if ((!isAperture(k) && !isStairs(k)) || k === 'recess') continue; // a recess is its outline only
       (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
     }
     for (const [k, rects] of byKind) {
@@ -2027,6 +2027,7 @@ export function setupMR(view, project, getFootprint) {
       const lines = [`${t('heat.map.wall')} · ${W(c.wm2)}`];
       for (const b of c.bands) {
         if (b.kind === 'wall') lines.push(`${t('heat.map.wallBand')} ${U(b.u)} · ${W(b.wm2)} · R ${c.r.toFixed(2)}${c.walled ? '' : ` (${t('heat.map.placeholder')})`}`);
+        else if (b.kind === 'recess') lines.push(`${t('heat.map.recess')} ${U(b.u)} · ${W(b.wm2)} · ${fmt(b.sill)}–${fmt(b.head)} · R ${b.r.toFixed(2)}`);
         else if (b.kind === 'opening') lines.push(`${t('heat.map.opening')} ${U(b.u)} · ${W(b.wm2)} · ${fmt(b.sill)}–${fmt(b.head)}`);
         else lines.push(`${t('heat.map.earth')} ${U(b.u)} · ${W(b.wm2)}`);
       }

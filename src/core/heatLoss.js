@@ -120,6 +120,18 @@ export function layerStack(cuts) {
   return { r, insulated, walled };
 }
 
+// The part of layer `c` outside the depth [lo, hi] a recess takes out, its R in
+// proportion (a layer's R spreads evenly over its depth, as in layerStack).
+function carve(c, lo, hi) {
+  const span = c.hi - c.lo;
+  if (span < EPS) return c.lo > lo && c.lo < hi ? [] : [c];
+  const out = [];
+  for (const [a, b] of [[c.lo, Math.min(c.hi, lo)], [Math.max(c.lo, hi), c.hi]]) {
+    if (b - a > EPS) out.push({ ...c, lo: a, hi: b, rz: c.rz * (b - a) / span });
+  }
+  return out;
+}
+
 // ISO 13370 basement wall: the U of a wall buried z m deep (the floor's depth below the
 // earth), from its own R and the floor's equivalent thickness d_t.
 export function buriedWallU(z, wallR, dt) {
@@ -139,6 +151,7 @@ function wallLoss(floor, comp, s, fh, dT) {
     .map((r) => r.bounds);
   const layers = floor.rectangles.filter((r) => LAYER_KINDS.has(zoneKind(r)));
   const openings = floor.rectangles.filter((r) => OPENING_KINDS.has(zoneKind(r)));
+  const recesses = floor.rectangles.filter((r) => zoneKind(r) === 'recess');
   for (const polygon of computeFootprint(comp.rectangles)) {
     for (const ring of polygon) {
       for (let i = 0; i < ring.length - 1; i++) {
@@ -168,8 +181,30 @@ function wallLoss(floor, comp, s, fh, dT) {
             cuts.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), rz, wall });
           }
           let { r, insulated, walled } = layerStack(cuts);
-          if (!walled) r += s.wallDepth / s.wallLambda; // the placeholder masonry
+          const placeholder = walled ? 0 : s.wallDepth / s.wallLambda; // the placeholder masonry
+          r += placeholder;
           const u = 1 / (RS_WALL + r);
+          // Recesses here (owner, 2026-10-05): between its sill and head a recess takes
+          // its depth out of every layer it overlaps; the rest of the layers stay.
+          const here = [];
+          for (const q of recesses) {
+            const b = q.bounds;
+            if (!contains(b, mx - nx * 0.005, my - ny * 0.005) && !hitsSegment(b, sx, sy, px, py)) continue;
+            const e0 = nx ? (b.x0 - mx) * nx : (b.y0 - my) * ny, e1 = nx ? (b.x1 - mx) * nx : (b.y1 - my) * ny;
+            const z0 = Math.max(0, q.sill ?? 0), z1 = Math.min(H, q.head ?? H);
+            if (z1 - z0 > EPS) here.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), z0, z1 });
+          }
+          const rWith = new Map(); // R of the layers left under a set of recesses
+          const rUnder = (active) => {
+            if (!active.length) return r;
+            const key = active.map((q) => here.indexOf(q)).join(',');
+            if (!rWith.has(key)) {
+              let left = cuts;
+              for (const q of active) left = left.flatMap((c) => carve(c, q.lo, q.hi));
+              rWith.set(key, layerStack(left).r + placeholder);
+            }
+            return rWith.get(key);
+          };
           let openH = 0, openU = 0, openSill = 0;
           for (const o of openings) {
             if (!hitsSegment(o.bounds, mx - nx * 0.3, my - ny * 0.3, px, py)) continue;
@@ -181,23 +216,50 @@ function wallLoss(floor, comp, s, fh, dT) {
                 : isGlazedKind(kind) ? s.windowU : s.doorU;
             }
           }
-          // The opening's band takes its share of the buried height first (a window
-          // above the earth leaves the buried wall whole).
-          const openBuried = Math.max(0, Math.min(buriedH, openSill + openH) - openSill);
-          const earthA = ds * Math.max(0, buriedH - openBuried);
-          const wallA = ds * Math.max(0, H - openH), openA = ds * openH, airA = Math.max(0, wallA - earthA);
+          // Split the column by height: the opening's band, each recess band, the buried
+          // part below the earth, the rest in air. Each piece has its own U.
+          const openTop = openSill + openH;
+          const zs = [...new Set([0, H, buriedH, openSill, openTop, ...here.flatMap((q) => [q.z0, q.z1])]
+            .filter((v) => v >= 0 && v <= H))].sort((p, q) => p - q);
+          const band = {}; // kind → { area, w, u (last), r, sill, head }
+          const add = (kind, a, uu, wm2, extra) => {
+            const e = band[kind] ?? (band[kind] = { kind, area: 0, w: 0, ...extra });
+            e.area += a; e.w += a * wm2; e.u = uu;
+            e.sill = Math.min(e.sill ?? Infinity, extra.sill ?? Infinity); e.head = Math.max(e.head ?? -Infinity, extra.head ?? -Infinity);
+          };
+          let wallA = 0, openA = 0, earthA = 0, wAir = 0, wEarth = 0, wOpen = 0;
+          for (let zi = 0; zi < zs.length - 1; zi++) {
+            const lo = zs[zi], hi = zs[zi + 1], a = ds * (hi - lo), mid = (lo + hi) / 2;
+            if (a <= 0) continue;
+            if (openH > 0 && mid > openSill && mid < openTop) {
+              openA += a; wOpen += a * openU * dT;
+              add('opening', a, openU, openU * dT, { sill: openSill, head: openTop });
+              continue;
+            }
+            wallA += a;
+            const active = here.filter((q) => mid > q.z0 && mid < q.z1);
+            const rr = rUnder(active), uu = active.length ? 1 / (RS_WALL + rr) : u;
+            const rec = active.length ? { sill: Math.min(...active.map((q) => q.z0)), head: Math.max(...active.map((q) => q.z1)), r: rr } : { r: rr };
+            if (mid < buriedH) {
+              const ue = buriedWallU(z, rr, dt);
+              earthA += a; wEarth += a * ue * groundDT;
+              add('earth', a, ue, ue * groundDT, rec);
+            } else {
+              wAir += a * uu * dT;
+              add(active.length ? 'recess' : 'wall', a, uu, uu * dT, rec);
+            }
+          }
           out.wallArea += wallA; out.openingArea += openA; out.earthArea += earthA;
           if (insulated) out.insulated += wallA;
-          const uEarth = earthA > 0 ? buriedWallU(z, r, dt) : 0;
-          const wAir = airA * u * dT, wEarth = earthA * uEarth * groundDT, wOpen = openA * openU * dT;
           out.wall += wAir + wEarth;
           out.opening += wOpen;
           // The heat map (docs/heat-loss.md "Where the heat goes"): this 5 cm column of
           // wall, its bands (W/m² each) and the whole column's W/m².
-          const bands = [];
-          if (airA > EPS) bands.push({ kind: 'wall', area: airA, u, wm2: u * dT });
-          if (openA > EPS) bands.push({ kind: 'opening', area: openA, u: openU, wm2: openU * dT, sill: openSill, head: openSill + openH });
-          if (earthA > EPS) bands.push({ kind: 'earth', area: earthA, u: uEarth, wm2: uEarth * groundDT });
+          const bands = ['wall', 'recess', 'opening', 'earth'].filter((k) => band[k]?.area > EPS).map((k) => {
+            const e = band[k];
+            return { kind: k, area: e.area, u: e.u, wm2: e.w / e.area, r: e.r,
+              ...(Number.isFinite(e.sill) ? { sill: e.sill, head: e.head } : {}) };
+          });
           out.samples.push({
             x0: ax + (bx - ax) * (k / n), y0: ay + (by - ay) * (k / n),
             x1: ax + (bx - ax) * ((k + 1) / n), y1: ay + (by - ay) * ((k + 1) / n),

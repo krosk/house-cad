@@ -626,8 +626,10 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   language; **MARKER · EDIT** = retype the selected marker, or the drop type if none selected
   (`cycleMarkerType`, wraps), including general, shutter, and air-conditioning outlets;
   **MATERIAL · FURNITURE** = the selected zone's product; **PLAN · ADD** = the kind to add over `ZONE_KINDS`
-  (room/wall/insulation/door/passage/garage/halfwall/heater/sliding/window/stairs up/stairs down/cabinet/furniture, `cycleZoneKind`);
-  **PASSAGE** is an open doorway with no leaf (jambs + dashed lintel on plans; floors meet at its middle like a door)
+  (room/wall/insulation/door/passage/garage/halfwall/heater/sliding/window/recess/stairs up/stairs down/cabinet/furniture, `cycleZoneKind`);
+  **PASSAGE** is an open doorway with no leaf (jambs + dashed lintel on plans; floors meet at its middle like a door);
+  **RECESS** (2026-10-05) is a window's reveal through a thick wall: SILL + HEAD on the band pad (default 0.90 / 2.10),
+  it cuts the wall and insulation it overlaps only in that band and only in its own footprint (outline only on plans)
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
   baseline) or LANGUAGE row (→ cycles the sheet language), which take precedence.

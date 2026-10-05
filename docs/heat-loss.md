@@ -133,12 +133,31 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned (λ ≈ 0.045; set R when known) |
 
+## Recesses: a window's reveal through a thick wall (owner, 2026-10-05)
+
+Owner: "semantically it is a recess, and functionally it is like a passage with a sill, that I want to
+count for heat loss"; "I probably need insulation to have a sill at that location too". A RECESS zone
+(sill + head, default 0.90 / 2.10) takes its depth out of every WALL and INSULATION layer it overlaps,
+only between its sill and head; outside that band the layers are whole. That is the insulation's
+"sill": draw the recess over the lining and the lining is cut there. In the heat loss each 5 cm column
+is split by height (opening band, each recess band, buried part, the rest), each piece with its own U;
+in a recess band the remaining layers count (a cut layer keeps R in proportion to its remaining depth;
+where no wall zone is drawn the placeholder stays). In 3D it cuts its own footprint only (a window or
+door pierces through contiguous layers; a recess must not). A PASSAGE over a window was rejected: it
+cuts from the floor, the floor finish runs through it, and it prints as a doorway.
+**Proven** (Node, 2026-10-05): with no recess, every room part, area and map column is identical to
+the previous code at earth 0, 1.2 and 3.5 m. A test window 1 m wide on the living-room wall (lining
+R 4.08): a recess the window's width changes nothing (3604 W; the window band already replaces the
+wall); 1.6 m wide → the columns beside the window lose the lining in 0.90–2.10 (R 0.25, 6 → 31 W/m²,
+room 3644 W); sill 0.60 / head 2.30 → 3690 W. 3D wall boxes: the lining in the recess is open only
+between sill and head; the outer wall beside the window stays solid.
+
 ## Where the heat goes: the heat map (owner, 2026-10-04)
 
 Owner: "see at a glance where I lose heat, whether floor, wall, or ceiling", values shown "as the
 reticle pass over them". Everything in W/m² on one scale so walls, floor and ceiling compare.
 - `floorHeatLoss` returns each room's `map`: `wall` = every 5 cm column of exterior wall with its
-  bands (`wall` in air, `opening` sill–head, `earth` below the earth level), each with U and W/m², and
+  bands (`wall` in air, `recess` the wall behind a recess, `opening` sill–head, `earth` below the earth level), each with U and W/m², and
   the column's average W/m² over the room height; `floor` / `ceiling` = the room's footprint cut by
   what lies across (`heated` 0, `unheated`, `earth`, `air`, `attic`), each with U and W/m².
   **Proven** (Node on the headset plan, 2026-10-04): the map's watts add back to every room's parts on

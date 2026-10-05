@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])

@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'stairs_up', 'stairs_down', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -19,6 +19,7 @@ export const ZONE_COLORS = {
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
   window:  0x22d3ee, // cyan
+  recess:  0x67e8f9, // pale cyan — a window's reveal through a thick wall; window-family
   stairs_up:   0xfbbf24, // yellow — arrow follows the existing/legacy stair direction
   stairs_down: 0xf59e0b, // amber — inverse arrow
   cabinet: 0xa78bfa, // purple
@@ -58,6 +59,12 @@ export const APERTURE_DEFAULTS = {
   // 4 states like a door — `hinge` = slide direction (left/right), `swing` = which
   // wall face the rail/panel sits on (in/out).
   sliding:  { sill: 0,   head: 2.1,  hinge: 'left', swing: 'in' },
+  // A recess (owner, 2026-10-05): the reveal of a window through a thick wall, "a passage
+  // with a sill". It cuts every wall and insulation layer it overlaps, only between its
+  // sill and head, and only within its own footprint (it never pierces through the wall
+  // like a window or door). The heat loss counts the wall behind it as thinner there.
+  // Default: the window's band.
+  recess:   { sill: 0.9, head: 2.1,  hinge: null   },
 };
 
 // Stairs orientation. `climb` is the PHYSICAL ascent direction in plan ('+x',
