@@ -19,19 +19,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-04 (session 38, continued five times after context compactions; the Quest came back late in it)
-**Status:** Proven (git): everything is pushed; head: the furniture-batch commit after `4847125` (item 24: heat-loss overlap rule,
-per-zone λ, the HEAT LOSS heat map, RECESS zones, DIMS internal names, eye-level conflict signs); the
-tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
-output and the running app's script, 2026-10-05): the AR app ran `index-BBZECggd.js`, the live build of
-`c20544c` (routes, HUD `edge: r60.bottom`). The Quest then became unavailable (owner, 2026-10-05). None of item 24 has been seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
-later edits (item 24), plus five Ground dimensions re-added by us (item 24). Proven (`am broadcast`
-result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
-normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
-PERF report header, 2026-10-03): the Quest ran `d00be61`, so session 37's AR changes are live there.
-Proven (owner, 2026-10-03, after `856592c`): their link's **3D view now opens on their phone** ("Ok it
-works"); before, it crashed the canvas. The owner opened session 38 links on desktop and phone; the
-rest of session 38 (Realistic fps, photo floors' look) is not yet reported.
+**Date:** 2026-10-05 (session 38, continued many times after context compactions; the Quest was
+back from the evening of 2026-10-04 to 2026-10-05, then unavailable again)
+**Status:** Proven (git, 2026-10-05): `main` = `origin/main`, nothing unpushed; app head `c88ae9a`
+(furniture batch), doc head after it. Tree clean apart from the owner's untracked `Document from Alexis
+He.json`. Proven (the owner's PERF report header, 2026-10-05): the headset ran `4847125`, so items 24–30
+are on it except item 31 (`c88ae9a`, installs over its next launch or two; `update-app` skipped, no
+Quest). **The headset plan changed after our last read** (item 30): read it before any headset work.
+Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
 PERF clipboard report (two reports pasted) and an AR 3D view frame rate the owner accepts (50–80 fps on
@@ -233,8 +228,7 @@ All owner requests, 2026-10-03.
     - Node: `tools/house-query.mjs conflicts <house>`.
     - Proven (Node, on the headset copy): adding 15 mm to each dimension in turn, the altered one was
       a suspect in all 57 conflicting cases (lists of 1–7).
-    - Not seen on the Quest; the desktop shows no suspects.
-    - The owner's own conflicting survey value was never read: no Quest.
+    - Used on the Quest (items 26–27); the desktop shows no suspects.
 23. **Vernisse relief, and finish textures painted in software** (`f857b41`; `docs/materials.md`
     Vernisse and "Texture preparation in a worker"):
     - The owner's rule: the tile body is thicker at the edges than over its face, unevenly. It is a
@@ -244,6 +238,49 @@ All owner requests, 2026-10-03.
     - Edge glints fixed: the anti-aliased outline pixel is now sealed at joint height.
     - Chrome's GPU canvas cut one row's tiles short, so `unitCanvas` now paints every designed finish
       in software. Proven no slower. Only Vernisse was re-checked; the GPU cause is a Hypothesis.
+
+## What changed late in session 38 (2026-10-04 evening – 10-05, Quest back, then gone)
+
+> Next agent: fold what is still live into "Standing decisions" or "Findings" and delete the rest.
+
+24. **Deleted dimensions re-added** (owner): the owner had deleted five Ground y dimensions on the
+    headset while hunting a conflict (c220, c224, c238, c370, c753). Re-added to the headset's current
+    plan by id, nothing else changed; Proven: written with the `--base` guard, read back identical, no
+    conflict after. c220 moved 39 Ground zones 15.8 mm in y; the owner's new walls r170–r174 and room
+    r175 have no y dimension and stayed (owner: "write as is", re-align by hand).
+25. **Heat loss** (`ba5f59e`, `7e0f3e0`, `b4dc594`; `docs/heat-loss.md`):
+    - overlapping layer zones: that depth counts once, at the larger R per metre (owner rule; the
+      "layer over layer" reading is a Hypothesis to confirm);
+    - a wall or insulation zone takes its **R or its λ** (`rect.lambda`, exclusive; numpad SWAP);
+    - **heat map** in HEATING · HEAT LOSS: wall strips, floor/ceiling tint (thumbstick), readout under
+      the reticle. Agreed next: the same map on the wall faces in the AR 3D view (not started);
+    - **RECESS** zone kind: a window reveal through a thick wall, cut only between its sill and head and
+      only in its footprint; thins the heat-loss layers there. Owner asked about sill/head on walls
+      instead: no for holes (one band can't make a hole); a *solid* foot/top band for layers that stop
+      at a height is possible later (not requested). A floor-level alcove is ROOM, not RECESS.
+    - Owner facts: walls probably **meulière** with 2–4 cm of 1980 white polystyrene; the living-room
+      lining is polystyrene + 13 mm plaster (label R not given, parked). Proven (Node): depth-derived R
+      (18–21 cm / 0.04 ≈ 4.5) overstates a 3–4 cm layer (R 0.75–1.0) by ~560 W on two rooms.
+26. **Conflicts on the Quest** (`1d0bcd3`, `c20544c`, `4847125`; `docs/ar-survey.md` "Conflicting
+    dimensions"): eye-level warning triangles (1.55 m; "!" over a flagged dimension, numbered over the
+    suspects or the current route); **routes**: thumbstick-y cycles suspects → route 1 → route 2…
+    (`conflictRoutes`). Owner decisions: 0 mm dimensions get no sign; the value being entered gets no
+    sign. Proven on the Quest (owner): the routes and their triangles work (one hid behind the numpad).
+27. **The owner's survey conflict** (owner, 2026-10-05): r59.bottom → r60.bottom = 4070, 80 mm off;
+    both routes imply 3990 and share only **c232 (r60's thickness 210, implied 130)**, hence the single
+    suspect (c236 is backed by a second route). The owner then "sorted out the measurement
+    discrepancy" on the headset. **Not read back**: which value was wrong is unknown.
+28. **Debug HUD `edge:` line** shows the lit edge's zone id and side (`edge: r60.bottom · 0.93 m`)
+    (`5c51858`; owner: "just show the static rxxx name", "it also needs the edge label"). A longer
+    readout id line (`fcbb58a`) confused the owner (it showed the picked A and labels) and was removed.
+29. **Thumbstick and controls**: in HEAT LOSS, thumbstick-y off the panel = FLOOR ⇄ CEILING; in DIMS
+    with a conflict shown = suspects ⇄ routes. Both were free before.
+30. **PERF** (owner's reports, Ground plan view, `4847125`): ~50 fps seen; `all` 19.0 ms ≈ 53 fps,
+    11.4 ms with `furn` hidden. Ground then had 77 zones, 79 markers, **472 dims** (410 at our last
+    read), 30 finishes. The report's `fps 90` line was the plan-hidden window (fixed in item 31).
+31. **Furniture plan pieces batched** (`c88ae9a`): 44 meshes → at most 3 (fill, solid, dashed
+    outline); the report's fps now measured with all drawn. Hypothesis: plan view back near 90 fps;
+    `zones` (4.4 ms, 12 translucent quads) next if not. Not measured.
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -546,53 +583,15 @@ All owner requests, 2026-10-03.
 - **Thick walls between rooms are hollow in 3D** (12 cm skin per room face; wider gaps leave a void).
 - **The desktop `Sketch2D` stays live during AR**; a throw in any `onChange` listener aborts the AR caller.
 - **`rlog` works only on the dev server**; never stage `quest-debug.log`.
+- **`update-app` and headset reads need the browser in front of the wearer** (after `adb forward
+  tcp:9333 localabstract:chrome_devtools_remote`): an unworn headset times out (`Page.enable` /
+  `Runtime.evaluate`). `am broadcast` `prox_close` keeps it awake for a DevTools session;
+  `automation_disable` after. The AR app's page (`?ar=1`) is a CDP target too: its loaded
+  `assets/index-*.js` tells which build it runs (read-only `Runtime.evaluate`).
+- **PERF's frame-interval source** (Quest: no GPU timer) steps at 11.1 / 22.2 ms: read layer costs as
+  over/under the 90 fps budget, not as ms.
 - **Latent:** `~/house-cad-apk/app/src/main/res/values/strings.xml` lacks `appName`/`launcherName` —
   add them before the next `bubblewrap build`.
-
-24. **Quest back; deleted dimensions re-added; heat-loss layers** (owner, 2026-10-04 evening):
-    - The owner had deleted five Ground y dimensions on the headset while hunting a conflict
-      (c220 r55 height 4400, c224, c238, c370, c753), then asked to put them back. Diffed by id
-      against the plan written that morning; added back to the headset's current plan, nothing else
-      changed (backup `quest-backup-20261004-2149`, scratchpad, gone next session). Proven: written
-      with the `--base` guard and read back identical; with them back the solver and
-      `diagnoseConflicts` find **no conflict**, so the owner's new survey value (refused, never
-      saved) is what conflicts; it was not given to us. Restoring c220 moves r55 and 38 other Ground
-      zones (and 54 markers) 15.8 mm in y; the owner's new walls r170–r174 and room r175 have no y
-      dimension and stay put (owner chose "write as is": re-align them by hand).
-    - **Overlapping layers: the larger R prevails** (owner rule; `layerStack` in
-      `src/core/heatLoss.js`, `docs/heat-loss.md`). Interpretation (Hypothesis, to confirm): layer zones
-      overlapping across the wall's depth, compared on R per metre.
-    - **Heat map** in HEAT LOSS (`7e0f3e0`; `docs/heat-loss.md` "Where the heat goes"): wall strips,
-      floor/ceiling tint, readout under the reticle. Agreed next: the same map on the wall faces in
-      the AR 3D view, band by band at real height (not started).
-    - **RECESS** (`b4dc594`; `docs/heat-loss.md` "Recesses"): a window reveal, cut only in its
-      sill–head band and own footprint; thins the heat-loss layers there. Owner asked whether walls/
-      insulation should get sill/head instead: answered no for holes (one band can't express a hole;
-      4 zones per reveal), yes as a possible later *solid* foot/top band for layers that stop at a
-      height (not built, not requested).
-    - **DIMS internal names** (`fcbb58a`, replaced by `85ef047`: owner wants only the lit edge's
-      `rxxx` on the debug HUD `edge:` line; the readout id line confused them) and **eye-level conflict signs** (`1d0bcd3`, numbered over
-      the suspects of a refused value), **conflict routes** (`c20544c`, thumbstick-y cycles suspects →
-      routes). The owner's value: **r59.bottom → r60.bottom = 4070** (80 mm off; both routes imply 3990
-      and share only **c232, r60's thickness 210**, implied 130). The owner used the routes on the Quest
-      (a route triangle hid behind the numpad panel; offered raising the triangles, not asked for) and
-      then said "I sorted out the measurement discrepancy". **Not read back**: the Quest went away
-      first, so which value was wrong and the plan's current state are unknown (last read: no conflict,
-      410 Ground dims). Proven (the owner's PERF report, 2026-10-05 13:21Z): the headset ran
-      `4847125`; Ground then had 77 zones, 79 markers, **472 dims** (62 more than our last read), 30
-      finishes; plan view 90 fps (worst 12 ms), js 0.7 / render 1.4 ms. Its per-layer ms came from the
-      `frame` source (vsync-quantized). A second report (13:26Z): `all` 19.0 ms ≈ 53 fps (the owner saw ~50;
-      the report's `fps 90` was the plan-hidden window), 11.4 ms with `furn` hidden. Fixed in the next
-      commit: plan furniture pieces batched (44 meshes → 3) and the report's fps measured with all drawn.
-      Not yet measured on the Quest.
-    - **R or λ per zone** (owner: "a dual option"): `rect.lambda` (W/mK) beside `rValue`, exclusive;
-      SWAP on the AR numpad toggles. Build + Node only; not tried on the headset.
-    - Owner's living-room lining is polystyrene + 13 mm plaster, label R not yet given (parked by the
-      owner); the depth-derived R (≈4.5) overstates it if the label is about 0.9 (Node: +560 W).
-    - Proven (`adb`): adb is at `~/Android/Sdk/platform-tools/adb`, not on PATH. `update-app` needs
-      `adb forward tcp:9333 localabstract:chrome_devtools_remote` and the browser in front of the
-      wearer; `am start -a android.intent.action.VIEW -d <url> com.oculus.browser` opens the page but
-      a headset nobody wears still times out (`Page.enable`).
 
 ## Commits
 
@@ -613,8 +612,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
 - **Session 38, later:** `e13576d` heat-loss wall layers + earth level · `d87eb21` conflict suspects ·
-  `f857b41` Vernisse edges + software-painted finish textures · the next commit: heat-loss overlapping
-  layers (larger R prevails) + R or λ per zone.
+  `f857b41` Vernisse edges + software-painted finish textures · `ba5f59e` overlap rule + R or λ ·
+  `7e0f3e0` heat map · `b4dc594` RECESS · `1d0bcd3` eye-level conflict signs · `85ef047`/`5c51858` HUD
+  edge id · `c20544c` conflict routes · `c88ae9a` furniture plan pieces batched + PERF fps.
 - **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
   grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
   card.
@@ -660,6 +660,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/core/architectural3d.js` | Plan → slabs/walls/openings/stairs + `wallMarkerPlacements()` (pure, Node-testable) |
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
+| `src/core/conflicts.js` | `diagnoseConflicts` (suspects), `conflictRoutes` (routes), `isCertain` (0 mm) |
 | `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss`, `roomHeatLoss`), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
 | `src/core/architectural3d.js` stair part | `stairsGeometry`: `STAIR_RISER` 0.18 (owner), `STAIR_GOING` 0.25 (estimate) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
@@ -687,22 +688,20 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Next step
 
-~~**Session 39 has no Quest**~~ (superseded: the Quest came back at the end of session 38; ask the
-owner each session whether it is available).
+~~**Session 39 has no Quest**~~ (superseded: the Quest came back late in session 38). **Ask the
+owner each session whether it is available**; at the end of session 38 it was not (2026-10-05).
+Without it: no headset read/write, skip `update-app` and say so.
 
-- **The Quest is unavailable again** (owner, 2026-10-05, end of session): the next session starts
-  without it unless the owner says otherwise. Without it: no headset read/write, skip `update-app`.
-- **First, once the Quest is back:** read the plan (it changed after our last read: the owner's
-  conflict fix) and record which value was wrong; check no conflict remains.
-- **First, with the Quest:**
-  - Run `update-app` (browser in front of the wearer) so item 24's build is installed.
-  - The owner re-enters the conflicting survey value; the refusal lists suspects (item 22). Or they
-    give the two edges + value and we run `diagnoseConflicts` on a fresh read.
-  - Re-align r170–r175 to the walls that moved 15.8 mm (item 24), owner's call.
-  - HEATING · R / U: the ⇄ λ toggle, and the label R of the living-room lining (item 24).
-  - HEAT LOSS heat map on device (item 24), then build its AR 3D version.
-- **Off the headset:** Vernisse and the other designed finishes in View 3D Realistic after the switch
-  to software painting (item 23; Hypothesis: they look the same or cleaner).
+- **First, once the Quest is back:**
+  - Read the plan (`quest-storage.mjs read`; it changed after our last read, item 30). Diff it against
+    the owner's description, record which value was wrong in item 27, and check `diagnoseConflicts`
+    finds nothing.
+  - A new PERF report on Ground plan view after `c88ae9a` (item 31): `furn` ≈ 6 calls, `fps … (all
+    drawn)` near 90. If not, the `zones` layer.
+  - Then the heat-loss items on device (item 25: ⇄ λ, heat map, RECESS) and r170–r175's alignment
+    (item 24, owner's call).
+- **Off the headset:** the heat map's AR 3D version (agreed, item 25); Vernisse and the other designed
+  finishes in View 3D Realistic after the switch to software painting (item 23).
 - Never put the owner's share link or plan into the repo: it encodes the owner's house.
 
 - **A — Owner walks the parked work on the Quest**, then update `docs/ar-qa-checklist.md` (items exist
@@ -821,7 +820,10 @@ owner each session whether it is available).
 - **Session 38, later:**
   - The GPU-canvas glitch's cause is unproven (a minimal repro would settle it), and the Quest's and
     the phone's GPU paths are untested; the software path avoids both questions.
-  - Conflict suspects: a single loop can't single out its wrong member; there is no desktop UI.
+  - Conflict suspects: a single loop can't single out its wrong member (routes help, item 26); there
+    is no desktop UI. Routes are capped at 12 within a search budget (1 ms worst on the house).
+  - Which value was wrong in the owner's r59 → r60 conflict (item 27); the plan since our last read.
+  - Furniture batch's effect on fps (item 31); the warning triangles' size/height in passthrough.
   - Heat loss: `r112` (7 cm, on an exterior edge) and the real earth level are unknown.
   - Heat loss: the overlap rule's reading (layer over layer, R per metre) awaits the owner's
     confirmation; Ground ceilings with no room above lose ~3300 W at bare R 0.06 (no roof R set;
