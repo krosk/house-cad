@@ -20,12 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-04 (session 38, continued five times after context compactions; the Quest came back late in it)
-**Status:** Proven (git): everything is pushed; head `c20544c` (item 24: heat-loss overlap rule,
+**Status:** Proven (git): everything is pushed; head: the furniture-batch commit after `4847125` (item 24: heat-loss overlap rule,
 per-zone λ, the HEAT LOSS heat map, RECESS zones, DIMS internal names, eye-level conflict signs); the
 tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
-output, 2026-10-05): the headset app holds `1d0bcd3`; `85ef047`, `5c51858` (HUD `edge: r60.bottom`)
-and `c20544c` (conflict routes) failed to install (browser not in front) and update over the next
-launch or two. None of item 24 has been seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
+output and the running app's script, 2026-10-05): the AR app ran `index-BBZECggd.js`, the live build of
+`c20544c` (routes, HUD `edge: r60.bottom`). The Quest then became unavailable (owner, 2026-10-05). None of item 24 has been seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
 later edits (item 24), plus five Ground dimensions re-added by us (item 24). Proven (`am broadcast`
 result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
 normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
@@ -574,8 +573,18 @@ All owner requests, 2026-10-03.
     - **DIMS internal names** (`fcbb58a`, replaced by `85ef047`: owner wants only the lit edge's
       `rxxx` on the debug HUD `edge:` line; the readout id line confused them) and **eye-level conflict signs** (`1d0bcd3`, numbered over
       the suspects of a refused value), **conflict routes** (`c20544c`, thumbstick-y cycles suspects →
-      routes). The owner's value: **r59.bottom → r60.bottom = 4070** (not entered; 80 mm off). Both
-      routes imply 3990 and share only **c232, r60's thickness 210** (implied 130): remeasure r60.
+      routes). The owner's value: **r59.bottom → r60.bottom = 4070** (80 mm off; both routes imply 3990
+      and share only **c232, r60's thickness 210**, implied 130). The owner used the routes on the Quest
+      (a route triangle hid behind the numpad panel; offered raising the triangles, not asked for) and
+      then said "I sorted out the measurement discrepancy". **Not read back**: the Quest went away
+      first, so which value was wrong and the plan's current state are unknown (last read: no conflict,
+      410 Ground dims). Proven (the owner's PERF report, 2026-10-05 13:21Z): the headset ran
+      `4847125`; Ground then had 77 zones, 79 markers, **472 dims** (62 more than our last read), 30
+      finishes; plan view 90 fps (worst 12 ms), js 0.7 / render 1.4 ms. Its per-layer ms came from the
+      `frame` source (vsync-quantized). A second report (13:26Z): `all` 19.0 ms ≈ 53 fps (the owner saw ~50;
+      the report's `fps 90` was the plan-hidden window), 11.4 ms with `furn` hidden. Fixed in the next
+      commit: plan furniture pieces batched (44 meshes → 3) and the report's fps measured with all drawn.
+      Not yet measured on the Quest.
     - **R or λ per zone** (owner: "a dual option"): `rect.lambda` (W/mK) beside `rValue`, exclusive;
       SWAP on the AR numpad toggles. Build + Node only; not tried on the headset.
     - Owner's living-room lining is polystyrene + 13 mm plaster, label R not yet given (parked by the
@@ -681,6 +690,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 ~~**Session 39 has no Quest**~~ (superseded: the Quest came back at the end of session 38; ask the
 owner each session whether it is available).
 
+- **The Quest is unavailable again** (owner, 2026-10-05, end of session): the next session starts
+  without it unless the owner says otherwise. Without it: no headset read/write, skip `update-app`.
+- **First, once the Quest is back:** read the plan (it changed after our last read: the owner's
+  conflict fix) and record which value was wrong; check no conflict remains.
 - **First, with the Quest:**
   - Run `update-app` (browser in front of the wearer) so item 24's build is installed.
   - The owner re-enters the conflicting survey value; the refusal lists suspects (item 22). Or they
