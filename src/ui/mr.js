@@ -4354,7 +4354,7 @@ export function setupMR(view, project, getFootprint) {
     const token = ++furnitureBuildToken;
     // Plan pieces need the catalog footprint; it is usually loaded by now.
     furnitureCatalogReady.then(() => {
-      if (token === furnitureBuildToken) for (const item of items) furniturePlanGroup.add(furniturePlanPiece(item));
+      if (token === furnitureBuildToken) for (const o of furniturePlanPieces(items)) furniturePlanGroup.add(o);
     });
     for (const item of items) {
       const place = (obj) => {
@@ -4386,36 +4386,43 @@ export function setupMR(view, project, getFootprint) {
     }
   }
 
-  // A furniture product's plan piece: its catalog footprint (w × d) as a translucent fill
+  // The furniture products' plan pieces: each catalog footprint (w × d) as a translucent fill
   // plus outline, a notch on the front edge (+Z, the model's front), dashed when the
   // item is raised off the floor (a wall-hung unit, drawn like an overhead line on a
   // plan). Sits 4 mm above the floor so it doesn't z-fight the real one.
+  // Batched (owner's PERF report, 2026-10-05: plan view ~50 fps, 90 with furniture hidden;
+  // 22 products were 44 meshes, each drawn per eye): at most three objects for the floor,
+  // one fill mesh, one solid and one dashed outline, whatever the item count.
   const FURN_PLAN_COLOR = 0xa78bfa; // the FURNISH mode colour
-  function furniturePlanPiece(item) {
-    const [w, , d] = (furnitureCatalog[item.article]?.sizeMm || [600, 600, 600]).map((v) => v / 1000);
-    const g = new THREE.Group();
-    const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({
+  function furniturePlanPieces(items) {
+    const fill = [], solid = [], dashed = [];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+    const yAxis = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3();
+    for (const item of items) {
+      const [w, , d] = (furnitureCatalog[item.article]?.sizeMm || [600, 600, 600]).map((k) => k / 1000);
+      m.compose(pos.set(item.x, 0.004, -item.y), q.setFromAxisAngle(yAxis, THREE.MathUtils.degToRad(item.rotationY || 0)), one);
+      const put = (arr, x, y, z) => { v.set(x, y, z).applyMatrix4(m); arr.push(v.x, v.y, v.z); };
+      const x0 = -w / 2, x1 = w / 2, z0 = -d / 2, z1 = d / 2;
+      for (const [x, z] of [[x0, z0], [x1, z0], [x1, z1], [x0, z0], [x1, z1], [x0, z1]]) put(fill, x, 0, z);
+      const notch = Math.min(0.08, w / 4, d / 3);
+      const lines = (item.z || 0) > 1e-3 ? dashed : solid;
+      for (const [x, z] of [
+        [x0, z0], [x1, z0], [x1, z0], [x1, z1], [x1, z1], [x0, z1], [x0, z1], [x0, z0],
+        [-notch, z1], [0, z1 - notch], [0, z1 - notch], [notch, z1], // front notch (a "V" into the piece)
+      ]) put(lines, x, 0.001, z);
+    }
+    const geo = (arr) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
+    const out = [];
+    if (fill.length) out.push(new THREE.Mesh(geo(fill), new THREE.MeshBasicMaterial({
       color: FURN_PLAN_COLOR, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide,
-    }));
-    fill.rotation.x = -Math.PI / 2;
-    const x0 = -w / 2, x1 = w / 2, z0 = -d / 2, z1 = d / 2;
-    const notch = Math.min(0.08, w / 4, d / 3);
-    const pts = [
-      [x0, z0], [x1, z0], [x1, z0], [x1, z1], [x1, z1], [x0, z1], [x0, z1], [x0, z0],
-      [-notch, z1], [0, z1 - notch], [0, z1 - notch], [notch, z1], // front notch (a "V" into the piece)
-    ].map(([x, z]) => new THREE.Vector3(x, 0.001, z));
-    const raised = (item.z || 0) > 1e-3;
-    const lineMat = raised
-      ? new THREE.LineDashedMaterial({ color: FURN_PLAN_COLOR, dashSize: 0.05, gapSize: 0.035 })
-      : new THREE.LineBasicMaterial({ color: FURN_PLAN_COLOR });
-    const outline = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
-    if (raised) outline.computeLineDistances();
-    g.add(fill, outline);
-    g.position.set(item.x, 0.004, -item.y);
-    g.rotation.y = THREE.MathUtils.degToRad(item.rotationY || 0);
-    g.userData.furnitureId = item.id;
-    g.userData.fill = fill.material;
-    return g;
+    })));
+    if (solid.length) out.push(new THREE.LineSegments(geo(solid), new THREE.LineBasicMaterial({ color: FURN_PLAN_COLOR })));
+    if (dashed.length) {
+      const o = new THREE.LineSegments(geo(dashed), new THREE.LineDashedMaterial({ color: FURN_PLAN_COLOR, dashSize: 0.05, gapSize: 0.035 }));
+      o.computeLineDistances();
+      out.push(o);
+    }
+    return out;
   }
 
   // All existing model-changing call sites rebuild through this dispatcher, so a
@@ -8794,7 +8801,8 @@ export function setupMR(view, project, getFootprint) {
   ];
   const perfLayers = () => (arch3dOn ? PERF_LAYERS_3D : PERF_LAYERS);
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
-    ext: null, gl: null, active: false, pending: [], source: 'frame', layers: null, calls: new Map(), tris: new Map() };
+    ext: null, gl: null, active: false, pending: [], source: 'frame', layers: null, calls: new Map(), tris: new Map(),
+    allFrames: { n: 0, sum: 0, worst: 0 }, allFps: null };
   function perfRecord(name, ms) {
     const s = perf.samples.get(name) ?? perf.samples.set(name, { sum: 0, n: 0 }).get(name);
     s.sum += ms; s.n++;
@@ -8806,7 +8814,7 @@ export function setupMR(view, project, getFootprint) {
       perf.layers = layers;
       Object.assign(perf, { phase: 0, phaseStart: time });
       perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
-      perf.copyState = ''; perf.reportText = '';
+      perf.copyState = ''; perf.reportText = ''; perf.allFrames = { n: 0, sum: 0, worst: 0 }; perf.allFps = null;
     }
     if (perf.phaseStart < 0) perf.phaseStart = time;
     if (time - perf.phaseStart >= PERF_WINDOW_MS) {
@@ -8814,6 +8822,11 @@ export function setupMR(view, project, getFootprint) {
       const s = perf.samples.get(name);
       if (s?.n) perf.result.set(name, s.sum / s.n);
       perf.samples.delete(name);
+      if (name === 'all' && perf.allFrames.n) {
+        const a = perf.allFrames;
+        perf.allFps = `${Math.round((1000 * a.n) / a.sum)}  (worst ${Math.round(a.worst)} ms)`;
+        perf.allFrames = { n: 0, sum: 0, worst: 0 };
+      }
       perf.phase = (perf.phase + 1) % layers.length;
       perf.phaseStart = time;
       if (perf.phase === 0) perfPrepareReport(); // a full cycle: build the text now, copy on the trigger
@@ -8821,6 +8834,12 @@ export function setupMR(view, project, getFootprint) {
     const settled = time - perf.phaseStart >= PERF_SETTLE_MS;
     perf.current = settled ? layers[perf.phase][0] : null;
     if (!perf.ext && perf.current && dt > 0) perfRecord(perf.current, dt);
+    // The frame rate with everything drawn, for the report (the HUD's fps line is the
+    // last 0.5 s, which at a full cycle falls in the window that hides the whole plan).
+    if (perf.current === 'all' && dt > 0) {
+      const a = perf.allFrames;
+      a.n++; a.sum += dt; a.worst = Math.max(a.worst, dt);
+    }
     const gl = perf.gl;
     while (perf.ext && perf.pending.length) {
       const { query, name } = perf.pending[0];
@@ -8863,7 +8882,7 @@ export function setupMR(view, project, getFootprint) {
     Object.assign(perf, { phase: 0, phaseStart: -1, pending: [], active: false });
     perf.layers = null;
     perf.samples.clear(); perf.result.clear(); perf.calls.clear(); perf.tris.clear();
-    perf.copyState = ''; perf.reportText = '';
+    perf.copyState = ''; perf.reportText = ''; perf.allFrames = { n: 0, sum: 0, worst: 0 }; perf.allFps = null;
     scene.onBeforeRender = perfBeforeRender;
     scene.onAfterRender = perfAfterRender;
   }
@@ -8887,7 +8906,7 @@ export function setupMR(view, project, getFootprint) {
       `house-cad PERF ${BUILD_ID} ${new Date().toISOString()}`,
       `view ${layers === PERF_LAYERS_3D ? '3D' : 'plan'}, mode ${modes[currentMode]?.id}, source ${perf.source}, `
         + `floor ${project.activeFloor?.name ?? '?'}${allFloorsView ? ' (ALL FLOORS)' : ''}`,
-      `fps ${fpsText}; time ${timeText}`,
+      `fps ${perf.allFps ?? '?'} (all drawn); time ${timeText}`,
       `all: ${f1(all)} ms, ${allCalls ?? '?'} calls, ${k(allTris)} tris (both eyes)`,
       '', '## layer: cost (ms, calls, tris) | without it (ms) | content (meshes, tris one pass, materials)',
     ];

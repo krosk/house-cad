@@ -528,7 +528,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   raw time without it, and its content (meshes, triangles, material kinds); in the 3D view the 40
   biggest meshes with their layer and material; the floor's counts (zones, markers, device
   products, dims, finishes, furniture); the renderer (geometries, textures, shader programs), the XR
-  framebuffer size, foveation, frame rate, GPU name and user agent. **It is copied only by the
+  framebuffer size, foveation, frame rate, GPU name and user agent. **Its `fps` line is measured over the `all` window**
+  (everything drawn), marked `(all drawn)` (owner, 2026-10-05: the report said 90 while the headset
+  showed ~50; the line used to be the HUD's last 0.5 s, which at a full cycle is the window that hides
+  the whole plan). The `time:` CPU split is still the HUD's last sample. **It is copied only by the
   trigger that stops PERF** (owner, 2026-10-03): clipboard writes need a user gesture, and that
   trigger's XR `select` event is one (the same activation the EXPORT LINK copy uses). The HUD header
   ends with `trigger to copy` once a full cycle is ready; the mode label flashes `PERF COPIED` or
@@ -1055,6 +1058,12 @@ teleport reticle; no last-active routing remains.
   Owner, 2026-10-03: fps dropped when a radiator and the bin came into view. **Hypothesis:** PBR
   per-pixel shading on large close surfaces was the cost (the products are only 2–11k triangles);
   measure with PROJECT · PERF (`furn` in the 3D list). Desktop View 3D keeps the PBR materials.
+- **Plan furniture pieces are batched** (2026-10-05): the owner's PERF reports on Ground (22 products)
+  gave `all` 19.0 ms (≈53 fps, the owner saw ~50) and 11.4 ms with `furn` hidden (≈88 fps); the plan
+  pieces were 44 meshes (a fill and an outline each), 132 calls. Now `furniturePlanPieces` draws at
+  most 3 objects (fill, solid outline, dashed outline for wall-hung items). **Hypothesis:** this
+  restores most of the 90 fps in plan view; `zones` (12 translucent quads, 4.4 ms) is next if not.
+  Measured with the frame-interval source, which steps 11.1 / 22.2 ms, so read it as over/under budget.
 - **Never add an AR overlay layer as one Mesh/Sprite per item.** Use the existing batch patterns:
   - dim + Z-dim labels: `addDimLabelBatch`, an atlas of 256x64 slots plus `makeBillboardMaterial`;
   - markers: `makeMarkerBatch`, a type+ring glyph atlas, one billboard mesh + one flat mesh;

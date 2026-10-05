@@ -428,6 +428,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] (2026-10-05) PLAN · DIMS: the debug HUD `edge:` line shows the lit edge's zone id, side + length (`r55.bottom · 4.40 m`), nothing when no edge is lit; a conflict readout shows ids in its lines (`#1 c215 …`)
 - [ ] (2026-10-05) A conflicting dimension shows a yellow ⚠ at eye level (1.55 m) on a red stem to its label, visible through walls; it goes when the conflict is fixed; a refused value shows numbered signs (pink stems) over its suspects, matching `#1…` in the readout; frame rate unchanged
 - [ ] (2026-10-05) Conflict routes: the suspects line ends `↕ n routes`; thumbstick down shows `ROUTE 1/n · value · off by` with its dims and light-blue numbered signs over them, again for the next route, then back to the suspects (r59.bottom → r60.bottom 4070: 2 routes, both 3990)
+- [ ] (2026-10-05) PERF on Ground plan view after the furniture batch: `furn` ≈ 6 calls (was 132); `fps … (all drawn)` near 90 (was ≈53 from `all` 19 ms); furniture pieces look as before (fill, outline, notch, dashed when wall-hung)
 - [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W) too; a room's `area:` HUD line adds its watts
 - [ ] Settings survive SAVE/LOAD and an APK relaunch (project data, autosaved)
 - [ ] Not offered in ALL FLOORS
