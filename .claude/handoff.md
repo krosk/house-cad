@@ -20,12 +20,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-05 (session 38, continued many times after context compactions; the Quest was
-back from the evening of 2026-10-04 to 2026-10-05, then unavailable again)
-**Status:** Proven (git, 2026-10-05): `main` = `origin/main`, nothing unpushed; app head `c88ae9a`
-(furniture batch), doc head after it. Tree clean apart from the owner's untracked `Document from Alexis
-He.json`. Proven (the owner's PERF report header, 2026-10-05): the headset ran `4847125`, so items 24–30
-are on it except item 31 (`c88ae9a`, installs over its next launch or two; `update-app` skipped, no
-Quest). **The headset plan changed after our last read** (item 30): read it before any headset work.
+back from the evening of 2026-10-04 to 2026-10-05 morning, then unavailable for the rest of the session)
+**Status:** Proven (git, 2026-10-05 evening): `main` = `origin/main`, nothing unpushed; app head
+`3cabce1` (radiators in HEAT LOSS), doc head after it. Tree clean apart from the owner's untracked
+`Document from Alexis He.json`. Proven (`version.json`, 2026-10-05): Pages served `0078f1b` mid-afternoon.
+The headset last reported `4847125` (PERF header); **items 31–38 have never run on it** (`update-app`
+skipped every time: `adb devices` empty). The owner did see `0078f1b`'s what-if rows on the headset (item
+36), so it updates itself from Pages. **The headset plan changed after our last read** (item 30): read
+it before any headset work.
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
@@ -239,7 +241,7 @@ All owner requests, 2026-10-03.
     - Chrome's GPU canvas cut one row's tiles short, so `unitCanvas` now paints every designed finish
       in software. Proven no slower. Only Vernisse was re-checked; the GPU cause is a Hypothesis.
 
-## What changed late in session 38 (2026-10-04 evening – 10-05, Quest back, then gone)
+## What changed late in session 38 (2026-10-04 evening – 10-05)
 
 > Next agent: fold what is still live into "Standing decisions" or "Findings" and delete the rest.
 
@@ -281,6 +283,34 @@ All owner requests, 2026-10-03.
 31. **Furniture plan pieces batched** (`c88ae9a`): 44 meshes → at most 3 (fill, solid, dashed
     outline); the report's fps now measured with all drawn. Hypothesis: plan view back near 90 fps;
     `zones` (4.4 ms, 12 translucent quads) next if not. Not measured.
+
+Then, with no Quest (2026-10-05 afternoon; all build- or Node-verified only, none seen on device):
+
+32. **PLAN · RULER** (`6247c24`, `3c839ef`; `docs/ar-survey.md`): trigger fixes A at the tip, the readout
+    (X, Y plan axes, Z, DIST) follows the tip, a second trigger freezes, a third restarts. Owner then
+    asked: points move with teleport / left-stick turn (stored planGroup-local) and thicker lines (5 mm
+    tubes, GL lines are 1 px in WebXR). Session-only.
+33. **OUTDOOR rooms** (`3c839ef`; `docs/heat-loss.md`): the owner's unheated glazed veranda next to the
+    kitchen stays a ROOM ("its measurements matter") with `outdoor: true` (PLAN · EDIT A/X on a room;
+    desktop button). Outside for heat loss (b = 1, owner accepted), never merged with an indoor room.
+34. **Owner's thermal facts** (`9f3be4a`, `docs/heat-loss.md`): attic quote ROCKWOOL JETROCK 2, 352 mm
+    settled, R 8 (Proven against Rockwool: λD 0.044, 6.80 kg/m²); slab ≈ 20 cm concrete → bare slab R
+    ≈ 0.09; meulière λ ≈ 1.5 (Hypothesis 1.2–1.8). **None is typed in the headset plan by us**: the owner
+    types them in the AR panel. Also fixed: the panel's "Insulation λ" row label (an i18n key clash).
+35. **What-if switches** (`0078f1b`): HEAT LOSS · WHAT IF (NOT SAVED): wall insulation, attic insulation,
+    windows (single glazing 5.8), reveals insulated; house W + kWh/yr (Degree-days 2200, Hypothesis)
+    and the difference vs as drawn under the title. Cached per project change (~140 ms per house pass).
+36. **Reveals** (`0078f1b`, fixed `3cabce1`): an opening in a wall with exterior insulation adds ψ ·
+    edge · ΔT (Reveal ψ 0.4, 0.08 with the what-if). Owner's windows sit at the indoor face; on
+    `0078f1b` the switch showed no change on the headset because the window had to be drawn into the
+    insulation; now insulation at or within 30 cm of the opening counts. Owner removed the RECESSes
+    (redundant: a window owns its band). Not re-checked by the owner.
+37. **Radiators in HEAT LOSS** (`3cabce1`): catalog radiators carry `powerW`; each room's label reads
+    `<loss> W · rad. <W> W`, a HEATERS line in the breakdown and per floor (green = covers the loss),
+    scaled by Radiator water ΔT (default 50, ^1.3). HEATER zones and radiator markers carry no power.
+38. **Heat pump plan** (owner, docs only, `docs/heat-loss.md`): future heat pump on the existing
+    radiators; method: set the design-day water ΔT (20 ≈ 45/40 °C, 30 ≈ 55/45) and treat the red rooms.
+    Also answered: VMC is the `ach` 0.5 air term (~9 % of the house on the old local file).
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
@@ -614,7 +644,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - **Session 38, later:** `e13576d` heat-loss wall layers + earth level · `d87eb21` conflict suspects ·
   `f857b41` Vernisse edges + software-painted finish textures · `ba5f59e` overlap rule + R or λ ·
   `7e0f3e0` heat map · `b4dc594` RECESS · `1d0bcd3` eye-level conflict signs · `85ef047`/`5c51858` HUD
-  edge id · `c20544c` conflict routes · `c88ae9a` furniture plan pieces batched + PERF fps.
+  edge id · `c20544c` conflict routes · `c88ae9a` furniture plan pieces batched + PERF fps ·
+  `6247c24`/`3c839ef` RULER + OUTDOOR rooms · `9f3be4a` Insulation λ label · `0078f1b` what-if +
+  reveals · `3cabce1` radiators in HEAT LOSS + reveal fix.
 - **Session 35:** `948c5ed` wire rockers (left/right) + pass-through node rejoin · `10c320a` shared
   grip cycle + `i/n` · `a031a0c` FLOOR keeps the teleport · `d481128` pills widen · `ba33078` material
   card.
@@ -661,7 +693,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
 | `src/core/conflicts.js` | `diagnoseConflicts` (suspects), `conflictRoutes` (routes), `isCertain` (0 mm) |
-| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss`, `roomHeatLoss`), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
+| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss(project, floor, without)`, `houseHeatLoss`, `roomHeaters`, `roomHeatLoss`; reveals ψ, OUTDOOR rooms), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
 | `src/core/architectural3d.js` stair part | `stairsGeometry`: `STAIR_RISER` 0.18 (owner), `STAIR_GOING` 0.25 (estimate) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
@@ -698,9 +730,13 @@ Without it: no headset read/write, skip `update-app` and say so.
     finds nothing.
   - A new PERF report on Ground plan view after `c88ae9a` (item 31): `furn` ≈ 6 calls, `fps … (all
     drawn)` near 90. If not, the `zones` layer.
-  - Then the heat-loss items on device (item 25: ⇄ λ, heat map, RECESS) and r170–r175's alignment
-    (item 24, owner's call).
-- **Off the headset:** the heat map's AR 3D version (agreed, item 25); Vernisse and the other designed
+  - Then the heat-loss items on device (item 25: ⇄ λ, heat map; items 33–37: OUTDOOR veranda, what-if
+    line, Reveals insulated now green, `rad.` labels, the panel's height: it grew ~8 rows and may not
+    fit), the RULER (item 32) and r170–r175's alignment (item 24, owner's call). Reading the plan also
+    tells which radiators are products and whether the owner typed attic R 8 / slab R 0.09 / λ 1.5.
+- **Off the headset:** the heat map's AR 3D version (agreed, item 25); offered, not requested: € per year
+  in the what-if line (needs the owner's energy and price), a heat-recovery VMC what-if, the heat
+  pump's design water temperature from a data sheet (item 38); Vernisse and the other designed
   finishes in View 3D Realistic after the switch to software painting (item 23).
 - Never put the owner's share link or plan into the repo: it encodes the owner's house.
 
@@ -825,6 +861,10 @@ Without it: no headset read/write, skip `update-app` and say so.
   - Which value was wrong in the owner's r59 → r60 conflict (item 27); the plan since our last read.
   - Furniture batch's effect on fps (item 31); the warning triangles' size/height in passthrough.
   - Heat loss: `r112` (7 cm, on an exterior edge) and the real earth level are unknown.
+  - Items 32–37 never seen on device; the reveal fix (item 36) not re-checked; the owner's local file
+    has no radiator product and no opening near exterior insulation, so neither is proven on the house.
+    Hypotheses: ψ 0.4 / 0.08, single glazing 5.8, degree-days 2200, radiator exponent 1.3, kWh/yr
+    scaling ground losses linearly; b = 1 for the veranda overstates the kitchen's shared wall.
   - Heat loss: the overlap rule's reading (layer over layer, R per metre) awaits the owner's
     confirmation; Ground ceilings with no room above lose ~3300 W at bare R 0.06 (no roof R set;
     Hypothesis: too high); every floor, Basement included, is set heated.
@@ -855,8 +895,8 @@ Without it: no headset read/write, skip `update-app` and say so.
   U 1.4, door U 2.0, λ 0.04 for the 3 linings until their R is set, basement 6 °C); Node totals with
   defaults (Ground 11.7 kW, Upper 8.4 kW; 8.8 / 4.6 with attic R 7) are not checked against any real
   heating. Next, if asked: exterior/interior edges coloured in HEAT LOSS (offered), stairs merged into
-  their room (offered, declined for now), radiator W against the need (catalog entries carry no W
-  yet; ratings are at ΔT 50 K), window products' Uw, a 22 °C bathroom, a desktop panel.
+  their room (offered, declined for now), ~~radiator W against the need~~ (done, item 37), window
+  products' Uw, a 22 °C bathroom, a desktop panel.
   Session 36 stairs: the 25 cm going; the 7–11 cm per storey no zone covers. Pedal bin estimates:
   pedal height 52 mm (photos 43 vs 61), spacing ±145 mm, handle width, corner radius.
   Session 36 estimates: ACOVA bar end positions (±3 mm, photos), the 1728 mm size's bracket rules

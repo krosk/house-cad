@@ -201,6 +201,12 @@ red when not), and this floor's line under the title. HEATER zones and radiator 
 power (not counted). **Proven** (Node): a 4 × 4 m room losing 4685 W with the 50 × 200 EASY (1730 W):
 1730 W at ΔT 50, 891 W at 30. The owner's local file has no radiator product.
 
+Owner plan (2026-10-05): a **future heat pump** on the existing radiators. Method agreed: set Radiator
+water ΔT to the design-day value (20 ≈ water 45/40 °C, 30 ≈ 55/45 °C) and treat the rooms that turn
+red (insulation or more radiator surface) so the water can stay as cool as possible. **Hypothesis**
+(typical air-to-water figures, a data sheet would prove them): SCOP ~4.5–5 at 35 °C, ~3.2–3.6 at 55 °C;
+a weather-compensated pump needs the design temperature only on the coldest days.
+
 ## What if: is the insulation worth it? (owner, 2026-10-05)
 
 Owner: "a toggle for all wall insulations, all attic insulations … whether insulation is worth it",
