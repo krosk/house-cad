@@ -20,11 +20,10 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-04 (session 38, continued five times after context compactions; the Quest came back late in it)
-**Status:** Proven (git): everything is pushed in one commit after `f857b41` (item 24: heat-loss
-overlap rule + per-zone λ); the tree is clean apart from the owner's untracked `Document from Alexis
-He.json`. Proven (`update-app` output, 2026-10-04 evening): the headset app holds `f857b41` (items
-21–23) for its next launch; item 24's build is not yet installed (run `update-app` with the browser in
-front of the wearer). The headset autosave holds the slabs, the IKEA kitchen and the owner's own
+**Status:** Proven (git): everything is pushed; head `7e0f3e0` (item 24: heat-loss overlap rule,
+per-zone λ, the HEAT LOSS heat map); the tree is clean apart from the owner's untracked `Document from
+Alexis He.json`. Proven (`update-app` output, 2026-10-05): the headset app holds `7e0f3e0` for its next
+launch; none of item 24 has been seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
 later edits (item 24), plus five Ground dimensions re-added by us (item 24). Proven (`am broadcast`
 result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
 normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
@@ -562,6 +561,9 @@ All owner requests, 2026-10-03.
     - **Overlapping layers: the larger R prevails** (owner rule; `layerStack` in
       `src/core/heatLoss.js`, `docs/heat-loss.md`). Interpretation (Hypothesis, to confirm): layer zones
       overlapping across the wall's depth, compared on R per metre.
+    - **Heat map** in HEAT LOSS (`7e0f3e0`; `docs/heat-loss.md` "Where the heat goes"): wall strips,
+      floor/ceiling tint, readout under the reticle. Agreed next: the same map on the wall faces in
+      the AR 3D view, band by band at real height (not started).
     - **R or λ per zone** (owner: "a dual option"): `rect.lambda` (W/mK) beside `rValue`, exclusive;
       SWAP on the AR numpad toggles. Build + Node only; not tried on the headset.
     - Owner's living-room lining is polystyrene + 13 mm plaster, label R not yet given (parked by the
@@ -673,6 +675,7 @@ owner each session whether it is available).
     give the two edges + value and we run `diagnoseConflicts` on a fresh read.
   - Re-align r170–r175 to the walls that moved 15.8 mm (item 24), owner's call.
   - HEATING · R / U: the ⇄ λ toggle, and the label R of the living-room lining (item 24).
+  - HEAT LOSS heat map on device (item 24), then build its AR 3D version.
 - **Off the headset:** Vernisse and the other designed finishes in View 3D Realistic after the switch
   to software painting (item 23; Hypothesis: they look the same or cleaner).
 - Never put the owner's share link or plan into the repo: it encodes the owner's house.
