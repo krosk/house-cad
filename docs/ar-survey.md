@@ -331,6 +331,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   ground), λ for an insulation zone with no R). The room breakdown adds `walls in earth` m² when any. Ray on a row + thumbstick-y steps it (up = more); trigger toggles HEATED or resets a value to its
   default (defaults grey, authored values orange). Aiming the floor shows the room under the reticle
   broken down by surface. Settings are project data (saved, autosaved). Not offered in ALL FLOORS.
+  **Heat map** (owner, 2026-10-04): one colour scale in W/m² (blue 0, yellow 50, red 100+, grey = no
+  loss). Each exterior wall's 5 cm columns are a strip 2–10 cm outside its room edge (the column's
+  average over the room height), plus a thin outer strip at 11–14 cm where an opening cuts the wall
+  (the opening's own W/m²). The floor or the ceiling of each room is tinted piece by piece by what lies
+  across it; thumbstick-y off the panel switches FLOOR ⇄ CEILING (default CEILING). The readout follows
+  the reticle: a wall column's average, then its bands (wall U, W/m², R of its layers or "no wall
+  drawn"; opening U, W/m², sill–head; in earth U, W/m²); a floor/ceiling piece's kind, U, W/m², area
+  and watts; else the room's parts; else the legend.
 - **HEATING · R / U** (`id: heat_r`) — every WALL and INSULATION zone of the active floor shows its R
   (m²K/W; grey `≈` = drawn depth / the wall or insulation λ) and every WINDOW / SLIDING / DOOR / GARAGE zone its U (W/m²K, the
   label's Uw / Ud; grey `≈` = the project's Window or Door U); orange = typed. The readout names the

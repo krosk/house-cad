@@ -24,7 +24,7 @@ import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
-import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners } from '../core/geometry2d.js';
+import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
@@ -1916,15 +1916,134 @@ export function setupMR(view, project, getFootprint) {
   // (an L-shaped room's box centre can fall outside it). Rebuilt with the plan.
   let heatRooms = [];      // floorHeatLoss of the active floor, rebuilt with the labels
   let heatHoverRoom = null; // the room under the reticle in HEAT LOSS
+  let heatHoverCol = null, heatHoverPiece = null; // the wall column / floor-ceiling piece under it
+  let heatSurface = 'ceiling'; // which of floor / ceiling the heat map tints (thumbstick)
   function addHeatLabels(floor) {
     const area = (r) => Math.abs(r.w * r.h);
     heatRooms = floorHeatLoss(project, floor);
-    heatHoverRoom = null;
+    heatHoverRoom = heatHoverCol = heatHoverPiece = null;
+    addHeatMap();
     const labels = heatRooms.map((room) => {
       const big = room.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m)).bounds;
       return makeDimLabel(`${Math.round(room.total)} W`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
     });
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
+  }
+
+  // Where the heat goes (owner, 2026-10-04: "see at a glance where I lose heat"; docs/heat-loss.md
+  // "Where the heat goes"): one colour scale in W/m² for every surface. Each exterior wall's
+  // 5 cm columns are a strip just outside its edge (the column's average over its height),
+  // with a thinner outer strip at an opening's own W/m²; the floor or the ceiling
+  // (thumbstick) tints each room piece by what lies across it. Grey = no loss.
+  const HEAT_MAP_MAX = 100; // W/m² at full red (a bare ceiling under the roof is ≈100)
+  const HEAT_STRIP = [0.02, 0.10], HEAT_OPEN_STRIP = [0.11, 0.14]; // m outward from the edge
+  const heatColor = (() => {
+    const stops = [[0, [0x3b, 0x82, 0xf6]], [0.5, [0xfa, 0xcc, 0x15]], [1, [0xef, 0x44, 0x44]]];
+    const none = new THREE.Color(0x64748b), c = new THREE.Color();
+    return (wm2) => {
+      if (!(wm2 > 0.05)) return none;
+      const t = Math.min(1, wm2 / HEAT_MAP_MAX);
+      const i = t <= 0.5 ? 0 : 1, [t0, a] = stops[i], [t1, b] = stops[i + 1], k = (t - t0) / (t1 - t0);
+      return c.setRGB(...a.map((v, j) => (v + (b[j] - v) * k) / 255), THREE.SRGBColorSpace);
+    };
+  })();
+  const heatMapMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide });
+  const heatStripMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  function addHeatMap() {
+    // Floor / ceiling pieces.
+    for (const room of heatRooms) for (const piece of room.map[heatSurface]) {
+      const geo = footprintFloorGeometry(piece.poly);
+      if (!geo) continue;
+      const col = heatColor(piece.wm2), n = geo.attributes.position.count, arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) arr.set([col.r, col.g, col.b], i * 3);
+      geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+      const mesh = new THREE.Mesh(geo, heatMapMat);
+      mesh.position.y = 0.0008; // over the room fill, under the zone tints
+      planGroup.add(mesh);
+    }
+    // Wall strips: consecutive columns of one edge in one colour step become one quad.
+    const pos = [], colr = [];
+    const quad = (c0, c1, d0, d1, wm2) => {
+      const { nx, ny } = c0, col = heatColor(wm2);
+      const p = [[c0.x0 + nx * d0, c0.y0 + ny * d0], [c1.x1 + nx * d0, c1.y1 + ny * d0],
+        [c1.x1 + nx * d1, c1.y1 + ny * d1], [c0.x0 + nx * d1, c0.y0 + ny * d1]];
+      for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(p[k][0], 0, -p[k][1]); colr.push(col.r, col.g, col.b); }
+    };
+    const runs = (cols, val, d) => {
+      let start = null, startV = null, prev = null;
+      const flush = () => { if (start) quad(start, prev, d[0], d[1], startV); start = null; };
+      for (const c of cols) {
+        const v = val(c);
+        const same = start && prev && v != null && Math.abs(v - startV) < 2 && prev.nx === c.nx && prev.ny === c.ny
+          && Math.abs(prev.x1 - c.x0) < 1e-6 && Math.abs(prev.y1 - c.y0) < 1e-6;
+        if (!same) { flush(); if (v != null) { start = c; startV = v; } }
+        prev = c;
+      }
+      flush();
+    };
+    for (const room of heatRooms) {
+      runs(room.map.wall, (c) => c.wm2, HEAT_STRIP);
+      runs(room.map.wall, (c) => c.bands.find((b) => b.kind === 'opening')?.wm2 ?? null, HEAT_OPEN_STRIP);
+    }
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+    const mesh = new THREE.Mesh(geo, heatStripMat);
+    mesh.position.y = 0.0045; // over the zone edge strips
+    planGroup.add(mesh);
+  }
+  // The wall column under plan point (px, py): within the strips outside its edge.
+  function heatColumnAt(px, py) {
+    for (const room of heatRooms) for (const c of room.map.wall) {
+      const ex = c.x1 - c.x0, ey = c.y1 - c.y0, len2 = ex * ex + ey * ey;
+      const t = ((px - c.x0) * ex + (py - c.y0) * ey) / len2;
+      const d = (px - c.x0) * c.nx + (py - c.y0) * c.ny;
+      if (t >= 0 && t < 1 && d >= 0 && d <= HEAT_OPEN_STRIP[1] + 0.02) return { room, col: c };
+    }
+    return null;
+  }
+  const inRing = (ring, x, y) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  function heatPieceAt(px, py) {
+    for (const room of heatRooms) for (const piece of room.map[heatSurface]) {
+      if (piece.poly.some((poly) => inRing(poly[0], px, py) && !poly.slice(1).some((h) => inRing(h, px, py)))) {
+        return { room, piece, area: multiPolygonArea(piece.poly) };
+      }
+    }
+    return null;
+  }
+  // The readout in HEAT LOSS: the column / piece under the reticle, else the room's parts.
+  function heatMapLines() {
+    const W = (v) => `${Math.round(v)} W/m²`, U = (v) => `U ${v.toFixed(2)}`;
+    if (heatHoverCol) {
+      const c = heatHoverCol.col;
+      const lines = [`${t('heat.map.wall')} · ${W(c.wm2)}`];
+      for (const b of c.bands) {
+        if (b.kind === 'wall') lines.push(`${t('heat.map.wallBand')} ${U(b.u)} · ${W(b.wm2)} · R ${c.r.toFixed(2)}${c.walled ? '' : ` (${t('heat.map.placeholder')})`}`);
+        else if (b.kind === 'opening') lines.push(`${t('heat.map.opening')} ${U(b.u)} · ${W(b.wm2)} · ${fmt(b.sill)}–${fmt(b.head)}`);
+        else lines.push(`${t('heat.map.earth')} ${U(b.u)} · ${W(b.wm2)}`);
+      }
+      return lines;
+    }
+    if (heatHoverPiece) {
+      const { piece, area } = heatHoverPiece;
+      return [`${t(heatSurface === 'floor' ? 'heat.map.floor' : 'heat.map.ceiling')} · ${t(`heat.map.${piece.what === 'earth' || piece.what === 'air' ? `${piece.what}_` : piece.what}`)}`,
+        `${U(piece.u)} · ${W(piece.wm2)} · ${area.toFixed(1)} m² → ${Math.round(piece.wm2 * area)} W`];
+    }
+    if (heatHoverRoom) {
+      const p = heatHoverRoom.parts, r = Math.round;
+      return [`${r(heatHoverRoom.total)} W`,
+        `${t('heat.map.walls')} ${r(p.wall)} · ${t('heat.map.openings')} ${r(p.opening)} · ${t('heat.map.air')} ${r(p.air)}`,
+        `${t('heat.map.floor')} ${r(p.floor)} · ${t('heat.map.ceiling')} ${r(p.ceiling)}`];
+    }
+    return [t('heat.map.legend'), t(heatSurface === 'floor' ? 'heat.map.showingFloor' : 'heat.map.showingCeiling')];
   }
 
   // HEATING · R / U: the thermal value each zone carries (core/heatLoss.js): a WALL or
@@ -7818,7 +7937,7 @@ export function setupMR(view, project, getFootprint) {
     else hideUnitMenu();
     if (m.id === 'export') showExportMenu();
     else hideExportMenu();
-    heatSelZone = heatHoverZone = heatHoverRoom = null;
+    heatSelZone = heatHoverZone = heatHoverRoom = heatHoverCol = heatHoverPiece = null;
     const labels = m.id === 'heat' ? 'w' : m.id === 'heat_r' ? 'r' : null;
     if (heatLabels !== labels) { // HEATING plan labels (room watts / zone R)
       heatLabels = labels;
@@ -8935,7 +9054,10 @@ export function setupMR(view, project, getFootprint) {
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
-      else if (modeId === 'heat') { if (hoverHeatRow) changeHeatRow(hoverHeatRow, stickY < 0 ? 1 : -1); } // up = more
+      else if (modeId === 'heat') { // up = more on a settings row; elsewhere FLOOR ⇄ CEILING
+        if (hoverHeatRow) changeHeatRow(hoverHeatRow, stickY < 0 ? 1 : -1);
+        else { heatSurface = heatSurface === 'floor' ? 'ceiling' : 'floor'; buildPlan(); applyPlanMatrix(); }
+      }
       else if (modeId === 'export') { // point at Compare/Language → cycle that; else format
         if (hoverExportAction === 'baseline') cycleExportBaseline(stickY < 0 ? -1 : 1);
         else if (hoverExportAction === 'lang') cycleExportLang(stickY < 0 ? -1 : 1);
@@ -9161,6 +9283,8 @@ export function setupMR(view, project, getFootprint) {
     const heatRStatus = modes[currentMode].id === 'heat_r'
       ? (heatSelZone || heatHoverZone ? heatZoneLines(heatSelZone || heatHoverZone).join('\n') : t('heat.aimZone'))
       : null;
+    // HEATING · HEAT LOSS: the heat map's value under the reticle.
+    const heatStatus = modes[currentMode].id === 'heat' && !hoverHeatRow ? heatMapLines().join('\n') : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
       ? t(translateTargets.x ? 'translate.pickY' : translateTargets.y ? 'translate.pickX' : 'translate.pickAny')
       : null;
@@ -9172,7 +9296,7 @@ export function setupMR(view, project, getFootprint) {
     const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const mergeHint = modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)
       ? `\n${t('marker.mergePair')}` : '';
-    const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus
+    const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || heatStatus
       || (conflictReadout ? conflictReadout.map(([text]) => text).join('\n') : hovDim);
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
@@ -9183,7 +9307,7 @@ export function setupMR(view, project, getFootprint) {
         : wireLengths ? [wireTypeColor(selectedRoutedWire), wireTypeColor(selectedRoutedWire),
           wireTypeColor({ type: wireLengths.otherType })]
         : wireTypeColor(selectedRoutedWire || { type: currentWireType }))
-      : exportStatus ? C_EXPORT : heatRStatus ? 0xfb923c
+      : exportStatus ? C_EXPORT : heatRStatus || heatStatus ? 0xfb923c
       : conflictReadout ? conflictReadout.map(([, color]) => color) : 0x38bdf8;
     // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
     // In WIRE, a grip cycle of 2+ devices/wires shows the target's `i/n` there instead
@@ -10111,10 +10235,15 @@ export function setupMR(view, project, getFootprint) {
         const { px, py } = worldToPlan(hit);
         const inside = (r) => { const b = r.bounds; return px > b.x0 && px < b.x1 && py > b.y0 && py < b.y1; };
         if (modeId === 'heat_r') heatHoverZone = project.rectangles.find((r) => isThermalZone(r) && inside(r)) || null;
-        else heatHoverRoom = heatRooms.find((room) => room.rectangles.some(inside)) || null;
+        else {
+          heatHoverCol = heatColumnAt(px, py);
+          heatHoverPiece = heatHoverCol ? null : heatPieceAt(px, py);
+          heatHoverRoom = heatHoverCol?.room || heatHoverPiece?.room
+            || heatRooms.find((room) => room.rectangles.some(inside)) || null;
+        }
       } else {
         reticle.visible = false;
-        if (!panelHit && !hoverKey) heatHoverRoom = heatHoverZone = null; // aiming at a panel keeps it shown
+        if (!panelHit && !hoverKey) heatHoverRoom = heatHoverZone = heatHoverCol = heatHoverPiece = null; // aiming at a panel keeps it shown
       }
       const lit = heatSelZone || heatHoverZone;
       if (lit) showRectOutline(lit, heatSelZone ? 0xfbbf24 : 0xfb923c);

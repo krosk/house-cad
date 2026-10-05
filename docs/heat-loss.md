@@ -133,6 +133,23 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned (λ ≈ 0.045; set R when known) |
 
+## Where the heat goes: the heat map (owner, 2026-10-04)
+
+Owner: "see at a glance where I lose heat, whether floor, wall, or ceiling", values shown "as the
+reticle pass over them". Everything in W/m² on one scale so walls, floor and ceiling compare.
+- `floorHeatLoss` returns each room's `map`: `wall` = every 5 cm column of exterior wall with its
+  bands (`wall` in air, `opening` sill–head, `earth` below the earth level), each with U and W/m², and
+  the column's average W/m² over the room height; `floor` / `ceiling` = the room's footprint cut by
+  what lies across (`heated` 0, `unheated`, `earth`, `air`, `attic`), each with U and W/m².
+  **Proven** (Node on the headset plan, 2026-10-04): the map's watts add back to every room's parts on
+  all three floors (mismatch < 1e-11 W); totals unchanged.
+- Plan (AR HEATING · HEAT LOSS, `docs/ar-survey.md`): a wall's column collapses to one colour (its
+  average) plus an opening strip; the height split is in the readout. **Next (agreed, not built):** the
+  same map painted on the wall faces in the AR 3D view, band by band at their real height.
+- Seen on first render (offline, Node → SVG with the same geometry): the 7 cm wall r112 shows red
+  (≈100 W/m², counted as the whole exterior wall); Ground ceilings with nothing above are red (bare R
+  0.06, no roof R set).
+
 UI: the HEATING group (owner, 2026-10-01: pipes, heat loss and R together), `docs/ar-survey.md`:
 HEATING · HEAT LOSS (room watts + settings) and HEATING · R / U (each insulation zone's R and each
 opening's U, typed on the numpad; an insulation R also on the PLAN · EDIT band pad). The room's watts also show on the PLAN · EDIT `area:`

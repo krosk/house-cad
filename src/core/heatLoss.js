@@ -128,7 +128,7 @@ export function buriedWallU(z, wallR, dt) {
 }
 
 function wallLoss(floor, comp, s, fh, dT) {
-  const out = { wall: 0, opening: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0 };
+  const out = { wall: 0, opening: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0, samples: [] };
   const H = ceilingHeight(floor); // the room's walls, below the slab
   // Below the earth: the part of each wall under it loses to the ground at the annual
   // mean temperature (EN 12831's fg1 · fg2 · ΔT, as for a slab on earth).
@@ -188,9 +188,22 @@ function wallLoss(floor, comp, s, fh, dT) {
           const wallA = ds * Math.max(0, H - openH), openA = ds * openH, airA = Math.max(0, wallA - earthA);
           out.wallArea += wallA; out.openingArea += openA; out.earthArea += earthA;
           if (insulated) out.insulated += wallA;
-          out.wall += airA * u * dT;
-          if (earthA > 0) out.wall += earthA * buriedWallU(z, r, dt) * groundDT;
-          out.opening += openA * openU * dT;
+          const uEarth = earthA > 0 ? buriedWallU(z, r, dt) : 0;
+          const wAir = airA * u * dT, wEarth = earthA * uEarth * groundDT, wOpen = openA * openU * dT;
+          out.wall += wAir + wEarth;
+          out.opening += wOpen;
+          // The heat map (docs/heat-loss.md "Where the heat goes"): this 5 cm column of
+          // wall, its bands (W/m² each) and the whole column's W/m².
+          const bands = [];
+          if (airA > EPS) bands.push({ kind: 'wall', area: airA, u, wm2: u * dT });
+          if (openA > EPS) bands.push({ kind: 'opening', area: openA, u: openU, wm2: openU * dT, sill: openSill, head: openSill + openH });
+          if (earthA > EPS) bands.push({ kind: 'earth', area: earthA, u: uEarth, wm2: uEarth * groundDT });
+          out.samples.push({
+            x0: ax + (bx - ax) * (k / n), y0: ay + (by - ay) * (k / n),
+            x1: ax + (bx - ax) * ((k + 1) / n), y1: ay + (by - ay) * ((k + 1) / n),
+            nx, ny, r, insulated, walled, bands,
+            w: wAir + wEarth + wOpen, wm2: H > 0 ? (wAir + wEarth + wOpen) / (ds * H) : 0,
+          });
         }
       }
     }
@@ -213,11 +226,25 @@ function splitByNeighbour(foot, neighbour) {
   };
 }
 
+// The pieces of a room's footprint by what lies across its floor or ceiling, as
+// polygons for the heat map: [{ poly (MultiPolygon), what: 'heated' | 'unheated' | 'none' }].
+function neighbourPieces(foot, neighbour) {
+  const nfoot = neighbour ? computeFootprint(spacesOf(neighbour)) : [];
+  if (!nfoot.length) return [{ poly: foot, what: 'none' }];
+  const over = polygonClipping.intersection(foot, nfoot), rest = polygonClipping.difference(foot, nfoot);
+  const out = [];
+  if (over.length) out.push({ poly: over, what: floorHeat(neighbour).heated ? 'heated' : 'unheated' });
+  if (rest.length) out.push({ poly: rest, what: 'none' });
+  return out;
+}
+
 /**
  * Heat loss of every room of `floor`, or [] for an unheated floor. Each result:
  * { ids, rectangles, area, volume, dT, total, parts: {wall, opening, floor, ceiling, air},
- *   detail: { wallArea, openingArea, insulatedArea, earthArea, below, above } } — watts and m².
- * wallArea includes earthArea, the part of it below the earth level.
+ *   detail: { wallArea, openingArea, insulatedArea, earthArea, below, above },
+ *   map: { wall: [5 cm columns], floor: [pieces], ceiling: [pieces] } } — watts and m².
+ * wallArea includes earthArea, the part of it below the earth level. A map piece is
+ * { poly, what ('heated' | 'unheated' | 'earth' | 'air' | 'attic'), u, wm2 }.
  */
 export function floorHeatLoss(project, floor) {
   const s = heatSettings(project), fh = floorHeat(floor);
@@ -244,8 +271,20 @@ export function floorHeatLoss(project, floor) {
     // Ceiling: under a heated room 0; under an unheated floor b; otherwise the attic
     // (counted as outside, the safe side) with this floor's added insulation.
     const uCeiling = 1 / (RS_CEILING + s.ceilingR + fh.ceilingR);
-    const ceilingW = up.unheated * (1 / (RS_CEILING + s.slabR + aboveH.floorR)) * dT * b(up.temp ?? s.tOut)
+    const uCeilingUnheated = 1 / (RS_CEILING + s.slabR + aboveH.floorR);
+    const ceilingW = up.unheated * uCeilingUnheated * dT * b(up.temp ?? s.tOut)
       + up.none * uCeiling * dT;
+    const floorMap = neighbourPieces(foot, below).map(({ poly, what }) => {
+      if (what === 'heated') return { poly, what, u: 0, wm2: 0 };
+      if (what === 'unheated') return { poly, what, u: uFloorUnheated, wm2: uFloorUnheated * dT * b(dn.temp ?? s.tOut) };
+      return onEarth ? { poly, what: 'earth', u: uGround, wm2: FG1 * fg2 * uGround * dT }
+        : { poly, what: 'air', u: uFloorAir, wm2: uFloorAir * dT };
+    });
+    const ceilingMap = neighbourPieces(foot, above).map(({ poly, what }) => {
+      if (what === 'heated') return { poly, what, u: 0, wm2: 0 };
+      if (what === 'unheated') return { poly, what, u: uCeilingUnheated, wm2: uCeilingUnheated * dT * b(up.temp ?? s.tOut) };
+      return { poly, what: 'attic', u: uCeiling, wm2: uCeiling * dT };
+    });
     const volume = comp.area * ceilingHeight(floor);
     const air = 0.34 * s.ach * volume * dT;
     const parts = { wall: w.wall, opening: w.opening, floor: floorW, ceiling: ceilingW, air };
@@ -258,6 +297,7 @@ export function floorHeatLoss(project, floor) {
         below: { ...dn, onEarth },
         above: up,
       },
+      map: { wall: w.samples, floor: floorMap, ceiling: ceilingMap },
     };
   });
 }
