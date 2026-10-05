@@ -6630,7 +6630,7 @@ export function setupMR(view, project, getFootprint) {
   const heatRIsLayer = () => heatSelZone && thermalOf(heatSelZone).sym === 'R';
   const heatRTitle = () => heatSelZone
     ? `${t(`mode.${zoneKindOf(heatSelZone)}`)} · ${t(!heatRIsLayer() ? 'heat.uValue'
-      : heatRField === 'lambda' ? 'heat.lambda' : 'heat.rValue')}` : '';
+      : heatRField === 'lambda' ? 'heat.lambdaField' : 'heat.rValue')}` : '';
   const redrawHeatRPad = () => numpad.draw(heatRTitle(), heatRBuffer, hoverKey,
     heatRIsLayer() ? `⇄ ${heatRField === 'lambda' ? 'R' : 'λ'}` : null, t('heat.clear'));
   const heatRLoad = () => {
@@ -7195,7 +7195,7 @@ export function setupMR(view, project, getFootprint) {
   const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue', 'lambda'] : verticalBandFields(rect));
   const rectHasBand = (rect) => bandFields(rect).length > 0;
   // Field labels are namespaced by which band the field belongs to.
-  const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambda')
+  const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambdaField')
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
   const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;

@@ -142,9 +142,9 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | undrawn wall depth | 0.20 m | placeholder where no WALL zone is drawn (owner, 2026-10-04) |
 | wall λ (no R) | 0.8 W/mK | Hypothesis: masonry unknown (owner knows thickness, not material); 20 cm → R 0.25 |
 | window / door U | 1.4 / 2.0 | Hypothesis: recent double glazing / ordinary door |
-| bare slab R | 0.15 | Hypothesis: owner does not know the slab construction |
+| bare slab R | 0.15 | owner (2026-10-05): concrete slab about 20 cm → R ≈ 0.09 (0.20 / λ 2.3, reinforced; Hypothesis: reinforcement assumed, 0.11 if plain at λ 1.75); to type in the AR panel, the default stays generic |
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
-| per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned (λ ≈ 0.045; set R when known) |
+| per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
 ## Recesses: a window's reveal through a thick wall (owner, 2026-10-05)
 
