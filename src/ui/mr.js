@@ -9436,9 +9436,9 @@ export function setupMR(view, project, getFootprint) {
         // PROJECT · HEAT LOSS.
         ...(modeId === 'edit' && roomAreaHud != null
           ? [`area:   ${roomAreaHud.toFixed(2)} m²${roomHeatHud ? ` · ${Math.round(roomHeatHud.total)} W` : ''}`] : []),
-        // The highlighted edge's zone id (owner, 2026-10-05: "just show the static rxxx name
-        // of the edge I am highlighting"), then its length.
-        ...(edgeM != null ? [`edge:   ${edgeRef.rectId} · ${fmt(edgeM)} ${unitLabel()}`] : []),
+        // The highlighted edge's zone id and side (owner, 2026-10-05: "the static rxxx name
+        // of the edge I am highlighting", "it also needs the edge label"), then its length.
+        ...(edgeM != null ? [`edge:   ${edgeRef.rectId}.${edgeRef.edge} · ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
       // ?perf: keep build/fps/draw and give the rest of the panel to the layer sweep.

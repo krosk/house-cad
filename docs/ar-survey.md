@@ -97,9 +97,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. The origin target is tested in plan space, so it remains aligned with the visible
   origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
-  **Internal names** (owner, 2026-10-05: "just show the static rxxx name of the edge I am highlighting"):
-  the debug HUD's `edge:` line shows the highlighted edge's zone id, then its length (`edge: r55 ·
-  4.40 m`), in EDGE and every DIMS mode, only while an edge is lit. (A first version put a longer id line
+  **Internal names** (owner, 2026-10-05: "just show the static rxxx name of the edge I am highlighting", "it also needs the edge label"):
+  the debug HUD's `edge:` line shows the highlighted edge's zone id, then its length (`edge:
+  r55.bottom · 4.40 m`), in EDGE and every DIMS mode, only while an edge is lit. (A first version put a longer id line
   in the readout pill; the owner found it confusing, it showed a stale picked/aimed state, and it was
   removed.) The conflict readout keeps ids in its lines: the hovered dimension's id, each suspect as
   `#1 c215 15 → 0`.
