@@ -406,6 +406,12 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Basement STAIRS UP (7 treads to 1.26 m) + Ground STAIRS DOWN (5 treads to −0.90 m) match the real basement stair
 - [ ] Tread depth (25 cm assumed) against the real treads; the same treads in desktop View 3D
 
+## HEAT LOSS · WHAT IF  ⬜ NEW (2026-10-05) — Node-verified only
+- [ ] The panel shows HOUSE W · kWh/yr under the title, and "All insulation and windows counted"
+- [ ] Wall insulation / Attic insulation / Windows → no: the room labels and heat map change, a red "vs all counted" line appears; back to yes removes it
+- [ ] A window drawn through the outdoor insulation: the room's openings rise (≈ 10 W per metre of edge at ψ 0.4); Reveals insulated → yes gives a green saving line
+- [ ] Reload: the switches are back to yes; the panel still fits in view (it grew by four rows)
+
 ## OUTDOOR room (veranda)  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] PLAN · EDIT: select the veranda room, A/X → TYPE reads `OUTDOOR ROOM`; A/X again → `ROOM`
 - [ ] HEAT LOSS: the veranda shows no watts; the kitchen's wall to it now loses heat; the EDIT area of the veranda and the kitchen are separate

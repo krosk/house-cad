@@ -52,7 +52,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { floorHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
+import { floorHeatLoss, houseHeatLoss, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -768,11 +768,12 @@ export function setupMR(view, project, getFootprint) {
   // floor's total, then one row per setting (`rows`, see HEAT_ROWS), grouped under
   // THIS FLOOR / WHOLE HOUSE headers. A row is aimed with the ray; the caller changes it.
   function makeHeatMenu(rows) {
-    const W = 512, TITLE_H = 116, HEAD_H = 44, ROW_H = 50;
+    const W = 512, TITLE_H = 196, HEAD_H = 44, ROW_H = 50;
     const layout = [];
     let y = TITLE_H;
+    const section = (row) => (row.whatIf ? 'heat.whatIf' : row.floor ? 'heat.floor' : 'heat.project');
     rows.forEach((row, i) => {
-      if (i === 0 || rows[i - 1].floor !== row.floor) { layout.push({ head: row.floor ? 'heat.floor' : 'heat.project', y }); y += HEAD_H; }
+      if (i === 0 || section(rows[i - 1]) !== section(row)) { layout.push({ head: section(row), y }); y += HEAD_H; }
       layout.push({ row, y }); y += ROW_H;
     });
     const ROOM_Y = y + 10, ROOM_H = 150; // the room under the reticle: watts by surface
@@ -794,7 +795,8 @@ export function setupMR(view, project, getFootprint) {
       return layout.find((l) => l.row && cy >= l.y && cy < l.y + ROW_H)?.row.key ?? null;
     }
     // values: key → { text, set (authored, not the default), dim (inactive) }.
-    function draw(accent, hoverKey, floorName, totalW, values, room, zoneLines = null) {
+    // house: { now: {watts, kwh}, full: {watts, kwh} | null (nothing taken away) }.
+    function draw(accent, hoverKey, floorName, totalW, values, room, zoneLines = null, house = null) {
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(15,18,24,0.96)';
       ctx.beginPath(); ctx.roundRect(0, 0, W, H, 24); ctx.fill();
@@ -805,6 +807,22 @@ export function setupMR(view, project, getFootprint) {
       ctx.fillText(floorName, 26, 88);
       ctx.textAlign = 'right'; ctx.fillStyle = accent;
       ctx.fillText(totalW == null ? '—' : `${t('heat.total')} ${Math.round(totalW)} W`, W - 26, 88);
+      if (house) { // the whole house, and what the "what if" rows add to it
+        const n = (v) => Math.round(v).toLocaleString('fr-FR');
+        ctx.textAlign = 'left'; ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = '#e6edf3';
+        ctx.fillText(`${t('heat.house')}  ${n(house.now.watts)} W · ${n(house.now.kwh)} ${t('heat.kwhYear')}`, 26, 132);
+        ctx.font = '22px sans-serif';
+        if (house.full) {
+          const dw = house.now.watts - house.full.watts, dk = house.now.kwh - house.full.kwh;
+          const pct = house.full.watts > 0 ? Math.round(100 * dw / house.full.watts) : 0;
+          const sg = (v) => (v >= 0 ? '+' : '−');
+          ctx.fillStyle = dw > 0 ? '#f87171' : '#4ade80'; // red = loses more, green = saves
+          ctx.fillText(`${t('heat.vsAll')}  ${sg(dw)}${n(Math.abs(dw))} W (${sg(dw)}${Math.abs(pct)} %) · ${sg(dk)}${n(Math.abs(dk))} ${t('heat.kwhYear')}`, 26, 168);
+        } else {
+          ctx.fillStyle = '#768390';
+          ctx.fillText(t('heat.allCounted'), 26, 168);
+        }
+      }
       for (const l of layout) {
         if (l.head) {
           ctx.textAlign = 'left'; ctx.fillStyle = '#768390'; ctx.font = 'bold 22px sans-serif';
@@ -1189,6 +1207,12 @@ export function setupMR(view, project, getFootprint) {
   // PROJECT · HEAT LOSS (docs/heat-loss.md). `floor` rows edit the active floor's
   // settings; the others are whole-house. Steps are one thumbstick flick.
   const HEAT_ROWS = [
+    // "What if" (owner, 2026-10-05: "whether insulation is worth it"): take one kind away;
+    // session-only, never saved (heatWithout). yes = counted as drawn.
+    { key: 'wallIns', whatIf: true, toggle: true },
+    { key: 'atticIns', whatIf: true, toggle: true },
+    { key: 'windows', whatIf: true, toggle: true },
+    { key: 'reveals', whatIf: true, toggle: true, adds: true }, // yes = reveals insulated (an improvement)
     { key: 'heated', floor: true, toggle: true },
     { key: 'temp', floor: true, step: 1, min: -15, max: 25, unit: '°C' },
     { key: 'floorR', floor: true, step: 0.5, min: 0, max: 15, r: true },
@@ -1203,6 +1227,8 @@ export function setupMR(view, project, getFootprint) {
     { key: 'slabR', step: 0.05, min: 0, max: 5, r: true },
     { key: 'earth', step: 0.05, min: -6, max: 6, unit: 'm' },
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
+    { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
+    { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
   const heatMenu = makeHeatMenu(HEAT_ROWS);
   scene.add(heatMenu.group);
@@ -2077,12 +2103,29 @@ export function setupMR(view, project, getFootprint) {
   // PROJECT · HEAT LOSS: each heated room's loss (W) at the centre of its largest rect
   // (an L-shaped room's box centre can fall outside it). Rebuilt with the plan.
   let heatRooms = [];      // floorHeatLoss of the active floor, rebuilt with the labels
+  const heatWithout = { wallIns: false, atticIns: false, windows: false, reveals: false }; // "what if" (session-only)
+  let heatHouse = null;    // { now, full } house totals for the panel (houseHeatLoss)
+  // A whole-house pass costs ~140 ms on a laptop (owner's plan), so each total is cached
+  // until the project changes (heatRev) or, for `now`, the what-if switches change.
+  let heatRev = 0;
+  project.onChange(() => { heatRev++; });
+  const heatHouseCache = new Map(); // `${heatRev}|${switches}` → houseHeatLoss
+  function houseTotal(without) {
+    const key = `${heatRev}|${Object.entries(without).filter(([, v]) => v).map(([k]) => k).join(',')}`;
+    if (!heatHouseCache.has(key)) {
+      for (const k of heatHouseCache.keys()) if (!k.startsWith(`${heatRev}|`)) heatHouseCache.delete(k);
+      heatHouseCache.set(key, houseHeatLoss(project, without));
+    }
+    return heatHouseCache.get(key);
+  }
   let heatHoverRoom = null; // the room under the reticle in HEAT LOSS
   let heatHoverCol = null, heatHoverPiece = null; // the wall column / floor-ceiling piece under it
   let heatSurface = 'ceiling'; // which of floor / ceiling the heat map tints (thumbstick)
   function addHeatLabels(floor) {
     const area = (r) => Math.abs(r.w * r.h);
-    heatRooms = floorHeatLoss(project, floor);
+    heatRooms = floorHeatLoss(project, floor, heatWithout);
+    heatHouse = { now: houseTotal(heatWithout),
+      full: Object.values(heatWithout).some(Boolean) ? houseTotal({}) : null };
     heatHoverRoom = heatHoverCol = heatHoverPiece = null;
     addHeatMap();
     const labels = heatRooms.map((room) => {
@@ -6599,6 +6642,10 @@ export function setupMR(view, project, getFootprint) {
     const floor = project.activeFloor, s = heatSettings(project), fh = floorHeat(floor);
     const out = {};
     for (const row of HEAT_ROWS) {
+      if (row.whatIf) { // `adds` rows switch an improvement on; the others take something away
+        const on = row.adds ? heatWithout[row.key] : !heatWithout[row.key];
+        out[row.key] = { text: t(on ? 'heat.yes' : 'heat.no'), set: heatWithout[row.key] }; continue;
+      }
       const v = row.floor ? fh[row.key] : s[row.key];
       const set = Object.prototype.hasOwnProperty.call(row.floor ? floor.heat || {} : project.heat || {}, row.key);
       const decimals = Math.max(0, -Math.floor(Math.log10(row.step ?? 1) + 1e-9));
@@ -6622,7 +6669,7 @@ export function setupMR(view, project, getFootprint) {
       : t(th.glazed ? 'heat.uDefaultWindow' : 'heat.uDefaultDoor'), t('heat.rEdit')];
   }
   const redrawHeatMenu = () => heatMenu.draw('#fb923c', hoverHeatRow, project.activeFloor.name,
-    floorHeatTotal(), heatRowValues(), heatHoverRoom);
+    floorHeatTotal(), heatRowValues(), heatHoverRoom, null, heatHouse);
 
   // Typing a zone's R: the settings panel steps aside for the numpad (both sit in front
   // of you). ENTER sets it and closes; CLEAR R (the DEL cell) returns to the project λ.
@@ -6696,6 +6743,13 @@ export function setupMR(view, project, getFootprint) {
   function changeHeatRow(key, dir) {
     const row = HEAT_ROWS.find((r) => r.key === key);
     if (!row) return;
+    if (row.whatIf) { // session-only: nothing saved, the project is untouched
+      heatWithout[key] = !heatWithout[key];
+      rlog('heat what-if', { ...heatWithout });
+      buildPlan(); applyPlanMatrix(); // room labels, heat map and the house totals
+      redrawHeatMenu();
+      return;
+    }
     const floor = row.floor ? project.activeFloor : null;
     const current = floor ? floorHeat(floor)[key] : heatSettings(project)[key];
     let next;

@@ -35,7 +35,16 @@ export const HEAT_DEFAULTS = {
   ceilingR: 0.06, // m²K/W bare ceiling (plasterboard), before attic insulation
   groundU: 0.7,  // W/m²K equivalent U of an uninsulated slab on earth
   earth: 0,      // m, the earth level outside, from the ground floor's floor level (+ up)
+  degreeDays: 2200, // K·day/year (base 18 °C) for the yearly estimate; Hypothesis: Paris area, recent winters
+  revealPsi: 0.4, // W/mK along an opening's edge where it cuts exterior insulation (Hypothesis: insulation not returned)
 };
+// "What if" (owner, 2026-10-05: "whether insulation is worth it"): the loss with a kind of
+// insulation taken away, never stored. `without` = { wallIns, atticIns, windows }:
+// every INSULATION zone ignored; every floor's added attic R 0; every window / sliding door
+// at single glazing.
+export const SINGLE_GLAZING_U = 5.8; // W/m²K, Hypothesis: old single glazing in a wooden frame
+// `without.reveals`: the reveals insulated (exterior insulation returned 2–3 cm into them).
+export const RETURNED_REVEAL_PSI = 0.08; // W/mK, Hypothesis: typical with a returned reveal
 // Per floor (`floor.heat`): heated or not, an unheated floor's winter temperature, and
 // insulation ADDED to its floor slab and above its ceiling (attic).
 export const FLOOR_HEAT_DEFAULTS = { heated: true, temp: 6, floorR: 0, ceilingR: 0 };
@@ -143,7 +152,11 @@ export function buriedWallU(z, wallR, dt) {
 }
 
 function wallLoss(floor, comp, s, fh, dT) {
-  const out = { wall: 0, opening: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0, samples: [] };
+  const out = { wall: 0, opening: 0, reveal: 0, revealLength: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0, samples: [] };
+  // Reveals (owner, 2026-10-05): an opening that cuts an exterior INSULATION layer leaks
+  // along its whole edge (sill, head, both jambs) past that insulation: ψ · length · ΔT.
+  const psi = s.noReveals ? RETURNED_REVEAL_PSI : s.revealPsi;
+  const revealJambs = new Set(); // openings whose two jambs are counted
   const H = ceilingHeight(floor); // the room's walls, below the slab
   // Below the earth: the part of each wall under it loses to the ground at the annual
   // mean temperature (EN 12831's fg1 · fg2 · ΔT, as for a slab on earth).
@@ -152,7 +165,8 @@ function wallLoss(floor, comp, s, fh, dT) {
   const groundDT = FG1 * (s.tRoom - s.tMean);
   const others = floor.rectangles.filter((r) => isSpace(r) && !comp.ids.has(r.id))
     .map((r) => r.bounds);
-  const layers = floor.rectangles.filter((r) => LAYER_KINDS.has(zoneKind(r)));
+  const layers = floor.rectangles.filter((r) => LAYER_KINDS.has(zoneKind(r))
+    && !(s.noWallIns && zoneKind(r) === 'insulation'));
   const openings = floor.rectangles.filter((r) => OPENING_KINDS.has(zoneKind(r)));
   const recesses = floor.rectangles.filter((r) => zoneKind(r) === 'recess');
   for (const polygon of computeFootprint(comp.rectangles)) {
@@ -172,6 +186,7 @@ function wallLoss(floor, comp, s, fh, dT) {
           const sx = mx + nx * 1e-4, sy = my + ny * 1e-4;
           if (others.some((b) => hitsSegment(b, sx, sy, px, py))) continue; // heated both sides
           const cuts = [];
+          let extInsLo = Infinity; // depth beyond the edge where exterior insulation starts
           for (const z of layers) {
             const b = z.bounds, wall = zoneKind(z) === 'wall';
             const inner = contains(b, mx - nx * 0.005, my - ny * 0.005);
@@ -182,6 +197,7 @@ function wallLoss(floor, comp, s, fh, dT) {
             // Its depth across the wall, outward from the edge.
             const e0 = nx ? (b.x0 - mx) * nx : (b.y0 - my) * ny, e1 = nx ? (b.x1 - mx) * nx : (b.y1 - my) * ny;
             cuts.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), rz, wall });
+            if (!wall && !inner) extInsLo = Math.min(extInsLo, Math.max(0, Math.min(e0, e1)));
           }
           let { r, insulated, walled } = layerStack(cuts);
           const placeholder = walled ? 0 : s.wallDepth / s.wallLambda; // the placeholder masonry
@@ -208,15 +224,27 @@ function wallLoss(floor, comp, s, fh, dT) {
             }
             return rWith.get(key);
           };
-          let openH = 0, openU = 0, openSill = 0;
+          let openH = 0, openU = 0, openSill = 0, openO = null;
           for (const o of openings) {
             if (!hitsSegment(o.bounds, mx - nx * 0.3, my - ny * 0.3, px, py)) continue;
             const kind = zoneKind(o);
             const sill = Math.max(0, o.sill ?? 0), head = Math.min(H, o.head ?? H);
             if (head - sill > openH) {
-              openH = head - sill; openSill = sill;
-              openU = Number.isFinite(o.uValue) && o.uValue > 0 ? o.uValue
+              openH = head - sill; openSill = sill; openO = o;
+              openU = s.noWindows && isGlazedKind(kind) ? SINGLE_GLAZING_U
+                : Number.isFinite(o.uValue) && o.uValue > 0 ? o.uValue
                 : isGlazedKind(kind) ? s.windowU : s.doorU;
+            }
+          }
+          // The opening's reveal: it reaches into the exterior insulation here.
+          if (openO && extInsLo < Infinity) {
+            const ob = openO.bounds;
+            const reach = Math.max(nx ? (ob.x0 - mx) * nx : (ob.y0 - my) * ny, nx ? (ob.x1 - mx) * nx : (ob.y1 - my) * ny);
+            if (reach > extInsLo + 0.005) {
+              let len = 2 * ds; // sill + head along this column
+              if (!revealJambs.has(openO.id)) { revealJambs.add(openO.id); len += 2 * openH; }
+              out.revealLength += len;
+              out.reveal += len * psi * dT;
             }
           }
           // Split the column by height: the opening's band, each recess band, the buried
@@ -308,11 +336,14 @@ function neighbourPieces(foot, neighbour) {
  * { ids, rectangles, area, volume, dT, total, parts: {wall, opening, floor, ceiling, air},
  *   detail: { wallArea, openingArea, insulatedArea, earthArea, below, above },
  *   map: { wall: [5 cm columns], floor: [pieces], ceiling: [pieces] } } — watts and m².
- * wallArea includes earthArea, the part of it below the earth level. A map piece is
+ * wallArea includes earthArea, the part of it below the earth level; parts.opening includes
+ * detail.reveal, the openings' edges past exterior insulation (W, revealLength m). A map piece is
  * { poly, what ('heated' | 'unheated' | 'earth' | 'air' | 'attic'), u, wm2 }.
  */
-export function floorHeatLoss(project, floor) {
-  const s = heatSettings(project), fh = floorHeat(floor);
+export function floorHeatLoss(project, floor, without = {}) {
+  const s = { ...heatSettings(project), noWallIns: !!without.wallIns, noWindows: !!without.windows,
+    noReveals: !!without.reveals };
+  const fh = without.atticIns ? { ...floorHeat(floor), ceilingR: 0 } : floorHeat(floor);
   if (!fh.heated || !(ceilingHeight(floor) > 0)) return [];
   const i = project.floors.indexOf(floor);
   const below = project.floors[i - 1] || null, above = project.floors[i + 1] || null;
@@ -352,19 +383,29 @@ export function floorHeatLoss(project, floor) {
     });
     const volume = comp.area * ceilingHeight(floor);
     const air = 0.34 * s.ach * volume * dT;
-    const parts = { wall: w.wall, opening: w.opening, floor: floorW, ceiling: ceilingW, air };
+    const parts = { wall: w.wall, opening: w.opening + w.reveal, floor: floorW, ceiling: ceilingW, air };
     return {
       ids: comp.ids, rectangles: comp.rectangles, area: comp.area, volume, dT,
       total: Object.values(parts).reduce((a, v) => a + v, 0),
       parts,
       detail: {
         wallArea: w.wallArea, openingArea: w.openingArea, insulatedArea: w.insulated, earthArea: w.earthArea,
+        reveal: w.reveal, revealLength: w.revealLength, // included in parts.opening
         below: { ...dn, onEarth },
         above: up,
       },
       map: { wall: w.samples, floor: floorMap, ceiling: ceilingMap },
     };
   });
+}
+
+/** The whole house at design conditions, with `without` taken away: { watts, kwh } (kWh/year
+ *  ≈ the design loss per kelvin × degree-days × 24 h; ground losses scaled the same way). */
+export function houseHeatLoss(project, without = {}) {
+  const s = heatSettings(project);
+  const watts = project.floors.reduce((a, f) => a + floorHeatLoss(project, f, without)
+    .reduce((b, r) => b + r.total, 0), 0);
+  return { watts, kwh: watts / (s.tRoom - s.tOut) * s.degreeDays * 24 / 1000 };
 }
 
 /** The heat loss of the room containing `rect` on `floor`, or null. */

@@ -165,6 +165,47 @@ wall); 1.6 m wide → the columns beside the window lose the lining in 0.90–2.
 room 3644 W); sill 0.60 / head 2.30 → 3690 W. 3D wall boxes: the lining in the recess is open only
 between sill and head; the outer wall beside the window stays solid.
 
+## Reveals: an opening through exterior insulation (owner, 2026-10-05)
+
+Owner's walls: meulière with exterior insulation, windows at the indoor face, the opening going
+through the wall and the insulation. Around the frame heat bypasses both the window and the
+insulation: a linear thermal bridge, **ψ · edge length · ΔT**, added to the room's openings. It
+applies to an opening (WINDOW / SLIDING / DOOR / GARAGE) whose zone reaches into an exterior INSULATION
+layer at that column; the length is its sill and head along those columns plus its two jambs (once per
+opening). **Reveal ψ (ext. insul.)** is a project setting, default 0.4 W/mK (**Hypothesis:** typical
+when the insulation is not returned into the reveal, 0.3–0.5); the what-if **Reveals insulated**
+switch uses 0.08 (`RETURNED_REVEAL_PSI`; Hypothesis: insulation returned 2–3 cm into the reveal). An
+opening drawn only through the wall (not into the insulation) gets none. A RECESS is not needed for
+this; one with the window's footprint and band changes nothing (the window owns its band).
+**Proven** (Node, made-up 4 m room, 45 cm meulière + 10 cm outdoor insulation R 2.5, 1.2 × 1.2 m window):
+4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W), 10 W with the reveals insulated, 0 with the
+window stopping at the wall or no outdoor insulation. The owner's local file (older than the headset
+plan) has no opening into outdoor insulation: 0 W.
+
+## What if: is the insulation worth it? (owner, 2026-10-05)
+
+Owner: "a toggle for all wall insulations, all attic insulations … whether insulation is worth it",
+then "a toggle windows insulations as well". The HEAT LOSS panel's **WHAT IF (NOT SAVED)** section has
+four switches, session-only (never in the project, back to as drawn on reload):
+- **Wall insulation** no: every INSULATION zone is ignored (its wall, or the placeholder, remains);
+- **Attic insulation** no: every floor's added attic R (`ceilingR`) is 0 (the bare ceiling remains);
+- **Windows** no: every WINDOW / SLIDING at single glazing, U 5.8 (`SINGLE_GLAZING_U`; Hypothesis:
+  old single glazing in a wooden frame); doors keep their U;
+- **Reveals insulated** yes: the reveal ψ drops to 0.08 (see Reveals above), an improvement.
+
+The room labels, the heat map and the floor total follow the switches. Under the title the panel shows
+the **whole house** (`houseHeatLoss`): design watts and a yearly estimate, kWh/yr = W / ΔT × degree-days
+× 24 / 1000, with **Degree-days /year** a project setting (default 2200 K·day base 18 °C; Hypothesis:
+Paris area, recent winters; ground losses are scaled the same way, a simplification). With any switch
+changed, a line shows the difference against as drawn, in W, % and kWh/yr (red = loses more,
+green = saves). A yearly cost needs the
+owner's heating energy and price (not modelled). Each whole-house total is cached until the project
+changes: ~140 ms per pass on a laptop for the owner's plan (Hypothesis: a few hundred ms on the Quest).
+**Proven** (Node on the owner's local file, older than the headset plan, 2026-10-05; nothing typed in
+`project.heat`): all counted 21 607 W / 43 878 kWh/yr; without wall insulation +1 996 W; without the
+windows +1 806 W; without attic insulation +0 (no attic R typed in that file). With attic R 8 typed on
+the top floor: 17 636 W, and without it +3 971 W (+22 %, +8 064 kWh/yr).
+
 ## Where the heat goes: the heat map (owner, 2026-10-04)
 
 Owner: "see at a glance where I lose heat, whether floor, wall, or ceiling", values shown "as the
