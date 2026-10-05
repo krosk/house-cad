@@ -700,7 +700,9 @@ conflict shows, **thumbstick-y cycles SUSPECTS → ROUTE 1 → ROUTE 2…** (`co
 edge to its second, shortest first (at most 12, within a search budget). Its readout: `ROUTE k/n · the
 value it implies · off by …` (red) or `· agrees` (green), then its non-zero dimensions `#1 c236 4.2`… (4
 lines, or 3 and `+n`); its dimensions get numbered signs on light-blue stems. The suspects line shows
-`↕ n routes`. A different conflict starts on its suspects again. **Proven** (Node, headset plan,
+`↕ n routes`. A different conflict starts on its suspects again. Owner decisions (2026-10-05): 0 mm
+dimensions in a route get no sign (they stay out, as from the suspects), and the value being entered
+(refused, so without a label) gets no sign either. **Proven** (Node, headset plan,
 2026-10-05): r59.bottom → r60.bottom = 4070 has 2 routes, both implying 3990: c236 4200 + c232 210, and
 c254, c251, c386, c1110, c238, c232; the only dimension both share is c232 (the suspect). Worst search
 time over the house, 30 mm injected into every 7th dimension: 1 ms.
