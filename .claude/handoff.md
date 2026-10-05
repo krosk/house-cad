@@ -20,10 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-04 (session 38, continued five times after context compactions; the Quest came back late in it)
-**Status:** Proven (git): everything is pushed; head `7e0f3e0` (item 24: heat-loss overlap rule,
-per-zone λ, the HEAT LOSS heat map); the tree is clean apart from the owner's untracked `Document from
-Alexis He.json`. Proven (`update-app` output, 2026-10-05): the headset app holds `7e0f3e0` for its next
-launch; none of item 24 has been seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
+**Status:** Proven (git): everything is pushed; head `1d0bcd3` (item 24: heat-loss overlap rule,
+per-zone λ, the HEAT LOSS heat map, RECESS zones, DIMS internal names, eye-level conflict signs); the
+tree is clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`
+output, 2026-10-05): the headset app holds `1d0bcd3` for its next launch; none of item 24 has been
+seen on the Quest. The headset autosave holds the slabs, the IKEA kitchen and the owner's own
 later edits (item 24), plus five Ground dimensions re-added by us (item 24). Proven (`am broadcast`
 result=0, 2026-10-04): `automation_disable` sent at the end of session 38, so the headset sleeps
 normally again; send `prox_close` to keep it awake for the next DevTools session. Proven (the owner's
@@ -564,6 +565,13 @@ All owner requests, 2026-10-03.
     - **Heat map** in HEAT LOSS (`7e0f3e0`; `docs/heat-loss.md` "Where the heat goes"): wall strips,
       floor/ceiling tint, readout under the reticle. Agreed next: the same map on the wall faces in
       the AR 3D view, band by band at real height (not started).
+    - **RECESS** (`b4dc594`; `docs/heat-loss.md` "Recesses"): a window reveal, cut only in its
+      sill–head band and own footprint; thins the heat-loss layers there. Owner asked whether walls/
+      insulation should get sill/head instead: answered no for holes (one band can't express a hole;
+      4 zones per reveal), yes as a possible later *solid* foot/top band for layers that stop at a
+      height (not built, not requested).
+    - **DIMS internal names** (`fcbb58a`) and **eye-level conflict signs** (`1d0bcd3`, numbered over
+      the suspects of a refused value): the owner is mid-survey on a conflicting value, not yet given.
     - **R or λ per zone** (owner: "a dual option"): `rect.lambda` (W/mK) beside `rValue`, exclusive;
       SWAP on the AR numpad toggles. Build + Node only; not tried on the headset.
     - Owner's living-room lining is polystyrene + 13 mm plaster, label R not yet given (parked by the
