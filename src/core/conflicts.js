@@ -128,3 +128,52 @@ export function diagnoseConflicts(floor) {
 
 /** The conflicting block holding dimension `cId`, or null. */
 export const conflictGroupOf = (floor, cId) => diagnoseConflicts(floor).find((g) => g.ids.has(cId)) || null;
+
+/**
+ * The ROUTES that tie dimension `cId`'s two edges together through the other dimensions
+ * of its conflicting block (owner, 2026-10-05: "I need to be able to cycle through the
+ * possible wrong routes"): every chain of dimensions from c's first edge to its second,
+ * each with the value it implies for c. A route that disagrees with c (or with another
+ * route) holds a wrong value; the suspects are the dimensions every disagreeing route
+ * shares. Shortest routes first, at most `max`, found within a step budget (a big block
+ * has too many to list).
+ * [{ steps: [{ id, value, sign }] (sign +1 = walked a → b), implied (m), off (implied − c.value) }]
+ */
+export function conflictRoutes(floor, block, cId, { max = 12, budget = 20000 } = {}) {
+  const dims = structuralDims(floor).filter((k) => block.ids.has(k.id));
+  const c = dims.find((k) => k.id === cId);
+  if (!c) return [];
+  const adj = new Map();
+  const link = (n, arc) => (adj.get(n) ?? adj.set(n, []).get(n)).push(arc);
+  for (const k of dims) {
+    if (k === c) continue;
+    const a = nodeOf(k.a), b = nodeOf(k.b);
+    link(a, { to: b, k, sign: 1 });
+    link(b, { to: a, k, sign: -1 });
+  }
+  const start = nodeOf(c.a), goal = nodeOf(c.b), out = [];
+  let steps = 0;
+  // Iterative deepening: every route of length L before any of length L + 1.
+  for (let L = 1; L <= dims.length && out.length < max && steps < budget; L++) {
+    const seen = new Set([start]), path = [];
+    const dfs = (n) => {
+      if (out.length >= max || ++steps > budget) return;
+      if (path.length === L) {
+        if (n === goal) {
+          const implied = path.reduce((sum, st) => sum + st.sign * st.k.value, 0);
+          out.push({ steps: path.map((st) => ({ id: st.k.id, value: st.k.value, sign: st.sign })), implied, off: implied - c.value });
+        }
+        return;
+      }
+      for (const arc of adj.get(n) || []) {
+        if (seen.has(arc.to) || (arc.to === goal && path.length + 1 < L)) continue;
+        seen.add(arc.to); path.push(arc);
+        dfs(arc.to);
+        path.pop(); seen.delete(arc.to);
+      }
+    };
+    dfs(start);
+  }
+  return out;
+}
+

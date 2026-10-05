@@ -128,7 +128,8 @@ The key insight: because every rectangle edge is axis-aligned, each edge is a si
 - A distance constraint stores an **ordered** pair `a`,`b` and a **signed** `value = coord(b) − coord(a)`. Order matters: it sets the sign, locks which side `b` is on, and picks the anchor (`a` holds, `b` moves). `swapConstraint()` reverses it. `setConstraintMagnitude()` preserves the sign. This signedness is deliberate — it keeps the system linear and the solution unique.
 - Conflicts are detected post-solve via residual > 1 mm and flagged on `c.conflict` (shown red).
   `src/core/conflicts.js` names the suspects (each dimension whose removal alone resolves the loop,
-  with the value the others imply; `docs/ar-survey.md` "Conflicting dimensions").
+  with the value the others imply) and its routes (the chains of other dimensions tying the same two
+  edges, each with the value it implies; `docs/ar-survey.md` "Conflicting dimensions").
 - **Furniture zones are solved one-way, after the structure** (`solveFurniture`): walls never move
   for furniture, a product fixes its zone's size, and an over-specified furniture dimension is
   **deleted, never flagged** (logged on `project.removedDims`; not while a rect is `_dragging`).

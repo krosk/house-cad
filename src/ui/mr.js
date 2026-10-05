@@ -31,7 +31,7 @@ import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windo
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
-import { diagnoseConflicts } from '../core/conflicts.js';
+import { diagnoseConflicts, conflictRoutes, isCertain, LOOP_TOL } from '../core/conflicts.js';
 import { footprintFloorGeometry } from '../core/extrude.js';
 import { getUnit, setUnit, cycleUnit, onUnitChange, UNIT_ORDER, toMeters, unitLabel, fmt } from '../core/units.js';
 import { t, localizedFloorName, revLabels, getLang, langLabel, setLang, cycleLang, onLangChange, LANG_ORDER } from '../core/i18n.js';
@@ -1351,40 +1351,66 @@ export function setupMR(view, project, getFootprint) {
     conflictDiag ??= diagnoseConflicts(project.activeFloor);
     return conflictDiag.find((g) => g.ids.has(cId)) || null;
   }
-  function showConflictTags(block) {
-    const key = block ? [...block.ids].join() : null;
+  // Thumbstick-y on a shown conflict cycles SUSPECTS → route 1 → route 2… (owner, 2026-10-05:
+  // "cycle through the possible wrong routes"): `conflictView` 0 = suspects, k = route k.
+  let conflictView = 0, conflictViewKey = null, conflictNav = 0; // nav = routes available this frame
+  const conflictRouteCache = new Map(); // `${cId}|${block ids}` → routes (dropped on plan build)
+  function routesFor(cId, block) {
+    const key = `${cId}|${[...block.ids].join()}`;
+    if (!conflictRouteCache.has(key)) conflictRouteCache.set(key, conflictRoutes(project.activeFloor, block, cId));
+    return conflictRouteCache.get(key);
+  }
+  // The dimensions a view numbers: the suspects, or one route's non-zero steps.
+  const conflictViewIds = (block, routes) => (conflictView > 0 && routes?.[conflictView - 1]
+    ? routes[conflictView - 1].steps.filter((st) => !isCertain(st)).map((st) => st.id)
+    : block.suspects.map((x) => x.id));
+  function showConflictTags(block, routes = null) {
+    const key = block ? `${[...block.ids].join()}#${conflictView}` : null;
     if (key === conflictTagsKey && conflictTagsSprites === dimSprites
       && conflictTags.every((m) => m.parent === planGroup)) return;
     for (const m of conflictTags) { m.parent?.remove(m); m.geometry.dispose(); if (m.isSprite) m.material.dispose(); }
     conflictTags = []; conflictTagsKey = key; conflictTagsSprites = dimSprites;
     if (!block) return;
-    const tags = block.suspects.map((s, i) => {
-      const sprite = dimSprites.find((d) => d.userData.cId === s.id);
-      return sprite && makeDimLabel(`#${i + 1}`, '#f0abfc', sprite.position.x, -sprite.position.z + 0.045);
+    const ids = conflictViewIds(block, routes), color = conflictView > 0 ? 0x7dd3fc : 0xf0abfc;
+    const tags = ids.map((id, i) => {
+      const sprite = dimSprites.find((d) => d.userData.cId === id);
+      return sprite && makeDimLabel(`#${i + 1}`, conflictView > 0 ? '#7dd3fc' : '#f0abfc', sprite.position.x, -sprite.position.z + 0.045);
     }).filter(Boolean);
     if (tags.length) conflictTags = addDimLabelBatch(tags, planGroup, 31);
-    // ...and at eye level: a numbered sign over each suspect, its number as in the readout.
-    block.suspects.forEach((s, i) => {
-      const sprite = dimSprites.find((d) => d.userData.cId === s.id);
-      if (sprite) conflictTags.push(...conflictSign(sprite.position, String(i + 1), 0xf0abfc));
+    // ...and at eye level: a numbered sign over each, its number as in the readout.
+    ids.forEach((id, i) => {
+      const sprite = dimSprites.find((d) => d.userData.cId === id);
+      if (sprite) conflictTags.push(...conflictSign(sprite.position, String(i + 1), color));
     });
   }
   // A refused value (PLAN DIMS !CONFLICT): diagnose the plan as it would be with it,
   // before the caller rolls it back.
   function noteRefusedConflict(c) {
     const block = diagnoseConflicts(project.activeFloor).find((g) => g.ids.has(c.id)) || null;
-    refusedConflict = block ? { c: { id: c.id, value: c.value }, block } : null;
+    // Its routes too: once rolled back it is no longer in the plan to search from.
+    refusedConflict = block ? { c: { id: c.id, value: c.value }, block, routes: conflictRoutes(project.activeFloor, block, c.id) } : null;
     rlog('dim conflict suspects', { id: c.id, worst: block && +block.worst.toFixed(4),
       suspects: block?.suspects.map((x) => `${x.id} ${+x.value.toFixed(4)}→${+x.implied.toFixed(4)}`) ?? [] });
   }
-  // The pill lines for an aimed red dimension, or null.
-  function conflictLines(c, block) {
+  // The pill lines for an aimed red dimension, or null. A route view lists that route.
+  function conflictLines(c, block, routes = null) {
     if (!block) return null;
     const len = (v) => `${fmt(Math.abs(v))}`;
     const lines = [[`${c.id && project.constraints.some((k) => k.id === c.id) ? `${c.id} ` : ''}${len(c.value)} ${unitLabel()} · ${t('conflict.off')} ${len(block.worst)}`, 0xff5c5c]];
-    if (!block.suspects.length) lines.push([t('conflict.several'), 0xffe14d]);
+    const nav = routes?.length ? ` · ↕ ${routes.length} ${t('conflict.routes')}` : '';
+    const route = conflictView > 0 ? routes?.[conflictView - 1] : null;
+    if (route) {
+      const wrong = Math.abs(route.off) > LOOP_TOL;
+      lines.push([`${t('conflict.route')} ${conflictView}/${routes.length} · ${len(route.implied)}`
+        + (wrong ? ` · ${t('conflict.off')} ${len(route.off)}` : ` · ${t('conflict.agrees')}`), wrong ? 0xff5c5c : 0x4ade80]);
+      const steps = route.steps.filter((st) => !isCertain(st)), shown = steps.length > 4 ? 3 : 4;
+      steps.slice(0, shown).forEach((st, i) => lines.push([`#${i + 1} ${st.id} ${len(st.value)}`, 0x7dd3fc]));
+      if (steps.length > shown) lines.push([`+${steps.length - shown} (#${shown + 1}…#${steps.length})`, 0x7dd3fc]);
+      return lines;
+    }
+    if (!block.suspects.length) lines.push([`${t('conflict.several')}${nav}`, 0xffe14d]);
     else {
-      lines.push([`${block.suspects.length} ${t('conflict.suspects')}`, 0xf0abfc]);
+      lines.push([`${block.suspects.length} ${t('conflict.suspects')}${nav}`, 0xf0abfc]);
       block.suspects.slice(0, CONFLICT_SHOWN).forEach((s, i) => lines.push([
         `#${i + 1} ${s.id} ${len(s.value)} → ${len(s.implied)}`, s.id === c.id ? 0xffe14d : 0xf0abfc]));
       const more = block.suspects.length - CONFLICT_SHOWN;
@@ -4399,6 +4425,7 @@ export function setupMR(view, project, getFootprint) {
   function buildPlan(withDims = true) {
     sheetDirty = true;
     conflictDiag = null; // the plan changed: re-diagnose on the next aim at a red dimension
+    conflictRouteCache.clear();
     // A loaded slot or file may hold furniture zones migrated from the old placed items
     // (no size yet): size them from the catalog before drawing. Emits only if one changed.
     if (furnitureCatalogLoaded) project.applyFurnitureCatalog(furnitureCatalog);
@@ -9108,6 +9135,10 @@ export function setupMR(view, project, getFootprint) {
       else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
       else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
+      else if (isDimMode(modeId) && conflictNav) { // a shown conflict: suspects ⇄ routes (down = next)
+        conflictView = (conflictView + (stickY < 0 ? -1 : 1) + conflictNav + 1) % (conflictNav + 1);
+        rlog('conflict view', { view: conflictView, routes: conflictNav });
+      }
       else if (modeId === 'edit') cycleSelectedZoneKind(stickY < 0 ? 1 : -1);
       else if (modeId === 'heat') { // up = more on a settings row; elsewhere FLOOR ⇄ CEILING
         if (hoverHeatRow) changeHeatRow(hoverHeatRow, stickY < 0 ? 1 : -1);
@@ -9282,8 +9313,14 @@ export function setupMR(view, project, getFootprint) {
     const hovC = hovSprite ? project.constraints.find((k) => k.id === hovSprite.userData.cId) : null;
     const hovConflict = hovC?.conflict ? conflictBlockOf(hovC.id) : null;
     const refused = dimConflict && dimRefA && dimRefB ? refusedConflict : null;
-    showConflictTags(refused?.block ?? hovConflict);
-    const conflictReadout = refused ? conflictLines(refused.c, refused.block) : conflictLines(hovC, hovConflict);
+    const shownBlock = refused?.block ?? hovConflict;
+    const shownRoutes = refused ? refused.routes : hovConflict ? routesFor(hovC.id, hovConflict) : null;
+    // A different conflict starts on its suspects.
+    const viewKey = refused ? `r|${refused.c.id}|${refused.c.value}` : hovConflict ? hovC.id : null;
+    if (viewKey !== conflictViewKey) { conflictViewKey = viewKey; conflictView = 0; }
+    conflictNav = shownBlock ? shownRoutes?.length ?? 0 : 0;
+    showConflictTags(shownBlock, shownRoutes);
+    const conflictReadout = refused ? conflictLines(refused.c, refused.block, shownRoutes) : conflictLines(hovC, hovConflict, shownRoutes);
     const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;

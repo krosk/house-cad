@@ -692,6 +692,19 @@ label. Built with the dimensions, so it follows a label drag and disappears once
 commit the solver refuses is rolled back, so nothing stays flagged: while its refusal shows, each
 suspect gets the same sign with its number (`1`, `2`… as `#1`, `#2` in the readout) on a pink stem.
 
+**Routes** (owner, 2026-10-05, after asking why c236 was not listed: "I need to be able to cycle through
+the possible wrong routes"). The suspects assume ONE wrong value; a dimension backed by a second,
+independent chain (c236, r59's depth, also fixed through r63/r65/r112) is never a suspect. So, while a
+conflict shows, **thumbstick-y cycles SUSPECTS → ROUTE 1 → ROUTE 2…** (`conflictRoutes` in
+`src/core/conflicts.js`): a route is a chain of the other dimensions from the conflicting one's first
+edge to its second, shortest first (at most 12, within a search budget). Its readout: `ROUTE k/n · the
+value it implies · off by …` (red) or `· agrees` (green), then its non-zero dimensions `#1 c236 4.2`… (4
+lines, or 3 and `+n`); its dimensions get numbered signs on light-blue stems. The suspects line shows
+`↕ n routes`. A different conflict starts on its suspects again. **Proven** (Node, headset plan,
+2026-10-05): r59.bottom → r60.bottom = 4070 has 2 routes, both implying 3990: c236 4200 + c232 210, and
+c254, c251, c386, c1110, c238, c232; the only dimension both share is c232 (the suspect). Worst search
+time over the house, 30 mm injected into every 7th dimension: 1 ms.
+
 The owner's need: "identify the other constraints that cause the conflict, so that I can verify
 systematically which one is wrong". `src/core/conflicts.js` `diagnoseConflicts(floor)`:
 - **The model:** on each axis the plan's dimensions are a graph (a node per rect edge plus the origin,
