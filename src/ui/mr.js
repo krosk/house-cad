@@ -5085,17 +5085,6 @@ export function setupMR(view, project, getFootprint) {
     : ref.kind === 'marker' ? t(`marker.${markerOf(ref)?.type ?? 'outlet'}`)
     : ref.kind === 'node' ? t('ref.node')
     : t(`edge.${ref.edge}`));
-  // A reference's internal name (owner, 2026-10-05: "put in info panel the internal name
-  // of the item I am highlighting"), e.g. `r55.top WALL`, `m12`, `origin.x`; the ids the
-  // plan JSON, the conflict suspects and tools/house-query.mjs use.
-  const refId = (ref) => {
-    if (!ref) return '?';
-    if (ref.kind === 'origin') return `origin${ref.axis ? `.${ref.axis}` : ''}`;
-    if (ref.kind === 'marker') return ref.markerId;
-    if (ref.kind === 'node') return ref.nodeId;
-    const r = project.activeFloor.rectangles.find((k) => k.id === ref.rectId);
-    return `${ref.rectId}.${ref.edge}${r ? ` ${t(`mode.${zoneKindOf(r)}`)}` : ''}`;
-  };
   const refsEqual = (a, b) =>
     !!a && !!b && a.kind === b.kind &&
     (a.kind === 'origin' ? true
@@ -9295,14 +9284,6 @@ export function setupMR(view, project, getFootprint) {
     const refused = dimConflict && dimRefA && dimRefB ? refusedConflict : null;
     showConflictTags(refused?.block ?? hovConflict);
     const conflictReadout = refused ? conflictLines(refused.c, refused.block) : conflictLines(hovC, hovConflict);
-    // DIMS: the internal names of what is picked and aimed at (a hovered dimension: its id
-    // and both ends).
-    const idLine = (() => {
-      if (!isDimMode(modes[currentMode].id) || !placed || conflictReadout) return null; // the conflict lines carry the ids (6-line pill)
-      if (hovC) return `${hovC.id}: ${refId(hovSprite.userData.refA)} → ${refId(hovSprite.userData.refB)}`;
-      if (dimRefA) return `${refId(dimRefA)} → ${dimRefB ? refId(dimRefB) : hoverRef ? refId(hoverRef) : '…'}`;
-      return hoverRef ? refId(hoverRef) : null;
-    })();
     const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
@@ -9372,7 +9353,6 @@ export function setupMR(view, project, getFootprint) {
       ? `\n${t('marker.mergePair')}` : '';
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || heatStatus
       || (conflictReadout ? conflictReadout.map(([text]) => text).join('\n') : hovDim);
-    const readoutWithId = idLine && !typeName ? (readoutText ? `${readoutText}\n${idLine}` : idLine) : readoutText;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
       : matStatus ? matColors
@@ -9387,9 +9367,7 @@ export function setupMR(view, project, getFootprint) {
     // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
     // In WIRE, a grip cycle of 2+ devices/wires shows the target's `i/n` there instead
     // (it covers a stack too: stacked devices are all in that cycle).
-    // The id line takes the last colour of a per-line colour list.
-    let pillText = readoutWithId, pillColor = idLine && readoutWithId !== readoutText && Array.isArray(readoutColor)
-      ? [...readoutColor, readoutColor[readoutColor.length - 1]] : readoutColor;
+    let pillText = readoutText, pillColor = readoutColor;
     const cycleMode = GRIP_PICK_MODES.has(modes[currentMode].id);
     const gripPickLine = cycleMode && gripPick?.mode === modes[currentMode].id && gripPick.size > 1
       ? `${gripPick.label} ${gripPick.index}/${gripPick.size}`
@@ -9458,7 +9436,9 @@ export function setupMR(view, project, getFootprint) {
         // PROJECT · HEAT LOSS.
         ...(modeId === 'edit' && roomAreaHud != null
           ? [`area:   ${roomAreaHud.toFixed(2)} m²${roomHeatHud ? ` · ${Math.round(roomHeatHud.total)} W` : ''}`] : []),
-        ...(edgeM != null ? [`edge:   ${fmt(edgeM)} ${unitLabel()}`] : []),
+        // The highlighted edge's zone id (owner, 2026-10-05: "just show the static rxxx name
+        // of the edge I am highlighting"), then its length.
+        ...(edgeM != null ? [`edge:   ${edgeRef.rectId} · ${fmt(edgeM)} ${unitLabel()}`] : []),
         ...(battery ? [`batt:   ${Math.round(battery.level * 100)}%${battery.charging ? ' (chg)' : ''}`] : []),
       ];
       // ?perf: keep build/fps/draw and give the rest of the panel to the layer sweep.
