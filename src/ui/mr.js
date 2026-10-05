@@ -1376,12 +1376,12 @@ export function setupMR(view, project, getFootprint) {
   function conflictLines(c, block) {
     if (!block) return null;
     const len = (v) => `${fmt(Math.abs(v))}`;
-    const lines = [[`${len(c.value)} ${unitLabel()} · ${t('conflict.off')} ${len(block.worst)}`, 0xff5c5c]];
+    const lines = [[`${c.id && project.constraints.some((k) => k.id === c.id) ? `${c.id} ` : ''}${len(c.value)} ${unitLabel()} · ${t('conflict.off')} ${len(block.worst)}`, 0xff5c5c]];
     if (!block.suspects.length) lines.push([t('conflict.several'), 0xffe14d]);
     else {
       lines.push([`${block.suspects.length} ${t('conflict.suspects')}`, 0xf0abfc]);
       block.suspects.slice(0, CONFLICT_SHOWN).forEach((s, i) => lines.push([
-        `#${i + 1} ${len(s.value)} → ${len(s.implied)}`, s.id === c.id ? 0xffe14d : 0xf0abfc]));
+        `#${i + 1} ${s.id} ${len(s.value)} → ${len(s.implied)}`, s.id === c.id ? 0xffe14d : 0xf0abfc]));
       const more = block.suspects.length - CONFLICT_SHOWN;
       if (more > 0) lines.push([`+${more} (#${CONFLICT_SHOWN + 1}…#${block.suspects.length})`, 0xf0abfc]);
     }
@@ -5031,6 +5031,17 @@ export function setupMR(view, project, getFootprint) {
     : ref.kind === 'marker' ? t(`marker.${markerOf(ref)?.type ?? 'outlet'}`)
     : ref.kind === 'node' ? t('ref.node')
     : t(`edge.${ref.edge}`));
+  // A reference's internal name (owner, 2026-10-05: "put in info panel the internal name
+  // of the item I am highlighting"), e.g. `r55.top WALL`, `m12`, `origin.x`; the ids the
+  // plan JSON, the conflict suspects and tools/house-query.mjs use.
+  const refId = (ref) => {
+    if (!ref) return '?';
+    if (ref.kind === 'origin') return `origin${ref.axis ? `.${ref.axis}` : ''}`;
+    if (ref.kind === 'marker') return ref.markerId;
+    if (ref.kind === 'node') return ref.nodeId;
+    const r = project.activeFloor.rectangles.find((k) => k.id === ref.rectId);
+    return `${ref.rectId}.${ref.edge}${r ? ` ${t(`mode.${zoneKindOf(r)}`)}` : ''}`;
+  };
   const refsEqual = (a, b) =>
     !!a && !!b && a.kind === b.kind &&
     (a.kind === 'origin' ? true
@@ -9230,6 +9241,14 @@ export function setupMR(view, project, getFootprint) {
     const refused = dimConflict && dimRefA && dimRefB ? refusedConflict : null;
     showConflictTags(refused?.block ?? hovConflict);
     const conflictReadout = refused ? conflictLines(refused.c, refused.block) : conflictLines(hovC, hovConflict);
+    // DIMS: the internal names of what is picked and aimed at (a hovered dimension: its id
+    // and both ends).
+    const idLine = (() => {
+      if (!isDimMode(modes[currentMode].id) || !placed || conflictReadout) return null; // the conflict lines carry the ids (6-line pill)
+      if (hovC) return `${hovC.id}: ${refId(hovSprite.userData.refA)} → ${refId(hovSprite.userData.refB)}`;
+      if (dimRefA) return `${refId(dimRefA)} → ${dimRefB ? refId(dimRefB) : hoverRef ? refId(hoverRef) : '…'}`;
+      return hoverRef ? refId(hoverRef) : null;
+    })();
     const dropKind = modes[currentMode].id === 'drop' ? currentZoneKind : null;
     const editKind = modes[currentMode].id === 'edit' && selectedRect ? zoneKindOf(selectedRect) : null;
     const markerType = modes[currentMode].id === 'marker' ? (selectedMarker?.type || currentMarkerType) : null;
@@ -9299,6 +9318,7 @@ export function setupMR(view, project, getFootprint) {
       ? `\n${t('marker.mergePair')}` : '';
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || heatStatus
       || (conflictReadout ? conflictReadout.map(([text]) => text).join('\n') : hovDim);
+    const readoutWithId = idLine && !typeName ? (readoutText ? `${readoutText}\n${idLine}` : idLine) : readoutText;
     const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
       : matStatus ? matColors
@@ -9313,7 +9333,9 @@ export function setupMR(view, project, getFootprint) {
     // Stacked hover adds a last line (CHECK folds it into its own hover line instead).
     // In WIRE, a grip cycle of 2+ devices/wires shows the target's `i/n` there instead
     // (it covers a stack too: stacked devices are all in that cycle).
-    let pillText = readoutText, pillColor = readoutColor;
+    // The id line takes the last colour of a per-line colour list.
+    let pillText = readoutWithId, pillColor = idLine && readoutWithId !== readoutText && Array.isArray(readoutColor)
+      ? [...readoutColor, readoutColor[readoutColor.length - 1]] : readoutColor;
     const cycleMode = GRIP_PICK_MODES.has(modes[currentMode].id);
     const gripPickLine = cycleMode && gripPick?.mode === modes[currentMode].id && gripPick.size > 1
       ? `${gripPick.label} ${gripPick.index}/${gripPick.size}`

@@ -97,6 +97,13 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
 - **PLAN · DIMS** (`id: plan_dims`) — plan constraints only: edge↔edge sizes and edge↔origin
   position locks. The origin target is tested in plan space, so it remains aligned with the visible
   origin ring after TELEPORT/navigation offsets. Marker floor icons and marker pins are inert.
+  **Internal names** (owner, 2026-10-05: "put in info panel the internal name of the item I am
+  highlighting"): in every DIMS mode the readout's last line names what the ray is on: an edge as
+  `r55.top ROOM`, a marker `m12`, a node, `origin`; once A is picked, `A → aimed`; on a dimension label,
+  `c220: r55.bottom ROOM → r55.top ROOM`. These are the ids of the plan JSON, the conflict suspects and
+  `tools/house-query.mjs`. While a conflict is shown the id line is dropped (the pill holds 6 lines) and
+  the conflict lines carry the ids instead: the hovered dimension's id first, each suspect as
+  `#1 c215 15 → 0`.
 - **MARKER · EDIT** (`id: marker`) — the marker editing domain. **Thumbstick up/down cycles the drop
   type** (standard/specialized outlets, switch, light, and ethernet) — or, if a marker is
   selected, **retypes that marker in place** (`setMarkerType`). Each type has a `markerFace()` glyph
