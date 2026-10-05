@@ -45,6 +45,7 @@ function serializeRect(r) {
   if (r.rValue !== undefined) out.rValue = r.rValue; // wall / insulation R (docs/heat-loss.md)
   if (r.lambda !== undefined) out.lambda = r.lambda; // or its λ (W/mK), R = depth / λ
   if (r.uValue !== undefined) out.uValue = r.uValue; // window/door U (docs/heat-loss.md)
+  if (r.outdoor) out.outdoor = true; // an OUTDOOR room (docs/heat-loss.md)
   return out;
 }
 // Every stored Rectangle field (the constructor validates), for load and paste.
@@ -52,6 +53,7 @@ const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
   hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
   article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, lambda: r.lambda, uValue: r.uValue,
+  outdoor: r.outdoor,
 });
 function serializeConstraint(c) {
   return {

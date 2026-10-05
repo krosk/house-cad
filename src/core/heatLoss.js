@@ -56,6 +56,9 @@ const RS_GROUND = 0.13 + 0.04;   // Rsi + Rse of a basement wall / floor in ISO 
 export const OPENING_KINDS = new Set(['window', 'sliding', 'door', 'garage']);
 export const isGlazedKind = (kind) => kind === 'window' || kind === 'sliding';
 const SPACE_KINDS = new Set(['room', 'stairs_up', 'stairs_down']);
+// An OUTDOOR room (a veranda; owner, 2026-10-05) is outside: no loss of its own, and a heated
+// room's edge on it is exterior. `isSpace` is every heated-or-not indoor space.
+const isSpace = (r) => SPACE_KINDS.has(zoneKind(r)) && !r.outdoor;
 // Across a slab, a neighbour floor's walls and linings count with its space (a room
 // edge sits over the partition below, not over outside air).
 const SLAB_KINDS = new Set([...SPACE_KINDS, 'wall', 'insulation']);
@@ -72,7 +75,7 @@ export const floorHeat = (floor) => ({ ...FLOOR_HEAT_DEFAULTS, ...(floor?.heat |
 const EPS = 1e-6;
 const area = (mp) => (mp.length ? multiPolygonArea(mp) : 0);
 // A floor's heated-or-not space: its rooms plus stairs (circulation, open to the rooms).
-const spacesOf = (floor) => (floor?.rectangles || []).filter((r) => SLAB_KINDS.has(zoneKind(r)))
+const spacesOf = (floor) => (floor?.rectangles || []).filter((r) => SLAB_KINDS.has(zoneKind(r)) && !r.outdoor)
   .map((r) => ({ bounds: r.bounds, op: 'add', kind: 'room' }));
 // Does rect r intersect the axis-aligned segment from (ax,ay) to (bx,by)?
 function hitsSegment(b, ax, ay, bx, by) {
@@ -147,7 +150,7 @@ function wallLoss(floor, comp, s, fh, dT) {
   const z = s.earth - (floor.elevation || 0), buriedH = Math.min(H, Math.max(0, z));
   const dt = s.wallDepth + LAMBDA_GROUND * (0.17 + s.slabR + fh.floorR + 0.04);
   const groundDT = FG1 * (s.tRoom - s.tMean);
-  const others = floor.rectangles.filter((r) => SPACE_KINDS.has(zoneKind(r)) && !comp.ids.has(r.id))
+  const others = floor.rectangles.filter((r) => isSpace(r) && !comp.ids.has(r.id))
     .map((r) => r.bounds);
   const layers = floor.rectangles.filter((r) => LAYER_KINDS.has(zoneKind(r)));
   const openings = floor.rectangles.filter((r) => OPENING_KINDS.has(zoneKind(r)));
@@ -318,7 +321,7 @@ export function floorHeatLoss(project, floor) {
   const dT = s.tRoom - s.tOut;
   const b = (temp) => (s.tRoom - temp) / dT;
   const aboveH = floorHeat(above);
-  return connectedRoomComponents(floor.rectangles).map((comp) => {
+  return connectedRoomComponents(floor.rectangles).filter((comp) => !comp.rectangles[0].outdoor).map((comp) => {
     const foot = computeFootprint(comp.rectangles);
     const w = wallLoss(floor, comp, s, fh, dT);
     const dn = splitByNeighbour(foot, below), up = splitByNeighbour(foot, above);

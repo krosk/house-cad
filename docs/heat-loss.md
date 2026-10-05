@@ -27,6 +27,19 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
   and ignored. Wall height = the room height, storey height − slab (`ceilingHeight`; `docs/product-intent.md`
   multi-floor); the room volume uses it too.
+- **OUTDOOR rooms** (owner, 2026-10-05: the unheated glazed veranda next to the kitchen, "I wish to
+  have it as a room, because its measurements matter", and "ok to treat it same as outside"). A ROOM
+  can be flagged `outdoor` (AR PLAN · EDIT: A/X on a selected room; desktop: the Indoor/Outdoor
+  button). It is measured, dimensioned and drawn like any room, but for heat loss it is outside: it
+  has no figure of its own, and a heated room's edge on it is exterior (b = 1), with the WALL /
+  INSULATION zones there as its layers. It never merges with an indoor room it touches
+  (`roomRectsConnect`), so its area is its own. Across a slab it counts as nothing (not a space).
+  That overstates the shared wall's share: **Hypothesis:** a glazed veranda is nearer b ≈ 0.6–0.9 at
+  night; accepted, as it errs on the safe side for sizing.
+  **Proven** (Node, made-up plan, 2026-10-05): a 4 × 4 m kitchen loses 4685 W with no veranda; with a
+  3 × 4 m indoor veranda beyond a 20 cm WALL zone 3992 W (the wall heated both sides), or 7159 W
+  touching it (merged); with the veranda OUTDOOR 4685 W in both cases. The flag survives save/load and
+  is dropped when the zone is retyped.
 - **Walls in the earth** (owner, 2026-10-04: one earth level for the house, for now): the HEAT LOSS
   setting **Earth level** is the outside ground's height from the ground floor's floor level (+ up,
   default 0). On every floor, the part of each exterior wall below it loses to the ground instead of

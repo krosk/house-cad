@@ -31,6 +31,7 @@ const STRINGS = {
   'mode.teleport': { en: 'TELEPORT', fr: 'TÉLÉPORT.', zh: '传送' },
   'mode.drop':     { en: 'ADD',    fr: 'AJOUT',    zh: '添加' },
   'mode.room':     { en: 'ROOM',   fr: 'PIÈCE',    zh: '房间' },
+  'mode.outdoor_room': { en: 'OUTDOOR ROOM', fr: 'PIÈCE EXTÉRIEURE', zh: '室外房间' },
   'mode.wall':     { en: 'WALL',   fr: 'MUR',      zh: '墙' },
   'mode.insulation': { en: 'INSULATION', fr: 'ISOLATION', zh: '保温层' },
   'mode.door':     { en: 'DOOR',   fr: 'PORTE',    zh: '门' },
@@ -163,9 +164,9 @@ const STRINGS = {
     zh: '瞄准一条边并扣动扳机锁定，再触碰真实墙面将其贴合。握把取消锁定。',
   },
   'help.edit': {
-    en: 'Edit the plan only. With nothing selected, grip cycles overlapping zones and trigger confirms the yellow target. B/Y deletes; thumbstick up/down changes type; trigger again deselects.',
-    fr: 'Modifiez seulement le plan. Sans sélection, la poignée parcourt les zones superposées et la gâchette valide la cible jaune. B/Y supprime ; joystick haut/bas change le type ; une nouvelle gâchette désélectionne.',
-    zh: '仅编辑平面。未选择时，握把循环重叠区域，扳机确认黄色目标。B/Y 删除；摇杆上/下更改类型；再次扣动取消选择。',
+    en: 'Edit the plan only. With nothing selected, grip cycles overlapping zones and trigger confirms the yellow target. B/Y deletes; thumbstick up/down changes type; A/X on a room makes it outdoor (a veranda) or indoor; trigger again deselects.',
+    fr: 'Modifiez seulement le plan. Sans sélection, la poignée parcourt les zones superposées et la gâchette valide la cible jaune. B/Y supprime ; joystick haut/bas change le type ; A/X sur une pièce la rend extérieure (véranda) ou intérieure ; une nouvelle gâchette désélectionne.',
+    zh: '仅编辑平面。未选择时，握把循环重叠区域，扳机确认黄色目标。B/Y 删除；摇杆上/下更改类型；对房间按 A/X 切换室外（阳光房）或室内；再次扣动取消选择。',
   },
   'help.translate': {
     en: 'Relocate the active floor rigidly. Pick an X edge and a Y edge, entering each desired distance from origin. FLIP changes side; the complete floor moves only after both are set.',

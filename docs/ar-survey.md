@@ -59,9 +59,11 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   decomposition in axis measurements") — trigger fixes point A at the controller tip; the tip is
   then B, and a readout 15 cm above it shows `X`, `Y`, `Z` and `DIST` (the straight distance),
   updated about 10 times a second, with coloured legs drawn A → along X → along Y → up Z → B
-  plus the straight A → B line. A second trigger freezes B; a third starts a new measurement.
-  X/Y are the plan axes once the plan is placed (the CAD's X and Y, so a reading compares
-  directly with a dimension); before ORIGIN they are the headset's own frame. Z is vertical.
+  plus the straight A → B line, as 1 cm tubes (`RULER_R`; owner: thicker lines, since WebXR
+  draws GL lines 1 px wide). A second trigger freezes B; a third starts a new measurement.
+  The points are stored in planGroup-local coordinates (owner, 2026-10-05): a teleport or a
+  left-stick turn carries the ruler with the plan. X/Y are therefore the plan axes (the CAD's X
+  and Y, so a reading compares directly with a dimension); Z is vertical.
   Values are magnitudes in the display unit. Session-only: nothing is saved, and leaving the
   mode clears it (`resetRuler`).
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
@@ -84,7 +86,8 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   through `ZONE_KINDS` (room→wall→insulation→door→garage→halfwall→heater→sliding→window→stairs up→stairs down→cabinet→
   furniture). **When the selection is an aperture** (door/garage/window/halfwall/heater/sliding), **A/X
   rotates it** (`rotateAperture`: door/sliding 4-way hinge×swing, window 3-way hinge, stairs 4-way
-  ascent; halfwall/heater return false = inert), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
+  ascent; halfwall/heater return false = inert); **on a room, A/X toggles it OUTDOOR** (a veranda; TYPE reads
+  `OUTDOOR ROOM`; `docs/heat-loss.md` "OUTDOOR rooms"), and the reused DIMS **numpad opens as a band pad** to type its `[sill,head]`
   bounds — see "Apertures & vertical bands". Selecting a **furniture** placeholder zone opens the same
   band pad for its `[foot,top]`. Marker
   glyphs are inert. The mode breadcrumb remains `PLAN · EDIT`; a separate, larger controller

@@ -1016,25 +1016,26 @@ export function setupMR(view, project, getFootprint) {
   // RULER (owner, 2026-10-05): trigger fixes point A at the controller tip; the tip is B
   // and the readout follows it (X, Y along the plan axes, Z the height, and the straight
   // distance); a second trigger freezes B; a third starts a new measurement. Session-only,
-  // never saved. Points are world positions; the axes are the plan's once it is placed,
-  // else the headset's own frame.
+  // never saved. Points are stored in planGroup-local coordinates, so a teleport or a
+  // left-stick turn carries them with the plan (owner, 2026-10-05); the group copies the
+  // plan's world matrix each frame (it is not a planGroup child: buildPlan empties that).
   const RULER_X = 0xff6b6b, RULER_Y = 0x51d88a, RULER_Z = 0x4ea1ff, RULER_D = 0xfacc15;
-  let rulerA = null, rulerB = null; // THREE.Vector3 world points; rulerB set = frozen
+  const RULER_R = 0.005; // m, tube radius: WebXR draws GL lines 1 px wide (owner: "make the lines thicker")
+  let rulerA = null, rulerB = null; // THREE.Vector3 planGroup-local points; rulerB set = frozen
   let rulerTextAt = -Infinity;      // ms of the last readout redraw (a canvas upload: ~10 Hz)
   const rulerGroup = new THREE.Group();
+  rulerGroup.matrixAutoUpdate = false;
   rulerGroup.visible = false;
-  // Four segments: A→X leg→Y leg→Z leg (the decomposition) and A→B (the distance).
-  const rulerLines = new THREE.LineSegments(
-    new THREE.BufferGeometry()
-      .setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(24), 3))
-      .setAttribute('color', new THREE.Float32BufferAttribute(
-        [RULER_X, RULER_X, RULER_Y, RULER_Y, RULER_Z, RULER_Z, RULER_D, RULER_D]
-          .flatMap((c) => new THREE.Color(c).toArray()), 3)),
-    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true }),
-  );
-  rulerLines.renderOrder = 30;
-  rulerLines.frustumCulled = false; // positions rewritten each frame
-  const rulerDotGeom = new THREE.SphereGeometry(0.006, 12, 8);
+  // Four tubes: A→X leg→Y leg→Z leg (the decomposition) and A→B (the distance). A unit
+  // cylinder along +Y, stretched and turned onto each segment per frame.
+  const rulerTubeGeom = new THREE.CylinderGeometry(1, 1, 1, 10, 1);
+  const rulerTubes = [RULER_X, RULER_Y, RULER_Z, RULER_D].map((color) => {
+    const m = new THREE.Mesh(rulerTubeGeom, new THREE.MeshBasicMaterial({ color, depthTest: false }));
+    m.renderOrder = 30;
+    m.frustumCulled = false;
+    return m;
+  });
+  const rulerDotGeom = new THREE.SphereGeometry(0.012, 14, 10);
   const rulerDotMat = new THREE.MeshBasicMaterial({ color: RULER_D, depthTest: false });
   const rulerDotA = new THREE.Mesh(rulerDotGeom, rulerDotMat);
   const rulerDotB = new THREE.Mesh(rulerDotGeom, rulerDotMat);
@@ -1042,34 +1043,44 @@ export function setupMR(view, project, getFootprint) {
   const rulerText = makeLabel(128);
   rulerText.sprite.scale.set(0.16, 0.08, 1); // 256 × 128 canvas
   rulerText.sprite.renderOrder = 32;
-  rulerGroup.add(rulerLines, rulerDotA, rulerDotB, rulerText.sprite);
+  rulerGroup.add(...rulerTubes, rulerDotA, rulerDotB, rulerText.sprite);
   scene.add(rulerGroup);
   function resetRuler() {
     rulerA = rulerB = null;
     rulerGroup.visible = false;
   }
-  const _rp1 = new THREE.Vector3(), _rp2 = new THREE.Vector3();
+  // A world point (the controller tip) in planGroup-local coordinates.
+  function rulerLocal(world) {
+    planGroup.updateMatrixWorld(true);
+    return planGroup.worldToLocal(world.clone());
+  }
+  const _rp1 = new THREE.Vector3(), _rp2 = new THREE.Vector3(), _rDir = new THREE.Vector3();
+  const _rUp = new THREE.Vector3(0, 1, 0);
+  function placeRulerTube(tube, from, to) {
+    _rDir.subVectors(to, from);
+    const len = _rDir.length();
+    tube.visible = len > 1e-4;
+    if (!tube.visible) return;
+    tube.position.addVectors(from, to).multiplyScalar(0.5);
+    tube.quaternion.setFromUnitVectors(_rUp, _rDir.divideScalar(len));
+    tube.scale.set(RULER_R, len, RULER_R);
+  }
   // Draw A → B (B = the frozen point, else the live tip) and its readout; `time` throttles
-  // the readout redraw while B moves.
+  // the readout redraw while B moves. Local frame: plan (x, y) = (x, −z), height = y.
   function updateRuler(tip, time) {
-    const b = rulerB || tip;
+    const b = rulerB || (tip && rulerLocal(tip));
     if (!rulerA || !b) { rulerGroup.visible = false; return; }
     const a = rulerA;
-    let dx, dy;
-    if (placed) { // plan axes: legs along plan X then plan Y, at A's height, then up Z
-      const pa = worldToPlan(a), pb = worldToPlan(b);
-      dx = pb.px - pa.px; dy = pb.py - pa.py;
-      planToWorld(pb.px, pa.py, _rp1).y = a.y;
-      planToWorld(pb.px, pb.py, _rp2).y = a.y;
-    } else { // headset axes: X = world x, Y = −world z (the plan mapping), Z = up
-      dx = b.x - a.x; dy = a.z - b.z;
-      _rp1.set(b.x, a.y, a.z);
-      _rp2.set(b.x, a.y, b.z);
-    }
-    const dz = b.y - a.y;
-    const p = rulerLines.geometry.attributes.position;
-    [a, _rp1, _rp1, _rp2, _rp2, b, a, b].forEach((v, i) => p.setXYZ(i, v.x, v.y, v.z));
-    p.needsUpdate = true;
+    planGroup.updateMatrixWorld(true); // a teleport/turn this frame moved the plan
+    rulerGroup.matrix.copy(planGroup.matrixWorld);
+    rulerGroup.matrixWorldNeedsUpdate = true;
+    const dx = b.x - a.x, dy = a.z - b.z, dz = b.y - a.y;
+    _rp1.set(b.x, a.y, a.z); // along plan X at A's height
+    _rp2.set(b.x, a.y, b.z); // then along plan Y; then up Z to B
+    placeRulerTube(rulerTubes[0], a, _rp1);
+    placeRulerTube(rulerTubes[1], _rp1, _rp2);
+    placeRulerTube(rulerTubes[2], _rp2, b);
+    placeRulerTube(rulerTubes[3], a, b);
     rulerDotA.position.copy(a);
     rulerDotB.position.copy(b);
     rulerText.sprite.position.set(b.x, b.y + 0.15, b.z); // clear of the tip's mode label
@@ -7549,8 +7560,8 @@ export function setupMR(view, project, getFootprint) {
       id: 'ruler', color: RULER_D,
       // Tip-to-tip measurement (see updateRuler): A, then B follows the tip until frozen.
       onTouch: (pos) => {
-        if (!rulerA || rulerB) { rulerA = pos.clone(); rulerB = null; rlog('ruler a'); return; }
-        rulerB = pos.clone();
+        if (!rulerA || rulerB) { rulerA = rulerLocal(pos); rulerB = null; rlog('ruler a'); return; }
+        rulerB = rulerLocal(pos);
         rlog('ruler b', { d: +rulerA.distanceTo(rulerB).toFixed(4) });
       },
     },
@@ -9184,6 +9195,13 @@ export function setupMR(view, project, getFootprint) {
       else if (modes[currentMode].id === 'edit' && selectedRect?.rotateAperture(1)) {
         project.touch(); buildPlan(); applyPlanMatrix();
       }
+      // PLAN EDIT: A/X on a selected room toggles indoor / OUTDOOR (a veranda: outside for
+      // heat loss, its own space for area; docs/heat-loss.md). The TYPE readout shows it.
+      else if (modes[currentMode].id === 'edit' && selectedRect?.kind === 'room') {
+        if (selectedRect.outdoor) delete selectedRect.outdoor; else selectedRect.outdoor = true;
+        rlog('edit outdoor', { id: selectedRect.id, outdoor: !!selectedRect.outdoor });
+        project.touch(); buildPlan(); applyPlanMatrix(); updateRoomAreaHud();
+      }
       // MATERIAL · FURNITURE: A/X turns the selected zone's product 90° (its footprint
       // swaps; the solver may then drop a dimension that no longer fits).
       else if (modes[currentMode].id === 'mat_furniture' && matSelDoor?.article && matSelDoor.rotateAperture(1)) {
@@ -9486,7 +9504,7 @@ export function setupMR(view, project, getFootprint) {
         : getOutputSettings().format === 'link' ? 'LINK · 3D VIEW'
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     checkRemovedDims();
-    const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(`mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
+    const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(selectedRect.outdoor ? 'mode.outdoor_room' : `mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const mergeHint = modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)
       ? `\n${t('marker.mergePair')}` : '';
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || heatStatus

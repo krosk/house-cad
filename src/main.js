@@ -550,6 +550,8 @@ const pY = document.getElementById('p-y');
 const pOp = document.getElementById('p-op');
 const pDel = document.getElementById('p-del');
 const pRot = document.getElementById('p-rot');
+const pOutdoorRow = document.getElementById('p-outdoor-row');
+const pOutdoor = document.getElementById('p-outdoor');
 const pApertureRow = document.getElementById('p-aperture-row');
 let selectedRect = null;
 
@@ -588,6 +590,9 @@ function updateProps() {
       : (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;
   }
+  // A room is indoor or OUTDOOR (a veranda: outside for heat loss, docs/heat-loss.md).
+  pOutdoorRow.hidden = r.kind !== 'room';
+  pOutdoor.textContent = r.outdoor ? '☀ Outdoor room' : '⌂ Indoor room';
 }
 
 sketch.onSelect = (rect) => {
@@ -608,6 +613,11 @@ pOp.addEventListener('click', () => {
 });
 pRot.addEventListener('click', () => {
   if (selectedRect?.rotateAperture(1)) project.touch();
+});
+pOutdoor.addEventListener('click', () => {
+  if (selectedRect?.kind !== 'room') return;
+  if (selectedRect.outdoor) delete selectedRect.outdoor; else selectedRect.outdoor = true;
+  project.touch();
 });
 pDel.addEventListener('click', () => sketch.deleteSelected());
 

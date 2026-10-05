@@ -135,6 +135,7 @@ export function multiPolygonArea(multiPolygon) {
 // Positive-area overlap counts, as does a shared boundary segment with positive
 // length. A single shared corner explicitly does not.
 function roomRectsConnect(a, b, epsilon) {
+  if (!!a.outdoor !== !!b.outdoor) return false; // an OUTDOOR room is its own space (model.js)
   const ab = a.bounds, bb = b.bounds;
   const overlapX = Math.min(ab.x1, bb.x1) - Math.max(ab.x0, bb.x0);
   const overlapY = Math.min(ab.y1, bb.y1) - Math.max(ab.y0, bb.y0);

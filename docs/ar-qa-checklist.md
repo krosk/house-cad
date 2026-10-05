@@ -406,10 +406,16 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Basement STAIRS UP (7 treads to 1.26 m) + Ground STAIRS DOWN (5 treads to −0.90 m) match the real basement stair
 - [ ] Tread depth (25 cm assumed) against the real treads; the same treads in desktop View 3D
 
+## OUTDOOR room (veranda)  ⬜ NEW (2026-10-05) — Node-verified only
+- [ ] PLAN · EDIT: select the veranda room, A/X → TYPE reads `OUTDOOR ROOM`; A/X again → `ROOM`
+- [ ] HEAT LOSS: the veranda shows no watts; the kitchen's wall to it now loses heat; the EDIT area of the veranda and the kitchen are separate
+- [ ] SAVE / LOAD keeps the flag; desktop panel shows ☀ Outdoor room
+
 ## PLAN · RULER (`ruler`)  ⬜ NEW (2026-10-05) — build-verified only
 - [ ] Trigger at a point: X, Y, Z and DIST follow the tip, the coloured legs and the A → B line follow it; the readout sits clear of the mode label
 - [ ] Trigger again: the values and lines freeze; a third trigger starts a new A
 - [ ] Measure a wall the plan already dimensions: X (or Y) matches the dimension; Z of a level move stays near 0
+- [ ] Teleport or turn with the left stick: the frozen ruler moves with the plan; the lines read as thick coloured tubes
 - [ ] Leaving RULER clears the measurement; the readout changes with PROJECT · UNIT
 
 ## Conflicting dimensions: suspects  ⬜ NEW (2026-10-04) — Node-verified only
