@@ -48,6 +48,8 @@ const STRINGS = {
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
   'mode.edit':     { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.translate': { en: 'TRANSLATE', fr: 'TRANSLATION', zh: '平移' },
+  'mode.ruler':    { en: 'RULER', fr: 'RÈGLE', zh: '量尺' },
+  'ruler.dist':    { en: 'DIST', fr: 'DIST', zh: '距离' },
   'mode.marker':   { en: 'EDIT',   fr: 'MODIF.',   zh: '编辑' },
   'mode.marker_link': { en: 'LINK', fr: 'LIER',     zh: '连接' },
   'mode.marker_wire': { en: 'WIRE', fr: 'CÂBLE',    zh: '布线' },
@@ -144,6 +146,11 @@ const STRINGS = {
     en: 'Aim the floor reticle and trigger to move your virtual position there. The surveyed origin stays unchanged.',
     fr: 'Visez le sol avec le réticule et appuyez sur la gâchette pour y déplacer votre position virtuelle. L’origine relevée reste inchangée.',
     zh: '用地面准星瞄准并扣动扳机，将虚拟位置移动到那里。测量原点保持不变。',
+  },
+  'help.ruler': {
+    en: 'Trigger at the first point with the controller tip. Move the tip: X and Y (plan axes), Z (height) and the straight distance follow it. Trigger again to freeze; once more starts a new measurement. Nothing is saved.',
+    fr: 'Gâchette au premier point avec la pointe de la manette. Déplacez la pointe : X et Y (axes du plan), Z (hauteur) et la distance directe la suivent. Gâchette à nouveau pour figer ; encore une fois pour une nouvelle mesure. Rien n’est enregistré.',
+    zh: '用手柄尖端在第一个点扣动扳机。移动尖端：X、Y（平面轴）、Z（高度）和直线距离随之更新。再扣一次扳机冻结；再扣一次开始新的测量。不会保存。',
   },
   'help.drop': {
     en: 'Thumbstick up/down picks the plan type, including STAIRS UP and STAIRS DOWN. All except ROOM subtract for now. Trigger drops the box where you stand.',

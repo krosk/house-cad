@@ -14,7 +14,7 @@ editor (`docs/product-intent.md`).
 
 ```text
 SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
-PLAN     · ADD → EDGE → DIMS → EDIT
+PLAN     · ADD → EDGE → DIMS → EDIT → RULER
 MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
 MATERIAL · FLOOR → WALL → DOOR → WINDOW → FURNITURE → SWITCH → OUTLET → ETHERNET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
@@ -25,7 +25,7 @@ navigation remains one fast linear cycle across the rows above (thumbstick-x, bo
 presentation adds hierarchy without remapping any contextual buttons or thumbstick-y actions.
 The single source of truth for order is `MODE_ORDER` (which sorts the `modes` array) and `MODE_GROUP`;
 IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport`, `drop`, `edge`,
-`plan_dims`, `edit`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
+`plan_dims`, `edit`, `ruler`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
 `conduit_edit`, `marker_wire`, `marker_pipe`, the MATERIAL modes, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
 `translate`, `save`, `load`, `export`, `unit`, `lang`. **`MODE_HIDDEN`** = `{copy_floor, paste_floor,
 move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
@@ -55,6 +55,15 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   to bring that plan coordinate beneath the headset. WebXR cannot move the physical passthrough
   camera, so this applies a horizontal `navOffset` to the CAD frame while preserving the surveyed
   `planPos`, yaw, and XR anchor. ORIGIN/RECAL (`placeAt`) clear the navigation offset; FLOOR keeps it.
+- **PLAN · RULER** (`id: ruler`, owner 2026-10-05: "measure between two points, with a
+  decomposition in axis measurements") — trigger fixes point A at the controller tip; the tip is
+  then B, and a readout 15 cm above it shows `X`, `Y`, `Z` and `DIST` (the straight distance),
+  updated about 10 times a second, with coloured legs drawn A → along X → along Y → up Z → B
+  plus the straight A → B line. A second trigger freezes B; a third starts a new measurement.
+  X/Y are the plan axes once the plan is placed (the CAD's X and Y, so a reading compares
+  directly with a dimension); before ORIGIN they are the headset's own frame. Z is vertical.
+  Values are magnitudes in the display unit. Session-only: nothing is saved, and leaving the
+  mode clears it (`resetRuler`).
 - **REGISTER** — 3-point derived origin corner. Touch P1,P2 along one wall (sets +X down it),
   then P3 on the perpendicular wall; origin = P3 projected onto the P1→P2 line, so the corner
   needn't be reachable. Tip steps WALL 1 → WALL 2 → PERP; grip undoes one point.

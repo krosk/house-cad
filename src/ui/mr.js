@@ -1013,6 +1013,77 @@ export function setupMR(view, project, getFootprint) {
   const recalBadge2 = makeBadge(); recalBadge2.setText('W2', C_WALL2); // rides wall 2
   const recalStep = makeBadge();                                      // rides the reticle (current step)
 
+  // RULER (owner, 2026-10-05): trigger fixes point A at the controller tip; the tip is B
+  // and the readout follows it (X, Y along the plan axes, Z the height, and the straight
+  // distance); a second trigger freezes B; a third starts a new measurement. Session-only,
+  // never saved. Points are world positions; the axes are the plan's once it is placed,
+  // else the headset's own frame.
+  const RULER_X = 0xff6b6b, RULER_Y = 0x51d88a, RULER_Z = 0x4ea1ff, RULER_D = 0xfacc15;
+  let rulerA = null, rulerB = null; // THREE.Vector3 world points; rulerB set = frozen
+  let rulerTextAt = -Infinity;      // ms of the last readout redraw (a canvas upload: ~10 Hz)
+  const rulerGroup = new THREE.Group();
+  rulerGroup.visible = false;
+  // Four segments: A→X leg→Y leg→Z leg (the decomposition) and A→B (the distance).
+  const rulerLines = new THREE.LineSegments(
+    new THREE.BufferGeometry()
+      .setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(24), 3))
+      .setAttribute('color', new THREE.Float32BufferAttribute(
+        [RULER_X, RULER_X, RULER_Y, RULER_Y, RULER_Z, RULER_Z, RULER_D, RULER_D]
+          .flatMap((c) => new THREE.Color(c).toArray()), 3)),
+    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true }),
+  );
+  rulerLines.renderOrder = 30;
+  rulerLines.frustumCulled = false; // positions rewritten each frame
+  const rulerDotGeom = new THREE.SphereGeometry(0.006, 12, 8);
+  const rulerDotMat = new THREE.MeshBasicMaterial({ color: RULER_D, depthTest: false });
+  const rulerDotA = new THREE.Mesh(rulerDotGeom, rulerDotMat);
+  const rulerDotB = new THREE.Mesh(rulerDotGeom, rulerDotMat);
+  rulerDotA.renderOrder = rulerDotB.renderOrder = 31;
+  const rulerText = makeLabel(128);
+  rulerText.sprite.scale.set(0.16, 0.08, 1); // 256 × 128 canvas
+  rulerText.sprite.renderOrder = 32;
+  rulerGroup.add(rulerLines, rulerDotA, rulerDotB, rulerText.sprite);
+  scene.add(rulerGroup);
+  function resetRuler() {
+    rulerA = rulerB = null;
+    rulerGroup.visible = false;
+  }
+  const _rp1 = new THREE.Vector3(), _rp2 = new THREE.Vector3();
+  // Draw A → B (B = the frozen point, else the live tip) and its readout; `time` throttles
+  // the readout redraw while B moves.
+  function updateRuler(tip, time) {
+    const b = rulerB || tip;
+    if (!rulerA || !b) { rulerGroup.visible = false; return; }
+    const a = rulerA;
+    let dx, dy;
+    if (placed) { // plan axes: legs along plan X then plan Y, at A's height, then up Z
+      const pa = worldToPlan(a), pb = worldToPlan(b);
+      dx = pb.px - pa.px; dy = pb.py - pa.py;
+      planToWorld(pb.px, pa.py, _rp1).y = a.y;
+      planToWorld(pb.px, pb.py, _rp2).y = a.y;
+    } else { // headset axes: X = world x, Y = −world z (the plan mapping), Z = up
+      dx = b.x - a.x; dy = a.z - b.z;
+      _rp1.set(b.x, a.y, a.z);
+      _rp2.set(b.x, a.y, b.z);
+    }
+    const dz = b.y - a.y;
+    const p = rulerLines.geometry.attributes.position;
+    [a, _rp1, _rp1, _rp2, _rp2, b, a, b].forEach((v, i) => p.setXYZ(i, v.x, v.y, v.z));
+    p.needsUpdate = true;
+    rulerDotA.position.copy(a);
+    rulerDotB.position.copy(b);
+    rulerText.sprite.position.set(b.x, b.y + 0.15, b.z); // clear of the tip's mode label
+    if (rulerB || time - rulerTextAt >= 100) {
+      rulerTextAt = time;
+      const u = unitLabel();
+      rulerText.setText([
+        `X  ${fmt(Math.abs(dx))} ${u}`, `Y  ${fmt(Math.abs(dy))} ${u}`, `Z  ${fmt(Math.abs(dz))} ${u}`,
+        `${t('ruler.dist')}  ${fmt(Math.hypot(dx, dy, dz))} ${u}`,
+      ].join('\n'), [RULER_X, RULER_Y, RULER_Z, RULER_D]);
+    }
+    rulerGroup.visible = true;
+  }
+
   // Whole-zone outline highlight for PLAN mode (the room/wall under your ray). All
   // four edges in one buffer (4 edges * 2 triangles * 3 verts = 24 verts / 72 floats).
   const rectHi = new THREE.Mesh(
@@ -7475,6 +7546,15 @@ export function setupMR(view, project, getFootprint) {
       },
     },
     {
+      id: 'ruler', color: RULER_D,
+      // Tip-to-tip measurement (see updateRuler): A, then B follows the tip until frozen.
+      onTouch: (pos) => {
+        if (!rulerA || rulerB) { rulerA = pos.clone(); rulerB = null; rlog('ruler a'); return; }
+        rulerB = pos.clone();
+        rlog('ruler b', { d: +rulerA.distanceTo(rulerB).toFixed(4) });
+      },
+    },
+    {
       id: 'translate', color: 0x2dd4bf,
       // Pick one vertical and one horizontal edge, enter their signed distances
       // from origin, then rigidly translate every item and annotation on this floor.
@@ -7929,7 +8009,7 @@ export function setupMR(view, project, getFootprint) {
   // behavior above; this list alone defines how A/B and thumbstick-x traverse them.
   const MODE_ORDER = [
     'register', 'floor', 'level', 'recal', 'teleport',
-    'drop', 'edge', 'plan_dims', 'edit',
+    'drop', 'edge', 'plan_dims', 'edit', 'ruler',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check',
     'marker_pipe', 'heat', 'heat_r',
     'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
@@ -7937,7 +8017,7 @@ export function setupMR(view, project, getFootprint) {
   ];
   const MODE_GROUP = {
     register: 'setup', floor: 'setup', recal: 'setup', teleport: 'setup', level: 'setup',
-    drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan',
+    drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan', ruler: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', outlet_dims: 'marker',
     // HEATING (owner, 2026-10-01): the pipe network, room heat loss and insulation R.
     marker_pipe: 'heating', heat: 'heating', heat_r: 'heating',
@@ -8009,6 +8089,7 @@ export function setupMR(view, project, getFootprint) {
     conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
     selectedEdge = null; edgePickKey = null; edgeSnapPrompt = false; // drop any pending EDGE lock + its label
     resetTranslate(); // ...and any partially-defined rigid floor translation
+    resetRuler(); // ...and any RULER measurement (session-only)
     clearTimeout(projectFlashTimer);
     pasteConfirmFloorId = null;
     rectHi.visible = false;
@@ -8313,6 +8394,7 @@ export function setupMR(view, project, getFootprint) {
     startupPoseFrames = 0;
     reticle.visible = false;
     leftTeleportReticle.visible = false;
+    resetRuler();
     sheetPanel.group.visible = false;
     exportMenu.group.visible = false;
     heatMenu.group.visible = false;
@@ -9531,6 +9613,11 @@ export function setupMR(view, project, getFootprint) {
         reticle.visible = false;
       }
       edgeHi.visible = false;
+    } else if (modeId === 'ruler') {
+      // The controller tip is the measured point; no reticle or edge picking.
+      reticle.visible = false;
+      edgeHi.visible = false;
+      updateRuler(tipPosition(editCtl), time);
     } else if (modeId === 'translate') {
       // Pick one edge per axis. Each selected edge opens the numpad for its desired
       // signed coordinate; after both entries the model applies one rigid delta.
