@@ -39,6 +39,15 @@ The storage is per origin, so DevTools needs a tab on `krosk.github.io`. The too
 `/house-cad/version.json` in a tab when none is on the origin: same origin, none of the app's code
 runs, so nothing gets saved. Quest Browser refuses `/json/new`, so it navigates an existing tab.
 
+Trap (owner, 2026-10-06): until the service worker excluded it (`navigateFallbackDenylist` in
+`vite.config.js`), navigating to `version.json` served `index.html` under that URL, so the "safe" tab
+ran the app (title "House CAD"). Proven: the deployed `sw.js` bound every navigation to `index.html`;
+the headset tab showed "House CAD" at `.../version.json`; a cache-bypassing reload showed
+`application/json`. The session-39 write went through such a tab and read back identical, and the
+autosave still matched afterwards. The tool now checks `document.contentType`, not the URL, and warns
+when the tab is the app. Hypothesis until checked on the headset: with the fix installed, a plain
+navigation to `version.json` shows the JSON.
+
 ```bash
 node --experimental-websocket tools/quest-storage.mjs backup <scratch>/quest-backup-<stamp>
 node --experimental-websocket tools/quest-storage.mjs read <scratch>/base.json

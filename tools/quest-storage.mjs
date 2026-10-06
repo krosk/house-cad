@@ -72,7 +72,10 @@ async function originTab() {
   }
   const href = await tab.evaluate('location.href');
   if (!href.startsWith(`${ORIGIN}/house-cad/`)) die(`tab is on ${href}`);
-  if (!href.endsWith('version.json')) console.warn(`warning: tab is the app (${href}); it may autosave over a write`);
+  // The URL is not enough: before the service worker's fallback excluded version.json,
+  // navigating there ran the app under that URL.
+  const isJson = await tab.evaluate("document.contentType === 'application/json'");
+  if (!isJson) console.warn(`warning: tab is the app (${href}); it may autosave over a write`);
   return tab;
 }
 

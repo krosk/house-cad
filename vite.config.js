@@ -108,6 +108,10 @@ export default defineConfig(({ command }) => {
           // The three.js chunk exceeds Workbox's 2 MiB default — raise the cap so
           // it's precached (otherwise the app wouldn't be fully offline).
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+          // Navigating to version.json must load the real file, not index.html (the
+          // default fallback for every navigation): tools/quest-storage.mjs opens it as
+          // the tab that runs none of the app's code (docs/headset-data.md).
+          navigateFallbackDenylist: [/version\.json$/],
         },
         devOptions: { enabled: false },
       })],
