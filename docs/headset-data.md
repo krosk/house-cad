@@ -14,8 +14,9 @@ unless marked Hypothesis. Skill: `quest-edit`.
 - **Back up every `house-cad:*` key before a write**, into the scratchpad. A save slot that still holds
   the pre-edit plan is a second undo; say which one.
 - **Never `adb shell pm clear com.krosk.housecad`**: it wipes the autosave and the slots.
-- The headset copy is usually **newer** than any export on the Deck (`Document from Alexis He.json` is
-  rev 9; the headset was rev 14 on 2026-10-04). Edit the headset copy, never push a Deck file over it.
+- The headset copy is the only current plan (the Deck's old rev 9 export was deleted at the owner's
+  request, 2026-10-06: "a newer format was introduced anyway"). Edit the headset copy, never push a
+  Deck file over it; Node checks run on a fresh `read` in the scratchpad.
 
 ## Connecting
 

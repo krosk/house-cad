@@ -21,9 +21,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 
 **Date:** 2026-10-06 (session 39; the Quest was reachable all session)
 **Status:** Proven (git, 2026-10-06): `main` = `origin/main`, nothing unpushed; app head `d6ff2f7`.
-Tree clean apart from the owner's untracked `Document from Alexis He.json`. Proven (`update-app`,
+Tree clean (the owner's old `Document from Alexis He.json` was deleted at their request). Proven (`update-app`,
 2026-10-06): the headset precache holds `d6ff2f7`. Proven (three `quest-storage read`s, 2026-10-06):
-the headset plan is **rev 17**, unchanged during the session; nothing was written to it. The owner has
+the headset plan is **rev 17**. At session end, on the owner's yes (AR closed, full backup first),
+we wrote their heat settings into it and read them back identical: tRoom 22, radiatorDT 24, revealPsi
+0.25 (planned foam), Ground heavyCeiling no + floorR 0.9 (planned 2 cm PIR), Upper heavy no + heavyCeiling
+no. Nothing else changed (diff: no conflicts, no deleted dims). The pre-write autosave exists only in
+that session's scratchpad backup (gone in a new session); no slot holds it (slot 1 = rev 17 of
+2026-10-05 15:26 UTC with tRoom 22, slabR 0; slot 3 = rev 6; slot 4 = rev 14). To undo, set the rows back in AR. The owner has
 not yet reported any session 38/39 feature from the device (items 31–45 unwalked).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
@@ -330,8 +335,8 @@ Then, with no Quest (2026-10-05 afternoon), compressed in session 39 (detail in 
 
 - **The owner's house is now edited directly on the headset** (owner, 2026-10-04: "we will keep
   continue modify the house via direct edit"): changes they ask for go into the headset autosave
-  through the `quest-edit` skill (`docs/headset-data.md`), not into a Deck export. The Deck's
-  `Document from Alexis He.json` (rev 9) is stale for current-state questions; read the headset.
+  through the `quest-edit` skill (`docs/headset-data.md`), not into a Deck export. There is no Deck
+  copy any more (owner deleted the rev 9 export, 2026-10-06); read the headset.
 
 - **Label every claim Proven or Hypothesis** (`CLAUDE.md` top rule), in reports, commit bodies, docs.
 - **Session 36 features (folded):** the AR group **HEATING** = PIPE (id `marker_pipe`) + HEAT LOSS +
@@ -681,8 +686,8 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `4cad922` Monastère, Lucia, detail layer · `9a82898` open doors in View 3D.
 - Earlier sessions: see `git log`.
 
-**Never stage** `Document from Alexis He.json` (untracked): the owner's house at rev 9, a read-only Node
-fixture only. The current plan is the **headset autosave** (read it with `quest-storage.mjs read`,
+The owner's old `Document from Alexis He.json` (rev 9) was deleted at their request (2026-10-06): if a
+house JSON ever appears in the tree, never stage it. The current plan is the **headset autosave** (read it with `quest-storage.mjs read`,
 `docs/headset-data.md`); scratchpad copies are session-local.
 
 ## Resuming from a clean checkout
@@ -741,10 +746,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 skip `update-app` and say so.
 
 - **First, with the Quest:**
-  - The owner sets in HEAT LOSS what they told us (not written by us; offer to write only on their
-    yes, AR closed, after a backup): Indoor 22; Upper Heavy floor no, Heavy attic floor no; Ground Heavy
-    attic floor no; Radiator ΔT 24; and, for the planned state, Window ψ 0.25 and Ground Floor ins. R 0.9.
-    Rev 17 still holds tRoom 19, radiatorDT 20 and heavy yes everywhere.
+  - Their heat settings are in the plan now (Status). Confirm the panel shows them orange, and that
+    the house reads ≈ 6.7 kW at −7 °C / 22 °C (Node on the written copy: 6 728 W).
   - Walk the junction view (item 39): bars/posts/frames where real junctions are, grey posts at the
     plaster partitions, any thick meulière partition missing (none detected on rev 17), the readout;
     the panel grew 4 rows since item 37 (fit?). Then items 32–37 and the RULER as before.
