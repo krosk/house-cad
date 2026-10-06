@@ -562,5 +562,22 @@
     "mountZMm": 882,
     "kitchen": "worktop-b-1540",
     "source": "IKEA METOD unit B of the owner's Kitchen Planner design \"Maison 2\" (C65F817E): SÄLJAN worktop 154; assembled from IKEA rotera part models (src/ui/kitchenUnits.js)"
+  },
+  "vb-architectura-4694r001": {
+    "name": "vb-architectura-4694r001",
+    "article": "4694R001",
+    "sizeMm": [
+      368,
+      361,
+      529
+    ],
+    "mountZMm": 80,
+    "procedural": "wall-hung-wc",
+    "params": {
+      "seat": true,
+      "lidOpen": false
+    },
+    "source": "procedural: Villeroy & Boch Architectura rimless wall-hung WC pan, DirectFlush, White Alpin (V&B 4694R001) with a generic slim seat; every ceramic ring is a section of V&B's own 3D data VB-Architectura-4694R0-3D01-v00-42570.stp (368.5 x 529.3 x 339.1 mm), rim at 415 mm from the 2D drawing VB-Architectura-4694R0-2D01-v02-39072; the seat and lid are estimates (sold separately); sources in the wall-hung-wc builder",
+    "registeredAt": "2026-10-06T00:00:00.000Z"
   }
 }

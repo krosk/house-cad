@@ -931,6 +931,187 @@ function moderTable(entry) {
   return g;
 }
 
+// Wall-hung WC pan (Villeroy & Boch Architectura rimless, 4694R001) with a generic slim
+// seat and lid. Every ceramic surface is a stack of horizontal plan rings of one shape: a
+// straight back with rounded corners, straight sides, and an elliptical front (`wcRing`),
+// stitched into smooth shells; about 2 500 triangles in all. Wall at −Z, front toward +Z;
+// the catalog `mountZMm` lifts it on drop (the foot is the trap's bottom).
+//
+// Sources:
+//   - Product page: https://pro.villeroy-boch.com/en/hu/bw/p/Architectura-Washdown-toilet,-rimless-Round-4694R001
+//     ("Washdown toilet, rimless, wall-mounted, with DirectFlush", 370 × 530 mm, White Alpin).
+//   - V&B 3D data VB-Architectura-4694R0-3D01-v00-42570.stp (assets.villeroy-boch.com/BW/dl_3d_data/;
+//     NX 10 export, 2019-01-22): every ring below is a section of it, tessellated at 0.5 mm with
+//     occt-import-js and cut by plane. STEP axes: x across, y = −d (wall at 0), z up with the
+//     rim top near 0. Overall 368.5 × 529.3 × 339.1 mm. Each plan section fits the ring shape
+//     within 3 mm RMS (elliptical front 174–188 mm long).
+//   - V&B 2D drawing VB-Architectura-4694R0-2D01-v02-39072.pdf (V01, 22.11.2022): 370 × 530,
+//     rim 415 above the floor (→ `mountZMm` 80 with the rim at STEP z +6), bowl opening
+//     280 × 335 (STEP: 286 × 338), waste Ø102, inlet Ø55, fixing bolts 180 apart.
+//   - Installation manual VB-Architectura-4694R0-II-v01-43643-en.pdf (dl_mal).
+//   - Rings (mm; STEP z → hw half-width, db..df from the wall, bF front ellipse, rB corners):
+//     outer z −8: 184.2, 0..529.3, bF 188 · z −45: 183.5, ..528.5 · z −55: 173.7, ..519 (the step
+//     under the rim slab) · z −60: 169.3, ..513.2, bF 174 · z −100: 164.3, ..497.2, bF 182 ·
+//     z −150: 157.8, ..474.1, bF 186 · z −200: 150.2, ..448.1 · z −240: 142.1, ..425.4 · flat
+//     underside at z −254. Top at z +6 (the STEP reads +5 at the front to +10 at the wall).
+//     Bowl: opening hw 143, 150..488, bF 158, rB 55 · z −100: 139, 134..478 · z −120: 110,
+//     142..452 · z −140: 63, 154..410 · z −160: 48, 166..370 · z −200: 45, 188..316 · z −240:
+//     41, 200..288 (closed there by the water surface). The undercut under the rimless rim is
+//     not modelled. Trap bulb: z −250: 51, 114..293 down to z −325: 23, 163..228, bottom −329.1.
+//     Wall foot: z −256: 129, 0..78 down to z −280: 33, 0..64. Seat holes Ø16 at x ±77.5, d 115.
+//   - The seat and lid are generic (not part of 4694R001, sold separately): 12 mm seat and
+//     12 mm lid following the rim outline, on 7 mm hinge posts at the seat holes. Estimates.
+const WC_Z0 = 329.1;            // STEP z of the lowest point (trap bottom) → Y = 0
+const WC_D = 529.3;             // depth, wall to front (plan centred on it)
+const WC_TOP = 6;               // STEP z of the flat seating rim
+const WC_SEG = { back: 2, corner: 4, side: 1, front: 16 };
+
+// One plan ring (mm): x across, d from the wall. Same point count for every ring.
+function wcRing(hw, db, df, bF, rB) {
+  const fit = Math.min(1, (df - db) / (bF + rB));
+  bF *= fit; rB = Math.max(1, rB * fit);
+  const { back, corner, side, front } = WC_SEG, pts = [];
+  const run = (n, f) => { for (let i = 0; i < n; i++) pts.push(f(i / n)); };
+  run(back, (t) => [-hw + rB + t * 2 * (hw - rB), db]);
+  run(corner, (t) => { const a = -Math.PI / 2 + t * Math.PI / 2; return [hw - rB + rB * Math.cos(a), db + rB + rB * Math.sin(a)]; });
+  run(side, (t) => [hw, db + rB + t * (df - bF - db - rB)]);
+  run(front, (t) => { const a = t * Math.PI; return [hw * Math.cos(a), df - bF + bF * Math.sin(a)]; });
+  run(side, (t) => [-hw, df - bF - t * (df - bF - db - rB)]);
+  run(corner, (t) => { const a = Math.PI + t * Math.PI / 2; return [-hw + rB + rB * Math.cos(a), db + rB + rB * Math.sin(a)]; });
+  return pts;
+}
+
+// Indexed shells from rings: consecutive stitches share vertices (smooth); a fresh ring
+// starts a crease. Faces point 'out'/'in' (from the ring's centre) or 'up'/'down'.
+class WcMesher {
+  constructor() { this.pos = []; this.idx = []; }
+  ring(pts, z) {
+    const base = this.pos.length / 3;
+    for (const [x, d] of pts) this.pos.push(x / 1000, (z + WC_Z0) / 1000, (d - WC_D / 2) / 1000);
+    return { base, pts, z };
+  }
+  tri(a, b, c, face, centre) {
+    const P = (i) => this.pos.slice(i * 3, i * 3 + 3);
+    const [pa, pb, pc] = [P(a), P(b), P(c)];
+    const e1 = pb.map((v, k) => v - pa[k]), e2 = pc.map((v, k) => v - pa[k]);
+    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    let s;
+    if (face === 'up' || face === 'down') s = n[1] * (face === 'up' ? 1 : -1);
+    else {
+      const m = [(pa[0] + pb[0] + pc[0]) / 3 - centre[0], 0, (pa[2] + pb[2] + pc[2]) / 3 - centre[1]];
+      s = (n[0] * m[0] + n[2] * m[2]) * (face === 'out' ? 1 : -1);
+    }
+    this.idx.push(...(s >= 0 ? [a, b, c] : [a, c, b]));
+  }
+  stitch(r1, r2, face) {
+    const n = r1.pts.length, c = r1.pts.reduce((s, [x, d]) => [s[0] + x / n, s[1] + d / n], [0, 0]);
+    const centre = [c[0] / 1000, (c[1] - WC_D / 2) / 1000];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      this.tri(r1.base + i, r1.base + j, r2.base + j, face, centre);
+      this.tri(r1.base + i, r2.base + j, r2.base + i, face, centre);
+    }
+  }
+  // A smooth shell through `rings` ([hw, db, df, bF, rB, z]), top to bottom.
+  shell(rings, face) {
+    let prev = null, first = null, last = null;
+    for (const [hw, db, df, bF, rB, z] of rings) {
+      const r = this.ring(wcRing(hw, db, df, bF, rB), z);
+      if (prev) this.stitch(prev, r, face);
+      first ??= r; prev = last = r;
+    }
+    return { first, last };
+  }
+  // A flat cap over a ring (fresh vertices, so its edge is a crease).
+  cap(r, face) {
+    const c = this.ring(r.pts, r.z), n = r.pts.length;
+    const mid = r.pts.reduce((s, [x, d]) => [s[0] + x / n, s[1] + d / n], [0, 0]);
+    const m = this.ring([mid], r.z).base;
+    for (let i = 0; i < n; i++) this.tri(m, c.base + i, c.base + (i + 1) % n, face);
+  }
+  // A flat band between two rings at one height (fresh vertices).
+  band(r1, r2, face) { this.stitch(this.ring(r1.pts, r1.z), this.ring(r2.pts, r2.z), face); }
+  geometry() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setIndex(this.idx);
+    g.computeVertexNormals();
+    return g;
+  }
+}
+
+function wallHungWc(entry) {
+  const p = entry.params || {};
+  const ceramic = new THREE.MeshStandardMaterial({ color: p.color ?? 0xf6f6f3, roughness: 0.12 });
+  const water = new THREE.MeshStandardMaterial({ color: 0xc4d2d8, roughness: 0.05 });
+  const plastic = new THREE.MeshStandardMaterial({ color: p.seatColor ?? 0xf9f9f7, roughness: 0.3 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, metalness: 0.9, roughness: 0.25 });
+  const T = WC_TOP;
+
+  // Ceramic: outer shell, seating rim, bowl, trap bulb, wall foot.
+  const m = new WcMesher();
+  const outer = m.shell([
+    [176, 0, 521, 180, 2, T], [182.5, 0, 527.5, 186, 2, T - 3], [184.2, 0, 529.3, 188, 2, -8],
+    [183.5, 0, 528.5, 188, 2, -45], [173.7, 0, 519, 180, 2, -55], [169.3, 0, 513.2, 174, 2, -60],
+    [164.3, 0, 497.2, 182, 2, -100], [157.8, 0, 474.1, 186, 2, -150], [150.2, 0, 448.1, 186, 2, -200],
+    [142.1, 0, 425.4, 184, 2, -240], [136, 0, 419, 180, 2, -250], [126, 0, 410, 172, 2, -254],
+  ], 'out');
+  m.cap(outer.last, 'down');
+  const bowl = m.shell([
+    [147, 146, 492, 160, 58, T], [139, 154, 484, 156, 55, -5], [139, 134, 478, 150, 40, -100],
+    [110, 142, 452, 140, 40, -120], [63, 154, 410, 110, 25, -140], [48, 166, 370, 90, 20, -160],
+    [45, 188, 316, 45, 30, -200], [41, 200, 288, 41, 30, -240],
+  ], 'in');
+  m.band(outer.first, bowl.first, 'up');
+  const bulb = m.shell([
+    [51, 114, 293, 51, 51, -250], [49, 119, 288, 49, 49, -270], [47.5, 125, 280, 47.5, 47.5, -290],
+    [45, 130, 273, 45, 45, -300], [41, 138, 263, 41, 41, -310], [34, 149, 249, 34, 34, -318],
+    [23, 163, 228, 23, 23, -325], [9, 186, 206, 9, 9, -329.1],
+  ], 'out');
+  m.cap(bulb.last, 'down');
+  const foot = m.shell([
+    [129, 0, 78, 30, 1, -252], [68, 0, 77, 30, 1, -262], [54, 0, 76, 30, 1, -270],
+    [33, 0, 64, 25, 1, -280], [25, 0, 55, 20, 1, -285],
+  ], 'out');
+  m.cap(foot.last, 'down');
+  const g = new THREE.Group();
+  g.name = entry.name || 'wall-hung-wc';
+  g.add(new THREE.Mesh(m.geometry(), ceramic));
+
+  // Water surface where the bowl's last ring closes.
+  const w = new WcMesher();
+  w.cap(w.ring(wcRing(41, 200, 288, 41, 30), -240), 'up');
+  g.add(new THREE.Mesh(w.geometry(), water));
+
+  if (p.seat === false) return g;
+  // Generic slim seat and lid (estimates), on hinge posts at the seat holes.
+  const S0 = T + 2, S1 = S0 + 12, L1 = S1 + 12, back = 128;
+  const s = new WcMesher();
+  const so = s.shell([[176, back, 524, 184, 12, S1 - 2], [178, back, 526, 186, 12, S1 - 6], [178, back, 526, 186, 12, S0]], 'out');
+  const si = s.shell([[116, 190, 462, 124, 50, S1 - 2], [114, 192, 460, 122, 50, S0]], 'in');
+  s.band(so.first, si.first, 'up');
+  s.band(so.last, si.last, 'down');
+  g.add(new THREE.Mesh(s.geometry(), plastic));
+  const l = new WcMesher();
+  const lo = l.shell([[175, back + 2, 523, 183, 12, L1], [178, back, 526, 186, 12, L1 - 3], [178, back, 526, 186, 12, S1 + 0.5]], 'out');
+  l.cap(lo.first, 'up');
+  l.cap(lo.last, 'down');
+  const lid = new THREE.Mesh(l.geometry(), plastic);
+  const hingeY = (S1 + WC_Z0) / 1000, hingeZ = (back - WC_D / 2) / 1000;
+  const pivot = new THREE.Group();
+  pivot.position.set(0, hingeY, hingeZ);
+  lid.position.set(0, -hingeY, -hingeZ);
+  pivot.add(lid);
+  if (p.lidOpen) pivot.rotation.x = -THREE.MathUtils.degToRad(100);
+  g.add(pivot);
+  for (const x of [-77.5, 77.5]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, (S1 - T) / 1000, 12), chrome);
+    post.position.set(x / 1000, ((T + S1) / 2 + WC_Z0) / 1000, (115 - WC_D / 2) / 1000);
+    g.add(post);
+  }
+  return g;
+}
+
 // A closed solid between two convex rings of plan points (same count, same order), flat
 // shaded; UVs: u along the perimeter, v the height, both in metres.
 function loft(upper, lower) {
@@ -967,7 +1148,7 @@ function loft(upper, lower) {
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
-  'pedal-bin': pedalBin, 'moder-table': moderTable,
+  'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc,
 };
 
 export function isProcedural(entry) {

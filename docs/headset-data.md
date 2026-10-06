@@ -45,8 +45,8 @@ ran the app (title "House CAD"). Proven: the deployed `sw.js` bound every naviga
 the headset tab showed "House CAD" at `.../version.json`; a cache-bypassing reload showed
 `application/json`. The session-39 write went through such a tab and read back identical, and the
 autosave still matched afterwards. The tool now checks `document.contentType`, not the URL, and warns
-when the tab is the app. Hypothesis until checked on the headset: with the fix installed, a plain
-navigation to `version.json` shows the JSON.
+when the tab is the app. Proven on the headset after `8dc326f` installed: a plain navigation to
+`version.json`, with the service worker in control, shows `application/json`.
 
 ```bash
 node --experimental-websocket tools/quest-storage.mjs backup <scratch>/quest-backup-<stamp>

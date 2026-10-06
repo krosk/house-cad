@@ -33,6 +33,23 @@ Storage is **code only, no GLB** (owner decision, 2026-09-26; `docs/furniture.md
 - A product page that 301-redirects to a category is usually discontinued (Hypothesis each time).
 - If a model exists, register it with `tools/fetch-ikea-model.mjs` instead and stop here.
 
+### A manufacturer CAD model (STEP)
+
+Some makers publish real 3D data, but as CAD rather than a mesh: Villeroy & Boch's product pages list
+a STEP file (`assets.villeroy-boch.com/BW/dl_3d_data/<…>.stp`) beside a 2D DXF/DWG/PDF drawing
+(`dl_2d_data`) and the manual (`dl_mal`); curl gets them all. Browsers cannot read STEP. Proven
+2026-10-06 on 4694R001:
+- `occt-import-js` (npm, installed in the scratchpad, never the repo) tessellates it in Node in about
+  5 s at any tolerance: 59 332 triangles at 0.5 mm, 8 380 at 2 mm (almost identical), 4 714 at 4 mm
+  (facets show).
+- Loading it in the app would need a proxy route (no CORS header on `assets.villeroy-boch.com`), a
+  3.1 MB (gzip) reader plus the 1.8 MB file per device, and conversion on the Quest (untested). The
+  owner chose procedural instead (2026-10-06): runtime download stays acceptable in principle, as
+  for IKEA.
+- Use it as the best source there is: cut it by plane (a few lines of Node over the triangles), fit
+  each section, and overlay the build's silhouettes on the STEP's (scratch preview, orthographic,
+  difference of the two masks). The builder `wall-hung-wc` is the example.
+
 ## 2. Collect sources: numbers, then the isometric manual, then photos
 
 Owner preference (2026-10-03): **dimension from an isometric assembly drawing whenever one exists**,

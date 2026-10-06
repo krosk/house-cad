@@ -300,6 +300,22 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   three visible legs, the seam); exact bounding boxes 1.100 × 0.7503 × 1.100 and
   1.550 × 0.7503 × 1.100 m (the seam lines stand 0.3 mm proud); ¾ views beside photos 13546302
   and 13546298. Not yet seen in AR, View 3D or on device.
+- `vb-architectura-4694r001`: Villeroy & Boch Architectura rimless wall-hung WC pan, DirectFlush,
+  White Alpin (V&B 4694R001), builder `wall-hung-wc`, with a generic slim seat and lid (the seat is
+  sold separately: owner, 2026-10-06; `params.seat: false` drops it, `params.lidOpen: true` raises the
+  lid). V&B publishes its own 3D data as a STEP file (no GLB) on the product page's downloads, beside
+  a dimensioned 2D drawing (DXF/DWG/PDF) and the installation manual. The owner chose a procedural
+  build measured from that STEP over loading it at runtime (2026-10-06; why: `docs/product-modelling.md`
+  "A manufacturer CAD model (STEP)"). Every ceramic surface is a stack of plan rings (straight back,
+  rounded corners, straight sides, elliptical front), each a section of the STEP: rim slab, the step
+  under it, tapered body, flat underside, bowl down to the water, trap bulb, wall foot; the undercut
+  under the rimless rim is not modelled. `mountZMm` 80 puts the rim at the drawing's 415 mm. Proven in
+  a scratch browser preview: 2 336 triangles with the seat (1 792 without; the STEP tessellates to
+  59 332 at 0.5 mm); bounding box 368.4 × 361.1 × 529.3 mm closed (STEP ceramic 368.5 × 339.1 × 529.3);
+  front, side and top silhouettes differ from the STEP's by a few millimetres at most (the largest along
+  the top at the back, where the STEP rises to +10 mm and the model stays flat at +6). The seat, lid and
+  hinge posts are estimates (Hypothesis until compared with a real seat). Not yet seen in AR, View 3D
+  or on device.
 
 ## IKEA kitchen units assembled from part models (2026-10-04)
 
