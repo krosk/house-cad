@@ -1234,6 +1234,8 @@ export function setupMR(view, project, getFootprint) {
     { key: 'temp', floor: true, step: 1, min: -15, max: 25, unit: '°C' },
     { key: 'floorR', floor: true, step: 0.5, min: 0, max: 15, r: true },
     { key: 'ceilingR', floor: true, step: 0.5, min: 0, max: 15, r: true },
+    { key: 'heavy', floor: true, toggle: true }, // thermal bridges: this floor's structure
+    { key: 'heavyCeiling', floor: true, toggle: true },
     { key: 'tOut', step: 1, min: -25, max: 10, unit: '°C' },
     { key: 'tRoom', step: 1, min: 10, max: 28, unit: '°C' },
     { key: 'ach', step: 0.1, min: 0, max: 3 },
@@ -1245,8 +1247,7 @@ export function setupMR(view, project, getFootprint) {
     { key: 'earth', step: 0.05, min: -6, max: 6, unit: 'm' },
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
     { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
-    { key: 'heavyFloors', toggle: true }, // thermal bridges (docs/heat-loss.md "Thermal bridges")
-    { key: 'heavyWalls', toggle: true },
+    { key: 'heavyWallMin', step: 0.01, min: 0, max: 1, unit: 'm' }, // thermal bridges (docs/heat-loss.md "Thermal bridges")
     { key: 'radiatorDT', step: 5, min: 10, max: 60, unit: 'K' },
     { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
@@ -2272,7 +2273,8 @@ export function setupMR(view, project, getFootprint) {
       }
     };
     for (const room of heatRooms) for (const j of room.map.junctions) {
-      col.set(JUNCTION_COLORS[j.type]).multiplyScalar(0.35 + 0.65 * Math.min(1, j.psi / 0.9));
+      if (j.psi > 0) col.set(JUNCTION_COLORS[j.type]).multiplyScalar(0.35 + 0.65 * Math.min(1, j.psi / 0.9));
+      else col.set(0x64748b); // found but not counted (a light partition): grey
       const ix = -j.nx * JUNCTION_INSET, iy = -j.ny * JUNCTION_INSET;
       const x0 = j.x0 + ix, y0 = j.y0 + iy, x1 = j.x1 + ix, y1 = j.y1 + iy;
       // Keep bars just off the floor and below the ceiling, so they read against both.
@@ -2313,7 +2315,8 @@ export function setupMR(view, project, getFootprint) {
     const name = (j) => `${t(`heat.jt.${j.type}`)}${j.at === 'floor' || j.at === 'ceiling' ? ` · ${t(`heat.at.${j.at}`)}` : ''}`;
     const calc = (j) => `ψ ${j.psi} × ${j.length.toFixed(2)} m${j.share < 1 ? ' × ½' : ''}`;
     const slab = (j) => (j.cls2 === 'ITE' ? (j.type === 'low' ? 'under' : 'above') : j.cls2); // insulation side
-    const kind = (j) => `${t(`heat.cls.${j.cls}`)}${j.cls2 ? ` · ${t(`heat.cls2.${slab(j)}`)}` : ''}`;
+    const kind = (j) => `${t(`heat.cls.${j.cls}`)}${j.cls2 ? ` · ${t(`heat.cls2.${slab(j)}`)}` : ''}`
+      + (j.type === 'partition' ? ` · ${Math.round(j.thick * 100)} cm ${t(j.heavy ? 'heat.partHeavy' : 'heat.partLight')}` : '');
     if (list.length === 1) {
       const { j } = list[0];
       return [`${name(j)} · ${Math.round(j.w)} W`, kind(j), calc(j)];
@@ -6755,7 +6758,7 @@ export function setupMR(view, project, getFootprint) {
         : `${v.toFixed(decimals)}${row.unit ? ` ${row.unit}` : row.u ? ' W/m²K' : row.r ? ' m²K/W' : ''}`;
       // The unheated temperature only matters for an unheated floor; the rest of the
       // floor rows only for a heated one.
-      const dim = row.floor && row.key !== 'heated' && (row.key === 'temp' ? fh.heated : !fh.heated);
+      const dim = row.floor && row.key !== 'heated' && row.key !== 'heavy' && (row.key === 'temp' ? fh.heated : !fh.heated);
       out[row.key] = { text, set, dim };
     }
     return out;

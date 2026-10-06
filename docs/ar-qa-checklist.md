@@ -416,7 +416,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] HEAT LOSS draws coloured bars inside the exterior walls: at the floor (amber over earth or the basement, pink over a heated floor), at the ceiling (pink under a heated floor, cyan under the attic), green posts where a partition meets the façade, red frames around windows
 - [ ] Each bar sits where the real junction is (floor line, ceiling line, the partition's end, the window's edge); none on interior walls; missing or invented ones noted with their room
 - [ ] The reticle 5–15 cm inside a wall reads e.g. "Intermediate floor · at ceiling · 31 W / wall uninsulated / ψ 0.86 × 3.40 m × ½"; one line each where floor, ceiling and window overlap
-- [ ] The room breakdown and the readout show `bridges <W>`; Heavy floors → no removes the pink and cyan bars, Heavy partitions → no the green posts, and the totals drop
+- [ ] The room breakdown and the readout show `bridges <W>`; Upper · Heavy floor → no removes the pink bars between Ground and Upper (both floors), Heavy attic floor → no the cyan bars on that floor, posts green at thick (≥ 10 cm, meulière) partitions and grey at thin plaster ones (readout "7 cm light partition: not counted"); every thick partition meeting the façade has a post; the totals drop
 - [ ] The panel (two more rows) still fits in view; frame rate unchanged
 
 ## HEAT LOSS · heaters  ⬜ NEW (2026-10-05) — Node-verified only

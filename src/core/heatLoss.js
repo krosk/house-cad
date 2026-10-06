@@ -38,8 +38,7 @@ export const HEAT_DEFAULTS = {
   degreeDays: 2200, // K·day/year (base 18 °C) for the yearly estimate; Hypothesis: Paris area, recent winters
   radiatorDT: 50, // K, radiator mean water − room temperature (EN 442 rating: 50; a heat pump runs lower)
   revealPsi: 0.9, // W/mK around a window in a wall with exterior insulation not returned into the reveal (DPE table)
-  heavyFloors: true, // intermediate and top floors are heavy (concrete, brick): their junctions count (DPE)
-  heavyWalls: true,  // interior partitions are heavy (refends): their junctions with the façade count (DPE)
+  heavyWallMin: 0.1, // m: a partition this thick or more is heavy masonry (owner, 2026-10-06: under 10 cm is plaster)
 };
 // "What if" (owner, 2026-10-05: "whether insulation is worth it"): the loss with a kind of
 // insulation taken away, never stored. `without` = { wallIns, atticIns, windows }:
@@ -51,7 +50,11 @@ export const RETURNED_REVEAL_PSI = 0.25; // W/mK, DPE table: ITE wall, returned,
 const REVEAL_NEAR_M = 0.3; // exterior insulation this close to an opening, along the wall, counts
 // Per floor (`floor.heat`): heated or not, an unheated floor's winter temperature, and
 // insulation ADDED to its floor slab and above its ceiling (attic).
-export const FLOOR_HEAT_DEFAULTS = { heated: true, temp: 6, floorR: 0, ceilingR: 0 };
+// `heavy`: this floor's own floor structure (the one under it) is heavy (concrete, brick), so
+// its junctions with the walls count (DPE: light, e.g. wooden, floors are neglected); owner,
+// 2026-10-06: the ground floor's is concrete over brick, the upper floor's wood. `heavyCeiling`:
+// the same for its ceiling where nothing is above it but an attic or the roof.
+export const FLOOR_HEAT_DEFAULTS = { heated: true, temp: 6, floorR: 0, ceilingR: 0, heavy: true, heavyCeiling: true };
 
 export const PROBE_M = 0.6;      // how far beyond an edge a neighbour room or exterior layer counts
 const STEP_M = 0.05;             // wall sampling step along each edge
@@ -215,7 +218,9 @@ function ringJunctions(cols, s, H, dT, out, others, own) {
   // on along it, within PROBE_M, lies another room whose own façade is there. The room on the
   // other side sees the same junction, so half each. (A turn with no room past it along the
   // façade, e.g. a wall facing nothing drawn, is not a partition.)
-  if (!s.heavyWalls) return;
+  // Its thickness is the gap between the two rooms along the façade: from `heavyWallMin` up it
+  // is heavy masonry (a refend, counted); thinner it is light (owner's plaster ones, ψ 0), still
+  // listed so the AR drawing shows what was decided.
   const found = [];
   for (let i = 0; i < cols.length; i++) {
     const a = cols[i], b = cols[(i + 1) % cols.length];
@@ -223,18 +228,20 @@ function ringJunctions(cols, s, H, dT, out, others, own) {
     const e = a.ext ? a : b, sgn = a.ext ? 1 : -1;
     const len = Math.hypot(e.x1 - e.x0, e.y1 - e.y0), ex = sgn * (e.x1 - e.x0) / len, ey = sgn * (e.y1 - e.y0) / len;
     const px = a.x1, py = a.y1;
-    let across = false;
+    let across = null; // the room past the partition
     for (let t = 0.05; t <= PROBE_M + EPS && !across; t += 0.05) {
       const qx = px + ex * t - e.nx * JUNCTION_INSET_M, qy = py + ey * t - e.ny * JUNCTION_INSET_M;
-      if (!others.some((r) => contains(r, qx, qy))) continue;
+      const r = others.find((o) => contains(o, qx, qy));
+      if (!r) continue;
       const fx = px + ex * t, fy = py + ey * t; // that room's façade: nothing beyond it
-      across = ![...others, ...own].some((r) => hitsSegment(r, fx + e.nx * 1e-4, fy + e.ny * 1e-4, fx + e.nx * PROBE_M, fy + e.ny * PROBE_M));
+      if (![...others, ...own].some((o) => hitsSegment(o, fx + e.nx * 1e-4, fy + e.ny * 1e-4, fx + e.nx * PROBE_M, fy + e.ny * PROBE_M))) across = r;
     }
     if (!across || found.some(([x, y]) => Math.hypot(x - px, y - py) < 0.3)) continue;
     found.push([px, py]);
-    const psi = PSI_PARTITION[e.cls];
-    if (psi > 0) push({ type: 'partition', at: 'height', cls: e.cls, cls2: null, psi, share: 0.5, length: H,
-      x0: px, y0: py, x1: px, y1: py, nx: e.nx, ny: e.ny, z0: 0, z1: H });
+    const thick = Math.max(0, ex > 0.5 ? across.x0 - px : ex < -0.5 ? px - across.x1 : ey > 0.5 ? across.y0 - py : py - across.y1);
+    const heavy = thick >= s.heavyWallMin - EPS;
+    push({ type: 'partition', at: 'height', cls: e.cls, cls2: null, psi: heavy ? PSI_PARTITION[e.cls] : 0, share: 0.5,
+      length: H, thick, heavy, x0: px, y0: py, x1: px, y1: py, nx: e.nx, ny: e.ny, z0: 0, z1: H });
   }
 }
 
@@ -242,17 +249,19 @@ function ringJunctions(cols, s, H, dT, out, others, own) {
 function slabJunctions(x, y, s, fh, nb) {
   const inAbove = nb.above?.rects.some((b) => contains(b, x, y)), inBelow = nb.below?.rects.some((b) => contains(b, x, y));
   return (cls) => {
+    // The slab between two floors is the upper one's floor (its `heavy`).
+    const upHeavy = inAbove ? nb.above.heavy : fh.heavyCeiling;
     const up = inAbove && nb.above.heated
-      ? { type: 'mid', psi: s.heavyFloors ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
+      ? { type: 'mid', psi: upHeavy ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
       : (() => { // under an attic, a roof or an unheated floor: insulation on its far side
         const r = inAbove ? nb.above.floorR : fh.ceilingR, cls2 = r > 0 ? 'ITE' : 'none';
-        return { type: 'top', psi: s.heavyFloors ? PSI_TOP[cls][cls2] : 0, share: 1, cls2 };
+        return { type: 'top', psi: upHeavy ? PSI_TOP[cls][cls2] : 0, share: 1, cls2 };
       })();
     const dn = inBelow && nb.below.heated
-      ? { type: 'mid', psi: s.heavyFloors ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
+      ? { type: 'mid', psi: fh.heavy ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
       : (() => { // floor insulation under the slab (owner, 2026-10-06: on the basement's ceiling)
         const cls2 = fh.floorR > 0 ? 'ITE' : 'none';
-        return { type: 'low', psi: PSI_LOW[cls][cls2], share: 1, cls2 };
+        return { type: 'low', psi: fh.heavy ? PSI_LOW[cls][cls2] : 0, share: 1, cls2 };
       })();
     return { up, dn };
   };
@@ -482,7 +491,8 @@ export function floorHeatLoss(project, floor, without = {}) {
   const b = (temp) => (s.tRoom - temp) / dT;
   const aboveH = floorHeat(above);
   // The neighbour floors' spaces, for the junctions at this floor's floor and ceiling.
-  const nbOf = (f) => (f ? { rects: spacesOf(f).map((r) => r.bounds), heated: floorHeat(f).heated, floorR: floorHeat(f).floorR } : null);
+  const nbOf = (f) => (f ? { rects: spacesOf(f).map((r) => r.bounds), heated: floorHeat(f).heated,
+    floorR: floorHeat(f).floorR, heavy: floorHeat(f).heavy } : null);
   const nb = { above: nbOf(above), below: nbOf(below) };
   return connectedRoomComponents(floor.rectangles).filter((comp) => !comp.rectangles[0].outdoor).map((comp) => {
     const foot = computeFootprint(comp.rectangles);
