@@ -871,7 +871,7 @@ export function setupMR(view, project, getFootprint) {
         const p = room.parts;
         ctx.fillText(`${t('heat.walls')} ${w(p.wall)} · ${t('heat.openings')} ${w(p.opening)} · ${t('heat.air')} ${w(p.air)}`, 30, ROOM_Y + 70);
         const d = room.detail; // walls in the earth: a share of the walls' watts and area
-        ctx.fillText(`${t('heat.floorPart')} ${w(p.floor)} · ${t('heat.ceilingPart')} ${w(p.ceiling)}`
+        ctx.fillText(`${t('heat.floorPart')} ${w(p.floor)} · ${t('heat.ceilingPart')} ${w(p.ceiling)} · ${t('heat.bridges')} ${w(p.bridge)}`
           + (d.earthArea > 0.05 ? ` · ${t('heat.inEarth')} ${d.earthArea.toFixed(1)} m²` : ''), 30, ROOM_Y + 104);
         ctx.fillStyle = '#aab4c0'; ctx.font = '20px sans-serif';
         ctx.fillText(`${t('heat.extWall')} ${d.wallArea.toFixed(1)} m² (${t('heat.insulated')} ${d.insulatedArea.toFixed(1)}) · ${t('heat.openings')} ${d.openingArea.toFixed(1)} m²`, 30, ROOM_Y + 134);
@@ -1245,6 +1245,8 @@ export function setupMR(view, project, getFootprint) {
     { key: 'earth', step: 0.05, min: -6, max: 6, unit: 'm' },
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
     { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
+    { key: 'heavyFloors', toggle: true }, // thermal bridges (docs/heat-loss.md "Thermal bridges")
+    { key: 'heavyWalls', toggle: true },
     { key: 'radiatorDT', step: 5, min: 10, max: 60, unit: 'K' },
     { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
@@ -2138,6 +2140,7 @@ export function setupMR(view, project, getFootprint) {
   }
   let heatHoverRoom = null; // the room under the reticle in HEAT LOSS
   let heatHoverCol = null, heatHoverPiece = null; // the wall column / floor-ceiling piece under it
+  let heatHoverJunctions = []; // the thermal bridges under it (heatJunctionsAt)
   let heatSurface = 'ceiling'; // which of floor / ceiling the heat map tints (thumbstick)
   function addHeatLabels(floor) {
     const area = (r) => Math.abs(r.w * r.h);
@@ -2147,7 +2150,9 @@ export function setupMR(view, project, getFootprint) {
     heatHouse = { now: houseTotal(heatWithout),
       full: Object.values(heatWithout).some(Boolean) ? houseTotal({}) : null };
     heatHoverRoom = heatHoverCol = heatHoverPiece = null;
+    heatHoverJunctions = [];
     addHeatMap();
+    addJunctionMap(ceilingHeight(floor));
     const labels = heatRooms.map((room) => {
       const big = room.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m)).bounds;
       const hw = room.heaters?.count ? ` · ${t('heat.radShort')} ${Math.round(room.heaters.watts)} W` : '';
@@ -2245,9 +2250,81 @@ export function setupMR(view, project, getFootprint) {
     }
     return null;
   }
+  // Thermal bridges (owner, 2026-10-06: "how do I see your pick?"; docs/heat-loss.md "Thermal
+  // bridges"): each junction heatLoss found, drawn where it is in the room, 4 cm inside the
+  // wall face: a bar along the wall at the floor or at the ceiling, a post floor to ceiling
+  // where a partition meets the façade, a frame around a window or door. The colour is its
+  // type, brighter for a larger ψ.
+  const JUNCTION_COLORS = { low: 0xf59e0b, mid: 0xe879f9, top: 0x22d3ee, partition: 0xa3e635, opening: 0xfb7185 };
+  const JUNCTION_INSET = 0.04, JUNCTION_T = 0.03; // m: inside the wall face; bar thickness
+  const JUNCTION_HOVER = 0.15; // m inside the wall face where the reticle picks a junction
+  const junctionMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  function addJunctionMap(H) {
+    const pos = [], colr = [], col = new THREE.Color();
+    // An axis-aligned bar between two plan points at heights z0 / z1 (plan → local x, z, −y).
+    const bar = (x0, y0, z0, x1, y1, z1) => {
+      const h = JUNCTION_T / 2;
+      const lo = [Math.min(x0, x1) - h, Math.min(z0, z1) - h, Math.min(-y0, -y1) - h];
+      const hi = [Math.max(x0, x1) + h, Math.max(z0, z1) + h, Math.max(-y0, -y1) + h];
+      const v = (i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]];
+      for (const f of [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]]) {
+        for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...v(f[k])); colr.push(col.r, col.g, col.b); }
+      }
+    };
+    for (const room of heatRooms) for (const j of room.map.junctions) {
+      col.set(JUNCTION_COLORS[j.type]).multiplyScalar(0.35 + 0.65 * Math.min(1, j.psi / 0.9));
+      const ix = -j.nx * JUNCTION_INSET, iy = -j.ny * JUNCTION_INSET;
+      const x0 = j.x0 + ix, y0 = j.y0 + iy, x1 = j.x1 + ix, y1 = j.y1 + iy;
+      // Keep bars just off the floor and below the ceiling, so they read against both.
+      const z = (v) => Math.min(H - JUNCTION_T, Math.max(JUNCTION_T, v));
+      if (j.type === 'partition') bar(x0, y0, z(0), x0, y0, z(H));
+      else if (j.type === 'opening') {
+        bar(x0, y0, z(j.z0), x0, y0, z(j.z1)); bar(x1, y1, z(j.z0), x1, y1, z(j.z1));
+        bar(x0, y0, z(j.z1), x1, y1, z(j.z1));
+        if (j.z0 > 0.01) bar(x0, y0, z(j.z0), x1, y1, z(j.z0));
+      } else bar(x0, y0, z(j.z0), x1, y1, z(j.z0));
+    }
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+    planGroup.add(new THREE.Mesh(geo, junctionMat));
+  }
+  // The junctions at plan point (px, py): along a wall, within JUNCTION_HOVER inside its face
+  // (every bar of that stretch: floor, ceiling, window), or that close to a partition's post.
+  function heatJunctionsAt(px, py) {
+    const out = [];
+    for (const room of heatRooms) for (const j of room.map.junctions) {
+      const d = (px - j.x0) * j.nx + (py - j.y0) * j.ny; // + outward
+      if (j.type === 'partition') {
+        if (Math.hypot(px - j.x0, py - j.y0) <= JUNCTION_HOVER) out.push({ room, j });
+        continue;
+      }
+      const ex = j.x1 - j.x0, ey = j.y1 - j.y0, len2 = ex * ex + ey * ey;
+      const t = len2 > 0 ? ((px - j.x0) * ex + (py - j.y0) * ey) / len2 : -1;
+      if (t >= 0 && t <= 1 && d <= 0 && d >= -JUNCTION_HOVER) out.push({ room, j });
+    }
+    const order = { opening: 0, partition: 1, low: 2, mid: 2, top: 3 };
+    return out.sort((a, b) => order[a.j.type] - order[b.j.type] || (a.j.at === 'floor' ? -1 : 1));
+  }
+  // "Intermediate floor · at ceiling · 31 W" / "interior insulation" / "ψ 0.92 × 3.40 m × ½";
+  // several at once: one line each.
+  function junctionLines(list) {
+    const name = (j) => `${t(`heat.jt.${j.type}`)}${j.at === 'floor' || j.at === 'ceiling' ? ` · ${t(`heat.at.${j.at}`)}` : ''}`;
+    const calc = (j) => `ψ ${j.psi} × ${j.length.toFixed(2)} m${j.share < 1 ? ' × ½' : ''}`;
+    const slab = (j) => (j.cls2 === 'ITE' ? (j.type === 'low' ? 'under' : 'above') : j.cls2); // insulation side
+    const kind = (j) => `${t(`heat.cls.${j.cls}`)}${j.cls2 ? ` · ${t(`heat.cls2.${slab(j)}`)}` : ''}`;
+    if (list.length === 1) {
+      const { j } = list[0];
+      return [`${name(j)} · ${Math.round(j.w)} W`, kind(j), calc(j)];
+    }
+    return list.slice(0, 5).map(({ j }) => `${name(j)} · ${calc(j)} → ${Math.round(j.w)} W`);
+  }
+
   // The readout in HEAT LOSS: the column / piece under the reticle, else the room's parts.
   function heatMapLines() {
     const W = (v) => `${Math.round(v)} W/m²`, U = (v) => `U ${v.toFixed(2)}`;
+    if (heatHoverJunctions.length) return junctionLines(heatHoverJunctions);
     if (heatHoverCol) {
       const c = heatHoverCol.col;
       const lines = [`${t('heat.map.wall')} · ${W(c.wm2)}`];
@@ -2268,9 +2345,9 @@ export function setupMR(view, project, getFootprint) {
       const p = heatHoverRoom.parts, r = Math.round;
       return [`${r(heatHoverRoom.total)} W`,
         `${t('heat.map.walls')} ${r(p.wall)} · ${t('heat.map.openings')} ${r(p.opening)} · ${t('heat.map.air')} ${r(p.air)}`,
-        `${t('heat.map.floor')} ${r(p.floor)} · ${t('heat.map.ceiling')} ${r(p.ceiling)}`];
+        `${t('heat.map.floor')} ${r(p.floor)} · ${t('heat.map.ceiling')} ${r(p.ceiling)} · ${t('heat.bridges')} ${r(p.bridge)}`];
     }
-    return [t('heat.map.legend'), t(heatSurface === 'floor' ? 'heat.map.showingFloor' : 'heat.map.showingCeiling')];
+    return [t('heat.map.legend'), t('heat.bridgeLegend'), t(heatSurface === 'floor' ? 'heat.map.showingFloor' : 'heat.map.showingCeiling')];
   }
 
   // HEATING · R / U: the thermal value each zone carries (core/heatLoss.js): a WALL or
@@ -8202,6 +8279,7 @@ export function setupMR(view, project, getFootprint) {
     if (m.id === 'export') showExportMenu();
     else hideExportMenu();
     heatSelZone = heatHoverZone = heatHoverRoom = heatHoverCol = heatHoverPiece = null;
+    heatHoverJunctions = [];
     const labels = m.id === 'heat' ? 'w' : m.id === 'heat_r' ? 'r' : null;
     if (heatLabels !== labels) { // HEATING plan labels (room watts / zone R)
       heatLabels = labels;
@@ -10537,14 +10615,18 @@ export function setupMR(view, project, getFootprint) {
         const inside = (r) => { const b = r.bounds; return px > b.x0 && px < b.x1 && py > b.y0 && py < b.y1; };
         if (modeId === 'heat_r') heatHoverZone = project.rectangles.find((r) => isThermalZone(r) && inside(r)) || null;
         else {
-          heatHoverCol = heatColumnAt(px, py);
-          heatHoverPiece = heatHoverCol ? null : heatPieceAt(px, py);
-          heatHoverRoom = heatHoverCol?.room || heatHoverPiece?.room
+          heatHoverJunctions = heatJunctionsAt(px, py);
+          heatHoverCol = heatHoverJunctions.length ? null : heatColumnAt(px, py);
+          heatHoverPiece = heatHoverCol || heatHoverJunctions.length ? null : heatPieceAt(px, py);
+          heatHoverRoom = heatHoverJunctions[0]?.room || heatHoverCol?.room || heatHoverPiece?.room
             || heatRooms.find((room) => room.rectangles.some(inside)) || null;
         }
       } else {
         reticle.visible = false;
-        if (!panelHit && !hoverKey) heatHoverRoom = heatHoverZone = heatHoverCol = heatHoverPiece = null; // aiming at a panel keeps it shown
+        if (!panelHit && !hoverKey) { // aiming at a panel keeps it shown
+          heatHoverRoom = heatHoverZone = heatHoverCol = heatHoverPiece = null;
+          heatHoverJunctions = [];
+        }
       }
       const lit = heatSelZone || heatHoverZone;
       if (lit) showRectOutline(lit, heatSelZone ? 0xfbbf24 : 0xfb923c);

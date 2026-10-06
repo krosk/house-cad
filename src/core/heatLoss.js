@@ -37,15 +37,17 @@ export const HEAT_DEFAULTS = {
   earth: 0,      // m, the earth level outside, from the ground floor's floor level (+ up)
   degreeDays: 2200, // K·day/year (base 18 °C) for the yearly estimate; Hypothesis: Paris area, recent winters
   radiatorDT: 50, // K, radiator mean water − room temperature (EN 442 rating: 50; a heat pump runs lower)
-  revealPsi: 0.4, // W/mK along an opening's edge where it cuts exterior insulation (Hypothesis: insulation not returned)
+  revealPsi: 0.9, // W/mK around a window in a wall with exterior insulation not returned into the reveal (DPE table)
+  heavyFloors: true, // intermediate and top floors are heavy (concrete, brick): their junctions count (DPE)
+  heavyWalls: true,  // interior partitions are heavy (refends): their junctions with the façade count (DPE)
 };
 // "What if" (owner, 2026-10-05: "whether insulation is worth it"): the loss with a kind of
 // insulation taken away, never stored. `without` = { wallIns, atticIns, windows }:
 // every INSULATION zone ignored; every floor's added attic R 0; every window / sliding door
 // at single glazing.
 export const SINGLE_GLAZING_U = 5.8; // W/m²K, Hypothesis: old single glazing in a wooden frame
-// `without.reveals`: the reveals insulated (exterior insulation returned 2–3 cm into them).
-export const RETURNED_REVEAL_PSI = 0.08; // W/mK, Hypothesis: typical with a returned reveal
+// `without.reveals`: the reveals insulated (exterior insulation returned into them).
+export const RETURNED_REVEAL_PSI = 0.25; // W/mK, DPE table: ITE wall, returned, window at the inner face
 const REVEAL_NEAR_M = 0.3; // exterior insulation this close to an opening, along the wall, counts
 // Per floor (`floor.heat`): heated or not, an unheated floor's winter temperature, and
 // insulation ADDED to its floor slab and above its ceiling (attic).
@@ -53,8 +55,24 @@ export const FLOOR_HEAT_DEFAULTS = { heated: true, temp: 6, floorR: 0, ceilingR:
 
 export const PROBE_M = 0.6;      // how far beyond an edge a neighbour room or exterior layer counts
 const STEP_M = 0.05;             // wall sampling step along each edge
-const DERATE_INTERIOR = 0.85;    // thermal bridges at slabs/partitions/rails (interior lining)
-const DERATE_EXTERIOR = 0.95;    // exterior insulation wraps the junctions
+// Thermal bridges (owner, 2026-10-06; docs/heat-loss.md "Thermal bridges"): linear ψ (W/mK) at
+// each junction of an exterior wall, from the French DPE method's tables (3CL-DPE 2021, arrêté
+// du 31 mars 2021 annexe 1; read from the open-source Open3CL engine, src/tv.js
+// `pont_thermique`). Keyed by the wall's insulation where the junction is: 'none' | 'ITI'
+// (a lining on the room side) | 'ITE' (outside the masonry) | 'ITI+ITE'; then, for a floor or
+// a ceiling, by its own insulation: 'none' | 'ITI' (on the room side) | 'ITE' (the far side).
+const PSI_LOW = { // lowest floor (on earth, over a basement or air) / wall
+  none: { none: 0.39, ITI: 0.47, ITE: 0.8 }, ITI: { none: 0.31, ITI: 0.08, ITE: 0.71 },
+  ITE: { none: 0.49, ITI: 0.48, ITE: 0.64 }, 'ITI+ITE': { none: 0.31, ITI: 0.08, ITE: 0.45 } };
+const PSI_MID = { none: 0.86, ITI: 0.92, ITE: 0.13, 'ITI+ITE': 0.13 }; // heavy intermediate floor / wall
+const PSI_TOP = { // heavy top floor (under an attic or a roof) / wall
+  none: { none: 0.3, ITI: 0.83, ITE: 0.4 }, ITI: { none: 0.27, ITI: 0.07, ITE: 0.75 },
+  ITE: { none: 0.55, ITI: 0.76, ITE: 0.58 }, 'ITI+ITE': { none: 0.27, ITI: 0.07, ITE: 0.58 } };
+const PSI_PARTITION = { none: 0.73, ITI: 0.82, ITE: 0.13, 'ITI+ITE': 0.13 }; // heavy partition / wall
+// Window or door / wall, the frame at the wall's inner face (the owner's house), 5 cm frame,
+// insulation not returned; ITE uses the project's revealPsi (0.9), RETURNED_REVEAL_PSI if returned.
+const PSI_OPENING = { none: 0.38, ITI: 0, 'ITI+ITE': 0 };
+const JUNCTION_INSET_M = 0.1; // a floor's or ceiling's neighbour is looked for this far into the room
 const RS_WALL = 0.13 + 0.04;
 const RS_CEILING = 0.10 + 0.10;  // heat up, into an attic / heated room above
 const RS_FLOOR = 0.17 + 0.17;    // heat down, into a basement
@@ -153,14 +171,102 @@ export function buriedWallU(z, wallR, dt) {
   return (2 * LAMBDA_GROUND / (Math.PI * z)) * (1 + 0.5 * dt / (dt + z)) * Math.log(z / dw + 1);
 }
 
-function wallLoss(floor, comp, s, fh, dT) {
-  const out = { wall: 0, opening: 0, reveal: 0, revealLength: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0, samples: [] };
-  // Reveals (owner, 2026-10-05): an opening in a wall with exterior INSULATION leaks along
-  // its whole edge (sill, head, both jambs) past that insulation: ψ · length · ΔT. The
-  // insulation counts at the opening's columns or within REVEAL_NEAR_M of them along the
-  // edge (it is often drawn stopping at the opening, and the opening never needs to be
-  // drawn into it: an opening always goes through it).
-  const psi = s.noReveals ? RETURNED_REVEAL_PSI : s.revealPsi;
+// The wall's insulation class at a column: 'none' | 'ITI' | 'ITE' | 'ITI+ITE'. An insulation
+// layer is interior when it is drawn inside the room (a lining) or, where masonry (a WALL
+// zone) is drawn, on the room's side of it; exterior otherwise.
+function insulationClass(cuts) {
+  const walls = cuts.filter((c) => c.wall);
+  const wallLo = walls.length ? Math.min(...walls.map((c) => c.lo)) : null;
+  let iti = false, ite = false;
+  for (const c of cuts) {
+    if (c.wall) continue;
+    if (c.inner || (wallLo != null && (c.lo + c.hi) / 2 < wallLo)) iti = true; else ite = true;
+  }
+  return iti && ite ? 'ITI+ITE' : iti ? 'ITI' : ite ? 'ITE' : 'none';
+}
+
+// The thermal bridges of one ring of a room's outline (docs/heat-loss.md "Thermal bridges"),
+// from its 5 cm columns in order: [{ ext, x0, y0, x1, y1, nx, ny, cls, dn, up }] where `dn` /
+// `up` = { type ('low' | 'mid' | 'top'), psi, share, cls2 } at the floor / the ceiling. Each
+// junction: { type, at ('floor' | 'ceiling' | 'height'), cls, cls2, psi, share, length, w,
+// x0, y0, x1, y1, nx, ny, z0, z1 }; w = ψ · length · share · ΔT (share ½ where the room on
+// the other side counts the other half).
+function ringJunctions(cols, s, H, dT, out, others, own) {
+  const push = (j) => { j.w = j.psi * j.length * j.share * dT; out.junctions.push(j); out.bridge += j.w; };
+  for (const [at, side] of [['floor', 'dn'], ['ceiling', 'up']]) {
+    let run = null;
+    const flush = () => { if (run) push(run); run = null; };
+    for (const c of cols) {
+      const j = c.ext ? c[side] : null;
+      if (!j || !(j.psi > 0)) { flush(); continue; }
+      if (run && run.type === j.type && run.psi === j.psi && run.cls === c.cls && run.nx === c.nx && run.ny === c.ny
+        && Math.abs(run.x1 - c.x0) < 1e-6 && Math.abs(run.y1 - c.y0) < 1e-6) {
+        run.x1 = c.x1; run.y1 = c.y1; run.length += Math.hypot(c.x1 - c.x0, c.y1 - c.y0);
+        continue;
+      }
+      flush();
+      run = { ...j, at, cls: c.cls, length: Math.hypot(c.x1 - c.x0, c.y1 - c.y0), x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1,
+        nx: c.nx, ny: c.ny, z0: at === 'floor' ? 0 : H, z1: at === 'floor' ? 0 : H };
+    }
+    flush();
+  }
+  // A partition meets the façade at a corner of the outline where an exterior edge turns
+  // into one with a heated room across, and the façade carries on past the partition: going
+  // on along it, within PROBE_M, lies another room whose own façade is there. The room on the
+  // other side sees the same junction, so half each. (A turn with no room past it along the
+  // façade, e.g. a wall facing nothing drawn, is not a partition.)
+  if (!s.heavyWalls) return;
+  const found = [];
+  for (let i = 0; i < cols.length; i++) {
+    const a = cols[i], b = cols[(i + 1) % cols.length];
+    if (a.ext === b.ext || (a.nx === b.nx && a.ny === b.ny)) continue; // a corner only
+    const e = a.ext ? a : b, sgn = a.ext ? 1 : -1;
+    const len = Math.hypot(e.x1 - e.x0, e.y1 - e.y0), ex = sgn * (e.x1 - e.x0) / len, ey = sgn * (e.y1 - e.y0) / len;
+    const px = a.x1, py = a.y1;
+    let across = false;
+    for (let t = 0.05; t <= PROBE_M + EPS && !across; t += 0.05) {
+      const qx = px + ex * t - e.nx * JUNCTION_INSET_M, qy = py + ey * t - e.ny * JUNCTION_INSET_M;
+      if (!others.some((r) => contains(r, qx, qy))) continue;
+      const fx = px + ex * t, fy = py + ey * t; // that room's façade: nothing beyond it
+      across = ![...others, ...own].some((r) => hitsSegment(r, fx + e.nx * 1e-4, fy + e.ny * 1e-4, fx + e.nx * PROBE_M, fy + e.ny * PROBE_M));
+    }
+    if (!across || found.some(([x, y]) => Math.hypot(x - px, y - py) < 0.3)) continue;
+    found.push([px, py]);
+    const psi = PSI_PARTITION[e.cls];
+    if (psi > 0) push({ type: 'partition', at: 'height', cls: e.cls, cls2: null, psi, share: 0.5, length: H,
+      x0: px, y0: py, x1: px, y1: py, nx: e.nx, ny: e.ny, z0: 0, z1: H });
+  }
+}
+
+// What lies across a room's floor or ceiling at plan point (x, y), for its junction there.
+function slabJunctions(x, y, s, fh, nb) {
+  const inAbove = nb.above?.rects.some((b) => contains(b, x, y)), inBelow = nb.below?.rects.some((b) => contains(b, x, y));
+  return (cls) => {
+    const up = inAbove && nb.above.heated
+      ? { type: 'mid', psi: s.heavyFloors ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
+      : (() => { // under an attic, a roof or an unheated floor: insulation on its far side
+        const r = inAbove ? nb.above.floorR : fh.ceilingR, cls2 = r > 0 ? 'ITE' : 'none';
+        return { type: 'top', psi: s.heavyFloors ? PSI_TOP[cls][cls2] : 0, share: 1, cls2 };
+      })();
+    const dn = inBelow && nb.below.heated
+      ? { type: 'mid', psi: s.heavyFloors ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
+      : (() => { // floor insulation under the slab (owner, 2026-10-06: on the basement's ceiling)
+        const cls2 = fh.floorR > 0 ? 'ITE' : 'none';
+        return { type: 'low', psi: PSI_LOW[cls][cls2], share: 1, cls2 };
+      })();
+    return { up, dn };
+  };
+}
+
+function wallLoss(floor, comp, s, fh, dT, nb) {
+  const out = { wall: 0, opening: 0, bridge: 0, wallArea: 0, openingArea: 0, insulated: 0, earthArea: 0, samples: [], junctions: [] };
+  // Windows and doors (owner, 2026-10-05, then the DPE table 2026-10-06): an opening leaks
+  // along its edge (sill, head, both jambs; a door's threshold belongs to the floor's
+  // junction) by the wall's insulation around it, taken at the opening's columns or within
+  // REVEAL_NEAR_M of them along the edge (insulation is often drawn stopping at the opening,
+  // and the opening never needs to be drawn into it: an opening always goes through it).
+  const revealITE = s.noReveals ? RETURNED_REVEAL_PSI : s.revealPsi;
+  const openingPsi = (cls) => (cls === 'ITE' ? revealITE : PSI_OPENING[cls]);
   const revealDone = new Set(); // openings already counted (an opening spans one edge)
   const H = ceilingHeight(floor); // the room's walls, below the slab
   // Below the earth: the part of each wall under it loses to the ground at the annual
@@ -170,12 +276,14 @@ function wallLoss(floor, comp, s, fh, dT) {
   const groundDT = FG1 * (s.tRoom - s.tMean);
   const others = floor.rectangles.filter((r) => isSpace(r) && !comp.ids.has(r.id))
     .map((r) => r.bounds);
+  const own = comp.rectangles.map((r) => r.bounds);
   const layers = floor.rectangles.filter((r) => LAYER_KINDS.has(zoneKind(r))
     && !(s.noWallIns && zoneKind(r) === 'insulation'));
   const openings = floor.rectangles.filter((r) => OPENING_KINDS.has(zoneKind(r)));
   const recesses = floor.rectangles.filter((r) => zoneKind(r) === 'recess');
   for (const polygon of computeFootprint(comp.rectangles)) {
     for (const ring of polygon) {
+      const cols = []; // every 5 cm column of the ring, in order (ringJunctions)
       for (let i = 0; i < ring.length - 1; i++) {
         const [ax, ay] = ring[i], [bx, by] = ring[i + 1];
         const len = Math.hypot(bx - ax, by - ay);
@@ -184,27 +292,30 @@ function wallLoss(floor, comp, s, fh, dT) {
         // so the outward normal is the right-hand one.
         const nx = (by - ay) / len, ny = -(bx - ax) / len;
         const n = Math.max(1, Math.ceil(len / STEP_M)), ds = len / n;
-        const extCol = new Array(n).fill(false), openCols = new Map(); // opening → { ks, h }
+        const colCls = new Array(n).fill(null), openCols = new Map(); // opening → { ks, h, sill }
         for (let k = 0; k < n; k++) {
           const t = (k + 0.5) / n;
           const mx = ax + (bx - ax) * t, my = ay + (by - ay) * t;
           const px = mx + nx * PROBE_M, py = my + ny * PROBE_M;
           const sx = mx + nx * 1e-4, sy = my + ny * 1e-4;
+          const col = { ext: false, x0: ax + (bx - ax) * (k / n), y0: ay + (by - ay) * (k / n),
+            x1: ax + (bx - ax) * ((k + 1) / n), y1: ay + (by - ay) * ((k + 1) / n), nx, ny };
+          cols.push(col);
           if (others.some((b) => hitsSegment(b, sx, sy, px, py))) continue; // heated both sides
           const cuts = [];
-          let extInsLo = Infinity; // depth beyond the edge where exterior insulation starts
           for (const z of layers) {
             const b = z.bounds, wall = zoneKind(z) === 'wall';
             const inner = contains(b, mx - nx * 0.005, my - ny * 0.005);
             if (!inner && !hitsSegment(b, sx, sy, px, py)) continue;
-            // Thermal bridges derate insulation only: a lining more (cut by slabs and
-            // partitions) than insulation outside (it wraps the junctions).
-            const rz = zoneR(z, nx, s) * (wall ? 1 : inner ? DERATE_INTERIOR : DERATE_EXTERIOR);
+            // No derating: the junctions are counted as thermal bridges (ringJunctions).
+            const rz = zoneR(z, nx, s);
             // Its depth across the wall, outward from the edge.
             const e0 = nx ? (b.x0 - mx) * nx : (b.y0 - my) * ny, e1 = nx ? (b.x1 - mx) * nx : (b.y1 - my) * ny;
-            cuts.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), rz, wall });
-            if (!wall && !inner) extInsLo = Math.min(extInsLo, Math.max(0, Math.min(e0, e1)));
+            cuts.push({ lo: Math.min(e0, e1), hi: Math.max(e0, e1), rz, wall, inner });
           }
+          col.ext = true;
+          col.cls = colCls[k] = insulationClass(cuts);
+          Object.assign(col, slabJunctions(mx - nx * JUNCTION_INSET_M, my - ny * JUNCTION_INSET_M, s, fh, nb)(col.cls));
           let { r, insulated, walled } = layerStack(cuts);
           const placeholder = walled ? 0 : s.wallDepth / s.wallLambda; // the placeholder masonry
           r += placeholder;
@@ -242,11 +353,10 @@ function wallLoss(floor, comp, s, fh, dT) {
                 : isGlazedKind(kind) ? s.windowU : s.doorU;
             }
           }
-          // Reveal bookkeeping, resolved after the edge (see revealDone).
-          extCol[k] = extInsLo < Infinity;
+          // Opening bookkeeping, resolved after the edge (see revealDone).
           if (openO) {
-            const e = openCols.get(openO) ?? openCols.set(openO, { ks: [], h: 0 }).get(openO);
-            e.ks.push(k); e.h = Math.max(e.h, openH);
+            const e = openCols.get(openO) ?? openCols.set(openO, { ks: [], h: 0, sill: Infinity }).get(openO);
+            e.ks.push(k); e.h = Math.max(e.h, openH); e.sill = Math.min(e.sill, openSill);
           }
           // Split the column by height: the opening's band, each recess band, the buried
           // part below the earth, the rest in air. Each piece has its own U.
@@ -299,19 +409,25 @@ function wallLoss(floor, comp, s, fh, dT) {
             w: wAir + wEarth + wOpen, wm2: H > 0 ? (wAir + wEarth + wOpen) / (ds * H) : 0,
           });
         }
-        // Each opening on this edge with exterior insulation at or near it: sill + head
-        // over its columns, plus its two jambs.
+        // Each opening on this edge, by the wall's insulation at or near it: sill (none for a
+        // door at the floor) + head over its columns, plus its two jambs.
         const near = Math.ceil(REVEAL_NEAR_M / ds);
-        for (const [o, { ks, h }] of openCols) {
+        for (const [o, { ks, h, sill }] of openCols) {
           if (revealDone.has(o.id)) continue;
-          const k0 = Math.max(0, Math.min(...ks) - near), k1 = Math.min(n - 1, Math.max(...ks) + near);
-          if (!extCol.slice(k0, k1 + 1).some(Boolean)) continue;
           revealDone.add(o.id);
-          const edgeLen = 2 * ds * ks.length + 2 * h;
-          out.revealLength += edgeLen;
-          out.reveal += edgeLen * psi * dT;
+          const ka = Math.min(...ks), kb = Math.max(...ks);
+          const around = colCls.slice(Math.max(0, ka - near), Math.min(n - 1, kb + near) + 1).filter(Boolean);
+          const iti = around.some((c) => c.startsWith('ITI')), ite = around.some((c) => c.endsWith('ITE'));
+          const cls = iti && ite ? 'ITI+ITE' : iti ? 'ITI' : ite ? 'ITE' : 'none', psi = openingPsi(cls);
+          if (!(psi > 0)) continue;
+          const width = ds * ks.length, length = (sill > EPS ? 2 : 1) * width + 2 * h, w = psi * length * dT;
+          out.junctions.push({ type: 'opening', at: 'frame', cls, cls2: null, psi, share: 1, length, w,
+            x0: ax + (bx - ax) * (ka / n), y0: ay + (by - ay) * (ka / n),
+            x1: ax + (bx - ax) * ((kb + 1) / n), y1: ay + (by - ay) * ((kb + 1) / n), nx, ny, z0: sill, z1: sill + h });
+          out.bridge += w;
         }
       }
+      ringJunctions(cols, s, H, dT, out, others, own);
     }
   }
   return out;
@@ -349,8 +465,8 @@ function neighbourPieces(foot, neighbour) {
  * { ids, rectangles, area, volume, dT, total, parts: {wall, opening, floor, ceiling, air},
  *   detail: { wallArea, openingArea, insulatedArea, earthArea, below, above },
  *   map: { wall: [5 cm columns], floor: [pieces], ceiling: [pieces] } } — watts and m².
- * wallArea includes earthArea, the part of it below the earth level; parts.opening includes
- * detail.reveal, the openings' edges past exterior insulation (W, revealLength m). A map piece is
+ * wallArea includes earthArea, the part of it below the earth level; parts.bridge is the
+ * thermal bridges, each in map.junctions (ringJunctions). A map piece is
  * { poly, what ('heated' | 'unheated' | 'earth' | 'air' | 'attic'), u, wm2 }.
  */
 export function floorHeatLoss(project, floor, without = {}) {
@@ -365,9 +481,12 @@ export function floorHeatLoss(project, floor, without = {}) {
   const dT = s.tRoom - s.tOut;
   const b = (temp) => (s.tRoom - temp) / dT;
   const aboveH = floorHeat(above);
+  // The neighbour floors' spaces, for the junctions at this floor's floor and ceiling.
+  const nbOf = (f) => (f ? { rects: spacesOf(f).map((r) => r.bounds), heated: floorHeat(f).heated, floorR: floorHeat(f).floorR } : null);
+  const nb = { above: nbOf(above), below: nbOf(below) };
   return connectedRoomComponents(floor.rectangles).filter((comp) => !comp.rectangles[0].outdoor).map((comp) => {
     const foot = computeFootprint(comp.rectangles);
-    const w = wallLoss(floor, comp, s, fh, dT);
+    const w = wallLoss(floor, comp, s, fh, dT, nb);
     const dn = splitByNeighbour(foot, below), up = splitByNeighbour(foot, above);
     // Floor: over a heated room 0; over an unheated floor (basement); over nothing
     // = slab on earth (at/below ground level) or outside air (an overhang).
@@ -396,18 +515,17 @@ export function floorHeatLoss(project, floor, without = {}) {
     });
     const volume = comp.area * ceilingHeight(floor);
     const air = 0.34 * s.ach * volume * dT;
-    const parts = { wall: w.wall, opening: w.opening + w.reveal, floor: floorW, ceiling: ceilingW, air };
+    const parts = { wall: w.wall, opening: w.opening, bridge: w.bridge, floor: floorW, ceiling: ceilingW, air };
     return {
       ids: comp.ids, rectangles: comp.rectangles, area: comp.area, volume, dT,
       total: Object.values(parts).reduce((a, v) => a + v, 0),
       parts,
       detail: {
         wallArea: w.wallArea, openingArea: w.openingArea, insulatedArea: w.insulated, earthArea: w.earthArea,
-        reveal: w.reveal, revealLength: w.revealLength, // included in parts.opening
         below: { ...dn, onEarth },
         above: up,
       },
-      map: { wall: w.samples, floor: floorMap, ceiling: ceilingMap },
+      map: { wall: w.samples, floor: floorMap, ceiling: ceilingMap, junctions: w.junctions },
     };
   });
 }

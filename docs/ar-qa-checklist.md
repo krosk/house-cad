@@ -412,6 +412,13 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] A window drawn through the outdoor insulation: the room's openings rise (≈ 10 W per metre of edge at ψ 0.4); Reveals insulated → yes gives a green saving line
 - [ ] Reload: the switches are back to yes; the panel still fits in view (it grew by four rows)
 
+## HEAT LOSS · thermal bridges  ⬜ NEW (2026-10-06) — Node-verified only
+- [ ] HEAT LOSS draws coloured bars inside the exterior walls: at the floor (amber over earth or the basement, pink over a heated floor), at the ceiling (pink under a heated floor, cyan under the attic), green posts where a partition meets the façade, red frames around windows
+- [ ] Each bar sits where the real junction is (floor line, ceiling line, the partition's end, the window's edge); none on interior walls; missing or invented ones noted with their room
+- [ ] The reticle 5–15 cm inside a wall reads e.g. "Intermediate floor · at ceiling · 31 W / wall uninsulated / ψ 0.86 × 3.40 m × ½"; one line each where floor, ceiling and window overlap
+- [ ] The room breakdown and the readout show `bridges <W>`; Heavy floors → no removes the pink and cyan bars, Heavy partitions → no the green posts, and the totals drop
+- [ ] The panel (two more rows) still fits in view; frame rate unchanged
+
 ## HEAT LOSS · heaters  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] A room with a radiator product reads `<loss> W · rad. <W> W`; its breakdown shows HEATERS (green when ≥ the loss)
 - [ ] The floor's heaters line under the title; Radiator water ΔT 30 → the heaters roughly halve

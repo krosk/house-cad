@@ -98,7 +98,9 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   but a depth-derived R counts the plaster as insulation (13 mm / 0.04 ≈ 0.33), so type the label R.
   **Proven** (Node on the headset plan, 2026-10-04): R 0.9 on every insulation zone instead of depth /
   0.04 (R 4.5–5.25) → living room r55+r58+r59 3567 → 3922 W, Upper r88+r90 3546 → 3751 W.
-- Thermal bridges: interior lining R × 0.85 (cut by slabs, partitions, rails); exterior R × 0.95.
+- Thermal bridges: linear ψ at each junction (see "Thermal bridges" below). Until 2026-10-06 they were
+  a derating of the insulation instead (interior lining R × 0.85, exterior R × 0.95), now dropped so a
+  bridge is not counted twice.
 - Partial coverage splits the wall into pieces, each with its own U (area-weighted sum).
 - A WALL zone's R is typed in HEATING · R / U like an insulation's (e.g. the wall's build-up from a
   survey); the masonry material is unknown, so the default λ is a Hypothesis.
@@ -145,6 +147,8 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | bare slab R | 0.15 | owner (2026-10-05): concrete slab about 20 cm → R ≈ 0.09 (0.20 / λ 2.3, reinforced; Hypothesis: reinforcement assumed, 0.11 if plain at λ 1.75); to type in the AR panel, the default stays generic |
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
 | radiator water ΔT | 50 K | EN 442 rating; Hypothesis for the owner's system (heaters only) |
+| window ψ (ext. insul.) | 0.9 W/mK | DPE table: wall with exterior insulation, frame at the inner face, insulation not returned (see Thermal bridges) |
+| heavy floors / heavy partitions | yes / yes | DPE: only heavy (concrete, brick) intermediate and top floors and partitions count; Hypothesis for the owner's house until they say what the floors and partitions are made of |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
 ## Recesses: a window's reveal through a thick wall (owner, 2026-10-05)
@@ -176,16 +180,62 @@ within 30 cm of them along the wall (`REVEAL_NEAR_M`): the opening need not be d
 insulation, and insulation drawn stopping at the opening still counts (an opening always goes through
 it). The length is its sill and head along its columns plus its two jambs, once per opening. First
 version (`0078f1b`) required the window zone to reach into the insulation; the owner's switch showed
-no change on the headset (2026-10-05), so that test was dropped. **Reveal ψ (ext. insul.)** is a project setting, default 0.4 W/mK (**Hypothesis:** typical
-when the insulation is not returned into the reveal, 0.3–0.5); the what-if **Reveals insulated**
-switch uses 0.08 (`RETURNED_REVEAL_PSI`; Hypothesis: insulation returned 2–3 cm into the reveal). An
-opening in a wall with no exterior insulation gets none. A RECESS is not needed for
+no change on the headset (2026-10-05), so that test was dropped. **Window ψ (ext. insul.)** (was
+"Reveal ψ") is a project setting. Since 2026-10-06 its default is the DPE table's 0.9 W/mK (was 0.4, a
+guess), the what-if **Reveals insulated** uses the table's 0.25 (was 0.08), and an opening in an
+uninsulated wall or one with a lining also gets its DPE ψ (see Thermal bridges). A RECESS is not needed for
 this; one with the window's footprint and band changes nothing (the window owns its band).
-**Proven** (Node, made-up 4 m room, 45 cm meulière + 10 cm outdoor insulation R 2.5, 1.2 × 1.2 m window):
-4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W) whether the window stops at the wall face,
+**Proven** (Node, made-up 4 m room, 45 cm meulière + 10 cm outdoor insulation R 2.5, 1.2 × 1.2 m window;
+the ψ values of that time): 4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W) whether the window stops at the wall face,
 goes into the insulation, or the insulation is drawn in two pieces stopping at it; 10 W with the
 reveals insulated; 0 with no outdoor insulation. The owner's local file (older than the headset
 plan) has no opening into outdoor insulation: 0 W.
+
+## Thermal bridges (owner, 2026-10-06)
+
+Owner: "Any more sophisticated way to compute thermal bridges?", then, with no reference values, the
+French DPE defaults; "how do I see your pick?" → drawn in the room in AR (option 2 of 3; no panel
+breakdown, no Node report). Method: linear ψ × junction length × ΔT at every junction of an exterior
+wall, the ψ from the **3CL-DPE 2021** tables (arrêté du 31 mars 2021, annexe 1). **Proven** (read
+2026-10-06 from the open-source Open3CL engine, `src/tv.js` table `pont_thermique`, and matching
+methode3cl.com 3.4.2 / 3.4.3): the values in `PSI_LOW`, `PSI_MID`, `PSI_TOP`, `PSI_PARTITION`,
+`PSI_OPENING` of `src/core/heatLoss.js`. They are deliberately cautious (upper bounds).
+
+The wall's insulation at each 5 cm column picks the row: **none**, **ITI** (an INSULATION zone inside
+the room, or on the room side of a drawn WALL zone), **ITE** (insulation outside the masonry, or beyond
+the edge where no WALL zone is drawn), **ITI+ITE**. Junctions (`ringJunctions`, `slabJunctions`):
+
+| Junction | Where it is found | Length | ψ (wall none / ITI / ITE) |
+|---|---|---|---|
+| lowest floor / wall | exterior columns of a room with no heated room under that point (earth, basement, unheated floor, air) | the run, full | 0.39 / 0.31 / 0.49 with the floor uninsulated; floor R set → "ITE" (insulation under the slab; owner, 2026-10-06: it is on the basement's ceiling): 0.80 / 0.71 / 0.64 |
+| intermediate floor / wall | a heated room above (at the ceiling) or below (at the floor), 10 cm into the room | the run, half per side | 0.86 / 0.92 / 0.13, heavy floors only |
+| top floor / wall | nothing heated above: attic, roof or an unheated floor | the run, full | 0.30 / 0.27 / 0.55 uninsulated; with attic R (or the unheated floor's floor R) → "ITE" (insulation above; owner, 2026-10-06: laid on the attic floor): 0.40 / 0.75 / 0.58; heavy floors only |
+| partition / wall | a corner of the room's outline where an exterior edge turns into one facing a heated room, and the façade carries on past the partition: within 60 cm along it lies another room whose own façade is there | the ceiling height, half per side | 0.73 / 0.82 / 0.13, heavy partitions only |
+| window or door / wall | each opening, by the insulation at or within 30 cm of it | sill + head + jambs (a door: no sill) | 0.38 / 0 / 0.9 (window ψ setting; 0.25 with "Reveals insulated"); frame at the inner face (owner, 2026-10-06), 5 cm |
+
+Rooms share an intermediate floor or a partition, so each counts half. The DPE neglects light (wood)
+floors and partitions: **Heavy floors** and **Heavy partitions** (project toggles, default yes) turn
+them off. Wall corners are not counted (DPE). The per-room part is `parts.bridge` (the panel's
+"bridges" figure, after floor and ceiling); `map.junctions` lists each junction with its type, wall
+and floor classes, ψ, length, share and W.
+
+In AR HEAT LOSS each junction is drawn where it is, 4 cm inside the wall face: a bar along the wall at
+the floor or at the ceiling, a post floor to ceiling for a partition, a frame around an opening. The
+colour is the type (amber lowest floor, pink intermediate, cyan top, green partition, red window), brighter for a larger ψ.
+Aiming the reticle within 15 cm inside a wall (or at a post) shows the junctions there:
+"Intermediate floor · at ceiling · 31 W / interior insulation / ψ 0.92 × 3.40 m × ½", one line each
+when several overlap.
+
+**Proven** (Node, made-up two-storey plan, two 4 × 4 m rooms per floor, 45 cm walls, a 20 cm partition):
+each partition T found once per room (half each), the intermediate slab on both floors at half, the
+window frame 4.90 m; with exterior insulation on one façade its slab ψ drops 0.86 → 0.13 and its window
+rises 0.38 → 0.9; a lining makes the window 0. **Proven** (Node on the owner's local file, older than
+the headset plan, 2026-10-06; nothing typed in `project.heat`): the house goes 21 607 → 24 965 W
+(+16 %): bridges 3 385 W (windows 947, lowest floor 709, intermediate 1 050, top 467, partitions 212),
+the rest from dropping the derating. A first partition rule (any turn from exterior to a heated room)
+found 74 on that file, mostly false: walls facing undrawn spaces; the corner-and-façade rule above
+finds 10. **Hypothesis:** partitions that a 60 cm probe cannot cross, or rooms drawn with odd gaps,
+are missed; the AR drawing is how the owner checks. Unverified on the Quest.
 
 ## Heaters: what the radiators give (owner, 2026-10-05)
 
@@ -216,7 +266,7 @@ four switches, session-only (never in the project, back to as drawn on reload):
 - **Attic insulation** no: every floor's added attic R (`ceilingR`) is 0 (the bare ceiling remains);
 - **Windows** no: every WINDOW / SLIDING at single glazing, U 5.8 (`SINGLE_GLAZING_U`; Hypothesis:
   old single glazing in a wooden frame); doors keep their U;
-- **Reveals insulated** yes: the reveal ψ drops to 0.08 (see Reveals above), an improvement.
+- **Reveals insulated** yes: the window ψ in exterior insulation drops to 0.25 (see Reveals above), an improvement.
 
 The room labels, the heat map and the floor total follow the switches. Under the title the panel shows
 the **whole house** (`houseHeatLoss`): design watts and a yearly estimate, kWh/yr = W / ΔT × degree-days
@@ -266,6 +316,7 @@ depend on the unknown wall, slab and lining R. Unverified on the Quest.
 - Stairs are circulation, not rooms: their own loss is not counted.
 - The attic counts as outside (b = 1); a sloped ceiling is counted flat (owner: flat ceilings under
   a ~1 m attic, so it fits).
-- Thermal bridges are a fixed derating of the insulation, not linear ψ values.
+- Thermal bridges use the DPE's tabulated ψ (cautious defaults), not a computed ψ per junction; balconies,
+  beams, lintels and cantilevers are not in the plan and not counted; wall corners are left out, as in the DPE.
 
 Open: the earth level, the masonry material, slab construction, attic R once blown, and the R of the existing linings.
