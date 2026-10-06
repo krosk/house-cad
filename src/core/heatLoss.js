@@ -320,7 +320,9 @@ function wallLoss(floor, comp, s, fh, dT, nb) {
           const col = { ext: false, x0: ax + (bx - ax) * (k / n), y0: ay + (by - ay) * (k / n),
             x1: ax + (bx - ax) * ((k + 1) / n), y1: ay + (by - ay) * ((k + 1) / n), nx, ny };
           cols.push(col);
-          if (others.some((b) => hitsSegment(b, sx, sy, px, py))) continue; // heated both sides
+          // Heated both sides: another room, or this room itself past a thin gap (a room that
+          // wraps around a slot, e.g. a stairwell's balustrade; owner's plan, 2026-10-06).
+          if (others.some((b) => hitsSegment(b, sx, sy, px, py)) || own.some((b) => hitsSegment(b, sx, sy, px, py))) continue;
           const cuts = [];
           for (const z of layers) {
             const b = z.bounds, wall = zoneKind(z) === 'wall';

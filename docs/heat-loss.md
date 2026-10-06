@@ -282,7 +282,7 @@ the headset plan rev 17 (read 2026-10-06), with the settings below typed in; hea
 products are **Hypothesis** (typical figures; the installer's calculation and the data sheet decide).
 
 **Target:** 22 °C in every room, at all times. **Water:** 50 °C flow (≈ 41 °C return, 45.5 °C mean,
-Radiator water ΔT 23.5) at 0 °C outside, without the split; up to 55 °C flow below about −3 °C
+Radiator water ΔT 23.5; the panel steps by 1 K, so 23 or 24) at 0 °C outside, without the split; up to 55 °C flow below about −3 °C
 (weather compensation; "hotter when very cold" accepted). Not underfloor-heating levels.
 
 Assumed renovation (all typed in the model for these numbers):
@@ -298,13 +298,15 @@ Assumed renovation (all typed in the model for these numbers):
 
 | Room | Loss 0 °C | Radiators at 50 °C flow | Loss −7 °C | At −7 °C, 50 °C flow |
 |---|---|---|---|---|
-| Ground living 39 m² | 2 187 W | 2 334 W ✓ | 2 838 W | −504 W: the **FTXM60A split** covers it (cold days only; not at 0 °C) |
+| Ground living 39 m² | 2 010 W | 2 334 W ✓ | 2 604 W | −270 W: the **FTXM60A split** covers it (cold days only; not at 0 °C) |
 | Ground 14 m² | 647 W | 778 W ✓ | 835 W | −57 W |
 | Ground 3 m² (shower room) | 232 W | 230 W ≈ | 299 W | −69 W |
 | Ground kitchen 10 m² (on earth) | 535 W | 600 W ✓ | 672 W | −72 W |
 | Ground 5 m² | 382 W | 600 W ✓ | 496 W | ✓ |
 | Upper (3 rooms) | ✓ | ✓ | ✓ | ✓ (4 m² bathroom just) |
-| **House** | **5.2 kW** | | **6.8 kW** | |
+| **House** | **5.1 kW** | | **6.6 kW** | |
+
+(Living room corrected 2026-10-06 for the self-facing gap fix, see Limits; the rest unchanged.)
 
 At −7 °C the small shortfalls go away at ~55 °C flow, or with the bathroom's electric element and
 21 °C in the 14 m² room and the kitchen. Mean water needed with today's radiators at 0 °C, for
@@ -382,7 +384,14 @@ depend on the unknown wall, slab and lining R. Unverified on the Quest.
 ## Limits (deliberate, keep it simple)
 
 - One indoor temperature for every room (no 22 °C bathroom yet).
-- Stairs are circulation, not rooms: their own loss is not counted.
+- Stairs are circulation, not rooms: their own loss is not counted. Owner (2026-10-06): the Ground
+  5.1 m² hall opens onto an open staircase, so its radiator also heats the stair and the Upper landing.
+  **Proven** (Node, headset plan, 0 °C out, 22 °C in, stairs typed as rooms in a copy): hall + stair
+  417 W (382 W without) and the Upper landing with the stair void 150 W (64 W for its two small
+  spaces), ≈ 570 W for the hall's 600 W radiator at 50 °C flow: sized right, not oversized.
+- A room's own far side across a thin gap counts as heated (2026-10-06). Before, a room wrapping
+  around a slot (the living room around a wall stub; a stairwell's balustrade) counted that edge as
+  an exterior wall: the living room 3 636 → 3 426 W as stored, 2 187 → 2 010 W at 0 °C / 22 °C (Node).
 - The attic counts as outside (b = 1); a sloped ceiling is counted flat (owner: flat ceilings under
   a ~1 m attic, so it fits).
 - Thermal bridges use the DPE's tabulated ψ (cautious defaults), not a computed ψ per junction; balconies,

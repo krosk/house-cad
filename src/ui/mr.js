@@ -1248,7 +1248,7 @@ export function setupMR(view, project, getFootprint) {
     { key: 'lambda', step: 0.002, min: 0.02, max: 0.1 },
     { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
     { key: 'heavyWallMin', step: 0.01, min: 0, max: 1, unit: 'm' }, // thermal bridges (docs/heat-loss.md "Thermal bridges")
-    { key: 'radiatorDT', step: 5, min: 10, max: 60, unit: 'K' },
+    { key: 'radiatorDT', step: 1, min: 5, max: 60, unit: 'K' }, // 1 K: a heat pump's water is set to the degree
     { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
   const heatMenu = makeHeatMenu(HEAT_ROWS);
