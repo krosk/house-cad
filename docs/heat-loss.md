@@ -150,7 +150,8 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | window ψ (ext. insul.) | 0.9 W/mK | DPE table: wall with exterior insulation, frame at the inner face, insulation not returned (see Thermal bridges) |
 | per floor: heavy floor, heavy attic floor | yes, yes | DPE: only heavy (concrete, brick) floors count. `heavy` is the floor's own structure (under it; the slab between two storeys is the upper one's floor), `heavyCeiling` its ceiling where only an attic or the roof is above. Owner (2026-10-06): the ground floor's is concrete over brick (heavy), the upper floor's wood and the loft (attic) floor above it wood too: Upper heavy no, heavy attic floor no; Ground heavy attic floor no (the loft over its single-storey part, "probably wood too"). Not yet set in the headset plan (rev 17 read 2026-10-06): the owner sets them in AR |
 | heavy partition from | 0.10 m | DPE: only heavy partitions (refends) count. Owner (2026-10-06): a mix, thin ones (< 10 cm) plaster, thick ones meulière; each T's partition thickness is the gap between the two rooms along the façade |
-| per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
+| per floor: heated, unheated °C, added floor R | yes, 6, 0 | added floor R (since 2026-10-06) counts only where a floor lies below: owner, "insulation on the basement ceiling … make it so that the kitchen does not double count"; a part on earth or over air keeps the bare slab (the kitchen, on earth). **Proven** (Node, headset plan, 0 °C out, 22 °C in): Ground floor R 3 → the living room 2 908 → 1 961 W, the kitchen 535 W unchanged (it was 484 W when R counted on earth too). |
+| per floor: attic R | 0 | blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
 ## Recesses: a window's reveal through a thick wall (owner, 2026-10-05)
 
@@ -184,7 +185,11 @@ version (`0078f1b`) required the window zone to reach into the insulation; the o
 no change on the headset (2026-10-05), so that test was dropped. **Window ψ (ext. insul.)** (was
 "Reveal ψ") is a project setting. Since 2026-10-06 its default is the DPE table's 0.9 W/mK (was 0.4, a
 guess), the what-if **Reveals insulated** uses the table's 0.25 (was 0.08), and an opening in an
-uninsulated wall or one with a lining also gets its DPE ψ (see Thermal bridges). A RECESS is not needed for
+uninsulated wall or one with a lining also gets its DPE ψ (see Thermal bridges). Owner (2026-10-06): the
+reveals are to be insulated with 1–2 cm of foam (planned). The DPE counts any return as returned
+(0.25) whatever its thickness; **Hypothesis:** 1–2 cm, if it lines the whole reveal from the outer
+insulation to the frame, comes close to that, and a 3–4 cm return would do better where the frame
+leaves room. A RECESS is not needed for
 this; one with the window's footprint and band changes nothing (the window owns its band).
 **Proven** (Node, made-up 4 m room, 45 cm meulière + 10 cm outdoor insulation R 2.5, 1.2 × 1.2 m window;
 the ψ values of that time): 4.80 m of edge, 50 W at ψ 0.4 (the window itself 52 W) whether the window stops at the wall face,
@@ -208,7 +213,7 @@ the edge where no WALL zone is drawn), **ITI+ITE**. Junctions (`ringJunctions`, 
 
 | Junction | Where it is found | Length | ψ (wall none / ITI / ITE) |
 |---|---|---|---|
-| lowest floor / wall | exterior columns of a room with no heated room under that point (earth, basement, unheated floor, air) | the run, full | 0.39 / 0.31 / 0.49 with the floor uninsulated; floor R set → "ITE" (insulation under the slab: the owner's planned renovation puts it on the basement's ceiling; today, 2026-10-06, the ground floor is a bare concrete/brick slab, floor R 0): 0.80 / 0.71 / 0.64 |
+| lowest floor / wall | exterior columns of a room with no heated room under that point (earth, basement, unheated floor, air) | the run, full | 0.39 / 0.31 / 0.49 with the floor uninsulated; floor R set and a floor below that point → "ITE" (insulation under the slab, on earth or over air never: the owner's planned renovation puts it on the basement's ceiling; today, 2026-10-06, the ground floor is a bare concrete/brick slab, floor R 0): 0.80 / 0.71 / 0.64 |
 | intermediate floor / wall | a heated room above (at the ceiling) or below (at the floor), looked for 10, 30 and 60 cm into the room and 30 cm to each side along the wall (floors rarely line up; a single 10 cm probe left 5–27 cm "roof" stretches at the corners on the owner's plan, 2026-10-06); runs under 10 cm are dropped | the run, half per side | 0.86 / 0.92 / 0.13, if the upper floor's `heavy` |
 | top floor / wall | nothing heated above: attic, roof or an unheated floor | the run, full | 0.30 / 0.27 / 0.55 uninsulated; with attic R (or the unheated floor's floor R) → "ITE" (insulation above; owner, 2026-10-06: laid on the attic floor): 0.40 / 0.75 / 0.58; if `heavyCeiling` (an unheated floor above: its `heavy`) |
 | partition / wall | a corner of the room's outline where an exterior edge turns into one facing a heated room, and the façade carries on past the partition: within 60 cm along it lies another room whose own façade is there | the ceiling height, half per side | 0.73 / 0.82 / 0.13 if the gap between the rooms is at least `heavyWallMin` (10 cm); thinner = plaster, ψ 0, drawn grey |
@@ -269,6 +274,57 @@ water ΔT to the design-day value (20 ≈ water 45/40 °C, 30 ≈ 55/45 °C) and
 red (insulation or more radiator surface) so the water can stay as cool as possible. **Hypothesis**
 (typical air-to-water figures, a data sheet would prove them): SCOP ~4.5–5 at 35 °C, ~3.2–3.6 at 55 °C;
 a weather-compensated pump needs the design temperature only on the coldest days.
+
+## Heating plan: heat pump water temperature (owner, 2026-10-06)
+
+The owner's target and decisions, and what the model says they need. Numbers: **Proven** by Node on
+the headset plan rev 17 (read 2026-10-06), with the settings below typed in; heat pump behaviour and
+products are **Hypothesis** (typical figures; the installer's calculation and the data sheet decide).
+
+**Target:** 22 °C in every room, at all times. **Water:** 50 °C flow (≈ 41 °C return, 45.5 °C mean,
+Radiator water ΔT 23.5) at 0 °C outside, without the split; up to 55 °C flow below about −3 °C
+(weather compensation; "hotter when very cold" accepted). Not underfloor-heating levels.
+
+Assumed renovation (all typed in the model for these numbers):
+- **Basement ceiling insulation: 2 cm PIR, R 0.9** (Ground · Floor ins. R (over basement); it counts
+  only over the basement, the kitchen on earth stays bare). R 2 (6–8 cm) was too thick; 2 cm already
+  removes ~75 % of the living room's floor loss (1 207 → ~290 W at 0 °C). Check fire covering rules
+  for exposed PIR in the basement.
+- **Reveals insulated** with 1–2 cm foam (Window ψ 0.25).
+- Upper floor, its loft floor and the loft floor over Ground: wood (heavy no); the ground floor
+  slab concrete over brick; partitions: plaster < 10 cm, meulière thicker.
+- Today's radiators (De'Longhi EASY, ACOVA Angora products in the plan); Basement unheated at 9 °C
+  (0 °C day) / 6 °C (−7 °C day).
+
+| Room | Loss 0 °C | Radiators at 50 °C flow | Loss −7 °C | At −7 °C, 50 °C flow |
+|---|---|---|---|---|
+| Ground living 39 m² | 2 187 W | 2 334 W ✓ | 2 838 W | −504 W: the **FTXM60A split** covers it (cold days only; not at 0 °C) |
+| Ground 14 m² | 647 W | 778 W ✓ | 835 W | −57 W |
+| Ground 3 m² (shower room) | 232 W | 230 W ≈ | 299 W | −69 W |
+| Ground kitchen 10 m² (on earth) | 535 W | 600 W ✓ | 672 W | −72 W |
+| Ground 5 m² | 382 W | 600 W ✓ | 496 W | ✓ |
+| Upper (3 rooms) | ✓ | ✓ | ✓ | ✓ (4 m² bathroom just) |
+| **House** | **5.2 kW** | | **6.8 kW** | |
+
+At −7 °C the small shortfalls go away at ~55 °C flow, or with the bathroom's electric element and
+21 °C in the 14 m² room and the kitchen. Mean water needed with today's radiators at 0 °C, for
+reference: bare slab 50 °C in the living room; R 0.6 (2 cm XPS) 45.2; R 0.9 44.4; R 2 43.0.
+
+- **Bathrooms:** a heat pump heats one circuit at one temperature (zones can be mixed cooler, never
+  hotter). For a warmer bathroom or towel drying: a dual-energy towel radiator (water + electric
+  element). Not from the hot-water tank.
+- **Efficiency (Hypothesis):** COP at 0 °C outside ≈ 3 at 50 °C flow (≈ 4 at 35 °C, ≈ 2.5 at 55–60 °C);
+  most of the season runs cooler (≈ 40 °C mean at +7 °C).
+- **Sizing (Hypothesis):** ~5–7 kW of heating at −7 °C / 55 °C flow, plus domestic hot water; not
+  oversized (short cycling). Check the operating map (55 °C at −7 °C), the output and COP at −7 / 55,
+  not the nominal +7 / 35 figures. Standard R32 air-to-water units reach 55–65 °C.
+- **The owner's Daikin 5MXM90A is an air-to-air multi-split** (5 indoor units such as the FTXM60A
+  and the CTXM15A in the plan; 10 kW nominal heating, web listings 2026-10-06). **Hypothesis**
+  (from the product type): it heats air only and cannot feed the radiators; the radiators need a
+  separate air-to-water heat pump. (The 5MWXM90A variant adds a domestic hot-water tank, not
+  radiator heating.)
+- The model has no per-room temperature, no "water needed" readout and no split as a heater yet
+  (offered, not built).
 
 ## What if: is the insulation worth it? (owner, 2026-10-05)
 

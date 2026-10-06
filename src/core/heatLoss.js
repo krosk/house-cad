@@ -49,7 +49,9 @@ export const SINGLE_GLAZING_U = 5.8; // W/m²K, Hypothesis: old single glazing i
 export const RETURNED_REVEAL_PSI = 0.25; // W/mK, DPE table: ITE wall, returned, window at the inner face
 const REVEAL_NEAR_M = 0.3; // exterior insulation this close to an opening, along the wall, counts
 // Per floor (`floor.heat`): heated or not, an unheated floor's winter temperature, and
-// insulation ADDED to its floor slab and above its ceiling (attic).
+// insulation ADDED to its floor slab and above its ceiling (attic). The floor's (`floorR`) counts
+// only where a floor lies below (owner, 2026-10-06: it goes on the basement's ceiling, so a
+// part on earth or over air, like the kitchen, keeps its bare slab).
 // `heavy`: this floor's own floor structure (the one under it) is heavy (concrete, brick), so
 // its junctions with the walls count (DPE: light, e.g. wooden, floors are neglected); owner,
 // 2026-10-06: the ground floor's is concrete over brick, the upper floor's wood. `heavyCeiling`:
@@ -267,8 +269,8 @@ function slabJunctions(mx, my, nx, ny, s, fh, nb) {
       })();
     const dn = inBelow && nb.below.heated
       ? { type: 'mid', psi: fh.heavy ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
-      : (() => { // floor insulation under the slab (owner, 2026-10-06: planned on the basement's ceiling)
-        const cls2 = fh.floorR > 0 ? 'ITE' : 'none';
+      : (() => { // floor insulation under the slab, only over the floor below (on the basement's ceiling)
+        const cls2 = inBelow && fh.floorR > 0 ? 'ITE' : 'none';
         return { type: 'low', psi: fh.heavy ? PSI_LOW[cls][cls2] : 0, share: 1, cls2 };
       })();
     return { up, dn };
@@ -289,7 +291,7 @@ function wallLoss(floor, comp, s, fh, dT, nb) {
   // Below the earth: the part of each wall under it loses to the ground at the annual
   // mean temperature (EN 12831's fg1 · fg2 · ΔT, as for a slab on earth).
   const z = s.earth - (floor.elevation || 0), buriedH = Math.min(H, Math.max(0, z));
-  const dt = s.wallDepth + LAMBDA_GROUND * (0.17 + s.slabR + fh.floorR + 0.04);
+  const dt = s.wallDepth + LAMBDA_GROUND * (0.17 + s.slabR + 0.04); // floorR: not on earth
   const groundDT = FG1 * (s.tRoom - s.tMean);
   const others = floor.rectangles.filter((r) => isSpace(r) && !comp.ids.has(r.id))
     .map((r) => r.bounds);
@@ -506,12 +508,13 @@ export function floorHeatLoss(project, floor, without = {}) {
     const foot = computeFootprint(comp.rectangles);
     const w = wallLoss(floor, comp, s, fh, dT, nb);
     const dn = splitByNeighbour(foot, below), up = splitByNeighbour(foot, above);
-    // Floor: over a heated room 0; over an unheated floor (basement); over nothing
-    // = slab on earth (at/below ground level) or outside air (an overhang).
+    // Floor: over a heated room 0; over an unheated floor (basement), with the added floor
+    // insulation; over nothing = slab on earth (at/below ground level) or outside air (an
+    // overhang), bare.
     const uFloorUnheated = 1 / (RS_FLOOR + s.slabR + fh.floorR);
-    const uGround = 1 / (1 / s.groundU + fh.floorR);
+    const uGround = s.groundU;
     const fg2 = (s.tRoom - s.tMean) / dT;
-    const uFloorAir = 1 / (RS_FLOOR_AIR + s.slabR + fh.floorR);
+    const uFloorAir = 1 / (RS_FLOOR_AIR + s.slabR);
     const floorW = dn.unheated * uFloorUnheated * dT * b(dn.temp ?? s.tOut)
       + (onEarth ? FG1 * fg2 * dn.none * uGround * dT : dn.none * uFloorAir * dT);
     // Ceiling: under a heated room 0; under an unheated floor b; otherwise the attic

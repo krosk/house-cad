@@ -536,7 +536,7 @@ const STRINGS = {
   'heat.yes':      { en: 'yes', fr: 'oui', zh: '是' },
   'heat.no':       { en: 'no', fr: 'non', zh: '否' },
   'heat.temp':     { en: 'Unheated temp.', fr: 'Temp. non chauffé', zh: '非供暖温度' },
-  'heat.floorR':   { en: 'Floor insulation R', fr: 'R isolant plancher', zh: '地面保温 R' },
+  'heat.floorR':   { en: 'Floor ins. R (over basement)', fr: 'R isolant plancher (sur sous-sol)', zh: '楼板保温 R（地下室上方）' },
   'heat.ceilingR': { en: 'Attic insulation R', fr: 'R isolant combles', zh: '阁楼保温 R' },
   'heat.tOut':     { en: 'Outdoor (design)', fr: 'Extérieur (base)', zh: '室外设计温度' },
   'heat.tRoom':    { en: 'Indoor', fr: 'Intérieur', zh: '室内温度' },
