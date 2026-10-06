@@ -148,7 +148,7 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | insulation λ (no R) | 0.04 | the 3 existing linings have no R yet; owner sets it per zone |
 | radiator water ΔT | 50 K | EN 442 rating; Hypothesis for the owner's system (heaters only) |
 | window ψ (ext. insul.) | 0.9 W/mK | DPE table: wall with exterior insulation, frame at the inner face, insulation not returned (see Thermal bridges) |
-| per floor: heavy floor, heavy attic floor | yes, yes | DPE: only heavy (concrete, brick) floors count. `heavy` is the floor's own structure (under it; the slab between two storeys is the upper one's floor), `heavyCeiling` its ceiling where only an attic or the roof is above. Owner (2026-10-06): the ground floor's is concrete over brick (heavy), the upper floor's wood (set Upper heavy no); the attic floor unknown (Hypothesis: wood like the upper floor) |
+| per floor: heavy floor, heavy attic floor | yes, yes | DPE: only heavy (concrete, brick) floors count. `heavy` is the floor's own structure (under it; the slab between two storeys is the upper one's floor), `heavyCeiling` its ceiling where only an attic or the roof is above. Owner (2026-10-06): the ground floor's is concrete over brick (heavy), the upper floor's wood and the loft (attic) floor above it wood too: Upper heavy no, heavy attic floor no; Ground heavy attic floor no (the loft over its single-storey part, "probably wood too"). Not yet set in the headset plan (rev 17 read 2026-10-06): the owner sets them in AR |
 | heavy partition from | 0.10 m | DPE: only heavy partitions (refends) count. Owner (2026-10-06): a mix, thin ones (< 10 cm) plaster, thick ones meulière; each T's partition thickness is the gap between the two rooms along the façade |
 | per floor: heated, unheated °C, added floor R, attic R | yes, 6, 0, 0 | attic: blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
@@ -208,8 +208,8 @@ the edge where no WALL zone is drawn), **ITI+ITE**. Junctions (`ringJunctions`, 
 
 | Junction | Where it is found | Length | ψ (wall none / ITI / ITE) |
 |---|---|---|---|
-| lowest floor / wall | exterior columns of a room with no heated room under that point (earth, basement, unheated floor, air) | the run, full | 0.39 / 0.31 / 0.49 with the floor uninsulated; floor R set → "ITE" (insulation under the slab; owner, 2026-10-06: it is on the basement's ceiling): 0.80 / 0.71 / 0.64 |
-| intermediate floor / wall | a heated room above (at the ceiling) or below (at the floor), 10 cm into the room | the run, half per side | 0.86 / 0.92 / 0.13, if the upper floor's `heavy` |
+| lowest floor / wall | exterior columns of a room with no heated room under that point (earth, basement, unheated floor, air) | the run, full | 0.39 / 0.31 / 0.49 with the floor uninsulated; floor R set → "ITE" (insulation under the slab: the owner's planned renovation puts it on the basement's ceiling; today, 2026-10-06, the ground floor is a bare concrete/brick slab, floor R 0): 0.80 / 0.71 / 0.64 |
+| intermediate floor / wall | a heated room above (at the ceiling) or below (at the floor), looked for 10, 30 and 60 cm into the room and 30 cm to each side along the wall (floors rarely line up; a single 10 cm probe left 5–27 cm "roof" stretches at the corners on the owner's plan, 2026-10-06); runs under 10 cm are dropped | the run, half per side | 0.86 / 0.92 / 0.13, if the upper floor's `heavy` |
 | top floor / wall | nothing heated above: attic, roof or an unheated floor | the run, full | 0.30 / 0.27 / 0.55 uninsulated; with attic R (or the unheated floor's floor R) → "ITE" (insulation above; owner, 2026-10-06: laid on the attic floor): 0.40 / 0.75 / 0.58; if `heavyCeiling` (an unheated floor above: its `heavy`) |
 | partition / wall | a corner of the room's outline where an exterior edge turns into one facing a heated room, and the façade carries on past the partition: within 60 cm along it lies another room whose own façade is there | the ceiling height, half per side | 0.73 / 0.82 / 0.13 if the gap between the rooms is at least `heavyWallMin` (10 cm); thinner = plaster, ψ 0, drawn grey |
 | window or door / wall | each opening, by the insulation at or within 30 cm of it | sill + head + jambs (a door: no sill) | 0.38 / 0 / 0.9 (window ψ setting; 0.25 with "Reveals insulated"); frame at the inner face (owner, 2026-10-06), 5 cm |
@@ -219,7 +219,12 @@ floors and partitions: **Heavy floor** and **Heavy attic floor** (per floor, THI
 yes) turn floors off; a partition is heavy from **Heavy partition from** (project, 0.10 m) up.
 **Proven** (Node on the owner's old local file): its 8 detected T's are all 7–9 cm (light, 0 W; the
 house 24 965 → 24 752 W). **Hypothesis:** the thick meulière partitions either do not reach the façade
-in that file or are missed; the AR posts (green = counted, grey = light) show which. The lowest floor's junction follows its
+in that file or are missed; the AR posts (green = counted, grey = light) show which.
+**Proven** (Node on the headset plan rev 17, read 2026-10-06): 8 811 W as stored, bridges 2 712 W
+(windows in exterior insulation the largest, 50.6 m at ψ 0.9); with the owner's answers (Upper floor
+and loft floor wood) 8 178 W, bridges 2 078 W; with the reveals insulated as well 7 322 W. Ground keeps
+≈ 250 W of top junctions in three rooms with only the loft above them (Ground's own heavy attic floor);
+the owner (2026-10-06): that loft floor is probably wood too, so Ground heavy attic floor no as well. The lowest floor's junction follows its
 floor's `heavy` too. **Proven** (Node on the owner's old local file, 2026-10-06): Upper heavy and heavy
 attic floor no → the house 24 965 → 24 235 W (Ground's ceiling and Upper's floor junction 515 W, Upper's
 top 209 W, Upper's lowest floor 8 W gone); both survive save and reload. Ground still has 167 W of top

@@ -198,7 +198,8 @@ function ringJunctions(cols, s, H, dT, out, others, own) {
   const push = (j) => { j.w = j.psi * j.length * j.share * dT; out.junctions.push(j); out.bridge += j.w; };
   for (const [at, side] of [['floor', 'dn'], ['ceiling', 'up']]) {
     let run = null;
-    const flush = () => { if (run) push(run); run = null; };
+    // A run under 10 cm is a corner artefact of floors that don't line up (a column or two).
+    const flush = () => { if (run && run.length >= 0.1 - EPS) push(run); run = null; };
     for (const c of cols) {
       const j = c.ext ? c[side] : null;
       if (!j || !(j.psi > 0)) { flush(); continue; }
@@ -245,9 +246,16 @@ function ringJunctions(cols, s, H, dT, out, others, own) {
   }
 }
 
-// What lies across a room's floor or ceiling at plan point (x, y), for its junction there.
-function slabJunctions(x, y, s, fh, nb) {
-  const inAbove = nb.above?.rects.some((b) => contains(b, x, y)), inBelow = nb.below?.rects.some((b) => contains(b, x, y));
+// What lies across a room's floor or ceiling at a wall column (mid-point mx, my, outward
+// normal nx, ny), for its junction there. A neighbour floor's space is looked for at a few
+// depths into the room and a little to each side along the wall: its walls rarely sit exactly
+// over this floor's, and a slightly thicker wall above would otherwise read as the roof at the
+// corners (owner's plan, 2026-10-06: 5–27 cm stretches).
+const SLAB_DEPTHS_M = [JUNCTION_INSET_M, 0.3, 0.6], SLAB_ALONG_M = [0, -0.3, 0.3];
+function slabJunctions(mx, my, nx, ny, s, fh, nb) {
+  const over = (n) => SLAB_ALONG_M.some((a) => SLAB_DEPTHS_M.some((d) => n?.rects.some((b) =>
+    contains(b, mx - nx * d - ny * a, my - ny * d + nx * a))));
+  const inAbove = over(nb.above), inBelow = over(nb.below);
   return (cls) => {
     // The slab between two floors is the upper one's floor (its `heavy`).
     const upHeavy = inAbove ? nb.above.heavy : fh.heavyCeiling;
@@ -259,7 +267,7 @@ function slabJunctions(x, y, s, fh, nb) {
       })();
     const dn = inBelow && nb.below.heated
       ? { type: 'mid', psi: fh.heavy ? PSI_MID[cls] : 0, share: 0.5, cls2: null }
-      : (() => { // floor insulation under the slab (owner, 2026-10-06: on the basement's ceiling)
+      : (() => { // floor insulation under the slab (owner, 2026-10-06: planned on the basement's ceiling)
         const cls2 = fh.floorR > 0 ? 'ITE' : 'none';
         return { type: 'low', psi: fh.heavy ? PSI_LOW[cls][cls2] : 0, share: 1, cls2 };
       })();
@@ -324,7 +332,7 @@ function wallLoss(floor, comp, s, fh, dT, nb) {
           }
           col.ext = true;
           col.cls = colCls[k] = insulationClass(cuts);
-          Object.assign(col, slabJunctions(mx - nx * JUNCTION_INSET_M, my - ny * JUNCTION_INSET_M, s, fh, nb)(col.cls));
+          Object.assign(col, slabJunctions(mx, my, nx, ny, s, fh, nb)(col.cls));
           let { r, insulated, walled } = layerStack(cuts);
           const placeholder = walled ? 0 : s.wallDepth / s.wallLambda; // the placeholder masonry
           r += placeholder;
