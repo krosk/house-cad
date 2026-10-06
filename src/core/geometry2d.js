@@ -134,7 +134,7 @@ export function multiPolygonArea(multiPolygon) {
 // Whether two axis-aligned rectangles belong to the same continuous room patch.
 // Positive-area overlap counts, as does a shared boundary segment with positive
 // length. A single shared corner explicitly does not.
-function roomRectsConnect(a, b, epsilon) {
+export function roomRectsConnect(a, b, epsilon = 1e-6) {
   if (!!a.outdoor !== !!b.outdoor) return false; // an OUTDOOR room is its own space (model.js)
   const ab = a.bounds, bb = b.bounds;
   const overlapX = Math.min(ab.x1, bb.x1) - Math.max(ab.x0, bb.x0);

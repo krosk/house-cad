@@ -384,11 +384,15 @@ depend on the unknown wall, slab and lining R. Unverified on the Quest.
 ## Limits (deliberate, keep it simple)
 
 - One indoor temperature for every room (no 22 °C bathroom yet).
-- Stairs are circulation, not rooms: their own loss is not counted. Owner (2026-10-06): the Ground
-  5.1 m² hall opens onto an open staircase, so its radiator also heats the stair and the Upper landing.
-  **Proven** (Node, headset plan, 0 °C out, 22 °C in, stairs typed as rooms in a copy): hall + stair
-  417 W (382 W without) and the Upper landing with the stair void 150 W (64 W for its two small
-  spaces), ≈ 570 W for the hall's 600 W radiator at 50 °C flow: sized right, not oversized.
+- Stairs (owner, 2026-10-06: "only if it is opened without a door separating"; `heatComponents`):
+  a STAIRS zone counts with the room it touches or overlaps, its walls, floor, ceiling and air, unless
+  a DOOR / SLIDING / GARAGE zone sits on their contact; a stair behind a wall gap stays apart and is not
+  counted (as all stairs were before). A stair open to two rooms joins them; a flight and its landing
+  join each other. Room areas elsewhere (EDIT, sheets) are unchanged. **Proven** (Node, headset plan,
+  0 °C out, 22 °C in): the Ground hall + its stair up 6.6 m², 417 W (382 W alone) for its 600 W
+  radiator at 50 °C flow (sized right, not oversized); the basement stair stays out (a gap); Upper's
+  landing + both stairs 4.0 m², 124 W (no radiator: heated by the hall below); the 0.9 m² cupboard
+  behind door r138 stays apart.
 - A room's own far side across a thin gap counts as heated (2026-10-06). Before, a room wrapping
   around a slot (the living room around a wall stub; a stairwell's balustrade) counted that edge as
   an exterior wall: the living room 3 636 → 3 426 W as stored, 2 187 → 2 010 W at 0 °C / 22 °C (Node).

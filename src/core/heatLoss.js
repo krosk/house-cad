@@ -15,7 +15,7 @@
 // rooms of the floors below/above (floors are ordered bottom → top).
 
 import polygonClipping from 'polygon-clipping';
-import { computeFootprint, connectedRoomComponents, multiPolygonArea } from './geometry2d.js';
+import { computeFootprint, connectedRoomComponents, multiPolygonArea, roomRectsConnect } from './geometry2d.js';
 import { zoneKind } from './zoneColors.js';
 import { ceilingHeight } from './storey.js';
 
@@ -481,6 +481,51 @@ function neighbourPieces(foot, neighbour) {
   return out;
 }
 
+// The heated spaces of a floor: its connected ROOM components, each with the stairs open to it
+// (owner, 2026-10-06: "only if it is opened without a door separating"). A STAIRS zone joins a
+// room it touches or overlaps, unless a DOOR / SLIDING zone sits on their contact; a stair
+// behind a wall gap (a doorway in a partition) stays apart, as before (not counted). A stair
+// open to two rooms joins them into one space. The stair then counts with that room: its
+// walls, floor, ceiling and air (its area is no longer taken out of the room's).
+const STAIR_KINDS = new Set(['stairs_up', 'stairs_down']);
+const DOOR_KINDS = new Set(['door', 'sliding', 'garage']);
+function heatComponents(floor) {
+  const rects = floor.rectangles;
+  const doors = rects.filter((r) => DOOR_KINDS.has(zoneKind(r)));
+  const doorBetween = (a, b) => {
+    const A = a.bounds, B = b.bounds, e = 0.02;
+    const box = { x0: Math.max(A.x0, B.x0) - e, x1: Math.min(A.x1, B.x1) + e, y0: Math.max(A.y0, B.y0) - e, y1: Math.min(A.y1, B.y1) + e };
+    return doors.some((d) => { const D = d.bounds; return D.x0 < box.x1 && D.x1 > box.x0 && D.y0 < box.y1 && D.y1 > box.y0; });
+  };
+  const stairs = rects.filter((r) => STAIR_KINDS.has(zoneKind(r)) && !r.outdoor);
+  const comps = connectedRoomComponents(rects);
+  if (!stairs.length) return comps;
+  // Group rooms' components and stairs: a stair links to a component, or to another stair (a
+  // flight and its landing), where they touch with no door between.
+  const nodes = [...comps.map((c) => ({ comp: c })), ...stairs.map((st) => ({ st }))];
+  const parent = nodes.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const link = (a, b) => { parent[find(a)] = find(b); };
+  const touches = (n, st) => (n.comp ? n.comp.rectangles : [n.st]).some((r) => roomRectsConnect(st, r) && !doorBetween(st, r));
+  stairs.forEach((st, k) => nodes.forEach((n, i) => { if (i !== comps.length + k && touches(n, st)) link(comps.length + k, i); }));
+  const groups = new Map();
+  nodes.forEach((n, i) => { const g = find(i); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(n); });
+  // Each open stair stands in as a room (same id and geometry, kind room, added); a stair
+  // reaching no room stays out (not counted, as before).
+  const proxy = (st) => Object.assign(Object.create(st), { kind: 'room', op: 'add', stair: true });
+  const out = [];
+  for (const members of groups.values()) {
+    const cs = members.filter((n) => n.comp), sts = members.filter((n) => n.st).map((n) => n.st);
+    if (!cs.length) continue;
+    if (!sts.length) { out.push(cs[0].comp); continue; }
+    const rectangles = [...cs.flatMap((n) => n.comp.rectangles), ...sts.map(proxy)];
+    const subtracts = rects.filter((r) => r.op === 'subtract' && zoneKind(r) !== 'furniture' && !sts.includes(r));
+    out.push({ rectangles, ids: new Set(rectangles.map((r) => r.id)),
+      area: multiPolygonArea(computeFootprint([...rectangles, ...subtracts])) });
+  }
+  return out;
+}
+
 /**
  * Heat loss of every room of `floor`, or [] for an unheated floor. Each result:
  * { ids, rectangles, area, volume, dT, total, parts: {wall, opening, floor, ceiling, air},
@@ -506,7 +551,7 @@ export function floorHeatLoss(project, floor, without = {}) {
   const nbOf = (f) => (f ? { rects: spacesOf(f).map((r) => r.bounds), heated: floorHeat(f).heated,
     floorR: floorHeat(f).floorR, heavy: floorHeat(f).heavy } : null);
   const nb = { above: nbOf(above), below: nbOf(below) };
-  return connectedRoomComponents(floor.rectangles).filter((comp) => !comp.rectangles[0].outdoor).map((comp) => {
+  return heatComponents(floor).filter((comp) => !comp.rectangles[0].outdoor).map((comp) => {
     const foot = computeFootprint(comp.rectangles);
     const w = wallLoss(floor, comp, s, fh, dT, nb);
     const dn = splitByNeighbour(foot, below), up = splitByNeighbour(foot, above);

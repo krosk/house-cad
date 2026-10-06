@@ -281,7 +281,7 @@ function contentBBox(floor, footprint, layers = resolveOutputLayers()) {
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance') continue;
     if (skipFurnitureConstraint(c, floor.rectangles, layers)) continue;
-    if (isMarkerConstraint(c) ? !layers.markerDims : !layers.planDims) continue;
+    if (isMarkerConstraint(c) ? !layers.markerDims : !structuralDimShown(c, floor.rectangles, layers)) continue;
     const a = endpointCoord(c.a, c.axis), b = endpointCoord(c.b, c.axis);
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
     const label = dimLabelCoord(c, a, b);
@@ -553,12 +553,21 @@ function drawTextChip(be, text, cx, cy, size = 1.9, color = C_MARK) {
   be.text(text, cx, cy + size * 0.05, { fill: color, size, align: 'center', baseline: 'middle' });
 }
 
+// A structural dimension is drawn with the plan dimensions, or, when only the furniture
+// dimensions are on (owner, 2026-10-06: "remove everything then re-enable only the furniture
+// and furniture dims"), when it touches a furniture edge.
+const furnitureDimsOnly = (layers) => !layers.planDims && layers.furniture && layers.furnitureDims;
+function structuralDimShown(c, rects, layers) {
+  return layers.planDims || (furnitureDimsOnly(layers) && constraintInvolvesFurniture(c, rects));
+}
+
 function drawDimensions(be, L, floor, layers) {
   const rects = floor.rectangles;
   let xTier = 0, yTier = 0;
   for (const c of floor.constraints || []) {
     if (c.type !== 'distance' || isMarkerConstraint(c) || isNodeConstraint(c)) continue;
     if (skipFurnitureConstraint(c, rects, layers)) continue;
+    if (!structuralDimShown(c, rects, layers)) continue;
     if (displaysZero(c.value)) continue; // a 0.00 dimension is clutter
     const la = structuralDimLine(c.a, rects);
     const lb = structuralDimLine(c.b, rects);
@@ -1595,7 +1604,7 @@ function renderFloor(be, floor, opts = {}) {
   if (layers.markerIcons) {
     drawElectricalLinks(be, L, floor); // logical switch→light control legs; conduit topology is never printed
   }
-  if (layers.planDims) drawDimensions(be, L, floor, layers);
+  if (layers.planDims || furnitureDimsOnly(layers)) drawDimensions(be, L, floor, layers);
   if (layers.markerDims) drawMarkerPins(be, L, floor, layers); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);
   if (layers.markerIcons) drawMarkers(be, L, floor, footprint); // contextual room-side callouts stay foremost

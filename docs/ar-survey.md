@@ -486,7 +486,10 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   `markerIcons`, `wiring`, `furniture`, `furnitureDims`, `area`): `wiring` (default **off**) surfaces
   the whole-house conduit/wire layer, and `furnitureDims` (default off) surfaces dimensions anchored to
   a furniture edge — each gated under its parent (`wiring` under `markerIcons`, `furnitureDims` under
-  `furniture`) so a dim/route to an undrawn element can't dangle. A separate **EXPORT** button
+  `furniture`) so a dim/route to an undrawn element can't dangle. With plan dims off and furniture +
+  furniture dims on, an SVG/PNG sheet shows the furniture dimensions alone (owner, 2026-10-06: "only
+  the furniture and furniture dims"); before, plan dims off hid them too. DXF still ties them to plan
+  dims. A separate **EXPORT** button
   downloads the selected format to the headset. These choices persist locally under
   `house-cad:output:v1`, not in project saves, and immediately redraw the LEFT preview.
   The panel also has two cycling rows, each cycled by flicking the RIGHT **thumbstick** while pointing
