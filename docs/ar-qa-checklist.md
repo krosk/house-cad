@@ -425,6 +425,11 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] The floor's heaters line under the title; Radiator water ΔT 30 → the heaters roughly halve
 - [ ] A window in a wall with outdoor insulation: Reveals insulated → yes gives a green saving line (it showed none on `0078f1b`)
 
+## HEAT LOSS · whole-house balance  ⬜ NEW (2026-10-07) — Node-verified only
+- [ ] WHOLE HOUSE · Whole-house balance → yes: labels add `· <°C>`; the header shows `Water needed ΔT 28.6 K (50.6 °C)` (headset plan, −7 °C, 22 °C); the plaster λ row lights up
+- [ ] Aim the ground shower room: `Reaches 20.4 °C · from neighbours +23 W` in red; the hall and the upper landing both read `… · with the stairwell` with the same temperature
+- [ ] Outdoor 0 °C: every room with a radiator reads 22.0 °C (green); the panel stays responsive after an edit (it recomputes once)
+
 ## OUTDOOR room (veranda)  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] PLAN · EDIT: select the veranda room, A/X → TYPE reads `OUTDOOR ROOM`; A/X again → `ROOM`
 - [ ] HEAT LOSS: the veranda shows no watts; the kitchen's wall to it now loses heat; the EDIT area of the veranda and the kitchen are separate

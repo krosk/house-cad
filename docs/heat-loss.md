@@ -27,6 +27,18 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
   and ignored. Wall height = the room height, storey height − slab (`ceilingHeight`; `docs/product-intent.md`
   multi-floor); the room volume uses it too.
+- **Air volume** (owner, 2026-10-06: "the area does not mark the actual air volume"): the room's
+  floor area × the room height, minus what each zone inside the room really fills (`airVolume`).
+  Walls, insulation and cabinets fill the full height; a half wall (incl. a plinth under a shower
+  tray) only up to its top; a heater only its band; doors, passages, windows, recesses and stairs
+  (owner, 2026-10-07: "stairs can count as air") are air; furniture is ignored. A stair open to the
+  room is already part of it ("Open stairs"), so it is not added twice; on the headset plan all three
+  stairs that touch a room are open to it, so the stairs rule changes nothing there (Proven in Node:
+  hall 17.78 m³, upper landing 10.84 m³, house 6 728 W, as before). Until then the net area (every non-furniture zone taken out) ×
+  the full height was used, so a 9.3 cm plinth under a 120 × 80 tray removed 2.6 m³ instead of
+  0.09 m³ (13 W in each bathroom). Proven in Node on the headset plan: ground shower room
+  8.05 m³ = 3.114 m² × 2.70 m − toilet half wall 0.231 m² × 1.15 m − plinth 0.96 m² × 0.093 m; air
+  40 W, as before the plinths. The reported area stays the net floor area.
 - **OUTDOOR rooms** (owner, 2026-10-05: the unheated glazed veranda next to the kitchen, "I wish to
   have it as a room, because its measurements matter", and "ok to treat it same as outside"). A ROOM
   can be flagged `outdoor` (AR PLAN · EDIT: A/X on a selected room; desktop: the Indoor/Outdoor
@@ -150,6 +162,8 @@ zone's `rValue` or `lambda`; additive, no FILE_VERSION bump); defaults in `src/c
 | window ψ (ext. insul.) | 0.9 W/mK | DPE table: wall with exterior insulation, frame at the inner face, insulation not returned (see Thermal bridges) |
 | per floor: heavy floor, heavy attic floor | yes, yes | DPE: only heavy (concrete, brick) floors count. `heavy` is the floor's own structure (under it; the slab between two storeys is the upper one's floor), `heavyCeiling` its ceiling where only an attic or the roof is above. Owner (2026-10-06): the ground floor's is concrete over brick (heavy), the upper floor's wood and the loft (attic) floor above it wood too: Upper heavy no, heavy attic floor no; Ground heavy attic floor no (the loft over its single-storey part, "probably wood too"). Not yet set in the headset plan (rev 17 read 2026-10-06): the owner sets them in AR |
 | heavy partition from | 0.10 m | DPE: only heavy partitions (refends) count. Owner (2026-10-06): a mix, thin ones (< 10 cm) plaster, thick ones meulière; each T's partition thickness is the gap between the two rooms along the façade |
+| whole-house balance | off | owner (2026-10-07): a toggle. See "Whole-house balance" |
+| plaster partition λ | 0.40 W/mK | Hypothesis: dense solid plaster block; owner (2026-10-07): "full plaster walls". 7 cm → U 2.3, 10 cm → 2.0 (with Rsi 0.13 each side). For the balance only |
 | per floor: heated, unheated °C, added floor R | yes, 6, 0 | added floor R (since 2026-10-06) counts only where a floor lies below: owner, "insulation on the basement ceiling … make it so that the kitchen does not double count"; a part on earth or over air keeps the bare slab (the kitchen, on earth). **Proven** (Node, headset plan, 0 °C out, 22 °C in): Ground floor R 3 → the living room 2 908 → 1 961 W, the kitchen 535 W unchanged (it was 484 W when R counted on earth too). |
 | per floor: attic R | 0 | blown rock wool planned; owner's quote (2026-10-05): ROCKWOOL JETROCK 2, 360 mm blown, 352 mm settled, R 8 = 0.352 / λ 0.044. Proven against Rockwool's documentation (web search, 2026-10-05): λD 0.044, and for R 8 a settled 352 mm, 360 mm installed, at least 6.80 kg/m², so the quote matches the manufacturer's table; on site, check the depth markers and the bag count against that coverage |
 
@@ -327,6 +341,54 @@ reference: bare slab 50 °C in the living room; R 0.6 (2 cm XPS) 45.2; R 0.9 44.
   radiator heating.)
 - The model has no per-room temperature, no "water needed" readout and no split as a heater yet
   (offered, not built).
+
+## Whole-house balance (owner, 2026-10-07)
+
+Owner: "I won't be able to have individual water temp line", then "can we account for adjacent room
+spare?" and "make the whole house balance as a toggle option". With one water temperature, a room whose
+radiators fall short settles below the indoor temperature and draws heat from warmer neighbours; a room
+with spare is held at the indoor temperature by its thermostatic valve. `houseBalance` (heatLoss.js),
+on with the WHOLE HOUSE row **Whole-house balance**:
+
+- **Nodes:** every heated space on every heated floor. Spaces joined by an open stairwell across storeys
+  (a stair of one floor over a stair of the next, each open to its room) are one node (owner: "the
+  ground hall and upper landing are actually connected").
+- **Each node's loss** is linear around the indoor temperature: its loss there plus G·(T − tRoom), G =
+  walls, openings, bridges and air over (tRoom − tOut), the floor over (tRoom − what is below: the
+  annual mean on earth, the basement's temperature), the ceiling over (tRoom − what is above).
+- **Radiators:** rated × ((tRoom + water ΔT − T) / 50)^1.3, capped by the valve at tRoom.
+- **Between nodes:** partitions, sampled every 5 cm of each space's outline (the first other space
+  within 0.6 m; its gap is the partition's thickness), U = 1 / (0.26 + gap / λ), λ = the plaster
+  partition λ under the heavy-partition thickness, else the wall λ (meulière); each side samples the
+  wall once, so halved. Floors between two heated storeys: the overlap area at
+  U = 1 / (0.20 + bare slab R + 0.25 for a light floor) (Hypothesis: boards, joist void, plaster ceiling).
+- **Solved** by Gauss-Seidel (each node bisected for its temperature with the others fixed) until
+  nothing moves by 0.00001 K.
+- **Shown** (AR panel): each room's label adds the temperature it reaches; the room box adds
+  "Reaches 20.4 °C · from neighbours +23 W" (green at the indoor temperature, red under it; "with the
+  stairwell" for a joined node); the header adds **Water needed**, the lowest ΔT at which every space
+  with a radiator reaches the indoor temperature (bisection, up to 60 K).
+- **Not modelled:** a door in a partition (counted as partition), the air through an open door, the
+  split units, sun, people, appliances.
+
+**Proven** (Node, headset plan as of 2026-10-07 with the trays and toilets, 22 °C inside, ΔT 24 K =
+46 °C mean water, plaster λ 0.40):
+
+| Space | −7 °C: reaches, from neighbours | 0 °C |
+|---|---|---|
+| Ground shower room (1.9 m² net) | **20.4 °C**, +23 W (19.3 °C on its own) | 22.0 °C |
+| Ground hall + upper landing (stairwell, one node) | 21.1 °C, +31 W | 22.0 °C (gives 17 W) |
+| Ground living room | 21.2 °C, +7 W (the split not counted) | 22.0 °C |
+| Ground kitchen, 14 m² room | 21.1 °C, 21.5 °C | 22.0 °C |
+| Upper 18.4 m², bathroom, 14.7 m² | 21.8, 21.9, 22.0 °C; they give 34, 14, 39 W | 22.0 °C |
+| Upper 0.9 m² space (no radiator) | 20.1 °C, +32 W | 21.0 °C |
+
+**Water needed:** ΔT 28.6 K (50.6 °C mean) at −7 °C, 23.8 K (45.8 °C) at 0 °C, about the same as the
+tightest room on its own (the ground shower room: 28.8 and 24.0 K). Deliberate, not a bug: the valves
+hold every other room at exactly the indoor temperature, so at the point where all rooms reach it no
+neighbour is warmer and none can give. The balance changes how far short a room falls (19.3 → 20.4 °C),
+not the water needed for all to reach it. One run took about 0.4 s in Node (the floors' geometry,
+already the cost of the house total); the panel computes it once per plan change, only while on.
 
 ## What if: is the insulation worth it? (owner, 2026-10-05)
 

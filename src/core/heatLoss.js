@@ -39,6 +39,9 @@ export const HEAT_DEFAULTS = {
   radiatorDT: 50, // K, radiator mean water − room temperature (EN 442 rating: 50; a heat pump runs lower)
   revealPsi: 0.9, // W/mK around a window in a wall with exterior insulation not returned into the reveal (DPE table)
   heavyWallMin: 0.1, // m: a partition this thick or more is heavy masonry (owner, 2026-10-06: under 10 cm is plaster)
+  // Whole-house balance (owner, 2026-10-07; houseBalance): off = every room on its own at tRoom.
+  balance: false,
+  plasterLambda: 0.4, // W/mK, a thin (< heavyWallMin) solid plaster partition; Hypothesis: dense plaster block
 };
 // "What if" (owner, 2026-10-05: "whether insulation is worth it"): the loss with a kind of
 // insulation taken away, never stored. `without` = { wallIns, atticIns, windows }:
@@ -526,6 +529,39 @@ function heatComponents(floor) {
   return out;
 }
 
+// Air volume of a heated space (owner, 2026-10-06: "the area does not mark the actual air
+// volume"). The net area (the room minus every non-furniture subtract zone) × the ceiling
+// height takes each zone out over the full height, right for walls, insulation and cabinets.
+// A half wall (or a plinth under a shower tray) is solid only from the floor to its top, a
+// heater only over its band, and an opening (door, passage, window, recess) or a stair (owner,
+// 2026-10-07: "stairs can count as air") is air: their footprint inside the room gets its air
+// back above / around the solid part. A stair open to the room is already part of it (its
+// proxy is in `comp.ids`), so it is skipped rather than counted twice.
+const OPEN_KINDS = new Set(['door', 'passage', 'garage', 'window', 'sliding', 'recess', ...STAIR_KINDS]);
+function solidHeight(z, kind, H) {
+  if (OPEN_KINDS.has(kind)) return 0;
+  if (kind === 'halfwall') return Math.min(H, Math.max(0, z.sill ?? 0));
+  if (kind === 'heater') return Math.max(0, Math.min(H, z.head ?? H) - Math.max(0, z.sill ?? 0));
+  return H;
+}
+function airVolume(comp, rects, H) {
+  let volume = comp.area * H, gross = null;
+  const R = computeFootprint(comp.rectangles).flat(2);
+  const xs = R.map((q) => q[0]), ys = R.map((q) => q[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  for (const z of rects) {
+    const kind = zoneKind(z);
+    if (z.op !== 'subtract' || kind === 'furniture' || comp.ids.has(z.id)) continue;
+    const solid = solidHeight(z, kind, H);
+    const b = z.bounds;
+    if (solid >= H || b.x1 <= x0 || b.x0 >= x1 || b.y1 <= y0 || b.y0 >= y1) continue;
+    gross ??= multiPolygonArea(computeFootprint(comp.rectangles));
+    const inside = gross - multiPolygonArea(computeFootprint([...comp.rectangles, z]));
+    if (inside > EPS) volume += inside * (H - solid);
+  }
+  return volume;
+}
+
 /**
  * Heat loss of every room of `floor`, or [] for an unheated floor. Each result:
  * { ids, rectangles, area, volume, dT, total, parts: {wall, opening, floor, ceiling, air},
@@ -581,7 +617,7 @@ export function floorHeatLoss(project, floor, without = {}) {
       if (what === 'unheated') return { poly, what, u: uCeilingUnheated, wm2: uCeilingUnheated * dT * b(up.temp ?? s.tOut) };
       return { poly, what: 'attic', u: uCeiling, wm2: uCeiling * dT };
     });
-    const volume = comp.area * ceilingHeight(floor);
+    const volume = airVolume(comp, floor.rectangles, ceilingHeight(floor));
     const air = 0.34 * s.ach * volume * dT;
     const parts = { wall: w.wall, opening: w.opening, bridge: w.bridge, floor: floorW, ceiling: ceilingW, air };
     return {
@@ -631,4 +667,156 @@ export function roomHeaters(project, floor, rooms, powerOf) {
 export function roomHeatLoss(project, floor, rect) {
   if (!rect || zoneKind(rect) !== 'room') return null;
   return floorHeatLoss(project, floor).find((r) => r.ids.has(rect.id)) || null;
+}
+
+// ---- Whole-house balance (owner, 2026-10-07: "make the whole house balance as a toggle option") ----
+// With one water temperature for every radiator, a room whose radiators fall short settles a
+// little under tRoom and draws heat from warmer neighbours, through the partitions and the
+// floors between heated storeys; a room with spare is held at tRoom by its thermostatic valve.
+// Each heated space is a node: its loss is linear around tRoom (the room's loss at tRoom plus
+// G·(T − tRoom), G = each part over its own driving difference); its radiators give
+// rated · ((tWater − T) / 50)^1.3 (tWater = tRoom + radiatorDT); it exchanges K·(Tj − T) with each
+// neighbour. Spaces joined by an open stairwell across storeys (a stair of one floor over a stair
+// of the next, each open to its room) are one node (owner, 2026-10-07: the hall and the upper
+// landing are connected). Solved by Gauss-Seidel with the valve cap. Not modelled: doors in a
+// partition (counted as partition), an open door's air exchange, the split units, sun, people.
+const WOOD_FLOOR_R = 0.25; // m²K/W, a light (wooden) floor between heated storeys: boards, joist void, plaster ceiling (Hypothesis)
+const PROBE_STEP_M = 0.01;
+
+// Conductance (W/K) between the heated spaces of one floor through their partitions: every
+// STEP_M of a space's outline probes outward; the first other space within PROBE_M is across a
+// partition as thick as the gap. U = 1 / (Rsi + gap/λ + Rsi), λ = plaster under heavyWallMin,
+// else the wall λ (masonry). Each side samples the wall once: halved.
+function partitionLinks(rooms, H, s) {
+  const K = new Map();
+  const add = (i, j, v) => { const k = i < j ? `${i}|${j}` : `${j}|${i}`; K.set(k, (K.get(k) || 0) + v / 2); };
+  const boxes = rooms.map((r) => r.rectangles.map((q) => q.bounds));
+  const inRoom = (j, x, y) => boxes[j].some((b) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1);
+  rooms.forEach((room, i) => {
+    for (const poly of computeFootprint(room.rectangles)) for (const ring of poly) {
+      for (let e = 0; e + 1 < ring.length; e++) {
+        const [ax, ay] = ring[e], [bx, by] = ring[e + 1];
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < EPS) continue;
+        const nx = (by - ay) / len, ny = -(bx - ax) / len; // the room lies on the left: outward is right
+        const n = Math.max(1, Math.round(len / STEP_M)), step = len / n;
+        for (let k = 0; k < n; k++) {
+          const t = (k + 0.5) / n, px = ax + (bx - ax) * t, py = ay + (by - ay) * t;
+          if (inRoom(i, px + nx * 0.005, py + ny * 0.005)) continue; // not an outer face
+          for (let d = PROBE_STEP_M; d <= PROBE_M; d += PROBE_STEP_M) {
+            const j = rooms.findIndex((_, jj) => jj !== i && inRoom(jj, px + nx * d, py + ny * d));
+            if (j < 0) continue;
+            const gap = d - PROBE_STEP_M / 2;
+            const u = 1 / (2 * 0.13 + gap / (gap < s.heavyWallMin ? s.plasterLambda : s.wallLambda));
+            add(i, j, u * step * H);
+            break;
+          }
+        }
+      }
+    }
+  });
+  return K;
+}
+
+/**
+ * The whole house in balance at one water temperature (`radiatorDT`). `powerOf(article)` = a
+ * heater's rated W (EN 442, ΔT 50). Returns { rooms: Map(`${floorId}|${index}` → node), nodes,
+ * water } where index follows floorHeatLoss(project, floor, without); a node: { temp (°C the
+ * space settles at), radiator (W its radiators give there), maxRadiator (at tRoom), fromNeighbours
+ * (W received, negative = given), loss (W at tRoom), rated, stair (joined across storeys) }.
+ * water: { dT, mean } the lowest ΔT at which every space with a radiator reaches tRoom, or null
+ * when none does by 60 K.
+ */
+export function houseBalance(project, powerOf, without = {}) {
+  const s = heatSettings(project);
+  const dT = s.tRoom - s.tOut;
+  const spaces = []; // { floor, index, room, rated, G }
+  const perFloor = project.floors.map((floor) => {
+    const rooms = floorHeatLoss(project, floor, without);
+    const heaters = roomHeaters(project, floor, rooms, powerOf);
+    const first = spaces.length;
+    rooms.forEach((room, index) => {
+      const d = room.detail, p = room.parts;
+      const tBelow = d.below.onEarth ? s.tMean : (d.below.temp ?? s.tOut);
+      const tAbove = d.above.temp ?? s.tOut;
+      const per = (w, diff) => (w > EPS ? w / Math.max(0.5, diff) : 0);
+      const G = per(p.wall + p.opening + p.bridge + p.air, dT) + per(p.floor, s.tRoom - tBelow)
+        + per(p.ceiling, s.tRoom - tAbove);
+      spaces.push({ floor, index, room, rated: heaters[index].rated, G });
+    });
+    return { floor, rooms, first };
+  });
+  // Nodes: spaces, merged across an open stairwell.
+  const parent = spaces.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const stairsOf = (sp) => sp.floor.rectangles.filter((r) => STAIR_KINDS.has(zoneKind(r)) && sp.room.ids.has(r.id)).map((r) => r.bounds);
+  const overlap = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+  const K = new Map();
+  const addK = (i, j, v) => { if (i === j || !(v > 0)) return; const k = i < j ? `${i}|${j}` : `${j}|${i}`; K.set(k, (K.get(k) || 0) + v); };
+  perFloor.forEach(({ floor, rooms, first }, fi) => {
+    for (const [k, v] of partitionLinks(rooms, ceilingHeight(floor), s)) { const [a, b] = k.split('|').map(Number); addK(first + a, first + b, v); }
+    const next = perFloor[fi + 1];
+    if (!next || !rooms.length || !next.rooms.length) return;
+    const uMid = 1 / (RS_CEILING + s.slabR + (floorHeat(next.floor).heavy ? 0 : WOOD_FLOOR_R));
+    rooms.forEach((ra, a) => next.rooms.forEach((rb, b) => {
+      const i = first + a, j = next.first + b;
+      const sa = stairsOf(spaces[i]), sb = stairsOf(spaces[j]);
+      if (sa.some((x) => sb.some((y) => overlap(x, y) > 0.1))) parent[find(i)] = find(j);
+      const both = polygonClipping.intersection(computeFootprint(ra.rectangles), computeFootprint(rb.rectangles));
+      addK(i, j, uMid * multiPolygonArea(both));
+    }));
+  });
+  const roots = [...new Set(spaces.map((_, i) => find(i)))];
+  const nodeOf = new Map(roots.map((r, n) => [r, n]));
+  const nodes = roots.map(() => ({ loss: 0, G: 0, rated: 0, members: [], links: new Map(), temp: s.tRoom }));
+  spaces.forEach((sp, i) => {
+    const nd = nodes[nodeOf.get(find(i))];
+    nd.loss += sp.room.total; nd.G += sp.G; nd.rated += sp.rated; nd.members.push(sp);
+  });
+  for (const [k, v] of K) {
+    const [i, j] = k.split('|').map(Number), a = nodeOf.get(find(i)), b = nodeOf.get(find(j));
+    if (a === b) continue;
+    nodes[a].links.set(b, (nodes[a].links.get(b) || 0) + v);
+    nodes[b].links.set(a, (nodes[b].links.get(a) || 0) + v);
+  }
+  const solve = (radiatorDT) => {
+    const tw = s.tRoom + radiatorDT;
+    const rad = (nd, T) => nd.rated * Math.pow(Math.max(0, tw - T) / 50, 1.3);
+    const net = (nd, T) => {
+      let inflow = 0;
+      for (const [j, k] of nd.links) inflow += k * (nodes[j].temp - T);
+      return { inflow, need: nd.loss + nd.G * (T - s.tRoom) - inflow };
+    };
+    for (const nd of nodes) nd.temp = s.tRoom;
+    for (let it = 0; it < 500; it++) {
+      let moved = 0;
+      for (const nd of nodes) {
+        const before = nd.temp;
+        if (rad(nd, s.tRoom) >= net(nd, s.tRoom).need) nd.temp = s.tRoom; // the valve holds tRoom
+        else {
+          let lo = Math.min(s.tOut, s.tRoom - 40), hi = s.tRoom;
+          for (let b = 0; b < 50; b++) { const T = (lo + hi) / 2; if (rad(nd, T) >= net(nd, T).need) lo = T; else hi = T; }
+          nd.temp = lo;
+        }
+        moved = Math.max(moved, Math.abs(nd.temp - before));
+      }
+      if (moved < 1e-5) break;
+    }
+    return nodes.map((nd) => {
+      const { inflow, need } = net(nd, nd.temp);
+      return { temp: nd.temp, radiator: Math.min(rad(nd, nd.temp), Math.max(0, need)), maxRadiator: rad(nd, s.tRoom),
+        fromNeighbours: inflow, loss: nd.loss, rated: nd.rated, stair: new Set(nd.members.map((m) => m.floor)).size > 1 };
+    });
+  };
+  const reaches = (res) => res.every((r, n) => !nodes[n].rated || r.temp >= s.tRoom - 0.05);
+  let water = null;
+  if (nodes.some((nd) => nd.rated) && reaches(solve(60))) {
+    let lo = 0, hi = 60;
+    for (let b = 0; b < 30; b++) { const m = (lo + hi) / 2; if (reaches(solve(m))) hi = m; else lo = m; }
+    water = { dT: hi, mean: s.tRoom + hi };
+  }
+  const result = solve(s.radiatorDT);
+  const rooms = new Map();
+  spaces.forEach((sp, i) => rooms.set(`${sp.floor.id}|${sp.index}`, result[nodeOf.get(find(i))]));
+  return { rooms, nodes: result, water };
 }

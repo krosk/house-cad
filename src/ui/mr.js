@@ -52,7 +52,7 @@ import { electricalRoutePoints, isSwitch, linkRocker, wireRocker } from '../core
 import { conduitNetworkSegments, conduitNodePos, conduitNodeForMarker, conduitRunLength, wireRouteSegments, wireSegmentPath } from '../core/conduit.js';
 import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
-import { floorHeatLoss, houseHeatLoss, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
+import { floorHeatLoss, houseHeatLoss, houseBalance, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -774,7 +774,7 @@ export function setupMR(view, project, getFootprint) {
     return `${t('heat.heaters')} ${Math.round(h.watts).toLocaleString('fr-FR')} W (${h.count})${pct}`;
   }
   function makeHeatMenu(rows) {
-    const W = 512, TITLE_H = 232, HEAD_H = 44, ROW_H = 50;
+    const W = 512, TITLE_H = 268, HEAD_H = 44, ROW_H = 50;
     const layout = [];
     let y = TITLE_H;
     const section = (row) => (row.whatIf ? 'heat.whatIf' : row.floor ? 'heat.floor' : 'heat.project');
@@ -782,7 +782,7 @@ export function setupMR(view, project, getFootprint) {
       if (i === 0 || section(rows[i - 1]) !== section(row)) { layout.push({ head: section(row), y }); y += HEAD_H; }
       layout.push({ row, y }); y += ROW_H;
     });
-    const ROOM_Y = y + 10, ROOM_H = 184; // the room under the reticle: watts by surface, then its heaters
+    const ROOM_Y = y + 10, ROOM_H = 218; // the room under the reticle: watts by surface, its heaters, the balance
     const H = ROOM_Y + ROOM_H + 14;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -818,6 +818,11 @@ export function setupMR(view, project, getFootprint) {
         ctx.textAlign = 'left'; ctx.font = 'bold 22px sans-serif';
         ctx.fillStyle = heat.watts >= (totalW ?? 0) ? '#4ade80' : '#f87171';
         ctx.fillText(heaterLine(heat, totalW), 26, 206);
+        if (heat.balance) { // whole-house balance: the water the house needs to reach tRoom everywhere
+          const wn = heat.balance.water;
+          ctx.fillStyle = '#e6edf3';
+          ctx.fillText(wn ? `${t('heat.waterNeeded')} ΔT ${wn.dT.toFixed(1)} K (${wn.mean.toFixed(1)} °C)` : t('heat.waterNever'), 26, 242);
+        }
       }
       if (house) { // the whole house, and what the "what if" rows add to it
         const n = (v) => Math.round(v).toLocaleString('fr-FR');
@@ -879,6 +884,13 @@ export function setupMR(view, project, getFootprint) {
           ctx.font = 'bold 22px sans-serif';
           ctx.fillStyle = room.heaters.watts >= room.total ? '#4ade80' : '#f87171';
           ctx.fillText(heaterLine(room.heaters, room.total), 30, ROOM_Y + 168);
+        }
+        if (room.balance) { // whole-house balance: where this room settles at the set water ΔT
+          const b = room.balance, nb = Math.round(b.fromNeighbours);
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillStyle = b.temp >= room.tRoom - 0.05 ? '#4ade80' : '#f87171';
+          ctx.fillText(`${t('heat.reaches')} ${b.temp.toFixed(1)} °C · ${t('heat.fromNb')} ${nb >= 0 ? '+' : '−'}${Math.abs(nb)} W`
+            + (b.stair ? ` · ${t('heat.stairwell')}` : ''), 30, ROOM_Y + 202);
         }
       }
       tex.needsUpdate = true;
@@ -1249,6 +1261,8 @@ export function setupMR(view, project, getFootprint) {
     { key: 'revealPsi', step: 0.05, min: 0, max: 1, unit: 'W/mK' },
     { key: 'heavyWallMin', step: 0.01, min: 0, max: 1, unit: 'm' }, // thermal bridges (docs/heat-loss.md "Thermal bridges")
     { key: 'radiatorDT', step: 1, min: 5, max: 60, unit: 'K' }, // 1 K: a heat pump's water is set to the degree
+    { key: 'balance', toggle: true }, // whole-house balance (houseBalance; docs/heat-loss.md)
+    { key: 'plasterLambda', step: 0.05, min: 0.1, max: 2, unit: 'W/mK' }, // thin partitions, for the balance
     { key: 'degreeDays', step: 50, min: 500, max: 5000, unit: 'K·d' },
   ];
   const heatMenu = makeHeatMenu(HEAT_ROWS);
@@ -2139,6 +2153,18 @@ export function setupMR(view, project, getFootprint) {
     }
     return heatHouseCache.get(key);
   }
+  // The whole-house balance (BALANCE row): every floor at once, ~0.4 s in Node on the
+  // owner's plan, so cached like the totals and computed only while the row is on.
+  const heatBalanceCache = new Map();
+  function houseBal(without) {
+    const key = `${heatRev}|${Object.entries(without).filter(([, v]) => v).map(([k]) => k).join(',')}`;
+    if (!heatBalanceCache.has(key)) {
+      heatBalanceCache.clear();
+      heatBalanceCache.set(key, houseBalance(project, (a) => furnitureCatalog[a]?.powerW, without));
+    }
+    return heatBalanceCache.get(key);
+  }
+  let heatBalance = null; // houseBal() while BALANCE is on, else null
   let heatHoverRoom = null; // the room under the reticle in HEAT LOSS
   let heatHoverCol = null, heatHoverPiece = null; // the wall column / floor-ceiling piece under it
   let heatHoverJunctions = []; // the thermal bridges under it (heatJunctionsAt)
@@ -2150,6 +2176,9 @@ export function setupMR(view, project, getFootprint) {
       .forEach((h, i) => { heatRooms[i].heaters = h; });
     heatHouse = { now: houseTotal(heatWithout),
       full: Object.values(heatWithout).some(Boolean) ? houseTotal({}) : null };
+    heatBalance = heatSettings(project).balance ? houseBal(heatWithout) : null;
+    const tRoom = heatSettings(project).tRoom;
+    heatRooms.forEach((room, i) => { room.balance = heatBalance?.rooms.get(`${floor.id}|${i}`) ?? null; room.tRoom = tRoom; });
     heatHoverRoom = heatHoverCol = heatHoverPiece = null;
     heatHoverJunctions = [];
     addHeatMap();
@@ -2157,7 +2186,8 @@ export function setupMR(view, project, getFootprint) {
     const labels = heatRooms.map((room) => {
       const big = room.rectangles.reduce((m, r) => (area(r) > area(m) ? r : m)).bounds;
       const hw = room.heaters?.count ? ` · ${t('heat.radShort')} ${Math.round(room.heaters.watts)} W` : '';
-      return makeDimLabel(`${Math.round(room.total)} W${hw}`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
+      const bt = room.balance ? ` · ${room.balance.temp.toFixed(1)} °C` : '';
+      return makeDimLabel(`${Math.round(room.total)} W${hw}${bt}`, '#fb923c', (big.x0 + big.x1) / 2, (big.y0 + big.y1) / 2);
     });
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
@@ -6758,7 +6788,8 @@ export function setupMR(view, project, getFootprint) {
         : `${v.toFixed(decimals)}${row.unit ? ` ${row.unit}` : row.u ? ' W/m²K' : row.r ? ' m²K/W' : ''}`;
       // The unheated temperature only matters for an unheated floor; the rest of the
       // floor rows only for a heated one.
-      const dim = row.floor && row.key !== 'heated' && row.key !== 'heavy' && (row.key === 'temp' ? fh.heated : !fh.heated);
+      const dim = (row.floor && row.key !== 'heated' && row.key !== 'heavy' && (row.key === 'temp' ? fh.heated : !fh.heated))
+        || (row.key === 'plasterLambda' && !s.balance);
       out[row.key] = { text, set, dim };
     }
     return out;
@@ -6775,7 +6806,8 @@ export function setupMR(view, project, getFootprint) {
   }
   const floorHeaters = () => {
     const hs = heatRooms.map((r) => r.heaters).filter(Boolean);
-    return { watts: hs.reduce((a, h) => a + h.watts, 0), count: hs.reduce((a, h) => a + h.count, 0) };
+    return { watts: hs.reduce((a, h) => a + h.watts, 0), count: hs.reduce((a, h) => a + h.count, 0),
+      balance: heatBalance ? { water: heatBalance.water } : null };
   };
   const redrawHeatMenu = () => heatMenu.draw('#fb923c', hoverHeatRow, project.activeFloor.name,
     floorHeatTotal(), heatRowValues(), heatHoverRoom, null, heatHouse, floorHeaters());
