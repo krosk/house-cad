@@ -7990,7 +7990,7 @@ export function setupMR(view, project, getFootprint) {
     },
     {
       id: 'mat_outlet', color: 0x2dd4bf,
-      // The same for outlets (DEVICE_SURFACE: outlet, outlet_appliance).
+      // The same for outlets (DEVICE_SURFACE: outlet, outlet_appliance, outlet_shutter).
       onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
     },
     {

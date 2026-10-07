@@ -799,7 +799,7 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
 - Catalog entries: `surface: 'switch'`, `pattern: 'device'`, `design` (the builder in
   `src/ui/deviceProducts.js`), sizes as `*Mm` fields. `markerProduct(project, marker)` resolves a
   product only when its surface suits the marker type (`DEVICE_SURFACE`: switch → switch; outlet and
-  outlet_appliance → outlet; ethernet → ethernet),
+  outlet_appliance and outlet_shutter → outlet; ethernet → ethernet),
   so a stale id on another type is ignored.
 - **Two detail levels** (`buildDeviceProduct(def, { detail })`). Desktop View 3D builds `full`: the
   plate lofted from 128 directions × ~19 rings, ~5 100–5 500 triangles per device. AR builds `low`
@@ -852,9 +852,11 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
     View 3D or in AR.
 
 - **Schneider Ovalis flush outlet with earth, white** (`outlet_ovalis_white`, `surface: 'outlet'`,
-  Leroy Merlin 85231773, 2026-09-27). Outlet products go on `outlet` and `outlet_appliance` markers
-  (`DEVICE_SURFACE`); the shutter, aircon, cooktop, oven and water-heater variants are usually not
-  sockets and keep the standard faceplate. Authored in AR with **MATERIAL · OUTLET** (`mat_outlet`,
+  Leroy Merlin 85231773, 2026-09-27). Outlet products go on `outlet`, `outlet_appliance` and `outlet_shutter` markers
+  (`DEVICE_SURFACE`); the aircon, cooktop, oven and water-heater variants are usually not
+  sockets and keep the standard faceplate. Shutter outlets take the same products (owner, 2026-10-07):
+  a shutter cable outlet's plate is the same size, and the owner checks in AR whether the AC indoor
+  units above them leave room for it. Authored in AR with **MATERIAL · OUTLET** (`mat_outlet`,
   the same code path as SWITCH).
   - From the page: 87 mm wide, 44 mm deep (the mechanism, not modelled), 1 module.
   - Same plate and collar as the switches (`plate()` in `deviceProducts.js`, design `socket`). The side
@@ -867,6 +869,8 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
   - Proven 2026-09-27: build; Node (the product applies to `outlet` and `outlet_appliance`, not to
     `outlet_shutter` or a switch); a scratch render beside the front, side and angled (3163217) photos,
     bounding box 87 × 87 × 10 mm. Not yet seen in the real View 3D or in AR.
+  - Proven 2026-10-07: build; Node (after adding `outlet_shutter` to `DEVICE_SURFACE`, the product
+    resolves on a shutter outlet, still not on an aircon outlet). Not yet seen in AR on a shutter outlet.
 
 - **Schneider Ovalis RJ45 socket, white** (`ethernet_ovalis_white`, `surface: 'ethernet'`, design `rj45`,
   Leroy Merlin 85231775, 2026-09-27). Ethernet products go on single `ethernet` markers only

@@ -279,10 +279,11 @@ export function materialsFor(project, surface) {
 }
 
 // The product a marker carries (`marker.product`), if it suits the marker's type:
-// switch products on switch markers, outlet products on plain socket outlets (the
-// shutter/aircon/cooktop/oven/water-heater variants are usually not sockets), Ethernet
-// products on single Ethernet sockets (a dual socket is a different product).
-export const DEVICE_SURFACE = { switch: 'switch', switch_dual: 'switch', outlet: 'outlet', outlet_appliance: 'outlet', ethernet: 'ethernet' };
+// switch products on switch markers, outlet products on plain socket outlets and on
+// shutter outlets (owner, 2026-10-07: the same plate, to see what it collides with; the
+// aircon/cooktop/oven/water-heater variants are usually not sockets), Ethernet products
+// on single Ethernet sockets (a dual socket is a different product).
+export const DEVICE_SURFACE = { switch: 'switch', switch_dual: 'switch', outlet: 'outlet', outlet_appliance: 'outlet', outlet_shutter: 'outlet', ethernet: 'ethernet' };
 // A double-switch marker takes only a two-rocker product (a single switch marker may still
 // carry one: the older two-markers-per-double-switch survey, see markerProductDraws).
 export const productFitsMarker = (def, marker) => marker?.type !== 'switch_dual' || (def?.rockers ?? 1) === 2;

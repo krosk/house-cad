@@ -433,7 +433,7 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     selection amber; switches carrying a product get a teal floor square. The product shows in the AR
     3D view (LEFT X). Readout: product, height. A double-switch product applies to every switch at
     that plan point (the double is two markers) and draws once. Design in `docs/materials.md` "Switches".
-  - **OUTLET** (`id: mat_outlet`): the same for socket outlets (`outlet`, `outlet_appliance` markers) and
+  - **OUTLET** (`id: mat_outlet`): the same for socket outlets (`outlet`, `outlet_appliance`, `outlet_shutter` markers) and
     `surface: 'outlet'` products.
   - **ETHERNET** (`id: mat_ethernet`): the same for single Ethernet sockets (`ethernet` markers) and
     `surface: 'ethernet'` products.
