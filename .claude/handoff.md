@@ -150,8 +150,13 @@ Read `docs/product-intent.md` before planning AR work.
     `-wall` variant mounted flat on a wall). Two units drafted with their ducts (unit A above the kitchen
     fridge, roof outlet; unit B on the wall of basement r76 under column r122, outlet beside the garage
     door; the upper duct inside WC half wall r210 and the slab): `docs/plumbing-workflow.md` "VMC".
-    The headset write (r218 r219 r220 + 20 duct segments) waits for the owner's yes; the edited plan is
-    rebuilt by a scratch script from a fresh read (scratchpad `vmc-draft.mjs`, session-local).
+    Written to the headset on the owner's yes (2026-10-08; AR closed, backup, `--base`, read back
+    identical): r218, r219, boxing r220, 20 `vmc` segments (`pn36`–`pn57`, `p32`–`p51`). Then, owner
+    asked: the Geberit Duofix 111.333.00.6 frames as plain furniture boxes inside the WC half walls,
+    `r221` (Ground, in r139) and `r222` (Upper, in r210): 50 × 12 cm, 0–1.12 m, centred on their WC,
+    2 cm behind the half wall's face (Hypothesis: the board thickness). Same check, read back identical.
+    Then B's outlet moved 0.47 m from the garage door (`pn56`/`pn57`, read back identical). The duct
+    rules (DTU 68.3 via the RE2020 checklist) are in the VMC doc; owner: no inspection, efficiency only.
 
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
@@ -609,8 +614,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 skip `update-app` and say so.
 
 - **First, with the Quest:**
-  - VMC (item 59): if not yet written, rebuild the draft from a fresh headset read and write it on
-    the owner's yes; then check the boxes, ducts and readouts in HEATING · PIPE.
+  - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
+    HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
+    and per-diameter lengths (A: Ø80 2.33 · Ø125 1.70 m; B: Ø80 9.38 · Ø125 2.36 m).
   - TOOL menu (item 58): tap opens/closes, labels fit in EN/FR/ZH, no accidental open while flicking,
     the tap window (0.3 s) feels right (`docs/ar-qa-checklist.md`).
   - AC (items 52–56): HEATING · PIPE shows four green lines from each unit out through the west wall

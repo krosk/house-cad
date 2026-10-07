@@ -125,7 +125,7 @@ Unit B is **mounted flat on a wall, placed for the shortest run to the upper flo
 room r76 in its west corner, sockets up and right under the column, OUT down. A first draft hung it
 under the ceiling south of the garage door: upper duct 8.19 m, laundry 4.57 m, outlet 0.85 m.
 
-Draft (headset write pending; lengths 3D, into the box centre, so ~0.2 m per duct is inside it):
+In the headset plan (Proven: written 2026-10-08 and read back identical; lengths 3D, into the box centre, so ~0.2 m per duct is inside it):
 
 | Duct | Ø | m | Route |
 |---|---|---|---|
@@ -134,7 +134,48 @@ Draft (headset write pending; lengths 3D, into the box centre, so ~0.2 m per duc
 | A · roof outlet | 125 | 1.06 | OUT south, elbow up, cap 0.65 m above the ceiling, 0.17 m from the upper storey's wall |
 | B · upper shower + WC | 80 | 6.93 | vent at the ceiling above half wall r210's west end, down a boxing r220 on top of the half wall (15 × 22 cm, 1.15 m to the ceiling), inside the half wall beside the Geberit Duofix frame (about 29 cm free between the west wall and the frame), inside the upper floor's slab (10 cm under the floor) along the west wall to the column, down column r122 (a 19 cm offset inside it, toward the port: the basement wall face is 15 cm further in), straight into the blue port |
 | B · laundry vent | 80 | 2.45 | straight north at the basement ceiling, through two basement walls, down into the grey port |
-| B · wall outlet | 125 | 2.51 | OUT down, then along the west wall to beside the garage door (owner: it must go out there, not through r76's wall) |
+| B · wall outlet | 125 | 2.36 | OUT down, then along the west wall to beside the garage door (owner: it must go out there, not through r76's wall) |
+
+**Duct type and the rules** (owner asked "PVC or soft duct?", then "check that", 2026-10-08).
+Proven (notice 4666866): the kit's sketch shows flexible ducts (p. 4); ducts straight and taut, never
+crushed, 25 mm insulated recommended, "conduit rigide ou semi-rigide" for long runs (p. 6); the Twist &
+Go spigots screw into a flexible duct's spiral (p. 6); one 90° bend ≈ 3 m of duct (p. 7).
+Proven (BET André, "Liste des exigences obligatoires en maison individuelle simple flux", the RE2020
+ventilation-protocol checklist citing NF DTU 68.3 P1-1-2 / P1-1-4, fiche 2.24 R6, 2.19, 2.26 R7;
+https://www.etude-thermique-rt-2012.com/wp-content/uploads/2023/05/Controle-VMC-en-maison-individuelle-ANDRE.pdf):
+- a **flexible** duct from a vent to the unit, **self-regulating** system (the Agalina): **≤ 6 m and
+  ≤ 3 × 90° bends** (humidity-controlled: 3 m and 2 bends unless a sizing study says otherwise).
+  Summaries quoting only "3 m per vent" (Aldes, france-vmc) give the hygro case;
+- outlet: outside (never into a loft, garage or crawl space), **≥ 0.40 m from any opening** and
+  ≥ 0.60 m from any air inlet, measured to the outlet's axis;
+- a duct outside the heated volume: insulated, **R ≥ 0.6 m²·K/W**.
+Aldes's DTU 68.3 page (https://www.aldes.fr/reglementations/ventilation-et-qualite-d-air-interieur/nf-dtu-68.3)
+adds: a roof outlet ("sortie de toit") **Ø160 minimum** in a house, and not smaller than the unit's outlet
+spigot. Sauter's own sketch shows a Ø125 roof cap: the two disagree (open).
+Materials: no source found names PVC for VMC ducts. Rigid VMC ducts are galvanised steel (A1),
+aluminium or stainless; semi-rigid ones are aluminium/galvanised or PEHD systems sold for VMC. PVC
+drain pipe (NF EN 1329-1) is specified for soil and waste discharge and the **venting of that drain
+network**, not for VMC air ducts (Proven: the standard's scope; that it would be refused is Hypothesis).
+
+**Owner decision (2026-10-08): no inspection is planned and none is required for this house; the goal
+is an efficient system.** The rules above are used as engineering guidance (they exist to keep the
+design airflows and avoid condensation), not as compliance targets.
+
+Applied to the drafted routes (lengths Proven from the plan; bends at the vents and ports added by hand):
+- **B upper shower + WC, 6.93 m with ~4 bends: over the flexible limit on both counts**; for the flow,
+  rigid or semi-rigid (galvanised or a VMC semi-rigid system), a short flexible end at each spigot at
+  most (smooth walls and real elbows lose far less than a corrugated flexible duct's bends: Hypothesis,
+  general duct practice);
+- A bathroom 2.33 m (~3 bends), A kitchen 0.63 m, B laundry 2.45 m (2 bends): within the limit;
+- B outlet: its axis was 0.32 m from garage door r121; moved to 0.47 m (owner's yes, 2026-10-08; nodes
+  `pn56`/`pn57` y 1.30 → 1.15, written and read back identical): 2.36 m;
+- the basement is outside the heated volume in the heat-loss model: the laundry duct, the outlet and the
+  riser's basement part need R ≥ 0.6; A's roof outlet too where it crosses the roof build-up;
+- A's roof outlet: Ø160 roof terminal (Aldes) or Sauter's Ø125 cap: ask the installer.
+
+The WC frames (Geberit Duofix 111.333.00.6, 50 × 112 × 12 cm) are plain furniture boxes inside the
+half walls (`r221` Ground in r139, `r222` Upper in r210), centred on their WC 2 cm behind the face;
+the upper duct passes 21 cm west of `r222`.
 
 **Hypotheses in it:** the slab can take an Ø80 duct over that 0.6 m (its build-up is not in the plan); the fridge spot (end of the worktop, by wall r112: no fridge in the plan); box A
 at 2.50–2.65 m, box B at 1.48–1.85 m, 20 cm under the basement ceiling for the duct bends (ceiling
