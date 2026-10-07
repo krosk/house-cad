@@ -20,13 +20,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-07 (session 40; the Quest was reachable all session)
-**Status:** Proven (git, 2026-10-07): `main` = `origin/main`, nothing unpushed, tree clean; app head
-`ce85140`. Proven (`update-app`, 2026-10-07): the headset precache holds `ce85140`. Proven
+**Status:** Proven (git, 2026-10-07): everything committed and pushed; the app head is the TOOL
+menu commit (item 58; `git log -1 -- src`). Hypothesis: the headset precache holds it (`update-app`
+was run after the push; check the AR HUD `build` line). Proven
 (`quest-storage read` after each write, byte-identical): the headset plan carries every session-40
-edit (item 49); the last write was the radiator swap. Scratchpad backups before each write are
-session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse the edit
-in AR. Nothing from sessions 38–40 has been reported from the device (items 31–51 unwalked), except
-the version.json fix (item 46, Proven on the headset by CDP).
+edit (items 49 and 53); the last write was the four refrigerant lines. Scratchpad backups before each
+write are session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse
+the edit in AR. Nothing from sessions 38–40 has been reported from the device (items 31–57 unwalked),
+except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
@@ -117,6 +118,34 @@ Read `docs/product-intent.md` before planning AR work.
     models Ground floorR 0.9 (offered: set 1.0 if SOPREMA is chosen). Fire class and ceiling use of
     the SOPREMA board unchecked.
 
+52. **Air conditioning planned (owner's Daikin 5MXM90A multi-split, four wall units):** positions,
+    line routes and lengths, clearances and the Daikin rules are recorded in `docs/plumbing-workflow.md`
+    "Air conditioning" (manuals read: indoor 4P518023-17P, outdoor 3P600450-9V). Lines total 32.41 m
+    as drawn (+1 m each to buy); every line ≥ 3 m (Daikin minimum). Façade elevation plots were made
+    in the scratchpad only (`ac-plot-*.mjs`, gone next session).
+53. **Headset plan edits (AC)** (owner's yes each time; AR closed, backup, `--base`, read back identical):
+    - indoor units `r148`/`r149` (Upper) moved beside their windows, top 2.50 (`c1184`/`c1186` replaced by
+      `c1427`/`c1428`); `r215` FTXM60A and `r216` CTXM15A added on Ground (`c1429`–`c1432`); the owner then
+      moved `r215`/`r216` over their windows and `r149` to y 3.11–3.91 in AR themselves;
+    - outdoor unit `r217` (plain furniture box) under camera m183 (`c1441`/`c1442`);
+    - four `refrigerant` pipe networks `pn1`–`pn35` / `p1`–`p31` (needs `a913657`+: older builds turn
+      an unknown service into `cold` on load).
+54. **Shutter outlets take outlet products** (`4da7198`; owner: to see whether the AC units leave room
+    for them). Model check: the upper shutter outlets' 87 mm plates clear the CTXM15A's curved underside
+    by ~6 cm; the steel mounting plate behind is the unknown.
+55. **Window swing** (`74e4bff`): `src/core/windowSwing.js`; AR MATERIAL · WINDOW overlay (fan, arc,
+    leaf at its stop, obstacle red, readout per leaf) and View 3D **◫ Windows open (max)** toggle.
+    Proven: the 3D leaves' free edges land on the computed points (0 mm). On the plan now: r80 96°
+    (radiator r205), r108 155° (r204), r113 98° (unit r148), r114 100° (radiator r208), r115 175°.
+    `docs/materials.md` "Window swing".
+56. **HEATING · PIPE `refrigerant` service** (`a913657`, green; the readout adds the selected
+    network's 3D length).
+57. **A share link from the headset plan** (owner asked): built in Node with `encodeViewToHash` on a
+    fresh `quest-storage read` (round-trip checked), given in chat in a code block, never in the repo.
+58. **TOOL menu** (owner: "cycling through menus has grown big"): a right-thumbstick **tap** opens a
+    panel of every tool by group; ray + trigger jumps to one. The hold-to-exit is unchanged (its bar
+    starts after the 0.3 s tap window). Build only; never seen on the Quest (`docs/ar-survey.md` "Tool menu").
+
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
 1–3 links carry furniture/finishes/markers; URL-copy failure reason (cause unknown) · 4–5 photo finishes
@@ -139,6 +168,9 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 - **Heating (owner, 2026-10-07):** one water temperature for every radiator, kept at ΔT 24 (46 °C
   mean); the −7 °C shortfalls are accepted. A condensing gas boiler for the next 5 years, then a heat
   pump. The whole-house balance stays a toggle, off by default. Detail: `docs/heat-loss.md`.
+- **Air conditioning (owner, 2026-10-07):** outdoor unit under the west-façade camera; refrigerant lines
+  drawn in the pipe network (service `refrigerant`), not the electrical conduits (WIRE routes through
+  those); no trench (high shared duct). Detail: `docs/plumbing-workflow.md` "Air conditioning".
 - **Products with manufacturer CAD (STEP):** build procedurally, measured from the STEP (owner,
   2026-10-06); a runtime STEP loader stays acceptable in principle but needs a proxy route + 3.1 MB reader.
 - **The owner's house is now edited directly on the headset** (owner, 2026-10-04: "we will keep
@@ -291,6 +323,11 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 - **`version.json` used to open the app** (fixed `8dc326f`): the service worker served `index.html` for
   every navigation. An old cached app (before the update) still does; `quest-storage.mjs` now checks
   the page's content type and warns. `docs/headset-data.md`.
+- **Pipe services are normalised on load:** an app older than `a913657` turns `refrigerant` into
+  `cold` and autosaves it. Any new pipe service (or other enum) must deploy and `update-app` **before**
+  the headset write.
+- **Wait-for-deploy loops must grep the pushed hash** (`git log -1 --format=%h`): a loop with a wrong
+  hash polled 7 minutes after Pages already served the build (owner asked "did the deploy fail?").
 - **The diff tool ignores furniture heights** (`house-query.mjs diff` compares footprints and bands):
   check a foot/top edit from the edit script's own output and the read-back.
 - **The AR app process stub** (`pidof com.krosk.housecad`) persists after the owner closes the app; the
@@ -476,7 +513,8 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
 - **Session 40:** `8dc326f` version.json not answered with the app · `734560a` V&B WC from its STEP ·
-  `ce85140` real air volume + whole-house balance.
+  `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
+  `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service · TOOL menu (right-thumbstick tap).
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -552,6 +590,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
 | `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
+| `src/core/windowSwing.js` | `windowSwings(floor, materialOf)`: each leaf's max opening and what stops it (AR MATERIAL · WINDOW overlay, View 3D windows open) |
 | `src/ui/windowProducts.js` | Window product builder (`PROFILES` per design: frame, sashes, glass, hardware; `buildSliding` for the Néva) from `windowProductPlacements` |
 | `src/ui/exteriorView.js` | The AR 3D view's opaque glass material (procedural daylight exterior) |
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
@@ -563,6 +602,14 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 skip `update-app` and say so.
 
 - **First, with the Quest:**
+  - TOOL menu (item 58): tap opens/closes, labels fit in EN/FR/ZH, no accidental open while flicking,
+    the tap window (0.3 s) feels right (`docs/ar-qa-checklist.md`).
+  - AC (items 52–56): HEATING · PIPE shows four green lines from each unit out through the west wall
+    to `r217`; select each, its length matches item 52. MATERIAL · WINDOW: the swing overlay and
+    readout on r80/r113/r115 (r80's right leaf should stop at ~96° on radiator r205). MATERIAL · OUTLET
+    on shutter outlets m164/m144: the plate under the upper units. View 3D ◫ Windows open (max).
+    Ask: are the ground windows' shutter boxes inside (units sit 30 mm above the heads)? the real
+    ground level outside? r148 is at Daikin's 50 mm minimum: move 1–2 cm if the wall gets a finish.
   - The owner opens AR: the session-40 plan edits (item 49) in place: both WCs on their half walls
     (LEFT X: pan shape, seat, rim 41.5 cm), half walls 1.15 m, trays at 12 cm on plinths, the upper
     90×60 radiator. HEAT LOSS → Whole-house balance → yes: header `Water needed ΔT 28.6 K (50.6 °C)`,
@@ -691,6 +738,10 @@ skip `update-app` and say so.
 
 ## Known open questions
 
+- **Session 40, AC + windows (items 52–57):** nothing seen on the Quest. Hypotheses: r217's connection
+  side/height; the ground level outside; hole positions (±10 cm); the window lever on the right-hand
+  leaf seen from the room and the hinge axis (a few degrees); +1 m slack per line; 32.4 m of liquid line
+  → about 50 g extra refrigerant; the View 3D windows-open toggle in a share link (not opened).
 - **Session 40:** nothing seen on the Quest except item 46. Hypotheses: partition U from plaster λ 0.40
   (dense block) and meulière via the wall λ; the light floor's R 0.25; doors counted as partition; the
   balance's linear loss around tRoom; heat-pump efficiency −2–3 %/K; gas €0.12/kWh, boiler 92 %,
