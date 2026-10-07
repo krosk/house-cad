@@ -84,9 +84,11 @@ export function syncWireIdCounter(ids) {
 }
 let _pid = 0;
 let _pnid = 0;
-export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return'];
+// `refrigerant` (owner, 2026-10-07): a multi-split's line to one indoor unit (liquid + gas
+// pipes and the connection cable, drawn as one run; docs/plumbing-workflow.md).
+export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return', 'refrigerant'];
 export const PIPE_SERVICE_ROLE = {
-  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return',
+  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return', refrigerant: 'refrigerant',
 };
 export const nextPipeId = () => `p${++_pid}`;
 export const nextPipeNodeId = () => `pn${++_pnid}`;

@@ -3705,7 +3705,7 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
   const PIPE_SERVICE_COLOR = {
-    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6,
+    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399,
   };
   const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
   function pipeNodePos(node) {
@@ -3744,6 +3744,18 @@ export function setupMR(view, project, getFootprint) {
       mesh.position.set(p.x, p.z, -p.y); mesh.renderOrder = 17;
       mesh.userData.pipeNodeId = node.id; pipeGroup.add(mesh);
     }
+  }
+  // Length of the network a pipe belongs to (3D, risers included): a refrigerant line's
+  // length to buy before slack (docs/plumbing-workflow.md).
+  function pipeComponentLength(pipe) {
+    let total = 0;
+    for (const p of project.pipeComponent(pipe.a).pipes) {
+      const an = project.pipeNodes.find((n) => n.id === p.a), bn = project.pipeNodes.find((n) => n.id === p.b);
+      if (!an || !bn) continue;
+      const a = pipeNodePos(an), b = pipeNodePos(bn);
+      total += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+    }
+    return total;
   }
   function pipeAtFloorPoint(px, py) {
     const rank = pickRanker();
@@ -9729,6 +9741,7 @@ export function setupMR(view, project, getFootprint) {
       ? pendingPipeMerge
         ? `${t(`pipe.service.${project.pipeServiceAtNode(pendingPipeMerge.targetNodeId)}`)} → ${t(`pipe.service.${pendingPipeMerge.service}`)} · ${t('pipe.confirmMerge')}`
         : `${t(`pipe.service.${selectedPipe?.service || currentPipeService}`)} · ${pipePenNodeId ? t('conduit.run') : t('pipe.pickStart')}`
+          + (selectedPipe && !pipePenNodeId ? ` · ${fmt(pipeComponentLength(selectedPipe))} ${unitLabel()}` : '')
       : null;
     // HEATING · R: the zone under the reticle (or being typed): its R and its source.
     const heatRStatus = modes[currentMode].id === 'heat_r'

@@ -7,12 +7,17 @@ Plumbing is a separate whole-house lane from electrical conduit and wires.
 `HEATING · PIPE` (was MARKER · PIPE until 2026-10-01) authors a whole-house node graph. A node is either a free junction
 `{x,y,z,floorId}` or a logical fixture port `{markerId,role}` that follows its marker.
 Pipe segments join two node ids and carry their service and diameter. Thumbstick up/down
-chooses one of four services:
+chooses one of five services:
 
 - cold water
 - hot water
 - heating supply
 - heating return
+- refrigerant (owner, 2026-10-07): an air-conditioning line from the outdoor unit to one
+  indoor unit, drawn as one run standing for the liquid + gas pipes and the connection
+  cable. Each line is its own network (its own nodes), so selecting any segment reads that
+  line's length: the readout adds the 3D length of the selected pipe's whole network,
+  risers included (`pipeComponentLength`). Buy that plus slack per line.
 
 Fixture ports are logical, not spatial model connectors. Their role is inferred from the
 service (`cold`, `hot`, `supply`, or `return`), so one radiator or boiler marker can own
@@ -28,7 +33,7 @@ incident segments. In ALL FLOORS, aiming down favours your own storey and aiming
 the one above, and grip reaches farther storeys (the `docs/ar-survey.md` reticle rule). Join them
 to create risers.
 
-Colors are blue (cold), red (hot), orange (heating supply), and purple (heating return).
+Colors are blue (cold), red (hot), orange (heating supply), purple (heating return), and green (refrigerant).
 
 Service is edited as a connected-network property: changing any selected segment retypes
 every segment reachable through pipe nodes and updates fixture-port roles. While extending,
