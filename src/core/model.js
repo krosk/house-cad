@@ -86,9 +86,11 @@ let _pid = 0;
 let _pnid = 0;
 // `refrigerant` (owner, 2026-10-07): a multi-split's line to one indoor unit (liquid + gas
 // pipes and the connection cable, drawn as one run; docs/plumbing-workflow.md).
-export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return', 'refrigerant'];
+// `vmc` (owner, 2026-10-07): a mechanical-ventilation extract duct; its diameter is the
+// duct's (Ø80 / Ø125 / Ø160), so the ribbon shows its real width.
+export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return', 'refrigerant', 'vmc'];
 export const PIPE_SERVICE_ROLE = {
-  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return', refrigerant: 'refrigerant',
+  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return', refrigerant: 'refrigerant', vmc: 'vmc',
 };
 export const nextPipeId = () => `p${++_pid}`;
 export const nextPipeNodeId = () => `pn${++_pnid}`;

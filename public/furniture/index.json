@@ -579,5 +579,32 @@
     },
     "source": "procedural: Villeroy & Boch Architectura rimless wall-hung WC pan, DirectFlush, White Alpin (V&B 4694R001) with a generic slim seat; every ceramic ring is a section of V&B's own 3D data VB-Architectura-4694R0-3D01-v00-42570.stp (368.5 x 529.3 x 339.1 mm), rim at 415 mm from the 2D drawing VB-Architectura-4694R0-2D01-v02-39072; the seat and lid are estimates (sold separately); sources in the wall-hung-wc builder",
     "registeredAt": "2026-10-06T00:00:00.000Z"
+  },
+  "sauter-agalina-extra-plat": {
+    "name": "sauter-agalina-extra-plat",
+    "article": "sauter-agalina-extra-plat",
+    "sizeMm": [
+      379,
+      150,
+      372
+    ],
+    "procedural": "vmc-agalina",
+    "source": "procedural: Sauter Agalina extra-plat single-flow VMC unit (Leroy Merlin 80127930, Sauter 123 209; no manufacturer 3D model); size from the spec table, ports from the notice's dimension drawing + retailer photos (sources in the builder vmcAgalina)",
+    "registeredAt": "2026-10-07T00:00:00.000Z"
+  },
+  "sauter-agalina-extra-plat-wall": {
+    "name": "sauter-agalina-extra-plat-wall",
+    "article": "sauter-agalina-extra-plat-wall",
+    "sizeMm": [
+      379,
+      372,
+      150
+    ],
+    "procedural": "vmc-agalina",
+    "params": {
+      "wall": true
+    },
+    "source": "procedural: Sauter Agalina extra-plat VMC unit mounted flat on a wall (sockets up, OUT down); same sources as sauter-agalina-extra-plat (builder vmcAgalina)",
+    "registeredAt": "2026-10-07T00:00:00.000Z"
   }
 }

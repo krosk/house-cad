@@ -3780,7 +3780,7 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
   const PIPE_SERVICE_COLOR = {
-    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399,
+    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1,
   };
   const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
   function pipeNodePos(node) {
@@ -3822,16 +3822,30 @@ export function setupMR(view, project, getFootprint) {
   }
   // Length of the network a pipe belongs to (3D, risers included): a refrigerant line's
   // length to buy before slack (docs/plumbing-workflow.md).
+  // A network of several diameters (a VMC unit's ducts) also reads each diameter's length.
   function pipeComponentLength(pipe) {
     let total = 0;
+    const byDiameter = new Map();
     for (const p of project.pipeComponent(pipe.a).pipes) {
       const an = project.pipeNodes.find((n) => n.id === p.a), bn = project.pipeNodes.find((n) => n.id === p.b);
       if (!an || !bn) continue;
       const a = pipeNodePos(an), b = pipeNodePos(bn);
-      total += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      total += len;
+      byDiameter.set(p.diameter, (byDiameter.get(p.diameter) || 0) + len);
     }
-    return total;
+    return { total, byDiameter };
   }
+  function pipeLengthText(pipe) {
+    const { total, byDiameter } = pipeComponentLength(pipe);
+    const parts = byDiameter.size > 1
+      ? ` (${[...byDiameter].sort((x, y) => x[0] - y[0]).map(([d, l]) => `Ø${Math.round(d * 1000)} ${fmt(l)}`).join(' · ')})`
+      : '';
+    return `${fmt(total)} ${unitLabel()}${parts}`;
+  }
+  // Diameter of a new segment drawn in AR (no diameter editor yet): a VMC duct starts at
+  // Ø80 (a wet-room extract); written plans carry the real one.
+  const newPipeDiameter = (service) => (service === 'vmc' ? 0.08 : 0.016);
   function pipeAtFloorPoint(px, py) {
     const rank = pickRanker();
     let best = null, bestD = WIRE_PICK_M, bestR = Infinity;
@@ -8176,7 +8190,7 @@ export function setupMR(view, project, getFootprint) {
             return;
           }
           if (networksDiffer) project.setPipeComponentService(targetNodeId, sourceService, { emit: false });
-          project.addPipe(pipePenNodeId, targetNodeId, sourceService, 0.016, { emit: false });
+          project.addPipe(pipePenNodeId, targetNodeId, sourceService, newPipeDiameter(sourceService), { emit: false });
         }
         pipePenNodeId = targetNodeId;
         currentPipeService = sourceService;
@@ -9868,7 +9882,7 @@ export function setupMR(view, project, getFootprint) {
       ? pendingPipeMerge
         ? `${t(`pipe.service.${project.pipeServiceAtNode(pendingPipeMerge.targetNodeId)}`)} → ${t(`pipe.service.${pendingPipeMerge.service}`)} · ${t('pipe.confirmMerge')}`
         : `${t(`pipe.service.${selectedPipe?.service || currentPipeService}`)} · ${pipePenNodeId ? t('conduit.run') : t('pipe.pickStart')}`
-          + (selectedPipe && !pipePenNodeId ? ` · ${fmt(pipeComponentLength(selectedPipe))} ${unitLabel()}` : '')
+          + (selectedPipe && !pipePenNodeId ? ` · ${pipeLengthText(selectedPipe)}` : '')
       : null;
     // HEATING · R: the zone under the reticle (or being typed): its R and its source.
     const heatRStatus = modes[currentMode].id === 'heat_r'

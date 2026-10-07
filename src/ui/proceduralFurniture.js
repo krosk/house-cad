@@ -800,6 +800,124 @@ function pedalBin(entry) {
   return g;
 }
 
+// Sauter Agalina extra-plat: a single-flow self-regulating VMC unit (box only; the
+// vents and ducts are the plan's VMC pipes, docs/plumbing-workflow.md "VMC").
+// W × H × D from the catalog `sizeMm` (379 × 150 × 372). Front (+Z) = the face with the
+// two Ø80 sockets; the kitchen Ø125 is on −X, the OUT Ø125 and one Ø80 at the back (−Z),
+// one Ø80 on +X. Ducts are pushed onto the spigots, so a spigot stands out of the box
+// footprint (the plan zone is the body only).
+//
+// Sources:
+//   - Product page https://www.leroymerlin.fr/produits/kit-vmc-simple-flux-auto-a-detection-humidite-sauter-agalina-extra-plat-80127930.html
+//     (Leroy Merlin 80127930), spec table: "Dimension du caisson (LxHxP) (en cm): 37,9x15x37,2",
+//     "Nombre de piquages sanitaires (diamètre 80 mm): 4", "Nombre de piquages cuisine (diamètre
+//     125 mm): 1", "Diamètre piquage rejet (en mm): 125", "Emplacement du caisson préconisé: Faux
+//     plafond", "Poids du produit nu (en kg): 3.7".
+//   - Notice (media 4666866, Sauter ref 123 209) p. 2: the dimension drawing (379 wide across the
+//     socket face, 372 deep, 150 high, Ø125 kitchen on the left side, Ø80 on the right side), the
+//     exploded view (A–I); p. 5: fixed by 4 silentblocs or hung by cords.
+//   - Exploded view (media 4532339) p. 2–3: kitchen Ø125 regulated, rejet Ø125, Ø80 15/30 m³/h,
+//     125→80 adapter rings in the two front sockets.
+//   - Photos: media 1704578 (front, the dimensioned view: socket centres at about 0.28 and 0.71
+//     of the 379 width, kitchen spigot ~85 mm long, the base wider than the body with corner
+//     feet), media 1604438 (top: the lid's fan and OUT arrow; the back carries OUT near the
+//     kitchen side and an Ø80 near the other; the +X Ø80 ~0.27 of the depth from the front;
+//     the kitchen Ø125 ~0.68 of the depth from the front), media 3592542 / 3592541 (body
+//     black, lid dark grey graphic, kitchen and bathroom spigots blue, the others light grey).
+//   Port positions, spigot lengths and the lid graphic are photo estimates.
+// `params.wall` (owner, 2026-10-07: "can it be placed flat on the wall?"; notice p. 1: "montage
+// possible dans toutes les positions"): the same box on its back, base against the wall (−Z),
+// the socket face up, OUT down; `sizeMm` is then 379 W × 372 H × 150 D.
+function vmcAgalina(entry) {
+  if (entry.params?.wall) {
+    const [W, H, D] = (entry.sizeMm || [379, 372, 150]).map((v) => v / 1000);
+    const flat = vmcAgalina({ ...entry, sizeMm: [W * 1000, D * 1000, H * 1000], params: { ...entry.params, wall: false } });
+    // Flat X → −X, flat Y (height) → Z (out of the wall), flat Z (front) → Y (up): a proper
+    // rotation (det +1), 180° about (0, 1, 1).
+    flat.setRotationFromMatrix(new THREE.Matrix4().set(-1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1));
+    flat.position.set(0, H / 2, -D / 2);
+    const g = new THREE.Group();
+    g.name = entry.name || 'vmc-agalina-wall';
+    g.add(flat);
+    return g;
+  }
+  const [W, H, D] = (entry.sizeMm || [379, 150, 372]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const black = new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.6 });
+  const lidMark = new THREE.MeshStandardMaterial({ color: 0x3b3e44, roughness: 0.5 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x5b9bd5, roughness: 0.45 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0xd9dcdf, roughness: 0.5 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'vmc-agalina';
+  // Base plate with corner feet (silentbloc tabs), then the body, a touch narrower.
+  const baseH = 0.018, foot = 0.03; // base plate; 30 mm corner feet, 6 mm proud (photo estimate)
+  const base = new THREE.Mesh(new RoundedBoxGeometry(W - 0.012, baseH, D - 0.012, 2, 0.006), black);
+  base.position.set(0, baseH / 2, 0);
+  g.add(base);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * (W / 2 - foot / 2), z = sz * (D / 2 - foot / 2);
+    g.add(box([x - foot / 2, 0, z - foot / 2], [x + foot / 2, baseH * 0.7, z + foot / 2], black));
+  }
+  const bw = W - 0.012, bd = D - 0.012, bh = H - baseH;
+  const body = new THREE.Mesh(new RoundedBoxGeometry(bw, bh, bd, 3, 0.02), black);
+  body.position.set(0, baseH + bh / 2, 0);
+  g.add(body);
+  // Lid graphic: four fan blades and the OUT arrow, 1 mm proud.
+  const blade = new THREE.Shape();
+  blade.moveTo(0, 0);
+  blade.bezierCurveTo(0.03, 0.02, 0.10, 0.03, 0.115, -0.005);
+  blade.bezierCurveTo(0.12, -0.04, 0.05, -0.05, 0, 0);
+  const lidY = H + 0.0008;
+  for (let i = 0; i < 4; i++) {
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(blade, 8), lidMark);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = i * Math.PI / 2;
+    m.position.set(-0.02, lidY, 0.03);
+    g.add(m);
+  }
+  const hubM = new THREE.Mesh(new THREE.CircleGeometry(0.02, 16), lidMark);
+  hubM.rotation.x = -Math.PI / 2;
+  hubM.position.set(-0.02, lidY + 0.0002, 0.03);
+  g.add(hubM);
+  // A spigot: a short tube (outer ring + darker bore) standing out of a face.
+  // `axis` is the face normal ('x' | 'z'), `s` its sign, `at` the position along the face.
+  const yC = baseH + bh / 2;
+  const spigot = (axis, s, at, dia, len, mat, ring = false) => {
+    const r = dia / 2;
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 24, 1, true), mat);
+    const bore = new THREE.Mesh(new THREE.CircleGeometry(r * 0.94, 24), black);
+    const face = (axis === 'z' ? bd : bw) / 2;
+    const c = face + len / 2 - 0.004;
+    if (axis === 'z') {
+      tube.rotation.x = Math.PI / 2; tube.position.set(at, yC, s * c);
+      bore.position.set(at, yC, s * (face + len - 0.006)); if (s < 0) bore.rotation.y = Math.PI;
+    } else {
+      tube.rotation.z = Math.PI / 2; tube.position.set(s * c, yC, at);
+      bore.rotation.y = s * Math.PI / 2; bore.position.set(s * (face + len - 0.006), yC, at);
+    }
+    tube.material.side = THREE.DoubleSide;
+    g.add(tube, bore);
+    if (ring) { // the 125 socket around a 125→80 adapter (front face)
+      const rr = new THREE.Mesh(new THREE.RingGeometry(r + 0.004, 0.068, 32), lidMark);
+      if (axis === 'z') rr.position.set(at, yC, s * (face + 0.001));
+      g.add(rr);
+    }
+  };
+  const P = p.portsMm || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  // Front: bathroom Ø80 (blue, the humidity port) and a WC/bathroom Ø80, in 125 sockets.
+  spigot('z', 1, -W / 2 + mm(P.frontBlueFromLeft, 106), 0.08, mm(P.frontLen, 55), blue, true);
+  spigot('z', 1, -W / 2 + mm(P.frontGreyFromLeft, 269), 0.08, mm(P.frontLen, 55), grey, true);
+  // Left (−X): kitchen Ø125, blue, toward the back.
+  spigot('x', -1, D / 2 - mm(P.kitchenFromFront, 253), 0.125, mm(P.kitchenLen, 85), blue);
+  // Right (+X): Ø80, toward the front.
+  spigot('x', 1, D / 2 - mm(P.rightFromFront, 100), 0.08, mm(P.sideLen, 50), grey);
+  // Back (−Z): OUT Ø125 near the kitchen side, an Ø80 near the other.
+  spigot('z', -1, -W / 2 + mm(P.outFromLeft, 114), 0.125, mm(P.outLen, 90), grey);
+  spigot('z', -1, -W / 2 + mm(P.backGreyFromLeft, 276), 0.08, mm(P.sideLen, 50), grey);
+  return g;
+}
+
 // Habitat Moder II extendable round dining table, natural oak (Habitat ref 910365).
 // W × H × D from the catalog `sizeMm`: closed 1100 × 750 × 1100, extended 1550 × 750 × 1100
 // (a second catalog entry). The leaf is W − D: the top is two half-discs of radius D/2
@@ -1148,7 +1266,7 @@ function loft(upper, lower) {
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
-  'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc,
+  'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
 };
 
 export function isProcedural(entry) {

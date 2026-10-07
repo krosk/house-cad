@@ -145,6 +145,13 @@ Read `docs/product-intent.md` before planning AR work.
 58. **TOOL menu** (owner: "cycling through menus has grown big"): a right-thumbstick **tap** opens a
     panel of every tool by group; ray + trigger jumps to one. The hold-to-exit is unchanged (its bar
     starts after the 0.3 s tap window). Build only; never seen on the Quest (`docs/ar-survey.md` "Tool menu").
+59. **VMC** (owner): a `vmc` pipe service (light grey, ducts drawn at their diameter, readout per
+    diameter) and the Sauter Agalina extra-plat unit as furniture (`sauter-agalina-extra-plat`, plus a
+    `-wall` variant mounted flat on a wall). Two units drafted with their ducts (unit A above the kitchen
+    fridge, roof outlet; unit B on the wall of basement r76 under column r122, outlet beside the garage
+    door; the upper duct inside WC half wall r210 and the slab): `docs/plumbing-workflow.md` "VMC".
+    The headset write (r218 r219 r220 + 20 duct segments) waits for the owner's yes; the edited plan is
+    rebuilt by a scratch script from a fresh read (scratchpad `vmc-draft.mjs`, session-local).
 
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
@@ -602,6 +609,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 skip `update-app` and say so.
 
 - **First, with the Quest:**
+  - VMC (item 59): if not yet written, rebuild the draft from a fresh headset read and write it on
+    the owner's yes; then check the boxes, ducts and readouts in HEATING · PIPE.
   - TOOL menu (item 58): tap opens/closes, labels fit in EN/FR/ZH, no accidental open while flicking,
     the tap window (0.3 s) feels right (`docs/ar-qa-checklist.md`).
   - AC (items 52–56): HEATING · PIPE shows four green lines from each unit out through the west wall

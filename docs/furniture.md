@@ -316,6 +316,16 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   the top at the back, where the STEP rises to +10 mm and the model stays flat at +6). The seat, lid and
   hinge posts are estimates (Hypothesis until compared with a real seat). Not yet seen in AR, View 3D
   or on device.
+- `sauter-agalina-extra-plat`: Sauter Agalina extra-plat single-flow self-regulating VMC unit
+  (Leroy Merlin 80127930, Sauter 123 209; owner, 2026-10-07: two of them, `docs/plumbing-workflow.md`
+  "VMC"), builder `vmc-agalina`. Box 379 × 150 × 372 mm (spec table and the notice's dimension
+  drawing, media 4666866 p. 2 and photo 1704578): black body on a base with corner feet, the lid's fan
+  mark, and six spigots: front two Ø80 in 125 sockets (blue = the bathroom humidity port, grey), kitchen
+  Ø125 (blue) on −X, OUT Ø125 and an Ø80 at the back, an Ø80 on +X. The plan zone is the body;
+  spigots stand out of it. Port positions and spigot lengths are photo estimates (top photo 1604438,
+  front 1704578). Proven in a scratch browser preview: front and top renders laid beside those two
+  photos show the same port layout; bounding box 0.494 × 0.152 × 0.497 m with spigots. Not yet seen
+  in AR, View 3D or on device.
 
 ## IKEA kitchen units assembled from part models (2026-10-04)
 

@@ -518,6 +518,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Thumbstick-x cycles modes (both ways); A/X = prev mode; **B/Y does NOT cycle modes** (flips DIMS or a pending TRANSLATE coordinate, else inert)
 - [ ] Thumbstick up/down = "cycle the current thing" (LEVEL floor / UNIT unit / LANG language / MARKER type / EDIT zone kind), no-op elsewhere
 - [ ] Thumbstick-hold (~1.2 s) exits AR; the EXIT bar shows during the hold, not during a short tap
+- [ ] ⬜ NEW (2026-10-07) MATERIAL · FURNITURE `sauter-agalina-extra-plat` on r218 (kitchen, above the fridge) and `-wall` on r219 (basement r76, upright on the wall, sockets up): black box, blue kitchen/bathroom spigots, OUT facing the roof riser / the wall
+- [ ] ⬜ NEW (2026-10-07) HEATING · PIPE: the VMC service (light grey, thumbstick-y); a new duct is drawn Ø80 wide; selecting a duct of a unit reads its total and each diameter's length
 - [ ] ⬜ NEW (2026-10-07) Right thumbstick **tap** opens the TOOL menu (six group columns, current tool filled); ray + trigger picks a tool and closes it; trigger off a tool or another tap closes it with no edit underneath; labels fit their cells in EN/FR/ZH; a flick while pressing does not open it; ALL FLOORS dims PLAN/MATERIAL tools and the MARKER ones except CONDUIT/CONDUIT EDIT/WIRE/CHECK
 - [ ] HUD debug lines present: `build` `ptr` `ret` `edge` (EDGE only) `batt`
 - [ ] Overlays ride the correct elevation on each floor
