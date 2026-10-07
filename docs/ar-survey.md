@@ -418,6 +418,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
     the DOOR code path through `APT_KIND`). Readout: product, `width × (head − sill)`, `1 LEAF` /
     `2 LEAVES` (the zone's hinge: both = two), `MADE TO MEASURE`. Design in `docs/materials.md`
     "Windows".
+    **Swing overlay** (owner, 2026-10-07): in this mode every swinging window of the active floor
+    shows, per leaf, a pale green fan on the floor and the arc of its free edge, green up to the
+    angle where it first touches something and red past it; the leaf itself as a pale panel at that
+    angle from sill to head (green ≥ 170°, amber ≥ 90°, red below); and the zone that stops it
+    outlined red on the floor. The readout adds one line per leaf, left first as seen from the room:
+    `LEFT LEAF 77° · <what stops it>` (a furniture product's name, a zone kind, `WALL`, or
+    `OPENS FLAT`). Computed by `windowSwings` on mode entry and after a product edit; docs/materials.md
+    "Window swing".
   - **FURNITURE** (`id: mat_furniture`): the product of a FURNITURE zone (owner, 2026-09-27;
     `docs/furniture.md` "merge"). Trigger selects the zone; **thumbstick up/down** cycles the
     furniture catalog (none first; stored as the zone's `article` + a `productMm` size snapshot);

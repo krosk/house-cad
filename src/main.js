@@ -4,6 +4,7 @@ import { loadFurnitureCatalog } from './ui/furnitureCatalog.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from './core/architectural3d.js';
+import { windowSwings } from './core/windowSwing.js';
 import { finishSurfaces } from './core/flooring.js';
 import { materialById, markerProductDraws } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
@@ -166,6 +167,25 @@ view3dRealistic.addEventListener('click', () => setDesktopRealistic(!view.realis
   setDesktopRealistic(saved, false);
 }
 
+// Windows open (owner, 2026-10-07: "seeing in View 3D how it looks when opened at max"):
+// every product window's leaves swung as far as they go (src/core/windowSwing.js).
+// Remembered per device like Realistic; presentation only, never project data.
+const WINDOWS_OPEN_KEY = 'house-cad:view3d-windows-open:v1';
+const view3dWindows = document.getElementById('view3d-windows');
+let windowsOpen = false;
+function setWindowsOpen(enabled, remember = true) {
+  windowsOpen = !!enabled;
+  view3dWindows.setAttribute('aria-pressed', String(windowsOpen));
+  view3dWindows.textContent = windowsOpen ? '◫ Windows open (max)' : '▯ Windows closed';
+  if (remember) { try { localStorage.setItem(WINDOWS_OPEN_KEY, windowsOpen ? '1' : '0'); } catch { /* private mode */ } }
+}
+view3dWindows.addEventListener('click', () => { setWindowsOpen(!windowsOpen); scheduleRebuild(); });
+{
+  let saved = false;
+  try { saved = localStorage.getItem(WINDOWS_OPEN_KEY) === '1'; } catch { /* private mode */ }
+  setWindowsOpen(saved, false);
+}
+
 // POV controls: the Overview button (a tap in POV walks instead of leaving) and the
 // opt-in phone tilt look, offered on touch devices that report orientation.
 const view3dNav = document.getElementById('view3d-nav');
@@ -323,6 +343,16 @@ function rebuildView() {
   const floorGeos = project.floors.map((f, index) => {
     const doorProducts = doorProductPlacements(f, (id) => materialById(project, id));
     const windowProducts = windowProductPlacements(f, (id) => materialById(project, id));
+    if (windowsOpen) {
+      // Each leaf at the angle where it first touches something, the lever on its leaf.
+      const swings = new Map(windowSwings(f, (id) => materialById(project, id)).map((w) => [w.rectId, w]));
+      for (const placement of windowProducts) {
+        const swing = swings.get(placement.rectId);
+        if (!swing) continue;
+        placement.open = Object.fromEntries(swing.leaves.map((l) => [l.end, l.maxDeg]));
+        placement.handleEnd = swing.leaves.find((l) => l.handle)?.end;
+      }
+    }
     return {
     ...buildArchitecturalFloor(f, {
       downRise: index > 0

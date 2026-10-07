@@ -297,7 +297,8 @@ body {
 }
 #view3d-lighting,
 #view3d-reflections,
-#view3d-realistic {
+#view3d-realistic,
+#view3d-windows {
   width: 100%;
   margin-top: 5px;
   padding: 7px 8px;
@@ -312,7 +313,8 @@ body {
 }
 #view3d-lighting[aria-pressed="true"],
 #view3d-reflections[aria-pressed="true"],
-#view3d-realistic[aria-pressed="true"] {
+#view3d-realistic[aria-pressed="true"],
+#view3d-windows[aria-pressed="true"] {
   color: #0b1220;
   background: #ffd166;
   border-color: #ffd166;

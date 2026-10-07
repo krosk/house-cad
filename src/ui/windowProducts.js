@@ -9,6 +9,9 @@
 // `placement` comes from windowProductPlacements (architectural3d.js). Returns plain
 // Meshes whose geometry already carries the plan → world transform, like
 // buildDoorProduct, so a caller only lifts them by the floor elevation.
+// `placement.open` ({ lo, hi }: degrees per leaf, by its hinge end) swings the sashes
+// into the room about their hinge jamb, and `placement.handleEnd` puts the lever on that
+// leaf (View 3D "windows open", src/core/windowSwing.js).
 
 import * as THREE from 'three';
 import { exteriorGlassMaterial } from './exteriorView.js';
@@ -84,7 +87,15 @@ export function buildWindowProduct(p, { lambert = false } = {}) {
   const leafW = (inner.x1 - inner.x0) / leaves;
   const glassZ = (sz0 + sz1) / 2;
   const handleY = h / 2;
+  // Local x runs from the plan's low end to its high end (place()), so leaf 0 is hinged at
+  // the 'lo' jamb and leaf 1 at 'hi'; a single leaf at the zone's hinge end.
+  const hingeSign = p.hingeEnd === 'hi' ? 1 : -1;
+  const leafEnd = (k) => (leaves === 2 ? (k === 0 ? 'lo' : 'hi') : (hingeSign > 0 ? 'hi' : 'lo'));
+  const openDeg = (k) => p.open?.[leafEnd(k)] || 0;
+  const leafParts = Array.from({ length: leaves }, () => []);
+  const own = (k, from) => { leafParts[k].push(...parts.splice(from)); };
   for (let k = 0; k < leaves; k++) {
+    const from = parts.length;
     const x0 = inner.x0 + k * leafW, x1 = x0 + leafW;
     const s = Math.min(P.sash, leafW / 4, h / 4);
     // Meeting stiles are narrower (two of them make the thin centre).
@@ -95,14 +106,29 @@ export function buildWindowProduct(p, { lambert = false } = {}) {
     // The black glazing gasket seen from outside, just inside the glass edge.
     const gk = 0.004;
     ring(gx0, gx1, gy0, gy1, [gk, gk, gk, gk], glassZ - P.glass / 2 - 0.004, glassZ - P.glass / 2, m.gasket);
+    own(k, from);
   }
   // Handle on the room face: on the meeting stiles (two leaves) or the lock stile,
-  // opposite the hinge (one leaf). White rose + lever pointing down (closed).
-  const hingeSign = p.hingeEnd === 'hi' ? 1 : -1;
-  const hx = leaves === 2 ? 0 : -hingeSign * (inner.x1 - P.sash / 2);
+  // opposite the hinge (one leaf). White rose + lever pointing down (closed). Opened, a
+  // two-leaf window's lever sits on the meeting stile of `handleEnd`'s leaf.
+  const handleLeaf = leaves === 2 ? (p.handleEnd === 'lo' ? 0 : 1) : 0;
+  const hx = leaves === 2 ? (p.open ? (handleLeaf ? 1 : -1) * P.meet / 2 : 0) : -hingeSign * (inner.x1 - P.sash / 2);
+  const handleFrom = parts.length;
   box(0.03, 0.075, 0.012, hx, handleY, sz1 + 0.006, m.pvc);
   box(0.014, 0.014, 0.035, hx, handleY + 0.012, sz1 + 0.025, m.pvc);
   box(0.018, 0.12, 0.016, hx, handleY - 0.045, sz1 + 0.045, m.pvc);
+  own(handleLeaf, handleFrom);
+  // Swing each leaf into the room (+Z) about its hinge axis: the jamb edge of the sash, on
+  // its room face (rotateY(φ) sends +x to −z for φ > 0, so the low-end leaf turns by −θ).
+  for (let k = 0; k < leaves; k++) {
+    const deg = openDeg(k);
+    const px = leafEnd(k) === 'lo' ? inner.x0 : inner.x1;
+    const phi = (leafEnd(k) === 'lo' ? -1 : 1) * (deg * Math.PI) / 180;
+    for (const [g] of leafParts[k]) {
+      if (deg) { g.translate(-px, 0, -sz1); g.rotateY(phi); g.translate(px, 0, sz1); }
+    }
+    parts.push(...leafParts[k]);
+  }
   // Hinges on the room face at the outer stiles (both sides on a two-leaf window).
   const hingeXs = leaves === 2 ? [-1, 1] : [hingeSign];
   // `hinges` per side, evenly from 8 cm above the sill to 10 cm below the head (the

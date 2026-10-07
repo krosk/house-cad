@@ -786,6 +786,36 @@ the zone (`project.setWindowFinish`, an alias of `setDoorFinish`), authored in A
   - Proven 2026-09-27: build; front and three-quarter renders in a scratch preview beside the
     photos (both products). Not yet seen in View 3D or AR.
 
+## Window swing (how far each leaf opens)
+
+Owner, 2026-10-07: "I need to know how far I can open windows, they will hit heaters and Aircon
+units", and "seeing in View 3D how it looks when opened at max". `src/core/windowSwing.js`
+(`windowSwings(floor, materialOf)`) turns each leaf into the room about its hinge jamb, one degree at
+a time, and stops at the first degree where the sash or its lever touches something:
+
+- **What stops a leaf:** FURNITURE and CABINET zones between their foot and top, a HALF WALL below its
+  sill, WALL and INSULATION zones, and anything outside the floor's ROOM rects (the walls). An opening
+  (the window itself, a door) is free space, so the wall around it never stops its own sash. Heights
+  matter: a sash from 0.02 to 2.25 m passes under an aircon unit whose bottom is 2.27 m.
+- **The leaf:** the sash from the Héméra builder: the frame centred on the zone, the hinge axis on
+  the sash's room face at the jamb (19 mm frame face), the sash 85 % of the product's `sashDepth`
+  thick, the leaf width (opening − 2 × 19 mm) / leaves. The lever handle sticks 55 mm out of the room
+  face 30 mm in from the free edge at mid-height, hanging 10 cm: on a single leaf, on its free stile;
+  on two leaves, on the **right-hand leaf seen from the room** (a common service leaf; Hypothesis per
+  window). A plain window (no product) uses the same defaults. Sliding products (`design: 'neva'`)
+  are left out.
+- **Left/right** are as seen from the room, facing the window.
+- **Where it shows:** AR MATERIAL · WINDOW draws it on the floor with a readout line per leaf
+  (`docs/ar-survey.md`); View 3D's **▯ Windows closed / ◫ Windows open (max)** toggle (remembered per
+  device, `house-cad:view3d-windows-open:v1`) builds every product window with its leaves at that
+  angle (`placement.open`, `placement.handleEnd` → `buildWindowProduct`). Presentation only: nothing
+  is stored in the project.
+- Proven 2026-10-07: build; Node on the owner's plan (e.g. ground r80: left leaf 180°, right leaf 77°,
+  stopped by the CTXM15A r216; upper r113 right leaf 98° by r148, r115 105° by r149); the 3D builder's
+  opened leaves put each free edge exactly on the computed point (0 mm, every swinging product window
+  of the plan); View 3D in a local browser showed the leaves open. Hypothesis: the hinge position and
+  the handle are estimates (a few degrees either way); not yet seen in AR.
+
 ## Switches and outlets (device products)
 
 Owner decisions (2026-09-27): a switch product is **a new material category that applies only to

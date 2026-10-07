@@ -28,6 +28,7 @@ import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, 
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
+import { windowSwings, leafDirection } from '../core/windowSwing.js';
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
@@ -3946,6 +3947,7 @@ export function setupMR(view, project, getFootprint) {
   let matReticle = null;   // plan point under the reticle (MATERIAL · FLOOR start corner pick)
   let matHoverFace = null, matSelFace = null;
   let matDoors = [];       // DOOR + WINDOW + FURNITURE zones of the active floor (their MATERIAL targets)
+  let matSwings = [];      // MATERIAL · WINDOW: windowSwings() of the active floor (overlay + readout)
   let matHoverDoor = null, matSelDoor = null;
   // MATERIAL · SWITCH / OUTLET: device markers of the active floor (DEVICE_SURFACE picks
   // which marker types each takes); grip cycles overlapping ones (a stack at one plan
@@ -4076,10 +4078,51 @@ export function setupMR(view, project, getFootprint) {
         if (markerProduct(project, m)) matBadge(arr, colors, m.x, m.y, 0x2dd4bf);
       }
     }
+    matSwings = modes[currentMode]?.id === 'mat_window' ? windowSwings(floor, (id) => materialById(project, id)) : [];
+    for (const w of matSwings) addSwingOverlay(arr, colors, w);
     if (arr.length) materialGroup.add(matMesh(arr, colors, 12));
     const hi = matMesh([], [], 13);
     hi.userData.matHighlight = true;
     materialGroup.add(hi);
+  }
+  // MATERIAL · WINDOW swing (owner, 2026-10-07: "how far can I open the windows"): per
+  // leaf, a floor fan and the arc of its free edge, green up to where it stops and red
+  // past it; the leaf itself as a pale panel at that angle (sill to head); and the zone
+  // that stops it outlined red on the floor. Batched into the material mesh.
+  const swingColor = (deg) => (deg >= 170 ? 0x51d88a : deg >= 90 ? 0xfbbf24 : 0xf87171);
+  function addSwingOverlay(arr, colors, w) {
+    const ok = new THREE.Color(0x51d88a), past = new THREE.Color(0xef4444), c = new THREE.Color();
+    const push = (pts, col, alpha) => { for (const [x, h, y] of pts) { arr.push(x, h, -y); colors.push(col.r, col.g, col.b, alpha); } };
+    for (const leaf of w.leaves) {
+      const { x: hx, y: hy } = leaf.hinge, R = leaf.radius;
+      const at = (deg, r) => { const d = leafDirection(leaf, deg); return [hx + r * d.x, hy + r * d.y]; };
+      for (let a = 0; a < 180; a += 3) {
+        const b = Math.min(180, a + 3), open = b <= leaf.maxDeg + 1e-9;
+        const [x0, y0] = at(a, R), [x1, y1] = at(b, R);
+        if (open) push([[hx, 0.0045, hy], [x0, 0.0045, y0], [x1, 0.0045, y1]], ok, 0.1); // the swept floor
+        const [i0x, i0y] = at(a, R - 0.02), [i1x, i1y] = at(b, R - 0.02);
+        push([[i0x, 0.005, i0y], [x0, 0.005, y0], [x1, 0.005, y1], [i0x, 0.005, i0y], [x1, 0.005, y1], [i1x, 0.005, i1y]],
+          open ? ok : past, open ? 0.9 : 0.4);
+      }
+      // The leaf at its stop, from the sill to the head.
+      c.setHex(swingColor(leaf.maxDeg));
+      const [tx, ty] = at(leaf.maxDeg, R);
+      push([[hx, w.sill, hy], [tx, w.sill, ty], [tx, w.head, ty], [hx, w.sill, hy], [tx, w.head, ty], [hx, w.head, hy]], c, 0.28);
+      if (leaf.stop?.rect) {
+        const r = project.activeFloor.rectangles.find((q) => q.id === leaf.stop.rect);
+        if (r) matCellQuads(arr, colors, [r.bounds], 0.006, 0xef4444, 0.45);
+      }
+    }
+  }
+  function swingLines(rect) {
+    const w = matSwings.find((s) => s.rectId === rect.id);
+    if (!w) return [];
+    const what = (stop) => (!stop ? t('swing.flat') : stop.wall ? t('swing.wall')
+      : stop.article ? furnitureLabel(stop.article) : t(`mode.${stop.kind}`));
+    // Left leaf first, as seen from the room.
+    return [...w.leaves].sort((a, b) => (a.hand === 'left' ? -1 : 1) - (b.hand === 'left' ? -1 : 1))
+      .map((leaf) => [`${t(w.leaves.length === 2 ? `swing.${leaf.hand}` : 'swing.leaf')} ${leaf.maxDeg}° · ${what(leaf.stop)}`,
+        swingColor(leaf.maxDeg)]);
   }
   // Yellow highlight for the hovered (pale) and selected (strong) target; rebuilt only
   // when the target changes.
@@ -4298,6 +4341,7 @@ export function setupMR(view, project, getFootprint) {
         [`${fmt(width)} × ${fmt(tall)} ${unitLabel()}`, 0xe2e8f0],
         // A product with its own leaf count (porte-fenêtre, sliding bay) ignores the hinge.
         ...(isWindow ? [[t((mat?.leaves ?? ((rect.hinge ?? 'left') === 'both' ? 2 : 1)) === 2 ? 'mat.leaves2' : 'mat.leaves1'), 0xe2e8f0]] : []),
+        ...(isWindow ? swingLines(rect) : []),
         // A rail-hung door is a fixed size (not made to measure): its leaf, and whether the
         // opening fits under it.
         ...(mat?.mount === 'rail'

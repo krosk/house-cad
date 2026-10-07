@@ -229,9 +229,9 @@ const STRINGS = {
     zh: '为门区域选择门款。扳机选择准星下的门；摇杆上/下循环门款（首项为无）；B/Y 清除。按尺寸定制：门采用该区域的宽度、门头高度、铰链和开启方向。推拉门区域使用轨道吊门（门扇尺寸固定；轨道位于区域的开启面，向铰链端滑动）。在三维视图中显示（左 X）。',
   },
   'help.mat_window': {
-    en: 'Choose a window product for a WINDOW zone. Trigger selects the window under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the window takes the zone\'s width, sill and head; its hinge picks the leaves (both = two leaves). Shown in the 3D view (LEFT X).',
-    fr: 'Choisissez un modèle de fenêtre pour une zone FENÊTRE. Gâchette : sélectionner la fenêtre visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la fenêtre prend la largeur, l’allège et la hauteur de la zone ; ses paumelles choisissent les vantaux (des deux côtés = deux vantaux). Visible dans la vue 3D (GAUCHE X).',
-    zh: '为窗区域选择窗款。扳机选择准星下的窗；摇杆上/下循环窗款（首项为无）；B/Y 清除。按尺寸定制：窗采用该区域的宽度、窗台和窗头高度；铰链决定扇数（两侧 = 双扇）。在三维视图中显示（左 X）。',
+    en: 'Choose a window product for a WINDOW zone. Trigger selects the window under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it. Made-to-measure: the window takes the zone\'s width, sill and head; its hinge picks the leaves (both = two leaves). Shown in the 3D view (LEFT X). On the floor, each leaf\'s swing: green as far as it opens, red past what stops it, with the leaf drawn at that angle.',
+    fr: 'Choisissez un modèle de fenêtre pour une zone FENÊTRE. Gâchette : sélectionner la fenêtre visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la fenêtre prend la largeur, l’allège et la hauteur de la zone ; ses paumelles choisissent les vantaux (des deux côtés = deux vantaux). Visible dans la vue 3D (GAUCHE X). Au sol, le débattement de chaque vantail : vert jusqu’où il s’ouvre, rouge au-delà de ce qui l’arrête, avec le vantail dessiné à cet angle.',
+    zh: '为窗区域选择窗款。扳机选择准星下的窗；摇杆上/下循环窗款（首项为无）；B/Y 清除。按尺寸定制：窗采用该区域的宽度、窗台和窗头高度；铰链决定扇数（两侧 = 双扇）。在三维视图中显示（左 X）。地面显示每扇的开启范围：绿色为可开启角度，红色为被阻挡之后的范围，并以该角度画出窗扇。',
   },
   'help.mat_switch': {
     en: 'Choose a switch product for a switch. Trigger selects the switch under the reticle; where switches overlap (a double switch is two markers), grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
@@ -474,6 +474,12 @@ const STRINGS = {
   'mat.pickEthernet': { en: 'PICK ETHERNET', fr: 'CHOISIR PRISE RÉSEAU', zh: '选择网口' },
   'mat.leaves1':   { en: '1 LEAF',      fr: '1 VANTAIL',      zh: '单扇' },
   'mat.leaves2':   { en: '2 LEAVES',    fr: '2 VANTAUX',      zh: '双扇' },
+  // Window swing (src/core/windowSwing.js): how far each leaf opens, seen from the room.
+  'swing.left':    { en: 'LEFT LEAF',   fr: 'VANTAIL GAUCHE', zh: '左扇' },
+  'swing.right':   { en: 'RIGHT LEAF',  fr: 'VANTAIL DROIT',  zh: '右扇' },
+  'swing.leaf':    { en: 'LEAF',        fr: 'VANTAIL',        zh: '窗扇' },
+  'swing.wall':    { en: 'WALL',        fr: 'MUR',            zh: '墙' },
+  'swing.flat':    { en: 'OPENS FLAT',  fr: 'S’OUVRE À PLAT', zh: '可全开' },
   'mat.toMeasure': { en: 'MADE TO MEASURE', fr: 'SUR MESURE', zh: '定制尺寸' },
   'mat.pcs':       { en: 'pcs',         fr: 'pcs',            zh: '片' },
   'mat.cut':       { en: 'cut',         fr: 'coupés',         zh: '切割' },
