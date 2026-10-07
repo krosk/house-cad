@@ -19,22 +19,19 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-06 (session 39; the Quest was reachable all session)
-**Status:** Proven (git, 2026-10-06): `main` = `origin/main`, nothing unpushed; app head `d6ff2f7`.
-Tree clean (the owner's old `Document from Alexis He.json` was deleted at their request). Proven (`update-app`,
-2026-10-06): the headset precache holds `d6ff2f7`. Proven (three `quest-storage read`s, 2026-10-06):
-the headset plan is **rev 17**. At session end, on the owner's yes (AR closed, full backup first),
-we wrote their heat settings into it and read them back identical: tRoom 22, radiatorDT 24, revealPsi
-0.25 (planned foam), Ground heavyCeiling no + floorR 0.9 (planned 2 cm PIR), Upper heavy no + heavyCeiling
-no. Nothing else changed (diff: no conflicts, no deleted dims). The pre-write autosave exists only in
-that session's scratchpad backup (gone in a new session); no slot holds it (slot 1 = rev 17 of
-2026-10-05 15:26 UTC with tRoom 22, slabR 0; slot 3 = rev 6; slot 4 = rev 14). To undo, set the rows back in AR. The owner has
-not yet reported any session 38/39 feature from the device (items 31–45 unwalked).
+**Date:** 2026-10-07 (session 40; the Quest was reachable all session)
+**Status:** Proven (git, 2026-10-07): `main` = `origin/main`, nothing unpushed, tree clean; app head
+`ce85140`. Proven (`update-app`, 2026-10-07): the headset precache holds `ce85140`. Proven
+(`quest-storage read` after each write, byte-identical): the headset plan carries every session-40
+edit (item 49); the last write was the radiator swap. Scratchpad backups before each write are
+session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse the edit
+in AR. Nothing from sessions 38–40 has been reported from the device (items 31–51 unwalked), except
+the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
 PERF clipboard report (two reports pasted) and an AR 3D view frame rate the owner accepts (50–80 fps on
-Ground with 33 device products). Everything else from sessions 30–37 is verified by build, Node or a
+Ground with 33 device products). Everything else from sessions 30–40 is verified by build, Node or a
 scratch/desktop browser only (Next step A).
 
 ## What the app is today (the gist, no code needed)
@@ -76,263 +73,74 @@ Detail: `docs/share-view.md`.
 **The goal (unchanged):** Phase 5 — an on-site MR survey tool, multi-storey, authored entirely in AR.
 Read `docs/product-intent.md` before planning AR work.
 
-## What changed in session 39 (2026-10-06, all heat loss unless said)
+## What changed in session 40 (2026-10-06 evening – 10-07)
 
-> Next agent: fold what is still live into "Standing decisions" or "Findings" and delete the rest.
-> Detail and numbers: `docs/heat-loss.md` ("Thermal bridges", "Heating plan", "Limits").
+> Next agent: when you add your own section, fold what is still live into "Standing decisions" or
+> "Findings" and shrink this list into the item index below.
 
-39. **Thermal bridges** (`d2831ed`): linear ψ per junction from the 3CL-DPE 2021 tables (read from the
-    Open3CL engine's `tv.js`), the old R × 0.85/0.95 derating dropped. Junctions: lowest floor, intermediate
-    floor (½ per side), top floor, partition/façade T (½ per side), window/door (Window ψ 0.9, 0.25 with
-    reveals insulated; replaces item 36's 0.4/0.08). Wall class per 5 cm column: none / ITI / ITE / both.
-    Drawn in AR HEAT LOSS 4 cm inside the walls (bars, posts, frames; colour = type); the reticle reads
-    them. Owner chose this view (option 2) over a panel breakdown or a Node report.
-40. **Heaviness** (`9ebba86`, `4ebe481`): per floor `heavy` / `heavyCeiling` (DPE neglects wood floors);
-    partitions heavy from `heavyWallMin` 0.10 m of gap thickness (plaster under, ψ 0, drawn grey). Floor
-    junctions look 10/30/60 cm in and ±30 cm along (floors don't line up); runs < 10 cm dropped.
-41. **Floor insulation only over the basement** (`9615e2a`): `floorR` ignores parts on earth/over air
-    (owner: the kitchen on earth must not double count). Panel row "Floor ins. R (over basement)".
-42. **Own-gap fix** (`bb28c35`): a room facing itself across a thin gap counted an exterior wall
-    (owner's living room: −210 W). Radiator water ΔT steps by 1 K.
-43. **Open stairs join their room** (`d6ff2f7`): unless a DOOR/SLIDING/GARAGE zone is on the contact
-    (owner rule). Heat loss only; EDIT/sheet areas unchanged. Hall + stair 6.6 m².
-44. **Sheets** (`d6ff2f7`): plan dims off + furniture + furniture dims on → furniture dims alone (SVG/PNG;
-    DXF unchanged). Chinese PNGs made for the owner from rev 17 (scratch only, via `floorToSvg` +
-    `rsvg-convert` with Noto CJK). Seen in them: the CJK legend overlaps (widths sized for Latin;
-    likely the same in-app, offered fix); furniture is never named on sheets (offered).
-45. **The owner's heating plan** (docs, `9615e2a`; table corrected `bb28c35`): 22 °C everywhere; 50 °C
-    flow at 0 °C (ΔT 24), 55 °C below ≈ −3 °C; the FTXM60A covers the living room's cold-day gap (not at
-    0 °C); basement ceiling 2 cm PIR (R 0.9) planned, slab bare today; reveals to get 1–2 cm foam; Upper
-    floor and both loft floors wood; ground slab concrete over brick; windows at the inner face. House
-    ≈ 5.1 kW at 0 °C, 6.6 kW at −7 °C (Node, those settings). Radiators: Upper 14.7 m² EASY 120×60 is
-    1.6× its need (90×60 suggested), the shower room's Angora 615 W is 0.97 (sets the water temperature;
-    a dual-energy towel radiator suggested), the hall is right once its stair counts. The owner's
-    **5MXM90A is an air-to-air multi-split** (Hypothesis: it cannot feed the radiators; flagged to the owner).
+46. **version.json no longer opens the app** (`8dc326f`; owner noticed). The service worker answered
+    every navigation with `index.html`, so `quest-storage.mjs`'s "safe" `version.json` tab ran the app
+    (it could autosave over a write). `navigateFallbackDenylist: [/version\.json$/]`; the tool checks
+    `document.contentType`. Proven on the headset (navigation shows `application/json`).
+47. **V&B Architectura wall-hung WC 4694R001** (`734560a`, `/model-product`): builder `wall-hung-wc`,
+    rings measured from V&B's own STEP (3D data on the product page; owner chose procedural over a
+    runtime STEP loader: proxy route + 3.1 MB reader). Generic slim seat (`seat`, `lidOpen` params).
+    2 336 triangles; silhouettes within a few mm of the STEP. `docs/product-modelling.md` "A
+    manufacturer CAD model (STEP)". Not seen in View 3D or AR.
+48. **Heat loss air volume** (`ce85140`): floor area × room height minus each zone's real solid part
+    (half wall/plinth to its top, heater its band, openings and stairs air); before, a 9.3 cm plinth
+    removed a 2.70 m column. `docs/heat-loss.md` "Air volume".
+49. **Headset plan edits** (owner's yes each time; AR closed, backup, `--base` write, read back identical):
+    - half wall `r139` (Ground, the WC frame box): 0.22 deep (`c1003` −0.22), 1.15 high; new half wall
+      `r210` (Upper, U1): 0.88 × 0.22, 1.15 high, tiled Lucia (sides + cap), `c1411`–`c1414`. Frame:
+      Geberit Duofix 111.333.00.6 (50 × 112 × 12 cm, free-standing);
+    - WC zones `r211` (Ground, facing 180, `c1415`/`c1416`) and `r212` (Upper, facing 0, `c1417`/`c1418`),
+      `vb-architectura-4694r001`, foot 0.08 (rim 41.5 cm);
+    - both Sensea trays (`r131`, `r136`) raised: foot 0.093, top 0.12; plinth half walls `r213`/`r214`
+      under them (sill 0.093), pinned like their trays (`c1419`–`c1426`);
+    - Upper `r207` radiator: EASY horizontal 120×60 → **90×60** (1 448 W), bottom end kept on the
+      window jamb (`c1406`).
+50. **Whole-house balance** (`ce85140`; owner: one water temperature for every radiator): WHOLE HOUSE
+    toggle `balance` (off by default) + plaster partition λ 0.40. `houseBalance` solves every heated
+    space at the set ΔT: valves cap rooms at tRoom, short rooms settle lower and draw heat through
+    partitions (U from the gap) and floors; the hall + upper landing are one node (stairwell).
+    Panel: reached °C per room, "Reaches … · from neighbours …", "Water needed". On the plan (22 °C,
+    ΔT 24): shower room 20.4 °C at −7 °C; water needed 28.6 K at −7, 23.8 K at 0 °C, ≈ the tightest
+    room alone (valves hold the others at exactly tRoom: deliberate). `docs/heat-loss.md`.
+51. **Answers, no code (owner's heating decisions, Node on the headset plan):** the owner keeps water
+    at ΔT 24 (46 °C mean) and accepts the −7 °C shortfalls; the ground shower towel radiator sets the
+    water temperature (upgrade to the 173 cm Angora suggested), then the hall + landing (EASY 60×200
+    suggested); a gas condensing boiler heats for the next 5 years, then a heat pump; the
+    basement-ceiling board: **SOPREMA PU 25 mm, R 1.0, €11.42/m²** (Leroy Merlin 69644526; no 20 mm PU
+    sold there), ≈ 61 m² ≈ €700, ≈ €340–450/yr on gas (Hypothesis prices); covering only the living
+    room fixes the living room only (other rooms over the basement stay near bare). The plan still
+    models Ground floorR 0.9 (offered: set 1.0 if SOPREMA is chosen). Fire class and ceiling use of
+    the SOPREMA board unchecked.
 
-## What changed in session 38
+### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
-> Next agent: when you add your own section, fold anything still a live constraint into "Standing
-> decisions" or "Findings" and delete this list. Session 37 is folded into "Standing decisions" and
-> "Findings" (its unwalked items stay in Next step A).
-
-All owner requests, 2026-10-03.
-1. **Share links** (`c00e97b`, `4c819aa`): a link (desktop Share view and AR EXPORT · LINK) now always
-   carries furniture products, **surface finishes** (floors, walls, door and window products: floor
-   slot 5 + top-level `m`/`cm`) and **markers**; QR always leaves markers out to fit. The owner's link
-   showed no Héméra windows and no furniture: the AR link followed the sheet FURNITURE layer (off by
-   default) and links carried no finishes. Proven in Node on the owner's file: 28 finishes round-trip,
-   8 windows + 6 doors restored, link 3 993 chars (2 205 without markers). Not yet opened as a real
-   link by the owner.
-2. **URL copy failure** (`fec23b8`, `4c819aa`): the owner hit `URL COPY FAILED (NotAllowedError)` on a
-   path identical to the working PERF copy. The flash now names the cause: `not ready, retry`,
-   `build: …`, `no clipboard`, or the error with `a0/a1` (activation), `f0/f1` (focus) and the size.
-   **Cause still unknown**; the owner said "never mind" and was sent a link built in Node instead.
-3. **View 3D Realistic** (`f8e1f35`, `src/ui/realism.js`): per-device toggle + time slider; sun from a
-   solar ephemeris for Val-de-Marne (Proven against Paris tables), shadows fitted to the shown floors,
-   window panes let the sun through; Poly Haven CC0 sky HDRI downloaded at runtime (its photographed sun
-   clamped out, the lighting copy desaturated: the raw sky turned rooms blue); GTAO through an
-   EffectComposer; pixel ratio capped at 1.5. Proven in Chrome on this Deck (demo house). **Frame rate
-   never measured** (hidden tab).
-4. **Photo finishes** (`ade036e`, `71208e4`, `src/ui/photoFinishes.js`), Realistic only: the Charme oak
-   from Leroy Merlin photo 799228 (11 whole planks laid by a shader, no repeat) and Monastère from its
-   three single-tile photos (stepped lattice in the shader, real wavy edges, grout baked in the atlas).
-   Owner asked whether a photo shows a repeat: tiling it did, hence the piece-by-piece layout.
-5. **Process recorded** (`6854420`): `docs/product-modelling.md` step 7 + the `model-product` skill step
-   for photo finishes; `tools/photo-measure.mjs` (rows / joints / bbox from a photo via ffmpeg) and
-   `tools/check-share-link.mjs <house.json>` (what a house loses in a link). Both run and reproduce this
-   session's numbers.
-6. Answered, no code: the Lucia ivory 30×90 wall tile is already in the catalog.
-7. **Texture work off the main thread** (`2798bc9`, `96e342f`; owner rule: "everything that is texture
-   preparation should be moved to background"). Once links carried finishes, opening the owner's link
-   froze the page and the 2D pan smeared: painting their 7 textured finishes took ~5.1 s of main thread
-   on this Deck, the Realistic photo atlases 2.9 s (Charme) + 0.9 s (Monastère), the sky parse 0.2 s.
-   One module worker (`textures.worker.js`, client `textureWorker.js`) now runs finish, photo, sky and
-   named small-texture `paint` jobs (`painters.js`: View 3D wood/plaster, AR window exterior, door
-   leaves, furniture); `paintedTexture()` hands builders a 1 px placeholder at once. Page fallback one
-   job per task. Proven: all jobs at once, longest main-thread block 40 ms; worker output byte-equal to
-   the page's except the canvas `blur` filter (means within 0.3/255).
-8. **Plan view prepares nothing 3D** (`cc72e0b`, owner's design): the owner still saw the count rise
-   while a pan did nothing and made the counter jump. Now the 3D model is built only while View 3D is
-   shown; ◈ View 3D shows a loading wheel (`Preparing 3D · textures n/N`, `✕ Cancel 3D`) and opens when
-   every job is done; the export mesh is built on export; sky, PMREM, GTAO buffers and default wood/
-   plaster wait for the first build. `· on page` in the count = worker unavailable (diagnostic).
-   Proven on this Deck with a synthetic house; **not** reproduced the owner's stall here (their device's
-   path is still unknown: they never reported whether `· on page` showed).
-9. **Phone memory** (`856592c`): the 3D view of the owner's link crashed the canvas on their phone.
-   Textures' canvases are freed after GPU upload (`freeAfterUpload`), and phones (coarse pointer, short
-   side < 600 px) get half-size finish and photo textures (`TEXTURE_SCALE`). Owner confirmed it works.
-10. **Monastère "missing" from a link:** Proven in Node it was in the link (12.8 m² on Ground room
-    `r65`, same surfaces after decoding). A fresh link was sent; the owner never said what they saw.
-11. **View 3D floor panel collapses** (`054aad7`): its "Floors" title toggles it down to one line that
-    still names the shown floor; remembered per device. Proven in Chrome on this Deck; not tried on a
-    phone, where it matters most.
-12. **Habitat Moder II table** (`a57716f`): two catalog entries on one builder `moder-table`, closed
-    110 cm and extended 155 × 110 cm (owner asked for both). Dimensions measured on the assembly
-    manual's isometric cover drawing (HA833381; the page's download is a button that fetches
-    `habitat.fr/asset/product/13552185`): blade legs, 61 mm splay, 11 + 15 mm edge. The first version,
-    from the front photo, had round legs half as splayed; the owner pointed out the drawing is
-    isometric. Proven: an orthographic render overlaid on the drawing coincides. Same commit: the
-    STOCKHOLM bed's legs used a *clone* of a worker-painted texture, which never receives the picture
-    (a regression from item 7); now a `paintedTexture` variant.
-13. **Modelling method** (`780aeeb`, owner): dimension from an isometric manual when one exists
-    (prove the 0.577 ellipse ratio, plan px/mm everywhere, heights × 0.816, overlay an orthographic
-    render); photos are eye perspective (measure only in a known length's plane, or match a
-    perspective camera); the drawing wins. `docs/product-modelling.md` step 2 + the skill.
-16. **Half walls inside a room take wall finishes** (owner: Lucia on the bathroom half wall, "the half
-    wall top needs to get it too"; uncommitted when noted): its room-facing sides and its top
-    (`edge: 'cap'`) are finish targets in the takeoff, the 3D overlays and AR WALL picking, and the
-    room face behind it drops the hidden band (was a known overcount). `docs/materials.md` (Quantities
-    limits). Proven: build; Node on the owner's Ground bathroom (numbers in the doc); save and share
-    link keep all five targets. Not seen in View 3D or AR.
-14. **Vernisse tile laid as a straight grid, tiles upright** (`2352c66`, owner): `pattern: 'grid'`,
-    75.4 × 301 mm, `sheets: [16, 4]` (a grid's `sheets` may now be [cols, rows]). Proven: build,
-    scratch render of the colour and bump canvases, takeoff 52 tiles on a 2 × 0.6 m splashback.
-15. **The owner's Lapeyre window quote applied to the headset autosave** (owner, 2026-10-04; no repo
-    change). The quote (PDF upload, dated 2026-08-01) lists Héméra PVC windows / French doors (Uw 1.2),
-    a Néva sliding bay (Uw 1.5) and an Ange-Line entry door (no U given), each with H × W. The headset
-    autosave (rev 14, newer than the Deck's `Document from Alexis He.json` rev 9) already carried the
-    owner's products on every quoted opening, which confirmed the quote → zone mapping. Owner rules:
-    the quote is the correct size; extra height goes to a higher head; one end pin is removed where
-    both ends were pinned. Written over CDP and read back byte-identical (Proven); save slots untouched
-    (slot 4 = the pre-edit rev 14). Pre-edit backup of all 11 `house-cad:*` keys:
-    scratchpad `quest-backup-20261004-0009/` (session-local; not durable). Changes, checked in Node
-    (no conflicts, no dimension deleted, nothing else moved):
-    - Uw 1.2 on `r80`, `r108`, `r111`, `r110` (Ground), `r113`–`r115` (Upper), `r146` (Basement); 1.5 on
-      `r109`.
-    - Heads: Ground French doors `r80`/`r108`/`r111` + Néva `r109` 2.28 → 2.27; entry door `r81`
-      2.10 → 2.25; Upper `r113`–`r115` 2.28 → 2.43 (1390 tall, sill 1.04 kept).
-    - Basement `r146` = the quote's 620 × 1260 two-leaf window: sill 1.50 (owner's placeholder), head
-      2.12, `hinge: both`, Héméra product added, widened 30 mm each side (`c1091` −1.52, `c1088` 1.70).
-    - Widths to the quote: `r81` 960 (`c270`), `r108` 1550 (`c371`), `r109` 2400 (`c860` removed,
-      `c1111`), `r110` 660 (`c990` removed, `c1191` added), `r111` 1550 (`c379` removed, `c1192` from the
-      bottom end), `r114` 1250 (`c392` removed, `c1193`), `r115` 1450 (`c396` removed, `c1194`).
-    - Side effect: markers pinned to a moved edge followed it: `m212`, `m213` 5 cm (with `r108`'s
-      bottom end), `m7` 1 cm (with `r81`).
-    - Then (owner): furniture zone `r152` on Ground, `habitat-moder-ii-155` (extended), `facing` 90 so
-      the long side runs along y, centred under light `m12` in the living room `r59` (plan x 0.815–1.915,
-      y 1.685–3.235); no dimensions. Written and read back the same way.
-    - Then (owner): Lucia ivory 30×90 on every bathroom wall (bathrooms = the rooms holding a Sensea
-      Neo tray): Ground `r62` 4 faces + `r107` left/right/bottom, Upper `r86` 4 faces, and the half
-      wall `r139`'s room side + top (`cap`, item 16, written after `0727fab` deployed). Written and
-      read back byte-identical (Proven), on top of the autosave the app had re-saved in solved form
-      (same model). Takeoff: 320 Lucia tiles = 64 boxes house-wide, incl. the entrance's `r57` face.
-    - Open: which French door is the quote's Sw 0.51 one (Hypothesis: `r111`; the two Sw 0.47 ones cost
-      €93 more, maybe acoustic glass, both on the x ≈ −4.8 façade).
-17. **Headset editing as a procedure** (`fa10818`): `docs/headset-data.md`, skill `quest-edit`,
-    `tools/quest-storage.mjs` (backup / read / write with a `--base` guard) and `tools/house-query.mjs`
-    (openings, rooms-with, takeoff, diff). Every write since went through them (Proven).
-18. **Slab thickness** (`b5a55f2`; owner: "my ceiling is indeed 2700", 2.95 was typed only to stack
-    the floors). `floor.slab`; the room height is `ceilingHeight(floor)` = height − slab
-    (`src/core/storey.js`) for walls, ceilings, finishes, takeoff, heat loss, ceiling routes, new
-    lights; stacking and stairs keep `height`. AR LEVEL: SWAP toggles storey ↔ slab. Written to the
-    headset (owner's values): Basement 2.27 / 0.22, Ground 2.95 / 0.25, Upper 2.70 → 2.95 / 0.25.
-    Node on that copy: Lucia 320 → 300 tiles, Vernisse 1030 → 927, heat loss Basement 7629 → 6982 W,
-    Ground 9861 → 9277 W.
-19. **Headset app updated after every deploy** (`4ae38b3`, owner: "record this as an automatic
-    update if the headset is reachable"): `quest-storage.mjs update-app` makes the app's service
-    worker take the live build (the browser shares it), so the next launch opens it. Rule in `CLAUDE.md`
-    (Git workflow). Proven: ran after `4ae38b3`, `e2f6f7a`, `1a25943`.
-20. **IKEA kitchen** (`e2f6f7a`, `1a25943`; owner's IKEA Kitchen Planner PDF "Maison 2", 37 pages):
-    16 `metod-*` products (planner units 1–14, worktops A/B), each assembled in
-    `src/ui/kitchenUnits.js` from IKEA's own rotera part models (owner chose them over procedural);
-    `docs/furniture.md` "IKEA kitchen units". Owner rulings: ASPUDDEN (no model) → their framed fronts
-    605.950.50 / 005.950.48 painted white; generic oven/microwave; two worktop zones; IKEA dims are
-    to the tile faces (8 mm allowance); m126 behind wall cabinet r163 is a supply outlet for the
-    cabinet lights and stays. Written to the headset: Ground r153–r168, the owner's placeholders
-    r134, r141–r145 and their 24 dims removed (owner). Proven: scratch renders of every unit and the
-    whole kitchen; placement solves with no conflict. The tap first sat 96 mm in the wall (its GLB
-    origin is the bbox centre, base 110 mm behind), fixed in `1a25943`.
-21. **Heat loss: wall layers and walls in the earth** (owner, 2026-10-04; `docs/heat-loss.md`):
-    - An exterior wall is its drawn WALL + INSULATION zones, and their R add up. Where no WALL zone is
-      drawn, a placeholder wall stands in. Settings: undrawn depth 0.20 m and wall λ 0.8, replacing
-      the bare wall R 0.25.
-    - One earth level for the house (owner): walls below it lose to the ground (ISO 13370 basement
-      wall).
-    - Proven (Node on the headset copy): Ground 9277 → 9240 W, Upper 8374 → 8329 W, Basement at
-      earth 0 → 2856 W.
-    - Open: the 7 cm wall `r112` now raises the kitchen room's loss by about 160 W. Is it really the
-      outer wall? The owner's real earth level is also still unknown.
-    - Not seen on the Quest.
-22. **Conflicting dimensions: suspects** (`d87eb21`; owner: "identify the other constraints that
-    cause the conflict, so that I can verify systematically which one is wrong";
-    `docs/ar-survey.md` "Conflicting dimensions"):
-    - How it works: `src/core/conflicts.js` splits each axis into loop blocks. A suspect is a
-      dimension whose removal alone makes its block agree, and it comes with the value the other
-      dimensions imply for it.
-    - The owner's rule: 0 mm dimensions are certain. They are never suspects and never listed.
-    - AR: a refused entry (`!CONFLICT`) is diagnosed before its rollback, as is any aimed red value.
-      The pill shows `#k stored → implied`, and pink `#k` tags mark the suspects on the plan.
-    - Node: `tools/house-query.mjs conflicts <house>`.
-    - Proven (Node, on the headset copy): adding 15 mm to each dimension in turn, the altered one was
-      a suspect in all 57 conflicting cases (lists of 1–7).
-    - Used on the Quest (items 26–27); the desktop shows no suspects.
-23. **Vernisse relief, and finish textures painted in software** (`f857b41`; `docs/materials.md`
-    Vernisse and "Texture preparation in a worker"):
-    - The owner's rule: the tile body is thicker at the edges than over its face, unevenly. It is a
-      white rim within 5 mm of the edge, falling softly into a darker face. The owner: "Ok this one
-      is great".
-    - Rejected: blobs along the edges ("quite ugly"), and a wide ramp that ate into the face.
-    - Edge glints fixed: the anti-aliased outline pixel is now sealed at joint height.
-    - Chrome's GPU canvas cut one row's tiles short, so `unitCanvas` now paints every designed finish
-      in software. Proven no slower. Only Vernisse was re-checked; the GPU cause is a Hypothesis.
-
-## What changed late in session 38 (2026-10-04 evening – 10-05)
-
-> Next agent: fold what is still live into "Standing decisions" or "Findings" and delete the rest.
-
-24. **Deleted dimensions re-added** (owner): the owner had deleted five Ground y dimensions on the
-    headset while hunting a conflict (c220, c224, c238, c370, c753). Re-added to the headset's current
-    plan by id, nothing else changed; Proven: written with the `--base` guard, read back identical, no
-    conflict after. c220 moved 39 Ground zones 15.8 mm in y; the owner's new walls r170–r174 and room
-    r175 have no y dimension and stayed (owner: "write as is", re-align by hand).
-25. **Heat loss** (`ba5f59e`, `7e0f3e0`, `b4dc594`; `docs/heat-loss.md`):
-    - overlapping layer zones: that depth counts once, at the larger R per metre (owner rule; the
-      "layer over layer" reading is a Hypothesis to confirm);
-    - a wall or insulation zone takes its **R or its λ** (`rect.lambda`, exclusive; numpad SWAP);
-    - **heat map** in HEATING · HEAT LOSS: wall strips, floor/ceiling tint (thumbstick), readout under
-      the reticle. Agreed next: the same map on the wall faces in the AR 3D view (not started);
-    - **RECESS** zone kind: a window reveal through a thick wall, cut only between its sill and head and
-      only in its footprint; thins the heat-loss layers there. Owner asked about sill/head on walls
-      instead: no for holes (one band can't make a hole); a *solid* foot/top band for layers that stop
-      at a height is possible later (not requested). A floor-level alcove is ROOM, not RECESS.
-    - Owner facts: walls probably **meulière** with 2–4 cm of 1980 white polystyrene; the living-room
-      lining is polystyrene + 13 mm plaster (label R not given, parked). Proven (Node): depth-derived R
-      (18–21 cm / 0.04 ≈ 4.5) overstates a 3–4 cm layer (R 0.75–1.0) by ~560 W on two rooms.
-26. **Conflicts on the Quest** (`1d0bcd3`, `c20544c`, `4847125`; `docs/ar-survey.md` "Conflicting
-    dimensions"): eye-level warning triangles (1.55 m; "!" over a flagged dimension, numbered over the
-    suspects or the current route); **routes**: thumbstick-y cycles suspects → route 1 → route 2…
-    (`conflictRoutes`). Owner decisions: 0 mm dimensions get no sign; the value being entered gets no
-    sign. Proven on the Quest (owner): the routes and their triangles work (one hid behind the numpad).
-27. **The owner's survey conflict** (owner, 2026-10-05): r59.bottom → r60.bottom = 4070, 80 mm off;
-    both routes imply 3990 and share only **c232 (r60's thickness 210, implied 130)**, hence the single
-    suspect (c236 is backed by a second route). The owner then "sorted out the measurement
-    discrepancy" on the headset. **Not read back**: which value was wrong is unknown.
-28. **Debug HUD `edge:` line** shows the lit edge's zone id and side (`edge: r60.bottom · 0.93 m`)
-    (`5c51858`; owner: "just show the static rxxx name", "it also needs the edge label"). A longer
-    readout id line (`fcbb58a`) confused the owner (it showed the picked A and labels) and was removed.
-29. **Thumbstick and controls**: in HEAT LOSS, thumbstick-y off the panel = FLOOR ⇄ CEILING; in DIMS
-    with a conflict shown = suspects ⇄ routes. Both were free before.
-30. **PERF** (owner's reports, Ground plan view, `4847125`): ~50 fps seen; `all` 19.0 ms ≈ 53 fps,
-    11.4 ms with `furn` hidden. Ground then had 77 zones, 79 markers, **472 dims** (410 at our last
-    read), 30 finishes. The report's `fps 90` line was the plan-hidden window (fixed in item 31).
-31. **Furniture plan pieces batched** (`c88ae9a`): 44 meshes → at most 3 (fill, solid, dashed
-    outline); the report's fps now measured with all drawn. Hypothesis: plan view back near 90 fps;
-    `zones` (4.4 ms, 12 translucent quads) next if not. Not measured.
-
-Then, with no Quest (2026-10-05 afternoon), compressed in session 39 (detail in `docs/heat-loss.md`,
-`docs/ar-survey.md`; none seen on device yet):
-
-32. **PLAN · RULER** (`6247c24`, `3c839ef`): A/B points planGroup-local (follow teleport/turn), 5 mm
-    tubes, X/Y/Z/DIST readout; session-only.
-33. **OUTDOOR rooms** (`3c839ef`): the veranda is a ROOM with `outdoor: true` (EDIT A/X), outside for
-    heat loss, never merged with an indoor room.
-34–38. Heat loss: owner facts (attic R 8 JETROCK proven, slab ≈ 20 cm, meulière λ ≈ 1.5; the owner types
-    values, we don't); what-if switches + house kWh/yr (`0078f1b`); radiators' `powerW` and the HEATERS
-    lines (`3cabce1`); reveals, now superseded by item 39's window junction; the heat-pump method,
-    superseded by item 45.
+1–3 links carry furniture/finishes/markers; URL-copy failure reason (cause unknown) · 4–5 photo finishes
++ process · 7–9 textures in a worker, plan view prepares nothing 3D, phone memory · 11 collapsible View
+3D floor panel · 12–13 Moder II table, modelling from isometric manuals · 14 Vernisse grid · 15 Lapeyre
+quote applied (open: which French door has the Sw 0.51 glass; Hypothesis `r111`) · 16 half-wall finishes
+· 17 headset editing tools · 18 slab thickness (Ground 2.95 / 0.25, rooms 2.70) · 19 `update-app` after
+every deploy · 20 IKEA kitchen (r153–r168) · 21 wall layers + earth level (open: `r112` 7 cm on an
+exterior edge; real earth level) · 22 conflict suspects · 23 Vernisse relief, software-painted finishes ·
+24 five deleted dims re-added · 25 heat map, R or λ, RECESS (agreed, not started: the heat map on the AR
+3D view's walls) · 26–27 conflict signs + routes; the owner's r59 → r60 conflict (open: which value was
+wrong) · 28 HUD edge id · 30–31 PERF reports, furniture plan pieces batched (fps not re-measured) · 32
+RULER · 33 OUTDOOR rooms · 34–38 heat-loss what-if, radiators, owner facts · 39 thermal bridges (DPE ψ,
+AR junction view) · 40 per-floor heaviness, partition thickness · 41 floor R only over the basement ·
+42 own-gap fix, ΔT 1 K steps · 43 open stairs join their room · 44 furniture-only dims on sheets (CJK
+legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heating plan").
 
 ## Standing decisions (live constraints; the "why" is in the docs above)
 
+- **Heating (owner, 2026-10-07):** one water temperature for every radiator, kept at ΔT 24 (46 °C
+  mean); the −7 °C shortfalls are accepted. A condensing gas boiler for the next 5 years, then a heat
+  pump. The whole-house balance stays a toggle, off by default. Detail: `docs/heat-loss.md`.
+- **Products with manufacturer CAD (STEP):** build procedurally, measured from the STEP (owner,
+  2026-10-06); a runtime STEP loader stays acceptable in principle but needs a proxy route + 3.1 MB reader.
 - **The owner's house is now edited directly on the headset** (owner, 2026-10-04: "we will keep
   continue modify the house via direct edit"): changes they ask for go into the headset autosave
   through the `quest-edit` skill (`docs/headset-data.md`), not into a Deck export. There is no Deck
@@ -480,6 +288,13 @@ Then, with no Quest (2026-10-05 afternoon), compressed in session 39 (detail in 
 
 ## Findings / traps worth knowing
 
+- **`version.json` used to open the app** (fixed `8dc326f`): the service worker served `index.html` for
+  every navigation. An old cached app (before the update) still does; `quest-storage.mjs` now checks
+  the page's content type and warns. `docs/headset-data.md`.
+- **The diff tool ignores furniture heights** (`house-query.mjs diff` compares footprints and bands):
+  check a foot/top edit from the edit script's own output and the read-back.
+- **The AR app process stub** (`pidof com.krosk.housecad`) persists after the owner closes the app; the
+  DevTools page list (no house-cad app page) is what shows it closed.
 - **After every deploy, update the headset app if reachable**: `quest-storage.mjs update-app` makes the
   app's service worker take the live build, so the next launch opens it (`docs/headset-data.md`).
 - **`floor.height` is floor-to-floor; the room height is `ceilingHeight(floor)` = height − slab**
@@ -660,6 +475,8 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
 - **Session 36:** `542e46f` ACOVA towel radiators · `e08eb59` conduit length readout · `084709f`
   De'Longhi EASY radiators (4) · `8824dc3` EASY 120 × 60 · `99d0cd9` heat loss · `51b0968` pedal bin ·
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
+- **Session 40:** `8dc326f` version.json not answered with the app · `734560a` V&B WC from its STEP ·
+  `ce85140` real air volume + whole-house balance.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -715,7 +532,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/io/planSheet.js` | Sheets (incl. the shared monochrome `drawMarkerGlyph`) |
 | `src/core/model.js` / `constraints.js` / `conduit.js` | Model + `_emit`; the solver; conduit graph, routing and `conduitRunLength` |
 | `src/core/conflicts.js` | `diagnoseConflicts` (suspects), `conflictRoutes` (routes), `isCertain` (0 mm) |
-| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss(project, floor, without)`, `houseHeatLoss`, `roomHeaters`, `roomHeatLoss`; `heatComponents` (rooms + open stairs), thermal bridges `ringJunctions` / `slabJunctions` and the `PSI_*` DPE tables, OUTDOOR rooms), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
+| `src/core/heatLoss.js` | Room heat loss (`floorHeatLoss(project, floor, without)`, `houseHeatLoss`, `roomHeaters`, `roomHeatLoss`; `heatComponents` (rooms + open stairs), `airVolume`, `houseBalance` (whole-house balance, `partitionLinks`), thermal bridges `ringJunctions` / `slabJunctions` and the `PSI_*` DPE tables, OUTDOOR rooms), defaults `HEAT_DEFAULTS` / `FLOOR_HEAT_DEFAULTS`, `OPENING_KINDS`, settings sanitizers used by model + serialize |
 | `src/core/architectural3d.js` stair part | `stairsGeometry`: `STAIR_RISER` 0.18 (owner), `STAIR_GOING` 0.25 (estimate) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/core/circuits.js` | Derived circuits (per wire nature) + `circuitDiagnostics` for MARKER · CHECK |
@@ -731,7 +548,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/paintedTexture.js` / `src/ui/painters.js` | Placeholder texture swapped when its picture arrives (`deferred`, `startDeferredTextures`, `freeAfterUpload`) / every named painter the worker runs |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`, V&B `wall-hung-wc`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
 | `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
@@ -746,14 +563,16 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 skip `update-app` and say so.
 
 - **First, with the Quest:**
-  - Their heat settings are in the plan now (Status). Confirm the panel shows them orange, and that
-    the house reads ≈ 6.7 kW at −7 °C / 22 °C (Node on the written copy: 6 728 W).
-  - Walk the junction view (item 39): bars/posts/frames where real junctions are, grey posts at the
-    plaster partitions, any thick meulière partition missing (none detected on rev 17), the readout;
-    the panel grew 4 rows since item 37 (fit?). Then items 32–37 and the RULER as before.
-  - Still unread: which value was wrong in item 27's conflict; `diagnoseConflicts` on rev 17; a PERF
-    report after `c88ae9a` (item 31).
-- **Offered, not built (heat):** a per-room "water needed" readout; per-room indoor temperature (22 °C
+  - The owner opens AR: the session-40 plan edits (item 49) in place: both WCs on their half walls
+    (LEFT X: pan shape, seat, rim 41.5 cm), half walls 1.15 m, trays at 12 cm on plinths, the upper
+    90×60 radiator. HEAT LOSS → Whole-house balance → yes: header `Water needed ΔT 28.6 K (50.6 °C)`,
+    shower room `Reaches 20.4 °C` (red), hall and landing "with the stairwell"; panel fit (two more
+    rows, taller room box) and how long a recompute takes on the Quest.
+  - Then the junction view (item 39) and items 32–37 as before; still unread: item 27's wrong value,
+    a PERF report after `c88ae9a` (item 31).
+- **Offered, not built (heat):** set Ground floorR 1.0 once the owner picks the SOPREMA 25 mm; the split
+  counted in the balance on cold days; per-room insulation under the basement ceiling (only Node-tested
+  in a temporary copy); per-room indoor temperature (22 °C
   living / 20 elsewhere / 24 bathroom); a split (FTXM60A) counted as a heater below an outdoor
   temperature; the CJK legend spacing and furniture names on sheets; € per year; heat-recovery VMC
   what-if. The heat map's AR 3D version (agreed in item 25) is still not started.
@@ -872,6 +691,13 @@ skip `update-app` and say so.
 
 ## Known open questions
 
+- **Session 40:** nothing seen on the Quest except item 46. Hypotheses: partition U from plaster λ 0.40
+  (dense block) and meulière via the wall λ; the light floor's R 0.25; doors counted as partition; the
+  balance's linear loss around tRoom; heat-pump efficiency −2–3 %/K; gas €0.12/kWh, boiler 92 %,
+  electricity €0.25/kWh, SCOP 3.5; degree-days 2 200 (base 18) understate a 22 °C target (≈ 2 900
+  suggested, not set). WC seat/lid/hinges are generic estimates; the WC zones' rim height assumes
+  V&B's 415 mm. The Geberit drawing's "10–14.5" was read as the waste axis behind the frame front
+  (half-wall depth 22 cm rests on it). The SOPREMA board's fire class and ceiling use unknown.
 - **Session 39:** nothing seen on the Quest. The DPE ψ are cautious defaults read from Open3CL (not
   the arrêté itself). Hypotheses: partition detection misses T's a 60 cm probe can't cross; no thick
   partition found on rev 17; the basement at 9 °C (0 °C day) / 6 °C; ach 0.5; radiator exponent 1.3 at
