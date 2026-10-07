@@ -35,6 +35,15 @@ diagram above. Un-hide by deleting an id from that set. **TRANSLATE now lives in
 furniture product is now a FURNITURE zone drawn in PLAN · ADD, given its product in MATERIAL ·
 FURNITURE.
 
+**Tool menu** (owner, 2026-10-07: "cycling through menus has grown big"; 37 tools in the flick
+loop). A **tap on the right thumbstick** parks a panel in front of you with every tool, one column
+per group in the order above, the current tool filled in its colour. Ray + trigger on a tool switches
+to it and closes the panel; trigger anywhere else (or another tap) only closes it, and while it is open
+the trigger never reaches the mode underneath. Flicks keep working and move the highlight. The parked
+`MODE_HIDDEN` tools are not listed; a tool ALL FLOORS makes unavailable is dim and can't be picked
+(`makeToolMenu`, `toolMenuColumns`, `toolMenuSelect`; the tap is told apart from the exit hold in
+`pollModeCycle`, `STICK_TAP_MS`). The left thumbstick was not used: its x already turns the plan.
+
 Modes are DATA in the `modes` array (each has `id`, `color`, `onTouch`; the label + help text
 come from i18n keyed by `id` — `t('mode.'+id)` / `t('help.'+id)`, see Localization below).
 Per-frame mode visuals/highlights are the big if/else chain keyed on `modeId` near the end of
@@ -667,8 +676,9 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   **PLAN · EDIT** = the selected zone's kind (`cycleSelectedZoneKind`); **EXPORT** = the SVG/PNG/DXF/
   Coohom/JSON format, UNLESS the ray points at the panel's COMPARE row (→ cycles the change-map
   baseline) or LANGUAGE row (→ cycles the sheet language), which take precedence.
-  **thumbstick-hold (~1.2 s)** =
-  exit AR.
+  **thumbstick tap** (released within 0.3 s, no flick meanwhile) = open/close the TOOL menu
+  (**Tool menu** under Mode hierarchy); **thumbstick-hold (~1.2 s)** = exit AR (the EXIT bar starts
+  after the 0.3 s tap window, so a tap never shows it).
 - **Neither face button cycles modes** (mode nav is thumbstick-x, both ways; prev-mode on A/X was
   removed as an asymmetric one-off). **A/X = FLIP or ROTATE**: in either DIMS mode with a completed
   pair it flips the dimension side (`flipConstraintSide`, NOT `swapConstraint`); in TRANSLATE it flips

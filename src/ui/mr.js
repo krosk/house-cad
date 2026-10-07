@@ -596,6 +596,77 @@ export function setupMR(view, project, getFootprint) {
     return { group, mesh, langAt, draw };
   }
 
+  // TOOL menu (owner, 2026-10-07: "cycling through menus has grown big"): every tool
+  // at once, one column per group. A tap on the right thumbstick opens it; the ray +
+  // trigger jumps straight to a tool. draw() takes the columns ready-made
+  // ([{ label, items: [{ id, label, color, enabled }] }]) so the panel knows nothing
+  // about modes; toolAt(u, v) returns the id under the ray (null off a cell).
+  function makeToolMenu() {
+    const W = 1536, HEAD = 84, ROW = 72, PAD = 10;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let tex = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    mesh.renderOrder = MENU_PANEL_RENDER_ORDER + 5; // above a mode panel parked at the same spot
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+    const PANEL_W = 0.5; // m
+    let cells = []; // { id, x, y, w, h } in canvas px, for toolAt
+    let H = 0;
+
+    function toolAt(u, v) {
+      const px = u * W, py = (1 - v) * H;
+      const c = cells.find((k) => px >= k.x && px < k.x + k.w && py >= k.y && py < k.y + k.h);
+      return c ? c.id : null;
+    }
+    // Largest bold font (≤ size) that fits `text` in `width` px.
+    const fit = (text, size, width) => {
+      let s = size;
+      do { ctx.font = `bold ${s}px sans-serif`; } while (ctx.measureText(text).width > width && --s > 12);
+    };
+    const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+    function draw(columns, currentId, hoverId) {
+      const rows = Math.max(1, ...columns.map((c) => c.items.length));
+      const h = HEAD + rows * ROW + PAD;
+      if (h !== H) { // size follows the longest column
+        H = h; canvas.width = W; canvas.height = H;
+        mesh.scale.set(PANEL_W, PANEL_W * H / W, 1);
+        tex.dispose(); tex = material.map = new THREE.CanvasTexture(canvas); material.needsUpdate = true; // a GL texture keeps its size
+      }
+      const colW = W / columns.length;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(15,18,24,0.94)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 22); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      cells = [];
+      columns.forEach((col, ci) => {
+        const x = ci * colW;
+        const active = col.items.some((it) => it.id === currentId);
+        ctx.fillStyle = active ? '#e6edf3' : '#8b949e';
+        fit(col.label, 34, colW - 2 * PAD);
+        ctx.fillText(col.label, x + colW / 2, HEAD / 2 + 4);
+        col.items.forEach((it, ri) => {
+          const y = HEAD + ri * ROW, cw = colW - 2 * PAD, ch = ROW - PAD;
+          const on = it.id === currentId, hot = it.id === hoverId && it.enabled;
+          ctx.fillStyle = on ? hex(it.color) : hot ? 'rgba(72,79,88,0.95)' : 'rgba(48,54,61,0.9)';
+          ctx.beginPath(); ctx.roundRect(x + PAD, y, cw, ch, 12); ctx.fill();
+          if (!on) { // the tool's own colour as a stripe, so each column reads at a glance
+            ctx.fillStyle = hex(it.color);
+            ctx.fillRect(x + PAD, y + 8, 6, ch - 16);
+          }
+          ctx.fillStyle = on ? '#0d1117' : it.enabled ? '#e6edf3' : '#5a636e';
+          fit(it.label, 30, cw - 24);
+          ctx.fillText(it.label, x + PAD + cw / 2 + 3, y + ch / 2 + 2);
+          if (it.enabled) cells.push({ id: it.id, x: x + PAD, y, w: cw, h: ch });
+        });
+      });
+      tex.needsUpdate = true;
+    }
+    return { group, mesh, toolAt, draw };
+  }
+
   // UNIT menu mirrors LANG: thumbstick up/down changes the global display/input
   // unit, while the ray and trigger can pick a specific row directly.
   function makeUnitMenu() {
@@ -1230,6 +1301,10 @@ export function setupMR(view, project, getFootprint) {
   // UNIT display/input-unit panel (shares numpadCursor as its ray-hit dot).
   const unitMenu = makeUnitMenu();
   scene.add(unitMenu.group);
+
+  // TOOL menu: every tool by group (right thumbstick tap; shares numpadCursor).
+  const toolMenu = makeToolMenu();
+  scene.add(toolMenu.group);
 
   // Unified SVG/PNG/DXF/JSON options + explicit export action.
   const exportMenu = makeExportMenu();
@@ -8403,6 +8478,7 @@ export function setupMR(view, project, getFootprint) {
     hoverAdjacent = null;
     buildAdjacentTargets(m.id);
     adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire' || m.id === 'marker_pipe';
+    if (toolMenu.group.visible) redrawToolMenu(); // a flick while the TOOL menu is open
   }
 
   // The stacked overview remains read-only for architecture and marker placement,
@@ -8426,6 +8502,44 @@ export function setupMR(view, project, getFootprint) {
     setMode(index);
   }
 
+  // ---- TOOL menu (right thumbstick tap; docs/ar-survey.md "Tool menu") ----
+  // Columns in MODE_ORDER's group order; parked tools are left out, and a tool that
+  // ALL FLOORS makes unavailable is drawn dim and can't be picked.
+  let hoverTool = null, prevHoverTool = null;
+  function toolMenuColumns() {
+    const columns = [], byGroup = new Map();
+    modes.forEach((m, i) => {
+      if (MODE_HIDDEN.has(m.id)) return;
+      const g = MODE_GROUP[m.id];
+      if (!byGroup.has(g)) { byGroup.set(g, { label: t(`group.${g}`), items: [] }); columns.push(byGroup.get(g)); }
+      byGroup.get(g).items.push({ id: m.id, label: t(`mode.${m.id}`), color: m.color, enabled: modeAvailable(i) });
+    });
+    return columns;
+  }
+  const redrawToolMenu = () => toolMenu.draw(toolMenuColumns(), modes[currentMode].id, hoverTool);
+  function showToolMenu() {
+    placePanel(toolMenu.group, 0.5, 0.1);
+    hoverTool = prevHoverTool = null;
+    toolMenu.group.visible = true;
+    redrawToolMenu();
+    rlog('tool menu open', { mode: modes[currentMode].id });
+  }
+  function hideToolMenu() {
+    toolMenu.group.visible = false;
+    hoverTool = prevHoverTool = null;
+  }
+  // Trigger while the menu is open: a tool under the ray → switch to it; anywhere else
+  // just closes the menu. Either way the trigger never reaches the mode beneath.
+  function toolMenuSelect(inputSource) {
+    const hit = rayPanelHit(inputSource, toolMenu.mesh);
+    const id = hit ? toolMenu.toolAt(hit.uv.x, hit.uv.y) : null;
+    hideToolMenu();
+    if (!id) return;
+    const index = modes.findIndex((m) => m.id === id);
+    rlog('tool menu pick', { mode: id });
+    if (index !== currentMode) setMode(index);
+  }
+
   // Re-render every localized on-screen string when the UI language changes. This
   // only fires from LANG mode (cycleLang / trigger), so the current label/help is
   // LANG's; any open pad/menu is redrawn too for good measure.
@@ -8440,6 +8554,7 @@ export function setupMR(view, project, getFootprint) {
     if (unitMenu.group.visible) redrawUnitMenu(); // title follows the current language
     if (exportMenu.group.visible) redrawExportMenu();
     if (heatMenu.group.visible) redrawHeatMenu();
+    if (toolMenu.group.visible) redrawToolMenu();
     if (sheetPanel.group.visible) redrawSheet(); // legend/marker names are localized
   });
 
@@ -8648,7 +8763,8 @@ export function setupMR(view, project, getFootprint) {
     view.onXRFrame = null;
     view.onXRAfterRender = null;
     restoreAfterArch3d();
-    exiting = false; exitHoldStart = 0; exitProgress = 0; // reset exit gesture
+    exiting = false; exitHoldStart = 0; exitProgress = 0; stickTapFlicked = false; // reset exit gesture
+    hideToolMenu();
     fpsFrames = 0; fpsSince = -1; fpsPrevTime = -1; fpsWorstMs = 0; fpsText = '—'; timeText = '—'; // fresh fps probe per session
     Object.assign(view.xrTiming, { js: 0, gl: 0, frames: 0 });
     anchor = null;
@@ -8706,6 +8822,7 @@ export function setupMR(view, project, getFootprint) {
       teleportToReticle(event.data);
       return;
     }
+    if (toolMenu.group.visible) { toolMenuSelect(event.data); return; }
     const pos = tipPosition(event.data);
     if (!pos) return;
     lastTouch.copy(pos); // for the debug HUD
@@ -9097,6 +9214,10 @@ export function setupMR(view, project, getFootprint) {
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
   // (not a tap) so it can't collide with stick flicks or be hit by accident.
   const EXIT_HOLD_MS = 1200;
+  // A press released sooner than this (with no flick during it) is a TAP: it opens or
+  // closes the TOOL menu. The EXIT bar only starts after it, so a tap never shows it.
+  const STICK_TAP_MS = 300;
+  let stickTapFlicked = false; // the stick was pushed past the flick threshold during this press
   let exitHoldStart = 0; // performance-time when the hold began (0 = not held)
   let exitProgress = 0;  // 0..1, for the HUD countdown
   let lastHudAt = -Infinity; // ms of the last debug-HUD redraw (throttled; see onXRFrame)
@@ -9406,7 +9527,7 @@ export function setupMR(view, project, getFootprint) {
   const controllerForSource = (source) => controllers.find((c) => c.userData.inputSource === source) ?? null;
 
   function pollModeCycle(frame, time) {
-    // xr-standard mapping: buttons[3]=thumbstick press (hold to EXIT),
+    // xr-standard mapping: buttons[3]=thumbstick press (tap = TOOL menu, hold to EXIT),
     // buttons[4]=A/X (flip: DIMS completed pair / TRANSLATE pending coord; else inert),
     // buttons[5]=B/Y (delete the selected/hovered item; never cycles modes),
     // axes[2]=thumbstick x (cycle mode, both ways), axes[3]=thumbstick y (cycle the current
@@ -9417,20 +9538,26 @@ export function setupMR(view, project, getFootprint) {
     if (gp) {
       aBtn = !!gp.buttons[4]?.pressed;      // A/X (lower face) -> flip (DIMS / TRANSLATE)
       bBtn = !!gp.buttons[5]?.pressed;      // B/Y (upper face) -> delete
-      stickDown = !!gp.buttons[3]?.pressed; // thumbstick click (hold to exit)
+      stickDown = !!gp.buttons[3]?.pressed; // thumbstick click (tap = TOOL menu, hold to exit)
       stickX = gp.axes[2] ?? 0;
       stickY = gp.axes[3] ?? 0;
     }
     // Hold-to-exit: accumulate hold time; end the session past the threshold.
+    // Tap (released within STICK_TAP_MS, no flick meanwhile) = TOOL menu open/close.
     if (stickDown && !exiting) {
-      if (!exitHoldStart) exitHoldStart = time;
-      exitProgress = Math.min(1, (time - exitHoldStart) / EXIT_HOLD_MS);
+      if (!exitHoldStart) { exitHoldStart = time; stickTapFlicked = false; }
+      if (Math.abs(stickX) > 0.7 || Math.abs(stickY) > 0.7) stickTapFlicked = true;
+      const held = time - exitHoldStart;
+      exitProgress = Math.max(0, Math.min(1, (held - STICK_TAP_MS) / (EXIT_HOLD_MS - STICK_TAP_MS)));
       if (exitProgress >= 1) {
         exiting = true;
         rlog('exit AR (thumbstick hold)');
         frame.session.end().catch(() => {});
       }
     } else {
+      if (exitHoldStart && !exiting && !stickTapFlicked && time - exitHoldStart < STICK_TAP_MS) {
+        if (toolMenu.group.visible) hideToolMenu(); else showToolMenu();
+      }
       exitHoldStart = 0;
       exitProgress = 0;
     }
@@ -10756,6 +10883,13 @@ export function setupMR(view, project, getFootprint) {
       // DROP modes: no floor target (zones drop at the standing position).
       reticle.visible = false;
       edgeHi.visible = false;
+    }
+    // TOOL menu hover: after the mode's own frame code, so its cursor wins.
+    if (toolMenu.group.visible) {
+      const hit = editCtl ? rayPanelHit(editCtl, toolMenu.mesh) : null;
+      hoverTool = hit ? toolMenu.toolAt(hit.uv.x, hit.uv.y) : null;
+      if (hit) { numpadCursor.position.copy(hit.point); numpadCursor.visible = true; }
+      if (hoverTool !== prevHoverTool) { redrawToolMenu(); prevHoverTool = hoverTool; }
     }
     // A hovered device that shares its point (markerStackInfo): outline the lights it
     // controls in the LINK cyan. LINK itself already shows the selected switch's lights.
