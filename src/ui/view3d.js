@@ -22,6 +22,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
 import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
+import { Ruler3D } from './ruler3d.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -301,6 +302,12 @@ export class View3D {
     this.renderer.domElement.addEventListener('pointerup', this._viewPointerUp.bind(this));
     this.renderer.domElement.addEventListener('pointercancel', this._viewPointerUp.bind(this));
     this.renderer.domElement.addEventListener('wheel', this._viewWheel.bind(this), { passive: false });
+    // Overview ruler (src/ui/ruler3d.js): while on, an overview tap measures instead of entering POV.
+    this.ruler = new Ruler3D(this);
+  }
+
+  setRulerEnabled(enabled) {
+    this.ruler.setEnabled(enabled);
   }
 
   // The renderer is shared with WebXR, but the desktop plan does not need its
@@ -325,6 +332,7 @@ export class View3D {
     }
     for (const m of this.house.children) m.geometry.dispose();
     this.house.clear();
+    this.ruler?.clear(); // its faces were on the old meshes
     this.markerLights.clear();
     this._clearFurniture();
     const furnitureToken = ++this.furnitureBuildToken;
@@ -668,6 +676,7 @@ export class View3D {
 
   setFloorFilter(floorId = null) {
     this.floorFilter = floorId;
+    this.ruler?.clear();
     for (const mesh of this.house.children) {
       mesh.visible = this._meshVisible(mesh);
     }
@@ -981,7 +990,8 @@ export class View3D {
     const p = this.viewPointer;
     if (!p || p.id !== event.pointerId) return;
     if (!p.moved && !this.cameraTransition && event.type === 'pointerup') {
-      if (this.navigationMode === 'overview') this._enterPovFromPointer(event.clientX, event.clientY);
+      if (this.navigationMode === 'overview' && this.ruler.enabled) this.ruler.pick(event.clientX, event.clientY);
+      else if (this.navigationMode === 'overview') this._enterPovFromPointer(event.clientX, event.clientY);
       else if (this.navigationMode === 'pov') this._walkToPointer(event.clientX, event.clientY);
     }
     this.viewPointer = null;
@@ -1270,6 +1280,7 @@ export class View3D {
       t.js += t1 - t0; t.gl += performance.now() - t1; t.frames++;
       return;
     }
+    this.ruler?.updateLabel();
     if (this.realisticEnabled && this.composer && !this.renderer.xr.isPresenting) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }

@@ -91,8 +91,10 @@
           </label>
           <div id="view3d-sky-status" class="view3d-sky-status" hidden></div>
         </aside>
-        <!-- Shown only in POV (view3d.js onNavigationChange). -->
+        <!-- Overview: the ruler; POV: Overview + tilt (main.js, view3d.js onNavigationChange). -->
         <div id="view3d-nav" hidden>
+          <button id="view3d-ruler" type="button" aria-pressed="false" hidden
+            title="Measure: tap a wall face, then another (two parallel faces give the gap between them)">📏 Ruler</button>
           <button id="view3d-overview" type="button" title="Back to the top-down overview">▦ Overview</button>
           <button id="view3d-tilt" type="button" aria-pressed="false" hidden
             title="Look around by moving the phone">◎ Tilt look</button>

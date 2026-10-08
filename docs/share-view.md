@@ -59,7 +59,18 @@ At startup a `#view=` hash **wins over autosave** and sets `viewMode`, which:
 - makes the session **read-only**: `Sketch2D.setReadOnly(true)` limits tools to pan and
   dimension, and the `#app.view-only` CSS hides every geometry-editing control (add/subtract/
   select, height, delete/clear, save/load, floor add/copy/paste, rectangle properties);
-- opens on a centered plan.
+- opens on a centered plan, unless the link says otherwise (next paragraph).
+
+**A link that opens in 3D** (owner, 2026-10-08: "a direct link entry for a 3d view"). 🔗 Share view
+pressed while View 3D is shown appends `&open=3d` and the floor shown, `&floor=<n>` (its position in
+the floor list counting from 1, since a shared view renumbers floor ids `f1…` in list order) or
+`&floor=all`. Opening such a link goes straight to ◈ View 3D (same loading wheel) on that floor;
+copied from the plan, the link opens on the plan as before. `init()` reads the hash once before
+decoding (it is async). AR's EXPORT · LINK carries no `open=3d`. **Proven** (local build, Chrome, the
+owner's plan as a share link, 2026-10-08): `&open=3d&floor=2` opened View 3D on Ground floor.
+
+**The View 3D ruler works in a view too** (it stores nothing): see `CLAUDE.md` "Core architecture"
+(View 3D) and `src/ui/ruler3d.js`.
 
 **Dimensions in a view are measurements, not constraints.** A viewer may add dimensions to read
 the fixed geometry; they are tagged `measurement`, bypass `Project._emit()`, never feed the solver,

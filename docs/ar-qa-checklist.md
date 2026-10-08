@@ -531,3 +531,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Upper/basement overlay heights match reality (only as good as the typed storey heights)
 - [ ] EXPORT · LINK with the FURNITURE layer off: open the copied link on desktop; View 3D shows the furniture products (2026-10-03 fix)
 - [ ] EXPORT · LINK, opened on desktop: windows (Héméra, Néva), door products and floor/wall finishes show in View 3D (2026-10-03)
+
+## Desktop / phone View 3D (not AR)
+- [ ] ⬜ NEW (2026-10-08) 🔗 Share view pressed in View 3D: the link opens straight in 3D on the same floor (or All floors); copied from the plan it opens on the plan. Proven on desktop Chrome (local build); check on the phone
+- [ ] ⬜ NEW (2026-10-08) Overview 📏 Ruler (also in a shared link): two walls of a room read their clear gap (living room 8.62 m · X, the 14 m² room 3.11 m · Y were Proven on desktop); a tap near a window still reads the wall; a thin partition reads its room-side face; any other pair reads DIST · X · Y; ruler off: a tap enters POV again. Check by touch on the phone (snap reach 22 px)

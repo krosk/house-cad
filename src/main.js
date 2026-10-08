@@ -187,11 +187,21 @@ view3dWindows.addEventListener('click', () => { setWindowsOpen(!windowsOpen); sc
 }
 
 // POV controls: the Overview button (a tap in POV walks instead of leaving) and the
-// opt-in phone tilt look, offered on touch devices that report orientation.
+// opt-in phone tilt look, offered on touch devices that report orientation. The overview
+// has the ruler (src/ui/ruler3d.js; owner, 2026-10-08): while it is on, a tap measures
+// instead of entering POV. View-only, so shared links have it too.
 const view3dNav = document.getElementById('view3d-nav');
 const view3dTilt = document.getElementById('view3d-tilt');
-document.getElementById('view3d-overview').addEventListener('click', () => view.exitPov());
-view3dTilt.hidden = !(typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer: coarse)').matches);
+const view3dOverview = document.getElementById('view3d-overview');
+const view3dRuler = document.getElementById('view3d-ruler');
+view3dOverview.addEventListener('click', () => view.exitPov());
+const tiltSupported = typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+function setRuler(on) {
+  view.setRulerEnabled(on);
+  view3dRuler.setAttribute('aria-pressed', String(!!on));
+  view3dRuler.textContent = on ? '📏 Ruler on' : '📏 Ruler';
+}
+view3dRuler.addEventListener('click', () => setRuler(!view.ruler.enabled));
 function showTiltState(on) {
   view3dTilt.setAttribute('aria-pressed', String(on));
   view3dTilt.textContent = on ? '◉ Tilt look' : '◎ Tilt look';
@@ -200,7 +210,14 @@ view3dTilt.addEventListener('click', async () => {
   // The permission request must run inside this tap (iOS).
   showTiltState(await view.setTiltEnabled(!view.tiltEnabled));
 });
-view.onNavigationChange = (mode) => { view3dNav.hidden = mode !== 'pov'; };
+view.onNavigationChange = (mode) => {
+  const pov = mode === 'pov';
+  view3dNav.hidden = false;
+  view3dRuler.hidden = pov;
+  view3dOverview.hidden = !pov;
+  view3dTilt.hidden = !pov || !tiltSupported;
+  if (pov && view.ruler.enabled) setRuler(false);
+};
 
 function render3DFloorList() {
   if (selected3DFloorId && !project.floors.some((f) => f.id === selected3DFloorId)) {
@@ -873,12 +890,18 @@ document.getElementById('save').addEventListener('click', () => {
 // Architecture, finishes, furniture and markers (lights, device products): docs/share-view.md.
 document.getElementById('share-view').addEventListener('click', async () => {
   try {
-    const url = await buildShareUrl(project, { markers: true });
+    // Copied while View 3D is shown: the link opens straight in 3D, on the same floor
+    // (owner, 2026-10-08: "a direct link entry for a 3d view").
+    // The floor travels as its position in the list: a shared view renumbers floor ids.
+    const in3D = app.classList.contains('show-3d');
+    const floorIndex = project.floors.findIndex((f) => f.id === selected3DFloorId);
+    const floorParam = floorIndex >= 0 ? `&floor=${floorIndex + 1}` : (hasChosen3DFloor ? '&floor=all' : '');
+    const url = await buildShareUrl(project, { markers: true }) + (in3D ? `&open=3d${floorParam}` : '');
     let copied = false;
     try { await navigator.clipboard?.writeText(url); copied = true; } catch { /* clipboard blocked */ }
     const kb = (new Blob([url]).size / 1024).toFixed(1);
     sketch.onStatus?.(copied
-      ? `Copied a view-only 3D link (${kb} KB). Paste to share — it's not editable.`
+      ? `Copied a view-only ${in3D ? 'link that opens in 3D' : '3D link'} (${kb} KB). Paste to share — it's not editable.`
       : `View link ready (${kb} KB) — copy failed; see console.`);
     if (!copied) console.log('Share view URL:\n' + url);
   } catch (err) {
@@ -1145,8 +1168,9 @@ function seedDemo() {
 // A shared view link (#view=…) wins over autosave; otherwise restore the last session,
 // otherwise seed a demo house.
 (async function init() {
+  const startHash = location.hash; // read once: decoding is async
   try {
-    const viewData = await decodeViewFromHash(location.hash);
+    const viewData = await decodeViewFromHash(startHash);
     if (viewData) {
       loadView(project, viewData);
       viewMode = true;
@@ -1160,6 +1184,18 @@ function seedDemo() {
       // next painted layout so the imported floor is centered in its real area.
       requestAnimationFrame(() => sketch.frameActiveFloor());
       sketch.onStatus?.('Opened a shared view — read-only. Pan/zoom to inspect; ◈ opens 3D.');
+      // A link copied from View 3D (`&open=3d`, optional `&floor=<n>` counting from 1 in
+      // the floor list, or `all`) opens straight in 3D.
+      const params = new URLSearchParams(startHash.replace(/^#/, ''));
+      if (params.get('open') === '3d') {
+        const floor = params.get('floor');
+        const chosen = floor === 'all' ? null : project.floors[Number(floor) - 1];
+        if (floor === 'all' || chosen) {
+          selected3DFloorId = chosen ? chosen.id : null;
+          hasChosen3DFloor = true;
+        }
+        open3D();
+      }
       return;
     }
   } catch (err) {

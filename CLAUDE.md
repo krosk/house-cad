@@ -77,7 +77,14 @@ drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture p
 screen a house wider than deep is turned 90° so it fills the screen; tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a
 floor walks there (door leaves, drawn swung open in View 3D, don't block, so a tap through a doorway enters the next room), and the
-Overview button returns to the saved overview. POV keeps at least 65° horizontal FOV on narrow screens
+Overview button returns to the saved overview. The overview also has a **📏 Ruler** (owner, 2026-10-08;
+`src/ui/ruler3d.js`, shared links too): while on, a tap measures instead of entering POV. Each tap
+snaps to the vertical face planes within ~22 px (walls, half walls, stairs, furniture sides; a tap
+landing on a face takes it first; floor-slab edges, door leaves and glass never snap). Two taps on
+parallel planes read the gap between them, picking the pair that faces each other (a tape between
+two walls: a thin wall's room-side face, a window's wall face rather than its reveal); otherwise
+point to point with plan X / Y legs. Session-only: nothing is stored; a rebuild, a floor change,
+POV or the button clears it. POV keeps at least 65° horizontal FOV on narrow screens
 (vertical capped at 100°); the overview stays at 50°. Camera state is session-only and must not
 mutate project or shared-view data. The viewer initially isolates the
 project's active floor; POV reveals that floor's ceiling, which stays hidden in overview.
