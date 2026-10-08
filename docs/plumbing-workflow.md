@@ -106,9 +106,12 @@ side and height. Window opening against the units: docs/materials.md "Window swi
 ## VMC: two Sauter Agalina units (2026-10-07, draft)
 
 **Model changed (owner, 2026-10-08): Aldes EasyHOME Hygro Compact Classic** (Leroy Merlin kit 82201371,
-Aldes 11033404, with 3 Bdh vents; furniture `aldes-easyhome-hygro-compact`, `docs/furniture.md`). The
-Agalina text below is the earlier draft and still describes the headset plan (r218/r219 carry the
-Agalina, Proven: not edited since). What changes (Proven: spec table and notice media 3963727):
+Aldes 11033404, with 3 Bdh vents; furniture `aldes-easyhome-hygro-compact`, `docs/furniture.md`). Unit **A
+(r218) is the Aldes on the headset** (written 2026-10-09, read back identical: flat, facing 0, OUT south,
+kitchen Ø125 + an Ø80 north, two Ø80 east, lug west; x 0.62–0.98, y −1.78…−1.42, 2.463–2.65 m; ducts
+redrawn to its ports, kitchen vent moved to (1.25, −1.30) so the kitchen and shower ducts don't cross).
+Unit **B (r219) is still the Agalina** in the plan: its move to the laundry is decided but not drawn
+(below, "Unit B in the laundry"). The Agalina text further down is the earlier draft. What changes (Proven: spec table and notice media 3963727):
 - **humidity-controlled (hygro B)**, not self-regulating: the flexible-duct rule further down drops to
   **≤ 3 m and ≤ 2 bends per vent** unless a sizing study says otherwise, so every drafted run over 3 m
   (B upper 6.93 m) needs rigid or semi-rigid duct even more;
@@ -149,9 +152,9 @@ In the headset plan (Proven: written 2026-10-08 and read back identical; lengths
 
 | Duct | Ø | m | Route |
 |---|---|---|---|
-| A · ground shower + WC | 80 | 2.33 | blue port north, along wall r112 at the ceiling, over passage r117, through the partition |
-| A · kitchen vent | 125 | 0.63 | kitchen port east, vent 0.3 m from the box |
-| A · roof outlet | 125 | 1.06 | OUT south, elbow up, cap 0.65 m above the ceiling, 0.17 m from the upper storey's wall |
+| A · ground shower + WC | 80 | 2.30 | Aldes east Ø80 (north one), east at y −1.51 to x 1.40, north to y −1.125, along wall r112 at the ceiling, over passage r117, through the partition (2026-10-09) |
+| A · kitchen vent | 125 | 0.89 | Aldes kitchen port north, north to y −1.30, east to the vent at (1.25, −1.30) (2026-10-09) |
+| A · roof outlet | 160 | 1.04 | Aldes OUT south, straight up, cap 0.65 m above the ceiling, 0.17 m from the upper storey's wall (2026-10-09) |
 | B · upper shower + WC | 80 | 6.93 | vent at the ceiling above half wall r210's west end, down a boxing r220 on top of the half wall (15 × 22 cm, 1.15 m to the ceiling), inside the half wall beside the Geberit Duofix frame (about 29 cm free between the west wall and the frame), inside the upper floor's slab (10 cm under the floor) along the west wall to the column, down column r122 (a 19 cm offset inside it, toward the port: the basement wall face is 15 cm further in), straight into the blue port |
 | B · laundry vent | 80 | 2.45 | straight north at the basement ceiling, through two basement walls, down into the grey port |
 | B · wall outlet | 125 | 2.36 | OUT down, then along the west wall to beside the garage door (owner: it must go out there, not through r76's wall) |
@@ -190,7 +193,8 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
   length; in rigid it is 6.93 m plus elbows. Estimate (Hypothesis: Darcy with Blasius f, smooth wall;
   elbow K ≈ 0.3–0.5): 30 m³/h in Ø80 = 1.7 m/s, Re ≈ 9 000, ≈ 0.7 Pa/m → ≈ 4.6 Pa straight + ≈ 2 Pa of
   elbows ≈ **7 Pa** (flexible ≈ 25–30 Pa), small against the few tens of Pa a self-regulating vent
-  works over: viable. Watch: the PVC-to-spigot joint (both may be 80 mm outside), a short insulated
+  works over: viable. **Superseded 2026-10-09** (80 mm bore, gentle bends, 30 m³/h): see "Pressure
+  budget" below, at the real bore and the boost flow. Watch: the PVC-to-spigot joint (both may be 80 mm outside), a short insulated
   flexible piece at the unit against fan noise, R ≥ 0.6 in the basement, the slab opening sealed, no low
   point. Precedents (owner asked, 2026-10-08): ALDES sells rigid PVC VMC ducts, the flat Minigaine
   (40 × 100 mm ≈ Ø80, 60 × 200 ≈ Ø125, self-extinguishing PVC, simple and double flow; e-novelec listing
@@ -256,6 +260,56 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
 - the basement is outside the heated volume in the heat-loss model: the laundry duct, the outlet and the
   riser's basement part need R ≥ 0.6; A's roof outlet too where it crosses the roof build-up;
 - A's roof outlet: Ø160 roof terminal (Aldes) or Sauter's Ø125 cap: ask the installer.
+
+**Pressure budget for the hygro vents (2026-10-09, owner questions).** Proven (Aldes BW21 Bahia Curve S
+sheet, 11015144): the hygro vents hold their flow between **80 and 160 Pa** across the vent; the vent
+must be ≥ 1.80 m up, high on a wall or on the ceiling, its centre **≥ 20 cm from adjacent walls**,
+removable (in a sleeve) and cleaned yearly; the hygro strip needs no power, the 9 V battery (or the
+230 V interface 11015280) only drives the presence boost. Proven (notice 3963727 p. 13): the HP version
+holds ≈ 120 Pa (speed 3) / ≈ 130 Pa (speed 4) flat to ≈ 250 m³/h; the Classic is single-speed AC and its
+curve is not published (Aldes page, notice pp. 11–13). Owner's duct: Girpi PVC downpipe Ø80 (Leroy
+Merlin 61477423), push-fit male/female, ≈ 77–78 mm bore (owner; ≈ 1.4 mm wall from the packed weight:
+Hypothesis), 45° pairs at every turn, rigid to the ends (no flexible pieces). Loss of B's upper duct with
+B in the laundry, ≈ 9 m and 5 pairs (Hypothesis: Colebrook, smooth PVC, a pair ≈ 0.3 × dynamic pressure):
+
+| Vent flow | Duct loss | Vent sees, HP speed 3 / 4 (minus ≈ 10–20 Pa of room depression behind the window inlets at boost, ≈ 1–8 Pa otherwise) |
+|---|---|---|
+| 45 m³/h (boost) | ≈ 20 Pa | ≈ 80–90 / 90–100 Pa: speed 4 is within margin, speed 3 at the edge |
+| 15 m³/h | ≈ 3 Pa | ≈ 110–117 / 120–127 Pa |
+| 5 m³/h | ≈ 0.3 Pa | ≈ 119 / 129 Pa: under the 160 Pa ceiling |
+
+B in r76 instead costs the upper vent ≈ 4 Pa less (6.93 m, 4 pairs: 15.3 Pa at boost); the laundry vent
+gains about as much. A flexible end piece adds ≈ 2–2.5 Pa straight and taut, 4–6 Pa bent, more if
+squashed. Levers, Ø80 only (owner): the HP at speed 4; fewer pairs (≈ 1.2 Pa each at boost); generous
+window inlets (the least certain term); two Ø80 in parallel on two of B's free ports (≈ 6 + 2–3 Pa).
+**Seal every downpipe joint** (PVC glue or aluminium tape): an unsealed push-fit joint draws air from the
+cavity under ~100 Pa and no fan setting recovers it. A 1.4 mm wall buried in the slab may deform: sleeve
+it or use 3 mm drain PVC there (Hypothesis). The 80 mm vent barrel will not go into a 77 mm bore: a Ø80
+sleeve at the vent, an undoable coupling at the unit. Commissioning: read the pressure at the upper
+vent during a boost. If it is short: HP (same box and ports), speed 4, a fixed-flow vent in that room,
+or the whole of B self-regulating; only re-piping needs the walls open. Searched (2026-10-09): no small
+2-port house unit exists (central units are 1 kitchen + 3–4 sanitary ports), so two units means two
+full boxes; one unit at A for all four rooms is possible (4 sanitaries max) at ≈ 25 m of duct and a
+ground-floor crossing (north route through the hall and corridors ≈ 5.9 m, or south along room r51
+≈ 6.6 m; scratchpad plot only). Owner chose to keep two units and to drop VMR (per-room fans).
+
+**Unit B in the laundry (owner, 2026-10-09; not drawn):** on the north wall of r66, west corner (x ≈ −4.6…−4.2),
+lid toward the room; the outlet through the **south wall, west of window r146**, axis at x ≈ −3.9 (≥ 0.6 m
+from the window edge −3.10, in case its frame has an inlet), as high as possible (≈ 1.9 m); the Ø160
+runs ≈ 2.9 m across the ceiling east of the machines; the upper duct continues from the column along
+today's laundry-duct path (+2.1 m, +1 pair); the laundry vent becomes a ≈ 0.5 m stub ≥ 20 cm from the
+walls. Needs a wall version with OUT up (`aldes-easyhome-hygro-compact-wall-out-up`, not built). The
+upper shower vent (−4.625, 0.42) is 7.5 cm / 11 cm from two walls: move it onto the south face of a
+widened boxing r220 (one bend less than a ceiling vent fed from below), ≥ 20 cm from the west wall and
+the ceiling. The laundry vent as drawn is 16 cm from the north wall.
+
+**WC stack vent (owner, 2026-10-09):** the contractor says the roof vent is not needed. Hypothesis
+(secondary summaries of DTU 60.11, not the text): one open vent to outside per network is required; an air
+admission valve is tolerated only with one; a vent far down the line does not protect a stack whose top is
+closed (the falling water needs air from above), so with a distant open vent put a valve at the top of
+the upper stack (in boxing r220). The ground WC after the swap (≈ 0.5 m drop into the basement drain)
+needs nothing of its own if it joins the same vented collector. Open: ask the contractor where the
+network's open vent is.
 
 **WC stack (written to the headset 2026-10-08, read back identical; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
 `waste`, Ø100 (Hypothesis: usual French size for a WC): the upper WC's branch from the Duofix outlet

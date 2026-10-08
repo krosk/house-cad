@@ -19,18 +19,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-08 (session 40, continued; the Quest was reachable until item 60, then not: no
-`adb` device, no DevTools page list)
-**Status:** Proven (git, 2026-10-08): everything committed and pushed on `main`; the app head is
-`d7538ff` (View 3D ruler + links that open in 3D; `git log -1 -- src`); Proven (live `version.json`
-read): Pages serves `d7538ff`. The headset app is **not** updated past `d68a7c9` (Proven by its last
-`update-app`): run `update-app` when the Quest is back (the ruler is desktop/phone only, so nothing
-in AR changed). Proven (`quest-storage read` after each write,
-byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59, 60); the last write
-was the WC stack + VMC riser (item 60). Scratchpad backups before each
-write are session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse
-the edit in AR. Nothing from sessions 38–40 has been reported from the device (items 31–57 unwalked),
-except the version.json fix (item 46, Proven on the headset by CDP).
+**Date:** 2026-10-09 (session 40, continued; the Quest reachable again on 10-09)
+**Status:** Proven (git): the app head is `c29de11` (Aldes EasyHOME furniture + this handoff's previous
+version), pushed; Proven (live `version.json`): Pages serves `c29de11`; Proven (`update-app`, 10-09):
+the headset precache holds `c29de11`, opened at the next app launch. Proven (`quest-storage read`
+after each write, byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59,
+60) and item 63's unit-A swap (written 2026-10-09). Scratchpad backups are session-local; no save slot
+holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
+from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
 Owner-confirmed on the Quest: AR performance (session 29), the MATERIAL flow, the 3D-only AR view,
 FURNISH's removal (session 32), the floor pattern **start corner** (session 33), and in session 37 the
@@ -576,7 +572,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -658,7 +654,42 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `public/furniture/index.json` | Furniture catalog: IKEA articles + procedural entries (`params` hold the tweakable dimensions) |
 | `src/main.js` / `src/ui/sketch2d.js` | Desktop wiring / 2D editor (incl. read-only view mode) |
 
+63. **VMC → Aldes EasyHOME Hygro Compact; unit A written** (owner, 2026-10-08/09): furniture
+    `aldes-easyhome-hygro-compact` (+ `-wall`, `-wall-out-down`), builder `vmc-easyhome` (`c29de11`;
+    measured on the notice's orthographic views, Proven by a scratch overlay). Unit A (r218) on the
+    headset is the Aldes with its three ducts redrawn (written 10-09, read back identical); unit B
+    (r219) is still the Agalina. Pressure budget for the hygro vents (80–160 Pa), the owner's Girpi Ø80
+    downpipe, the single-unit / VMR / small-unit options (all dropped), B's move to the laundry and the
+    WC-stack vent question: `docs/plumbing-workflow.md` "VMC" (Pressure budget, Unit B in the laundry,
+    WC stack vent).
+64. **Ground shower room swap: proposed, owner liked it, parked** (owner, 2026-10-08: "swap the toilet
+    (+half wall and frame) and the shower"; not in the plan, not in the docs beyond this item). The
+    proposal, from the item-60 plan: shower **100 × 100** in the south alcove r107 (x 2.25–3.25,
+    y −2.07…−1.07) on its plinth r213 (the catalog has only the 80 × 120 Sensea: a plain block); WC box
+    r139 fitted to the Duofix frame, **55 × 15 cm × 1.15 m on the north wall** (x 3.24–3.79,
+    y 0.02–0.17), frame r221 at x 3.265–3.765, y 0.05–0.17; WC r211 facing south (x 3.331–3.699,
+    y −0.509…0.02), over basement r74 so its drain drops straight down; towel radiator r202 on the
+    north face of wall r172 in front of the WC (x 3.30–3.80, y −1.02…−0.931), raised to 0.62–1.95 m
+    so the knees (0.42 m from the bowl) pass under; outlet m210 moved out of the shower to the west
+    wall above the vanity (y −0.05; it would be inside volume 2 otherwise); constraints on the moved
+    zones dropped (c879, c1259, c1002–c1005, c1415–c1416, c1419–c1422, c1395–c1396; c997 = −0.22).
+    Owner rejected the WC facing the door (west) and chose it facing south. The owner was given a
+    3D share link of it (not stored in the repo).
+
 ## Next step
+
+**Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
+none drawn in the plan:
+- Item 64, the ground shower room swap (exact geometry there).
+- Unit B to the laundry (`docs/plumbing-workflow.md` "Unit B in the laundry"): needs a new catalog
+  entry `aldes-easyhome-hygro-compact-wall-out-up` (OUT up), a push, `update-app`, then the write;
+  with it the laundry vent ≥ 20 cm from the walls and the upper shower vent moved onto boxing r220's
+  south face (widened).
+- The WC stack's roof vent: keep, swap for an air valve at the stack top, or drop, once the contractor
+  says where the network's open vent is.
+- The unit choice for B: Classic (curve unpublished) or HP (speed 4 within margin); Ø80 only.
+- Unit A's lid needs 440 × 340 mm above it to open (notice p. 5); flat under a 2.70 ceiling it has
+  5 cm: an access plan (hatch, or another orientation) is open.
 
 **Ask the owner each session whether the Quest is available.** Without it: no headset read/write,
 skip `update-app` and say so.
@@ -666,10 +697,10 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** run `update-app` first (the headset is on `d68a7c9`).
+- **First, with the Quest:** the app is updated (`c29de11`, 10-09); unit A shows as the Aldes (item 63).
   - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
     HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
-    and per-diameter lengths (A: Ø80 2.33 · Ø125 1.70 m; B: Ø80 9.38 · Ø125 2.36 m).
+    and per-diameter lengths (A, the Aldes since item 63: Ø80 2.30 · Ø125 0.89 · Ø160 1.04 m; B: Ø80 9.38 · Ø125 2.36 m).
   - WC stack + VMC riser (item 60): in place in AR (HEATING · PIPE: brown stack and vent, grey VMC
     against the wall; column r122 deeper; boxing r220 wider); the basement wall face (x −4.55) is a
     survey question the owner will correct.
