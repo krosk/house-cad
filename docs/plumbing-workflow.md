@@ -275,3 +275,51 @@ at 2.50–2.65 m, box B at 1.48–1.85 m, 20 cm under the basement ceiling for t
 x −5.10; the roof cap height. To check: a wall outlet next to the garage door (DTU 68.3 / the notice);
 unit B has no kitchen duct (its kitchen port needs a Ø125 plug, the kit has Ø80 ones), and unit A uses
 only two of its five inlets: whether the self-regulated flows still hold with that split (Sauter).
+
+## Heating pipes: radiator layout (2026-10-08, sketch, not in the plan)
+
+Owner: "my default was a star topology, but I wonder if there is an opportunity to share some pipes";
+the pipes are **composite (multilayer)**. Owner decisions:
+
+- **Boiler (gas condensing, then a heat pump at the same spot) at the water heater:** basement
+  north-east room, north wall, at the water-heater outlet marker (x 1.80, y 4.53). The outside wall is
+  the east wall: the flue length to it (≈ 3.5 m) is unchecked against a boiler manual.
+- **Hybrid layout, manifold at the boiler:**
+  - every ground-floor radiator on its **own pair** from the manifold, run along the basement ceiling
+    (every joint within reach), then straight up through the floor;
+  - the **kitchen and ground shower-room radiators on their own lines too** (owner chose them over
+    one shared pair split on the basement ceiling). There is no basement under them: both pairs go up
+    into the slab together at the south edge of the east basement room; one short trench (≈ 1.3 m,
+    4 pipes on its first 0.6 m);
+  - the **upper floor on TWO pairs**, both up the column `r122` beside the VMC duct and the WC stack,
+    then along the upper west wall: one north to the north bedroom alone, one south to the bathroom
+    (tee) and the south bedroom (owner, 2026-10-08: **16×2 only**, no 20 mm pipe; superseded one
+    shared 20×2 pair with three tees).
+- **Keep the garage door's overhead area clear** (owner): no pipe in the basement ceiling within the
+  garage door's footprint (2.10 m in from the west wall, 0.15 m past each jamb). The west living-room
+  radiator sits right above that door, so its pair comes up south of the area and runs ≈ 1.7 m along
+  the living-room skirting.
+- **Contractor's route (owner, 2026-10-08):** along the basement north wall, then down the west wall,
+  "supposedly no conflict with the garage door". Same length (≈ 190 m vs ≈ 187 m, sketch) and the west
+  living-room radiator's pair then comes straight up at the wall (no skirting run). It runs in the
+  ceiling-wall corner right over the door opening. **Hypothesis:** fine for a swing, side-sliding
+  or tilting door, or when the corner sits above the door's travel; a sectional door's curved
+  tracks and top panel, or a roller door's drum, use that corner. To check on site: the door
+  type, the height from the opening's top to the ceiling (the plan's 2.10 m head above a 2.05 m
+  ceiling is the known wrong default), and where the tracks curve. Also on that route: VMC unit B
+  (south wall of `r76`, near the column).
+
+Sizes, for the future heat pump (5 K drop; the boiler runs ≈ 9 K and needs about half the flow):
+**16×2 everywhere** (owner): ≤ 138 L/h per radiator (≈ 0.34 m/s); upper south pair 863 W
+(148 L/h, 0.36 m/s, ≈ 7 kPa over ≈ 36 m), north pair 743 W (128 L/h, 0.31 m/s, ≈ 4.5 kPa). Why not
+one upper pair in 16×2: the upper rooms need 1.58 kW at −7 °C (HEAT LOSS), 271 L/h at 5 K → 0.67 m/s
+and ≈ 22 kPa over 39 m (fine with the boiler's 9 K or a heat pump at 7 K). The manifold sits on the
+boiler; that link (6.3 kW, 1 080 L/h at 5 K) is the boiler/manifold kit's connection, not 16×2.
+**Proven** (arithmetic from the catalog's `powerW` × 0.385 for ΔT 24, and the plan's heat loss);
+speed limit (≈ 0.5–0.7 m/s) and pressure losses (smooth pipe, water at 45 °C) are **Hypothesis**.
+Lengths (**Hypothesis**, square-to-the-wall sketch, flow and return counted): ≈ 187 m in total,
+≈ 219 m with a pair to every radiator. Not done: a single-pipe loop (hot return, last
+radiator cooler: bad for condensing and the heat pump) and reverse return (more pipe, not needed with
+lockshield valves). Balancing: the ground shower towel radiator sets the water temperature; keep its
+lockshield fully open. Open: the column's room for four insulated 16 mm pipes; how the upper floor's
+structure lets the pair run along the west wall; the garage door opener rail's real depth.

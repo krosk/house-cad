@@ -19,12 +19,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-07 (session 40; the Quest was reachable all session)
-**Status:** Proven (git, 2026-10-07): everything committed and pushed; the app head is the TOOL
-menu commit (item 58; `git log -1 -- src`). Hypothesis: the headset precache holds it (`update-app`
-was run after the push; check the AR HUD `build` line). Proven
-(`quest-storage read` after each write, byte-identical): the headset plan carries every session-40
-edit (items 49 and 53); the last write was the four refrigerant lines. Scratchpad backups before each
+**Date:** 2026-10-08 (session 40, continued; the Quest was reachable all session)
+**Status:** Proven (git, 2026-10-08): everything committed and pushed on `main`; the app head is
+`2f3771a` (the WASTE pipe service; `git log -1 -- src`). Proven (`update-app` output): the headset
+precache holds `d68a7c9` (same app, docs after it). Proven (`quest-storage read` after each write,
+byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59, 60); the last write
+was the WC stack + VMC riser (item 60). Scratchpad backups before each
 write are session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse
 the edit in AR. Nothing from sessions 38–40 has been reported from the device (items 31–57 unwalked),
 except the version.json fix (item 46, Proven on the headset by CDP).
@@ -165,6 +165,14 @@ Read `docs/product-intent.md` before planning AR work.
     duct re-routed against the west wall on both floors, straight down the column, slab runs 3 cm under
     the floor (trenches 11 / 13.5 cm), 45° pairs at the two rigid turns, soft pieces at both ends. Every
     coordinate and choice is in `docs/plumbing-workflow.md` "VMC" / "WC stack".
+61. **Heating pipes, radiator layout: answers + a sketch, no code, nothing in the plan** (owner,
+    2026-10-08; pipes are composite/multilayer): boiler (gas, later a heat pump) at the water heater
+    in the basement north-east room; manifold on the boiler; every ground radiator on its own pair
+    (kitchen and shower too); the upper floor on two pairs up column r122 (north bedroom; bathroom +
+    south bedroom); **16×2 only** (owner); the contractor routes along the basement north then west
+    wall, past the garage door (fit is a site check). Lengths ≈ 190 m (sketch). The owner asked to
+    keep the maps: scratchpad `heat-map.mjs` / `-zh.mjs` / `-c.mjs` + PNGs (session-local, so the
+    route geometry is also recorded in the doc). Detail: `docs/plumbing-workflow.md` "Heating pipes".
 
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
@@ -188,6 +196,13 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 - **Heating (owner, 2026-10-07):** one water temperature for every radiator, kept at ΔT 24 (46 °C
   mean); the −7 °C shortfalls are accepted. A condensing gas boiler for the next 5 years, then a heat
   pump. The whole-house balance stays a toggle, off by default. Detail: `docs/heat-loss.md`.
+- **VMC and waste (owner, 2026-10-07/08):** two Sauter Agalina units; ducts and the WC drain live in
+  the pipe network (services `vmc`, `waste`). The owner wants an **efficient** system and will invite no
+  inspector: DTU 68.3 limits are guidance, not compliance targets. Prefer **few bends, pipes against the
+  wall, shallow slab trenches**; rigid PVC Ø80 for the long riser, soft insulated pieces at both ends.
+  Keep product advice **generic** (the owner may not find a given brand; a brand's datasheet is only a
+  source of typical sizes). Plots: the owner asks for elevations "west wall facing me" (north on the
+  right), sometimes in Chinese. Detail: `docs/plumbing-workflow.md` "VMC".
 - **Air conditioning (owner, 2026-10-07):** outdoor unit under the west-façade camera; refrigerant lines
   drawn in the pipe network (service `refrigerant`), not the electrical conduits (WIRE routes through
   those); no trench (high shared duct). Detail: `docs/plumbing-workflow.md` "Air conditioning".
@@ -346,6 +361,13 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 - **Pipe services are normalised on load:** an app older than `a913657` turns `refrigerant` into
   `cold` and autosaves it. Any new pipe service (or other enum) must deploy and `update-app` **before**
   the headset write.
+- **Share links carry no pipe network** (Proven, `src/io/shareView.js`): VMC ducts, the WC stack and
+  the AC lines are missing from a link; only the headset plan has them.
+- **The basement's west face is x −4.55** in the plan, 15 cm inside the ground floor's −4.705: a duct
+  straight down against the ground-floor wall lands inside the basement wall (owner: a survey error to
+  correct later; the VMC riser is drawn that way on purpose).
+- **Plotting from a saved JSON shows stored, not solved, zone sizes**: load it through
+  `deserializeInto` + `serializeProject` first (a widened column plotted at its old size).
 - **Wait-for-deploy loops must grep the pushed hash** (`git log -1 --format=%h`): a loop with a wrong
   hash polled 7 minutes after Pages already served the build (owner asked "did the deploy fail?").
 - **The diff tool ignores furniture heights** (`house-query.mjs diff` compares footprints and bands):
@@ -534,7 +556,9 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `a2084e2` HEATING group + per-window U · `c2f6e0b` stairs from the floor.
 - **Session 40:** `8dc326f` version.json not answered with the app · `734560a` V&B WC from its STEP ·
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
-  `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service · TOOL menu (right-thumbstick tap).
+  `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
+  `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
+  (flat and `-wall`) · `2f3771a` WASTE pipe service.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -606,7 +630,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/paintedTexture.js` / `src/ui/painters.js` | Placeholder texture swapped when its picture arrives (`deferred`, `startDeferredTextures`, `freeAfterUpload`) / every named painter the worker runs |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`, V&B `wall-hung-wc`); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`, V&B `wall-hung-wc`, Sauter Agalina `vmc-agalina`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
 | `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
@@ -764,6 +788,11 @@ skip `update-app` and say so.
 
 ## Known open questions
 
+- **Session 40, VMC + WC stack (items 59–60):** nothing seen on the Quest. Hypotheses: the slab's build-up
+  (concrete or joists; 3 cm cover over the pipes), the fridge spot, the basement wall face, the roof
+  height (vent drawn to a 0.5 m stub), unit B with no kitchen duct (Ø125 plug), the Agalina port
+  positions (photo estimates), fitting sizes (typical, brand-dependent), loss factors in the PVC
+  estimates.
 - **Session 40, AC + windows (items 52–57):** nothing seen on the Quest. Hypotheses: r217's connection
   side/height; the ground level outside; hole positions (±10 cm); the window lever on the right-hand
   leaf seen from the room and the hinge axis (a few degrees); +1 m slack per line; 32.4 m of liquid line
