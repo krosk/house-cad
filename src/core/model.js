@@ -88,9 +88,11 @@ let _pnid = 0;
 // pipes and the connection cable, drawn as one run; docs/plumbing-workflow.md).
 // `vmc` (owner, 2026-10-07): a mechanical-ventilation extract duct; its diameter is the
 // duct's (Ø80 / Ø125 / Ø160), so the ribbon shows its real width.
-export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return', 'refrigerant', 'vmc'];
+// `waste` (owner, 2026-10-08): soil/waste drainage and its roof vent (Ø100 for a WC). No slope or
+// flow-direction semantics yet: a node's z carries the fall (docs/plumbing-workflow.md).
+export const PIPE_SERVICES = ['cold', 'hot', 'heating_supply', 'heating_return', 'refrigerant', 'vmc', 'waste'];
 export const PIPE_SERVICE_ROLE = {
-  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return', refrigerant: 'refrigerant', vmc: 'vmc',
+  cold: 'cold', hot: 'hot', heating_supply: 'supply', heating_return: 'return', refrigerant: 'refrigerant', vmc: 'vmc', waste: 'waste',
 };
 export const nextPipeId = () => `p${++_pid}`;
 export const nextPipeNodeId = () => `pn${++_pnid}`;

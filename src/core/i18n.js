@@ -447,6 +447,7 @@ const STRINGS = {
   'pipe.service.heating_return': { en: 'HEATING RETURN', fr: 'RETOUR CHAUFFAGE', zh: '供暖回水' },
   'pipe.service.refrigerant': { en: 'REFRIGERANT', fr: 'FRIGORIFIQUE', zh: '冷媒' },
   'pipe.service.vmc': { en: 'VENTILATION', fr: 'VMC', zh: '通风' },
+  'pipe.service.waste': { en: 'WASTE', fr: 'ÉVACUATION', zh: '排水' },
   'pipe.pickStart': { en: 'PICK START', fr: 'CHOISIR DÉPART', zh: '选择起点' },
   'pipe.pickEnd': { en: 'PICK END', fr: 'CHOISIR ARRIVÉE', zh: '选择终点' },
   'pipe.confirmMerge': { en: 'CONFIRM MERGE', fr: 'CONFIRMER FUSION', zh: '确认合并' },

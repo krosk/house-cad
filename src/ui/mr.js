@@ -3780,7 +3780,7 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
   const PIPE_SERVICE_COLOR = {
-    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1,
+    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1, waste: 0xa16207,
   };
   const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
   function pipeNodePos(node) {
@@ -3844,8 +3844,8 @@ export function setupMR(view, project, getFootprint) {
     return `${fmt(total)} ${unitLabel()}${parts}`;
   }
   // Diameter of a new segment drawn in AR (no diameter editor yet): a VMC duct starts at
-  // Ø80 (a wet-room extract); written plans carry the real one.
-  const newPipeDiameter = (service) => (service === 'vmc' ? 0.08 : 0.016);
+  // Ø80 (a wet-room extract), a waste pipe at Ø100 (a WC); written plans carry the real one.
+  const newPipeDiameter = (service) => (service === 'vmc' ? 0.08 : service === 'waste' ? 0.1 : 0.016);
   function pipeAtFloorPoint(px, py) {
     const rank = pickRanker();
     let best = null, bestD = WIRE_PICK_M, bestR = Infinity;

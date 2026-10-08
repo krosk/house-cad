@@ -7,7 +7,7 @@ Plumbing is a separate whole-house lane from electrical conduit and wires.
 `HEATING · PIPE` (was MARKER · PIPE until 2026-10-01) authors a whole-house node graph. A node is either a free junction
 `{x,y,z,floorId}` or a logical fixture port `{markerId,role}` that follows its marker.
 Pipe segments join two node ids and carry their service and diameter. Thumbstick up/down
-chooses one of six services:
+chooses one of seven services:
 
 - cold water
 - hot water
@@ -24,6 +24,9 @@ chooses one of six services:
   the real ones). All ducts of one unit form one network through a node at the unit's
   centre, so selecting any of them reads the unit's total plus each diameter's length
   (`pipeLengthText`): the shopping list, with ~0.2 m per duct inside the box as slack.
+- waste (owner, 2026-10-08; `waste`, brown): soil and waste drainage and its roof vent, drawn at
+  the pipe's diameter (Ø100 for a WC; an AR-drawn segment starts at Ø100). No slope or flow
+  direction yet: the fall is carried by the nodes' heights.
 
 Fixture ports are logical, not spatial model connectors. Their role is inferred from the
 service (`cold`, `hot`, `supply`, or `return`), so one radiator or boiler marker can own
@@ -39,7 +42,7 @@ incident segments. In ALL FLOORS, aiming down favours your own storey and aiming
 the one above, and grip reaches farther storeys (the `docs/ar-survey.md` reticle rule). Join them
 to create risers.
 
-Colors are blue (cold), red (hot), orange (heating supply), purple (heating return), green (refrigerant), and light grey (VMC).
+Colors are blue (cold), red (hot), orange (heating supply), purple (heating return), green (refrigerant), light grey (VMC), and brown (waste).
 
 Service is edited as a connected-network property: changing any selected segment retypes
 every segment reachable through pipe nodes and updates fixture-port roles. While extending,
@@ -55,7 +58,7 @@ touch from silently erasing the destination network's service.
 - exact spatial connector offsets on detailed 3D appliances
 - valves, manifolds, and connected-network inspection
 - print/DXF layers and legends
-- wastewater/drainage, which needs slope and flow-direction semantics
+- wastewater slope and flow-direction semantics (the `waste` service draws the pipes; the fall is in the node heights)
 
 ## Air conditioning: the owner's multi-split (2026-10-07)
 
@@ -179,12 +182,88 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
   two pipe makers and a fluids engineering firm "no contradiction", plumbing PVC ~10× cheaper; 2022:
   avoid it for heated supply air > 50 °C) and futura-sciences thread 910965 (2021–23: rigid PVC Ø80
   sturdier than flexible, whistling and flame-spread warnings): what people wrote, not tested results.
+- **The two ends** (owner asked, 2026-10-08). Proven (notice 4666866): at the unit, a Twist & Go
+  spigot is screwed into the duct, clamped (collier), its adapter fitted, then clipped into the unit and
+  locked by a 1/4 turn (p. 6); unused openings get a plug (p. 6); once a year the **blue spigot and its
+  adapter come out** to clean the humidity sensor behind it, and the OUT spigot to clean the fan
+  (p. 10). At the vent: a hole the size of the sleeve ("manchon"), the duct pulled out of the hole,
+  clamped on the sleeve, the sleeve pushed in (its wings fold back), the vent clipped in (p. 7); a
+  bathroom vent goes **as close to the shower as possible** (p. 7). Parts: spigot Ø80 30 m³/h 913672
+  (e-novelec lists it "Ø80"), sleeve "manchon placo 80" 915199, vent "bouche design Ø80" 913676
+  (exploded view 4532339). Hypothesis (no drawing found): the spigot and the sleeve are about 80 mm
+  outside, sized for a flexible duct's 80 mm bore, and a PVC drain pipe Ø80 is 80 mm outside too, so
+  the pipe cannot slide over them; a PVC coupling's socket (about 80 mm inside) can. Hence the
+  usual build: **rigid PVC in the middle, a short insulated flexible piece (≤ 0.5 m) at each end**,
+  joined to the PVC by a coupling or sleeve with a clamp and aluminium tape, never glued to a part that
+  must come out. At the unit that piece also lets the blue spigot pull out for cleaning and stops fan
+  noise travelling up the pipe. The upper vent (above half wall r210) is about 1.6 m from shower tray
+  r136 (the WC end of the room): within the notice's advice for one vent per room, but not "as close
+  as possible"; the ground one (unit A) is about 0.4 m from tray r131.
+- **Bend sizes** (owner asked, 2026-10-08; owner: keep the fittings generic, the brand may not be available:
+  any 45° / 87°30' PVC drain elbow Ø80 to NF EN 1329; Nicoll is only the source of typical dimensions,
+  other makers differ by a few millimetres). Proven (Nicoll datasheet "Coudes femelle/femelle",
+  FT_coudes_evac_FF.pdf, PVC drain fittings NF EN 1329-1, fire class **B-s2,d0**): Ø80 87°30' CR88
+  Z 61 / L 47 mm; 67°30' CR66 Z 43; 45° CR44 Z 26.5; 30° CR33 Z 20; 20° CR22 Z 15 (L 47 each). Z is
+  read as axis-to-socket-bottom and L as the socket depth (Hypothesis: the datasheet's drawing letters),
+  so a 90° turn takes about **108 mm from the corner to each socket mouth** and about **150 × 150 mm**
+  overall with the 80 mm pipe. Nicoll's own guide ("Guide spécialité sanitaire", §5 "Évitez les angles à
+  87°30") says two 45° flow better than one 87°30' (for water; the same holds for air: Hypothesis).
+  Two female/female 45° need a pipe stub between them (corners ≥ 2 × (Z + L) = 147 mm apart), so a
+  90° made of two 45° takes about **228 × 228 mm** (10 mm of stub showing) against ~151 × 151 mm for
+  one 87°30' (scratch drawing `bends.mjs`; a first drawing overlapped the two elbows, caught by the
+  owner).
+  Gains on the drafted VMC route (owner asked, 2026-10-08): its two rigid 90° turns (the half wall's foot,
+  the top of the drop) both have room for two 45°: the pair cuts the corner inside, so it needs no more
+  depth, only straight pipe up to ~185 mm from the corner on each side (instead of ~108 mm), which the
+  hollow half wall, the slab and the column top give. Estimate (Hypothesis: typical loss factors, short
+  87°30' K ≈ 0.6–0.8, two 45° ≈ 0.3–0.45; 30 m³/h in a Ø80 PVC of ~76 mm bore ≈ 1.8 m/s, ~2 Pa dynamic):
+  ~0.6 Pa saved per turn, ~1.2 Pa for both, about 15 % of the rigid duct's ~7 Pa and small against the
+  fan's tens of Pa; also less noise and dust in the corner; cost one elbow, a ~104 mm stub and a joint each.
+  For the WC waste two 45° and 45° branches are Nicoll's rule (§5 of its guide), not an option.
+- **Trench depth** (owner, 2026-10-08: "I can dig a trench… I just don't want to dig too much"): the slab
+  runs sit as high as the floor finish allows, not mid-slab: ~3 cm cover over the pipe (Hypothesis: tile,
+  adhesive and a mortar skim). Trench from the upper floor surface: **VMC Ø80 11 cm** (axis 7 cm, 11.3 at
+  the elbows), **WC branch Ø100 13 → 13.5 cm** (1 % fall to the stack), **roof vent Ø100 13–13.5 cm**
+  (rising away from the stack). The VMC and the vent run side by side (12.5 cm between axes): one
+  ~25 cm-wide trench; the WC branch its own short diagonal. The draft had them 10–13 cm down (trench
+  14–18 cm). What the 25 cm "slab" is made of is not in the plan: in concrete a trench this deep cuts
+  the structure (Hypothesis).
+  Fit in the route (Hypothesis, plan coordinates): the column jog (x −4.625 → −4.43 with two 45°) needs
+  ~0.28 m of diagonal between elbow axes (feasible in height), but at its bottom the pipe's edge reaches
+  x −4.39, **the column's outer face**: column r122 (31.5 cm wide as drawn) needs ~3 cm more width, or
+  unit B's blue port must move west (it is 2 cm from the basement wall already); the half wall (22 cm
+  deep) and a 25 cm slab take an 87°30' turn (~15 cm) if the slab build-up allows an 8 cm pipe.
 - A bathroom 2.33 m (~3 bends), A kitchen 0.63 m, B laundry 2.45 m (2 bends): within the limit;
 - B outlet: its axis was 0.32 m from garage door r121; moved to 0.47 m (owner's yes, 2026-10-08; nodes
   `pn56`/`pn57` y 1.30 → 1.15, written and read back identical): 2.36 m;
 - the basement is outside the heated volume in the heat-loss model: the laundry duct, the outlet and the
   riser's basement part need R ≥ 0.6; A's roof outlet too where it crosses the roof build-up;
 - A's roof outlet: Ø160 roof terminal (Aldes) or Sauter's Ø125 cap: ask the installer.
+
+**WC stack (draft, 2026-10-08; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
+`waste`, Ø100 (Hypothesis: usual French size for a WC): the upper WC's branch from the Duofix outlet
+through the slab at ~2 % to a stack in column r122 (x −4.49, y 0.00), down to the basement ceiling in
+r76 just north of unit B (x −4.49, y 0.00), two 45° at the foot, then along the basement ceiling at ~1 % back to the
+laundry room r66 (owner; the exit to the sewer is decided later); the **roof vent** (owner) leaves the
+stack top through the slab to half wall r210 and rises inside it (6 cm from the frame, 3.5 cm from the
+VMC duct) and boxing r220 (widened 15 → 27 cm) through the ceiling (roof height unknown: a 0.5 m stub
+stands for it). Lengths: branch 0.63, stack + basement run 6.06, vent to the ceiling + stub 3.72 m.
+Column r122 grows to y −0.37…+0.06 (+23 cm north via c774, for the stack; a +3 cm widening east the
+owner had approved is no longer needed). Proven on the drafted plan: no conflicts, only r122 and r220
+change, and ground window r108's left leaf now stops at 153° on the column instead of opening flat (180°).
+Owner then (2026-10-08), in turn: keep the VMC duct straight through the ground floor; fewest bends on
+the upper and ground floors (one straight diagonal across the slab: 3 bends); the duct closest to the west
+wall on both floors (which put an 11.5 cm jog at the column's foot, since the plan's basement face is at
+x −4.55); and finally (**the drafted route**) "just go straight for now and get out of ground floor into
+the wall of the basement, I can correct the dimensions later": the basement wall position is a survey
+question. Route: down inside half wall r210 against the wall (x −4.625), along the wall in the slab to
+y −0.18, **straight down column r122 against the wall and through the slab** to the basement ceiling at
+the same x (inside the basement wall as surveyed today), then the short flexible end piece to unit B's
+blue port. Bends on the upper and ground floors: the vent, the half wall's foot, the top of the drop.
+B's upper duct: 6.97 m. With the duct against the wall the WC stack returns to x −4.49 (4.5 cm from the
+duct, 5 cm from the column's original face), so **the column is not widened**: only +23 cm north
+(c774), passage r56 unchanged. Draft: `pn47`, `pn49`, `p41`, `p43` removed; `pn48` = slab end; new `pn58`
+(basement ceiling) and one segment to the port.
 
 The WC frames (Geberit Duofix 111.333.00.6, 50 × 112 × 12 cm) are plain furniture boxes inside the
 half walls (`r221` Ground in r139, `r222` Upper in r210), centred on their WC 2 cm behind the face;

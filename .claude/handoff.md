@@ -157,6 +157,15 @@ Read `docs/product-intent.md` before planning AR work.
     2 cm behind the half wall's face (Hypothesis: the board thickness). Same check, read back identical.
     Then B's outlet moved 0.47 m from the garage door (`pn56`/`pn57`, read back identical). The duct
     rules (DTU 68.3 via the RE2020 checklist) are in the VMC doc; owner: no inspection, efficiency only.
+60. **WASTE pipe service + WC stack and VMC riser draft** (owner, 2026-10-08): a `waste` service
+    (brown, Ø100 default, no slope semantics). Drafted, **not written to the headset**: the upper WC's
+    stack in column r122 (extended 23 cm north, c774 −0.20 → −0.43), its roof vent up half wall r210 and
+    boxing r220 (widened to 27 cm), the basement run back to laundry r66 (exit later); unit B's upper VMC
+    duct re-routed against the west wall on both floors, straight down the column, slab runs 3 cm under
+    the floor (trenches 11 / 13.5 cm), 45° pairs at the two rigid turns, soft pieces at both ends. Every
+    coordinate and choice is in `docs/plumbing-workflow.md` "VMC" / "WC stack"; the scratch script that
+    builds the write (`waste-draft.mjs`) is session-local, so a new session rebuilds it from the doc on a
+    fresh read. Needs this build on the Quest before the write (unknown service → `cold`).
 
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
@@ -617,6 +626,9 @@ skip `update-app` and say so.
   - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
     HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
     and per-diameter lengths (A: Ø80 2.33 · Ø125 1.70 m; B: Ø80 9.38 · Ø125 2.36 m).
+  - WC stack + VMC riser (item 60): on the owner's yes, rebuild the draft from the doc on a fresh read,
+    check (`house-query diff`: only r122, r220 and the pipes change; window r108's left leaf 153°) and
+    write; the basement wall face (x −4.55) is a survey question the owner will correct.
   - TOOL menu (item 58): tap opens/closes, labels fit in EN/FR/ZH, no accidental open while flicking,
     the tap window (0.3 s) feels right (`docs/ar-qa-checklist.md`).
   - AC (items 52–56): HEATING · PIPE shows four green lines from each unit out through the west wall
