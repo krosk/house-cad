@@ -240,7 +240,7 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
   riser's basement part need R ≥ 0.6; A's roof outlet too where it crosses the roof build-up;
 - A's roof outlet: Ø160 roof terminal (Aldes) or Sauter's Ø125 cap: ask the installer.
 
-**WC stack (draft, 2026-10-08; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
+**WC stack (written to the headset 2026-10-08, read back identical; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
 `waste`, Ø100 (Hypothesis: usual French size for a WC): the upper WC's branch from the Duofix outlet
 through the slab at ~2 % to a stack in column r122 (x −4.49, y 0.00), down to the basement ceiling in
 r76 just north of unit B (x −4.49, y 0.00), two 45° at the foot, then along the basement ceiling at ~1 % back to the
