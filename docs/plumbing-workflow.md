@@ -166,6 +166,19 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
   rigid or semi-rigid (galvanised or a VMC semi-rigid system), a short flexible end at each spigot at
   most (smooth walls and real elbows lose far less than a corrugated flexible duct's bends: Hypothesis,
   general duct practice);
+  Owner asked "19 m in rigid PVC, is it viable?" (2026-10-08): the 19 m was the flexible-equivalent
+  length; in rigid it is 6.93 m plus elbows. Estimate (Hypothesis: Darcy with Blasius f, smooth wall;
+  elbow K ≈ 0.3–0.5): 30 m³/h in Ø80 = 1.7 m/s, Re ≈ 9 000, ≈ 0.7 Pa/m → ≈ 4.6 Pa straight + ≈ 2 Pa of
+  elbows ≈ **7 Pa** (flexible ≈ 25–30 Pa), small against the few tens of Pa a self-regulating vent
+  works over: viable. Watch: the PVC-to-spigot joint (both may be 80 mm outside), a short insulated
+  flexible piece at the unit against fan noise, R ≥ 0.6 in the basement, the slab opening sealed, no low
+  point. Precedents (owner asked, 2026-10-08): ALDES sells rigid PVC VMC ducts, the flat Minigaine
+  (40 × 100 mm ≈ Ø80, 60 × 200 ≈ Ø125, self-extinguishing PVC, simple and double flow; e-novelec listing
+  3542280911029): Proven a maker's product, and a flat Ø80 equivalent may suit the slab run better
+  (Hypothesis). Plumbing PVC as VMC duct is reported done on forumconstruire.com topic 140468 (2011:
+  two pipe makers and a fluids engineering firm "no contradiction", plumbing PVC ~10× cheaper; 2022:
+  avoid it for heated supply air > 50 °C) and futura-sciences thread 910965 (2021–23: rigid PVC Ø80
+  sturdier than flexible, whistling and flame-spread warnings): what people wrote, not tested results.
 - A bathroom 2.33 m (~3 bends), A kitchen 0.63 m, B laundry 2.45 m (2 bends): within the limit;
 - B outlet: its axis was 0.32 m from garage door r121; moved to 0.47 m (owner's yes, 2026-10-08; nodes
   `pn56`/`pn57` y 1.30 → 1.15, written and read back identical): 2.36 m;
