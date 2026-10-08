@@ -19,10 +19,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-08 (session 40, continued; the Quest was reachable all session)
+**Date:** 2026-10-08 (session 40, continued; the Quest was reachable until item 60, then not: no
+`adb` device, no DevTools page list)
 **Status:** Proven (git, 2026-10-08): everything committed and pushed on `main`; the app head is
-`2f3771a` (the WASTE pipe service; `git log -1 -- src`). Proven (`update-app` output): the headset
-precache holds `d68a7c9` (same app, docs after it). Proven (`quest-storage read` after each write,
+`d7538ff` (View 3D ruler + links that open in 3D; `git log -1 -- src`); Proven (live `version.json`
+read): Pages serves `d7538ff`. The headset app is **not** updated past `d68a7c9` (Proven by its last
+`update-app`): run `update-app` when the Quest is back (the ruler is desktop/phone only, so nothing
+in AR changed). Proven (`quest-storage read` after each write,
 byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59, 60); the last write
 was the WC stack + VMC riser (item 60). Scratchpad backups before each
 write are session-local (gone in a new session); no save slot holds a pre-edit copy, so undo = reverse
@@ -173,6 +176,13 @@ Read `docs/product-intent.md` before planning AR work.
     wall, past the garage door (fit is a site check). Lengths ≈ 190 m (sketch). The owner asked to
     keep the maps: scratchpad `heat-map.mjs` / `-zh.mjs` / `-c.mjs` + PNGs (session-local, so the
     route geometry is also recorded in the doc). Detail: `docs/plumbing-workflow.md` "Heating pipes".
+62. **View 3D ruler + links that open in 3D** (`d7538ff`; owner, 2026-10-08): a 📏 Ruler in the top-down
+    overview (shared links too) snaps each tap to vertical face planes and reads the gap between two
+    parallel faces that face each other, else DIST · X · Y; 🔗 Share view pressed in View 3D appends
+    `&open=3d&floor=<n>` (list position) or `&floor=all`. Proven on desktop Chrome with the owner's plan
+    as a share link (8.62 m living room, 3.11 m room, Ground floor opened); phone touch unchecked.
+    `CLAUDE.md` (View 3D) and `docs/share-view.md`. The owner was given a 3D link built from the
+    item-60 plan copy (not stored in the repo).
 
 ### Item index, sessions 38–39 (detail in the docs and `git log`; numbers are cited below)
 
@@ -354,6 +364,14 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
   world yaw; only ORIGIN/RECAL re-register.
 
 ## Findings / traps worth knowing
+
+- **A shared view renumbers floor ids** `f1…` in list order (`loadView`): name a floor in a link by its
+  list position, never by the sender's id (the owner's plan lists Basement `f2` first, so it loads as
+  `f1`).
+- **Testing a share link in a local preview** (session 40): the service worker keeps serving the old
+  bundle after a rebuild (unregister it and clear `caches` before reloading); a long `#view=` URL is
+  echoed in every Chrome-tool result (serve the hash from `dist/` and `history.replaceState` to `/`
+  after load); 3D texture preparation stalls in a background tab until a screenshot is taken.
 
 - **`version.json` used to open the app** (fixed `8dc326f`): the service worker served `index.html` for
   every navigation. An old cached app (before the update) still does; `quest-storage.mjs` now checks
@@ -558,7 +576,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -630,7 +648,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 | `src/ui/paintedTexture.js` / `src/ui/painters.js` | Placeholder texture swapped when its picture arrives (`deferred`, `startDeferredTextures`, `freeAfterUpload`) / every named painter the worker runs |
 | `src/ui/furnitureCatalog.js` | The furniture catalog fetch, once, shared by View 3D, AR and migrated-zone sizing |
 | `src/core/apertureGlyph.js` | Shared plan-symbol segments for sheets, DXF and the AR plan (door, passage, window, …, furniture notch) |
-| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`, V&B `wall-hung-wc`, Sauter Agalina `vmc-agalina`); used by the AR 3D view and View 3D |
+| `src/ui/proceduralFurniture.js` | Code-built furniture (`procedural: <kind>` catalog entries: STOCKHOLM bed, Daikin wall units, NEO shower tray, V120 upright piano, ACOVA `towel-radiator`, De'Longhi `panel-radiator`, JOYFURNOS `pedal-bin`, Habitat `moder-table`, V&B `wall-hung-wc`, Sauter Agalina `vmc-agalina`, Aldes EasyHOME `vmc-easyhome`); used by the AR 3D view and View 3D |
 | `src/ui/doorProducts.js` | Door product builder (frame, leaf `DESIGNS`: Ange-Line, LINE, postformé; hardware) from `doorProductPlacements`; `buildRailDoor` for rail-hung doors on SLIDING zones |
 | `src/ui/deviceProducts.js` | Switch/outlet/Ethernet product builder: shared `plate()` (pyramid + stadium collar) and `flatInsert()`, `rocker` (single/double), `socket` and `rj45` designs, lofted from radial outlines; cached per entry and `detail` (`full` desktop, `low` AR), clones share geometry |
 | `src/ui/mergeByMaterial.js` | AR draw-call reduction: `mergePartsByMaterial` (the 3D view's parts) and `mergeObjectByMaterial` (a furniture model) |
@@ -645,7 +663,10 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 **Ask the owner each session whether the Quest is available.** Without it: no headset read/write,
 skip `update-app` and say so.
 
-- **First, with the Quest:**
+- **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
+  on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
+  and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
+- **First, with the Quest:** run `update-app` first (the headset is on `d68a7c9`).
   - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
     HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
     and per-diameter lengths (A: Ø80 2.33 · Ø125 1.70 m; B: Ø80 9.38 · Ø125 2.36 m).

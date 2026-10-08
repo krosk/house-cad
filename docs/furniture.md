@@ -326,6 +326,17 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   front 1704578). Proven in a scratch browser preview: front and top renders laid beside those two
   photos show the same port layout; bounding box 0.494 × 0.152 × 0.497 m with spigots. Not yet seen
   in AR, View 3D or on device.
+- `aldes-easyhome-hygro-compact`: Aldes EasyHOME Hygro Compact Classic single-flow humidity-controlled
+  VMC unit (Leroy Merlin kit 82201371, Aldes 11033404; owner, 2026-10-08: replaces the Agalina,
+  `docs/plumbing-workflow.md` "VMC"), builder `vmc-easyhome`. Body 360 × 187 × 361 mm (the plan zone);
+  the spigots and the left mounting lug stand out to 459 × 460 (spec table "46X18,7X45,9"). Every
+  dimension is measured on the notice's orthographic top and side views (media 3963727 p. 3, 600 dpi,
+  2.37 px/mm); colours and the lid's blue rim, HYGRO badge and logo from photos 1703321 (straight top)
+  and 6045647 (rim height, badge and logo sizes are estimates). Wall versions: `-wall` (base on the
+  wall, the two side Ø80 up, OUT sideways) and `-wall-out-down` (kitchen Ø125 + an Ø80 up, OUT Ø160
+  down). Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
+  scale, sit on the drawing's lines (overlay); bounding box 457.5 × 187.6 × 459.0 mm against the
+  drawing's 459 × 187 × 460; 3 028 triangles. Not yet seen in AR, View 3D or on device.
 
 ## IKEA kitchen units assembled from part models (2026-10-04)
 

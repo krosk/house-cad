@@ -606,5 +606,49 @@
     },
     "source": "procedural: Sauter Agalina extra-plat VMC unit mounted flat on a wall (sockets up, OUT down); same sources as sauter-agalina-extra-plat (builder vmcAgalina)",
     "registeredAt": "2026-10-07T00:00:00.000Z"
+  },
+  "aldes-easyhome-hygro-compact": {
+    "name": "aldes-easyhome-hygro-compact",
+    "article": "aldes-easyhome-hygro-compact",
+    "sizeMm": [
+      360,
+      187,
+      361
+    ],
+    "procedural": "vmc-easyhome",
+    "source": "procedural: Aldes EasyHOME Hygro Compact Classic single-flow hygro VMC unit (Leroy Merlin 82201371, Aldes 11033404; no manufacturer 3D model); body and ports from the notice's orthographic dimension views (media 3963727 p. 3) + retailer photos (sources in the builder vmcEasyhome)",
+    "registeredAt": "2026-10-08T00:00:00.000Z"
+  },
+  "aldes-easyhome-hygro-compact-wall": {
+    "name": "aldes-easyhome-hygro-compact-wall",
+    "article": "aldes-easyhome-hygro-compact-wall",
+    "sizeMm": [
+      361,
+      360,
+      187
+    ],
+    "procedural": "vmc-easyhome",
+    "params": {
+      "wall": true,
+      "up": "right"
+    },
+    "source": "procedural: Aldes EasyHOME Hygro Compact on a wall, the two side Ø80 up, OUT Ø160 sideways; same sources as aldes-easyhome-hygro-compact (builder vmcEasyhome)",
+    "registeredAt": "2026-10-08T00:00:00.000Z"
+  },
+  "aldes-easyhome-hygro-compact-wall-out-down": {
+    "name": "aldes-easyhome-hygro-compact-wall-out-down",
+    "article": "aldes-easyhome-hygro-compact-wall-out-down",
+    "sizeMm": [
+      360,
+      361,
+      187
+    ],
+    "procedural": "vmc-easyhome",
+    "params": {
+      "wall": true,
+      "up": "back"
+    },
+    "source": "procedural: Aldes EasyHOME Hygro Compact on a wall, kitchen Ø125 + an Ø80 up, OUT Ø160 down; same sources as aldes-easyhome-hygro-compact (builder vmcEasyhome)",
+    "registeredAt": "2026-10-08T00:00:00.000Z"
   }
 }

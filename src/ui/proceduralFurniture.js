@@ -918,6 +918,160 @@ function vmcAgalina(entry) {
   return g;
 }
 
+// Aldes EasyHOME Hygro Compact Classic: a single-flow humidity-controlled (hygro B) VMC unit
+// (box only; the vents and ducts are the plan's VMC pipes, docs/plumbing-workflow.md "VMC").
+// W × H × D from the catalog `sizeMm` (360 × 187 × 361): the body, as on the Agalina; the
+// spigots and the left mounting lug stand out of it (overall 459 × 460, the spec table's
+// 46 × 45,9). Seen from above as in the manual's top view: front (+Z) = the OUT Ø160 (left)
+// and an Ø80; back (−Z) = the kitchen Ø125 (left) and an Ø80; right (+X) = two Ø80; left
+// (−X) = the base's long mounting lug, no spigot.
+//
+// Sources:
+//   - Product page https://www.leroymerlin.fr/produits/kit-vmc-simple-flux-hygroreglable-aldes-11033404-82201371.html
+//     (Leroy Merlin 82201371, Aldes 11033404), spec table: "Composition du kit: Groupe EasyHOME
+//     Hygro COMPACT+ 3x Bouches Bdh", "Dimension du caisson (LxHxP) (en cm): 46X18,7X45,9",
+//     "Nombre de piquages sanitaires (diamètre 80 mm): 4", "Nombre de piquages cuisine (diamètre
+//     125 mm): 1", "Diamètre piquage rejet (en mm): 160", "Poids du produit nu (en kg): 7.17".
+//   - Notice (media 3963727, Aldes 11028725 "EasyHOME Hygro Compact Classic / Premium …") p. 3,
+//     "1.2 Dimensions": an orthographic top view and side view, rasterised at 600 dpi (2.37 px/mm:
+//     the 459 overall = 1087 px, the 460 = 1090 px). Measured there:
+//       body 360 × 361 (the 406 is the spacing of the two keyhole mounting holes), corners
+//         r ≈ 46 (built as 50, quadratic corners); lid top 325 square, its inner panel 274;
+//       spigot centres from the body centre: kitchen Ø125 x −100, back Ø80 x +95, OUT Ø160
+//         x −85, front Ø80 x +95, right Ø80s z −94 and +97; every end 229–230 from the centre
+//         (≈ 49 mm out of the body); outside diameters 83 / 126 / 162;
+//       side view, from the bottom: base flange 0–11, body wall to 164, lid bevel to 187;
+//         Ø80 and Ø125 centres at 90, the Ø160 at 95 (14–176);
+//       left lug: out to 228 from the centre, 256 long (z −140 … +115), joined to the body by
+//         slanted sides; right lug: a tab out to 225 at z 0, between the two right Ø80s.
+//     p. 3 isometric views and p. 10 (electrical): the left lug is a flat plate at the base.
+//     p. 5 "1.6": 400 mm free around the sides, 440 × 340 mm above the lid to open it.
+//   - Photos: media 1703321 (straight top view, the drawing turned 180°, same 2.37 px/mm: blue
+//     lid rim from the body edge to ~323 mm, black top, a blue "HYGRO" badge 113 × 31 mm centred
+//     114 mm toward the OUT side, the Aldes logo mid-lid); 6045647 (3/4 view: blue rim band on a
+//     black body, black spigots); 1702632 (a spigot's ribs and the flange's keyhole).
+//   Lid rim height, badge and logo sizes are photo estimates; everything else is the drawing.
+// `params.wall` (owner's unit B is wall-mounted): the same box with its base against the wall
+// (−Z). `params.up` picks the face that points up: 'right' (default: the two right Ø80 up, OUT
+// sideways toward +X, the left lug down) or 'back' (kitchen Ø125 + an Ø80 up, OUT down).
+function vmcEasyhome(entry) {
+  const p = entry.params || {};
+  if (p.wall) {
+    const right = (p.up || 'right') === 'right';
+    const [W, H, D] = (entry.sizeMm || (right ? [361, 360, 187] : [360, 361, 187])).map((v) => v / 1000);
+    const flatSize = right ? [H, D, W] : [W, D, H];
+    const flat = vmcEasyhome({ ...entry, sizeMm: flatSize.map((v) => v * 1000), params: { ...p, wall: false } });
+    if (right) {
+      // Flat X → +Y (up), flat Y (height) → +Z (out of the wall), flat Z (front) → +X.
+      flat.setRotationFromMatrix(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
+    } else {
+      flat.rotation.x = Math.PI / 2; // flat Y → +Z, flat Z (front, OUT) → −Y (down)
+    }
+    flat.position.set(0, H / 2, -D / 2);
+    const g = new THREE.Group();
+    g.name = entry.name || 'vmc-easyhome-wall';
+    g.add(flat);
+    return g;
+  }
+  const [W, H, D] = (entry.sizeMm || [360, 187, 361]).map((v) => v / 1000);
+  const black = new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.55 });
+  const spigotMat = new THREE.MeshStandardMaterial({ color: 0x232427, roughness: 0.5, side: THREE.DoubleSide });
+  const bore = new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.9 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x2f6fd6, roughness: 0.4 });
+  const logo = new THREE.MeshStandardMaterial({ color: 0xd8dadd, roughness: 0.5 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'vmc-easyhome';
+  // A rounded rectangle w × d (corner r), extruded h upward from y0.
+  const slab = (w, d, r, h, y0, mat, cx = 0, cz = 0) => {
+    const s = new THREE.Shape(), x = w / 2, z = d / 2;
+    s.moveTo(-x + r, -z); s.lineTo(x - r, -z); s.quadraticCurveTo(x, -z, x, -z + r);
+    s.lineTo(x, z - r); s.quadraticCurveTo(x, z, x - r, z); s.lineTo(-x + r, z);
+    s.quadraticCurveTo(-x, z, -x, z - r); s.lineTo(-x, -z + r); s.quadraticCurveTo(-x, -z, -x + r, -z);
+    const geo = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 6 });
+    geo.rotateX(-Math.PI / 2); // shape Y → −Z; extrusion → +Y
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(cx, y0, cz);
+    g.add(m);
+    return m;
+  };
+  const flangeH = 0.011, wallTop = 0.164; // drawing p. 3 side view
+  const rimH = 0.016;                      // blue rim band under the bevel (photo estimate)
+  // Base flange with the two mounting lugs (keyhole slots drawn as dark plates).
+  slab(W - 0.004, D - 0.004, 0.05, flangeH, 0, black);
+  const lug = new THREE.Shape(); // left lug: slanted sides from the body to the plate
+  lug.moveTo(-W / 2 + 0.01, 0.170); lug.lineTo(-0.205, 0.140); lug.quadraticCurveTo(-0.228, 0.135, -0.228, 0.110);
+  lug.lineTo(-0.228, -0.085); lug.quadraticCurveTo(-0.228, -0.110, -0.205, -0.115); lug.lineTo(-W / 2 + 0.01, -0.150);
+  const lugGeo = new THREE.ExtrudeGeometry(lug, { depth: flangeH, bevelEnabled: false, curveSegments: 6 });
+  lugGeo.rotateX(-Math.PI / 2);
+  g.add(new THREE.Mesh(lugGeo, black));
+  slab(0.05, 0.06, 0.012, flangeH, 0, black, W / 2 + 0.02, 0); // right tab, out to ~225
+  for (const x of [-0.203, 0.203]) slab(0.022, 0.009, 0.0045, 0.0005, flangeH, bore, x, 0);
+  // Body, then the blue rim band and the bevelled lid with its black top.
+  slab(W, D, 0.05, wallTop - flangeH, flangeH, black);
+  slab(W + 0.002, D + 0.002, 0.051, rimH, wallTop - 0.004, blue);
+  // The bevel: a loft between two rounded rectangles, the rim (W) to the lid top (0.325).
+  const loft = (w0, d0, r0, w1, d1, r1, y0, y1, mat) => {
+    const n = 6, ring = (w, d, r, y) => {
+      const pts = [], x = w / 2, z = d / 2;
+      for (const [cx, cz, a0] of [[x - r, z - r, 0], [-x + r, z - r, Math.PI / 2], [-x + r, -z + r, Math.PI], [x - r, -z + r, 1.5 * Math.PI]]) {
+        for (let i = 0; i <= n; i++) {
+          const a = a0 + (i / n) * Math.PI / 2;
+          pts.push(cx + r * Math.cos(a), y, cz + r * Math.sin(a));
+        }
+      }
+      return pts;
+    };
+    const a = ring(w0, d0, r0, y0), b = ring(w1, d1, r1, y1), k = a.length / 3;
+    const pos = [...a, ...b], idx = [];
+    for (let i = 0; i < k; i++) {
+      const j = (i + 1) % k;
+      idx.push(i, k + i, j, j, k + i, k + j);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat);
+    m.material.side = THREE.DoubleSide;
+    g.add(m);
+  };
+  const yRim = wallTop - 0.004 + rimH;
+  loft(W + 0.002, D + 0.002, 0.051, 0.325, 0.325, 0.03, yRim, H - 0.0005, blue);
+  slab(0.325, 0.325, 0.03, 0.0005, H - 0.001, black);         // lid top (black)
+  slab(0.274, 0.274, 0.025, 0.0004, H - 0.0006, black);       // inner panel outline
+  slab(0.113, 0.031, 0.006, 0.0012, H - 0.0006, blue, 0, 0.114); // HYGRO badge, OUT side
+  slab(0.075, 0.016, 0.002, 0.0008, H - 0.0006, logo, -0.02, 0.0); // Aldes logo
+  // A spigot: a ribbed tube (outside Ø `od`) standing out of a face up to `end` from the centre.
+  // `axis` is the face normal ('x' | 'z'), `s` its sign, `at` the position along the face.
+  const spigot = (axis, s, at, od, yC, end = 0.2295) => {
+    const face = (axis === 'z' ? D : W) / 2 - 0.01, len = end - face, r = od / 2;
+    const parts = [
+      new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 28, 1, true), spigotMat),
+      new THREE.Mesh(new THREE.TorusGeometry(r, 0.0015, 4, 28), spigotMat), // rib near the end
+      new THREE.Mesh(new THREE.CircleGeometry(r * 0.95, 28), bore),
+    ];
+    const [tube, rib, hole] = parts;
+    const u = face + len / 2, ribAt = end - 0.012, holeAt = end - 0.004;
+    if (axis === 'z') {
+      tube.rotation.x = Math.PI / 2; tube.position.set(at, yC, s * u);
+      rib.position.set(at, yC, s * ribAt);
+      hole.position.set(at, yC, s * holeAt); if (s < 0) hole.rotation.y = Math.PI;
+    } else {
+      tube.rotation.z = Math.PI / 2; tube.position.set(s * u, yC, at);
+      rib.rotation.y = Math.PI / 2; rib.position.set(s * ribAt, yC, at);
+      hole.rotation.y = s * Math.PI / 2; hole.position.set(s * holeAt, yC, at);
+    }
+    g.add(tube, rib, hole);
+  };
+  spigot('z', 1, -0.085, 0.162, 0.095);  // OUT Ø160 (front)
+  spigot('z', 1, 0.095, 0.083, 0.090);   // Ø80 (front)
+  spigot('z', -1, -0.100, 0.126, 0.090); // kitchen Ø125 (back)
+  spigot('z', -1, 0.095, 0.083, 0.090);  // Ø80 (back)
+  spigot('x', 1, -0.094, 0.083, 0.090);  // Ø80 (right, toward the back)
+  spigot('x', 1, 0.097, 0.083, 0.090);   // Ø80 (right, toward the front)
+  return g;
+}
+
 // Habitat Moder II extendable round dining table, natural oak (Habitat ref 910365).
 // W × H × D from the catalog `sizeMm`: closed 1100 × 750 × 1100, extended 1550 × 750 × 1100
 // (a second catalog entry). The leaf is W − D: the top is two half-discs of radius D/2
@@ -1267,6 +1421,7 @@ const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
+  'vmc-easyhome': vmcEasyhome,
 };
 
 export function isProcedural(entry) {

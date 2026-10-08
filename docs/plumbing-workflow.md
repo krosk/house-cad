@@ -105,6 +105,23 @@ side and height. Window opening against the units: docs/materials.md "Window swi
 
 ## VMC: two Sauter Agalina units (2026-10-07, draft)
 
+**Model changed (owner, 2026-10-08): Aldes EasyHOME Hygro Compact Classic** (Leroy Merlin kit 82201371,
+Aldes 11033404, with 3 Bdh vents; furniture `aldes-easyhome-hygro-compact`, `docs/furniture.md`). The
+Agalina text below is the earlier draft and still describes the headset plan (r218/r219 carry the
+Agalina, Proven: not edited since). What changes (Proven: spec table and notice media 3963727):
+- **humidity-controlled (hygro B)**, not self-regulating: the flexible-duct rule further down drops to
+  **≤ 3 m and ≤ 2 bends per vent** unless a sizing study says otherwise, so every drafted run over 3 m
+  (B upper 6.93 m) needs rigid or semi-rigid duct even more;
+- OUT is **Ø160** (Agalina Ø125): this matches the Ø160 minimum roof outlet below, and the outlet ducts
+  (A roof, B wall) become Ø160;
+- box 360 × 361 × 187 mm, 459 × 460 with spigots (Agalina 379 × 372 × 150): a deeper boxing above the
+  fridge; 221 m³/h, 7.17 kg;
+- ports: kitchen Ø125 and an Ø80 on one face, OUT Ø160 and an Ø80 on the opposite face, two Ø80 on
+  a side, a mounting lug on the last side, all spigot centres 90 mm above the base;
+- notice p. 5 asks for **400 mm free around the sides** and **440 × 340 mm above the lid** to open it
+  (maintenance): a closed boxing needs an access hatch over the lid (Hypothesis: the usual answer).
+The duct routes below were drawn to the Agalina's ports; they need re-drawing to the Aldes's.
+
 The owner plans **two Sauter Agalina extra-plat** units (Leroy Merlin 80127930; furniture
 `sauter-agalina-extra-plat`, `docs/furniture.md`). Proven (its notice, media 4666866): a **single-flow
 self-regulating** unit (not hygro B) with a humidity boost on the blue bathroom port; one kitchen Ø125,
