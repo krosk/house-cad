@@ -20,11 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-09 (session 40, continued; the Quest reachable again on 10-09)
-**Status:** Proven (git): the app head is `c29de11` (Aldes EasyHOME furniture + this handoff's previous
-version), pushed; Proven (live `version.json`): Pages serves `c29de11`; Proven (`update-app`, 10-09):
-the headset precache holds `c29de11`, opened at the next app launch. Proven (`quest-storage read`
-after each write, byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59,
-60) and item 63's unit-A swap (written 2026-10-09). Scratchpad backups are session-local; no save slot
+**Status:** Proven (git): the code head is `c29de11` (Aldes EasyHOME furniture); `daf3bf9` (docs) is
+pushed and served (live `version.json`) and in the headset precache (`update-app`, 10-09); this
+handoff + the item-65 doc block are the next commit. Proven (`quest-storage read` after each write,
+byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's
+unit-A swap and item 65 (upper WC at 60 cm, drain option A, column r122; written 2026-10-09). Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -675,6 +675,21 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     zones dropped (c879, c1259, c1002–c1005, c1415–c1416, c1419–c1422, c1395–c1396; c997 = −0.22).
     Owner rejected the WC facing the door (west) and chose it facing south. The owner was given a
     3D share link of it (not stored in the repo).
+65. **Upper WC at 60 cm, column r122, drain option A: written** (owner, 2026-10-09; two writes, each with
+    the owner's yes, AR closed, backup, fresh read unchanged, `--base`, read back identical; last 236 933
+    chars). Owner facts: the upper slab has a 14 cm trench by the west wall, **lintel 1** at 14–20 cm,
+    a 29 cm bay, **lintel 2** at 49–55 cm, probably a third at 84–90 (never cut, never passed under);
+    column r122 stands **90 cm from ground window r108**, 14 cm deep, free east/west; the basement wall
+    under it will be adjusted. The first write (layout C, a 45° branch under the floor) crossed lintel 2
+    once the second lintel was known, so the owner chose **option A**: the WC pipe crosses lintel 2 above
+    the slab inside the half wall, a tee at 28 cm (riser up, drop into bay 1), run south, stack at 28 cm;
+    r220 and the column's east face at 37 cm (c227 −0.36, passage r56 1.275 m); `p59`/`pn66` removed.
+    Details, clearances, flow notes and the rejected B/C: `docs/plumbing-workflow.md` "Upper WC position
+    and its drain". Open: lintel height/slab type (bay 1 needs ≈ 15 cm under the slab top), screed
+    thickness (model assumes 5 cm), the third lintel; the shower Ø40 joins the run in bay 1 flowing south
+    (route not drawn); the sink into the riser is a "possible option" only. Drawings given to the owner
+    (scratchpad, session-local): `duofix/opa.mjs` (option A top, north-wall face, 3D sketch); the Chinese
+    `duofix/wc60-zh.mjs` drawings show the superseded layout C.
 
 ## Next step
 
@@ -685,8 +700,10 @@ none drawn in the plan:
   entry `aldes-easyhome-hygro-compact-wall-out-up` (OUT up), a push, `update-app`, then the write;
   with it the laundry vent ≥ 20 cm from the walls and the upper shower vent moved onto boxing r220's
   south face (widened).
-- The WC stack's roof vent: keep, swap for an air valve at the stack top, or drop, once the contractor
-  says where the network's open vent is.
+- The WC stack's roof vent (still drawn): keep it, or a Ø100 air valve on the riser in boxing r220
+  at 1.30–1.49 m behind a grille hatch, once the contractor says where the network's open vent is.
+- The upper shower's Ø40 route and branch (item 65 advice), the upper sink (optional), and the slab's
+  make-up (the drain trench is ≈ 15 cm deep).
 - The unit choice for B: Classic (curve unpublished) or HP (speed 4 within margin); Ø80 only.
 - Unit A's lid needs 440 × 340 mm above it to open (notice p. 5); flat under a 2.70 ceiling it has
   5 cm: an access plan (hatch, or another orientation) is open.
@@ -697,7 +714,10 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`c29de11`, 10-09); unit A shows as the Aldes (item 63).
+- **First, with the Quest:** the app is updated (`daf3bf9`, 10-09); unit A shows as the Aldes (item 63);
+  item 65: the upper WC and frame 5 cm further east, column r122 thin, 37 cm wide and clear of window
+  r108, boxing r220 37 cm, the WC pipe running west just above the upper floor inside the half wall to
+  the riser at 28 cm, then the run under the floor in bay 1 to the stack.
   - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
     HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
     and per-diameter lengths (A, the Aldes since item 63: Ø80 2.30 · Ø125 0.89 · Ø160 1.04 m; B: Ø80 9.38 · Ø125 2.36 m).

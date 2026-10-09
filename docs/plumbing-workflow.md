@@ -310,6 +310,68 @@ closed (the falling water needs air from above), so with a distant open vent put
 the upper stack (in boxing r220). The ground WC after the swap (≈ 0.5 m drop into the basement drain)
 needs nothing of its own if it joins the same vented collector. Open: ask the contractor where the
 network's open vent is.
+Why a valve alone is not enough (Hypothesis): it only opens under suction; pressure pushed back up from
+the sewer or the long basement collector has no way out except through the lowest traps. The upper sink
+and shower join the same stack, so with a closed stack top the WC flush pulls their traps (the shower's,
+under a 9.3 cm tray, first). Valve size: it must be a Ø100 rated for a WC stack (≈ 43–44 l/s, e.g.
+Nicoll CEP100 147 × 132 × 190 mm, with the French DTA approval); Ø32–40 mini valves serve one fixture
+branch only. In boxing r220 at ≈ 1.30–1.49 m (above the 0.90 vanity rim), behind a hatch with a grille
+(it draws room air; the moisture it moves is negligible next to the VMC and goes down the drain).
+
+**Upper WC position and its drain (owner, 2026-10-09; drain option A chosen and written to the headset the same day, read back identical):**
+- **Slab constraint (owner, corrected 2026-10-09):** along the whole west wall of the upper floor, a 14 cm
+  trench next to the wall, then **lintel 1** (x −4.56…−4.50, 6 cm), a 29 cm clear bay (**bay 1**, 20–49 cm
+  from the wall), **lintel 2** (x −4.21…−4.15, 49–55 cm), and probably a third at 84–90 cm (owner: "I suppose
+  it will"; Hypothesis, likely a beam-and-block slab). Lintels are never cut and no pipe passes under one.
+  The VMC Ø80 stays in the trench (x −4.625). Lintel height, slab type and screed thickness are unknown.
+- **WC axis 60 cm from the west wall (owner, locked):** bowl r212 dimension c1418 0.356 → 0.416, frame
+  r222 x −4.35…−3.85, half wall r210 0.88 → 0.90 (the frame's east top bracket reaches x −3.805), boxing
+  r220 27 → 33 cm (air valve). Rejected 55 cm: the riser can pass 1.4 cm behind the frame's 5 cm-deep west
+  post if it sits 8 cm from the north wall, but the frame's west top wall bracket (1.085–1.115 m, 4.5 cm
+  west of the post, back to the wall) crosses it; fixes were dropping that bracket or two extra 45° elbows.
+  At 60 cm the bracket clears the riser by about 0.5 cm.
+- **The frame (Proven: Geberit CAD views 111.333.00.6_A/L/G.dxf from cdn.data.geberit.com, floor line
+  from the manual 972.363.00.0 p.2: drain axis 23, WC rods 33, top 112 cm):** 50 cm wide, posts and feet
+  5 cm deep; the PVC Ø100 outlet leg (rotating 45°, down or straight back; no sideways position) drops 9.2 cm
+  behind the frame face. Free depth behind the frame to the north wall, frame face 2 cm behind the
+  half-wall face: 5.6 cm behind the outlet bend (floor to 0.27 m, over its 10 cm width), 11.1 cm at
+  0.27–0.57 m (the sink Ø40 passes here at ≈ 0.45 m), 8.1 cm behind the cistern (0.57–1.02 m). Each extra
+  cm of cladding (Geberit allows 1–6) takes 1 cm off these.
+- **Drain option A (owner: "I settle for this"; fitting sizes typical NF PVC Ø100, socket Ø112, Hypothesis):**
+  the WC outlet at 60 cm stands against lintel 2's face (outlet 55–65 cm, its socket 6 mm into the lintel),
+  so the WC water crosses lintel 2 **above the slab, inside the half wall**: Geberit leg cut ≈ 11.5 cm above
+  the slab top → 87°30′ bend turning west, aimed 6° toward the north wall → ≈ 29 cm of pipe at ≈ 1.5 %,
+  lying on the slab (bottom on the slab, top ≈ 11 cm), passing behind the frame's west foot → **87°30′ tee
+  at (−4.42, 0.456)**, 28 cm from the west wall: up = the vent riser in boxing r220, down = the drop into
+  bay 1 → 87°30′ bend ≈ 9 cm under the slab top turning south → ≈ 75 cm of pipe at 1 % in bay 1 → 87°30′
+  bend at (−4.42, −0.30) down the stack. Pipe bottom in bay 1 ≈ 15 cm under the slab top (the deciding
+  unknown: lintel height and slab type). Clearances (cm, outside of pipe or socket): west foot 1.9 (Proven
+  geometry from the Geberit CAD: no crossbar between the feet below 12 cm, feet 4 cm wide × 4.5 cm deep, the
+  outlet 9.2 cm behind the frame face), north wall 1.8, boxing r220's inside 2.1 (valve 1.1), lintel 1 2.4,
+  lintel 2 15.4, column r122's east face ≈ 3.4 before its lining. Flow: about 1.1 m of horizontal pipe, the
+  riser directly over the tee where the WC enters (textbook primary vent), slopes within 1–3 %; the weak
+  point is four direction changes in ≈ 1.2 m (prefer a sweep tee, never less than 1 %, support the pipe on
+  the slab). Rodding: through the valve's hatch straight down the riser; with a roof vent, add a capped
+  access tee on the riser behind the hatch. Any back rail of the half wall along the north wall is left out
+  where the pipe passes. A thicker half wall does not help: the frame, its outlet and its feet move together.
+- ~~Layout C (45° elbow half above the floor, 45° M/F, flat 45° wye at (−4.45, 0.072), vent from the run's
+  north end, run at x −4.45, written to the headset 2026-10-09)~~: its 45° WC branch runs under the floor
+  from 60 cm to 25 cm and so crosses lintel 2, and its sockets touched lintel 1 once that lintel proved to be
+  6 cm wide. Option B (stack in bay 2) was rejected: the WC would have to move to ≈ 62 cm, there is no room
+  behind the frame for a Ø100 vent, and the column would move ≈ 70 cm from the wall. Option C (over lintel 2
+  in the screed) needs ≈ 12 cm of screed.
+- **Column r122 (owner):** north face 90 cm from ground window r108 (new dimension c1443; the old 43 cm
+  depth c774 removed), south face on room r57's edge (c772): **14 cm deep**; its east face is 37 cm from the
+  west wall for option A (passage r56's dimension c227 30 → 36 cm, the passage 1.335 → 1.275 m), 37.5 × 14 cm.
+  The stack (x −4.42) and the VMC duct (x −4.625) both drop through it at y −0.30; the stack is one plain
+  pipe with no joint inside the column. Boxing r220 upstairs is 37 cm wide (owner: "fine to raise the
+  boxing to 36 37"). Below, the basement wall between r67 and
+  r76 lies under the column; the owner will adjust it.
+- **Proven:** the option A edit (r220 37 cm, c227 −0.36, waste nodes moved to x −4.42, the old run north
+  p59 and node pn66 removed) solves on the 2026-10-09 headset plan with no conflicts and no dimension
+  dropped; only r56, r122 and r220 move. In the model the screed is assumed 5 cm (pipe z floor-relative).
+  Open: the lintel height and slab type (does bay 1 take ≈ 15 cm?), the screed thickness, the third
+  lintel, and the shower Ø40's route (it must enter the run in bay 1 flowing south).
 
 **WC stack (written to the headset 2026-10-08, read back identical; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
 `waste`, Ø100 (Hypothesis: usual French size for a WC): the upper WC's branch from the Duofix outlet
