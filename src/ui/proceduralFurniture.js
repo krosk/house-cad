@@ -1417,11 +1417,144 @@ function loft(upper, lower) {
   return geometry;
 }
 
+// Aldes Bahia Curve S hygro extract vent (Ø80), wall or ceiling. The visible part only: the
+// 155 × 155 domed face, 44 mm deep; the Ø75.6 barrel (22 mm, into the duct or sleeve) is hidden in
+// the wall and not built.
+//
+// Sources:
+//   - Aldes product sheet 11015144 "BW21 BAHIA CURVE S 5-45/30 m³/h - Ø 80 mm présence - Blanc"
+//     https://assets.aldes.fr/assets/productRefDocs/fr/FR-France-Aldes-BW21-BAHIA-CURVE-S-5-45-30-m-h-O-80-mm-presence-Blanc-11015144.pdf
+//     "Données dimensionnelles": H 155, L 48, Ø raccordement 80. Page 2 drawing (front and side
+//     orthographic views, rasterised at 600 dpi, 3.28 px/mm: the 155 width = 509 px, height 515 px):
+//       side view: 66 overall, 44 the face, the barrel 75.6 tall behind it; the face's depth from the
+//         wall read every 2.4 mm of height = PROFILE below (deepest, 44, from 67 to 120 mm up; the
+//         top falls off faster than the bottom);
+//       front view: side bands from 30 and 125 mm across (the face rounds off outside them); a
+//         recess 41–115 across, 73–127 up, bevelled in to the sensor window 54–102 across,
+//         81–120 up; a removable panel's edges at 57 and 138 mm up; the logo at 48 mm up; a small
+//         icon at 133 mm across, 100–110 up.
+//     Page 1: "à une hauteur d'au moins 1,80 m", "au moins 20 cm entre le centre de la bouche et les
+//     parois adjacentes", "en partie haute d'une paroi verticale ou au plafond".
+//   - Photo storeonline.aldes.fr image 3516 ("Bouche Bahia Curve bain Ø 80 mm", 11015171): white
+//     plastic, a rounded-square face with a softly rounded rim, a recessed square opening, the logo
+//     on the plain part. It shows the opening below the logo, the drawing above it: built as drawn.
+//   The face is concave (owner, 2026-10-09: "It should be concave"): the outline is the rim; the
+//   face dishes DISH mm in toward the middle, read from the side view's inner line at ≈ 35 mm, and
+//   the recess bottoms at ≈ 26 mm (its second inner line). Dish shape, the side edges' roll-over,
+//   corner rounding and the window, logo and icon tones are estimates.
+// `params.ceiling`: the same vent on a ceiling, face down; `sizeMm` is then 155 W × 44 H × 155 D.
+function vmcVentBahia(entry) {
+  const p = entry.params || {};
+  if (p.ceiling) {
+    const [W, H, D] = (entry.sizeMm || [155, 44, 155]).map((v) => v / 1000);
+    const wall = vmcVentBahia({ ...entry, sizeMm: [W * 1000, D * 1000, H * 1000], params: { ...p, ceiling: false } });
+    wall.rotation.x = Math.PI / 2; // wall front (+Z) → down (−Y), wall up (+Y) → +Z
+    wall.position.set(0, H / 2, -D / 2);
+    const g = new THREE.Group();
+    g.name = entry.name || 'vmc-vent-bahia-ceiling';
+    g.add(wall);
+    return g;
+  }
+  const [W, H, D] = (entry.sizeMm || [155, 155, 44]).map((v) => v / 1000);
+  const white = new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.45 });
+  const frame = new THREE.MeshStandardMaterial({ color: 0xe2e3e1, roughness: 0.5 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x8e9195, roughness: 0.8 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0xa7aaae, roughness: 0.5 });
+  // Rim depth (mm) against height (mm, from the bottom): the side view's outline, drawing p. 2.
+  const PROFILE = [[0, 5], [5, 11], [10, 16], [15, 20], [20, 23], [25, 26], [30, 28.5], [35, 31], [40, 33.5],
+    [45, 35.5], [50, 37], [55, 38.5], [60, 40], [67, 43], [75, 44], [115, 44], [122, 43], [128, 40.5],
+    [134, 38], [140, 35], [145, 30], [150, 24], [153, 19], [155, 12]];
+  const DISH = 9, RECESS = 26;          // mm: the face dishes 9 below the rim (side view's inner line at
+  //                                       ≈ 35 mid-height); the recess bottom at 26 (inner line at ≈ 26)
+  const OUT = [-36.5, 37.5, 73, 127], IN = [-24, 24, 81, 120]; // recess, sensor window (mm; x from centre)
+  const N = 8, a = W / 2, b = H / 2, mx = (W * 1000) / 155, mz = (H * 1000) / 155, md = (D * 1000) / 44;
+  const prof = (zmm) => {
+    const z = Math.min(155, Math.max(0, zmm / mz));
+    for (let i = 1; i < PROFILE.length; i++) if (z <= PROFILE[i][0]) {
+      const [z0, d0] = PROFILE[i - 1], [z1, d1] = PROFILE[i];
+      return d0 + (d1 - d0) * (z - z0) / (z1 - z0);
+    }
+    return PROFILE[PROFILE.length - 1][1];
+  };
+  const smooth = (e0, e1, t) => { const u = Math.min(1, Math.max(0, (t - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+  // Depth in mm at (x mm from the centre, z mm from the bottom): the rim (side edges rolled over their
+  // last ~8 mm), minus the dish, flat across the middle where the recess sits.
+  const depthMm = (x, z) => {
+    const ax = Math.abs(x / mx), r = ((ax / 77.5) ** N + (Math.abs(z / mz - 77.5) / 77.5) ** N) ** (1 / N);
+    const rim = prof(z) * (1 - 0.6 * smooth(69.5, 77.5, ax));
+    return Math.max(2, rim - DISH * smooth(0.92, 0.55, r)) * md;
+  };
+  const dz = (xm, ym) => -D / 2 + depthMm(xm * 1000, ym * 1000) / 1000; // metres, from the group's origin
+  // Grid: columns and rows in mm, with lines on the recess edges so its hole is exact; each column
+  // runs between the superellipse outline's bottom and top at that x.
+  const lines = (lo, hi, n, extra) => [...new Set([...Array.from({ length: n + 1 }, (_, i) => lo + (hi - lo) * i / n), ...extra])].sort((p1, p2) => p1 - p2);
+  const xs = lines(-77.5, 77.5, 14, OUT.slice(0, 2)).map((v) => v * mx / 1000);
+  const vs = lines(0, 155, 14, OUT.slice(2)).map((v) => (v - 77.5) / 77.5);
+  const yMax = (x) => b * Math.max(0, 1 - Math.abs(x / a) ** N) ** (1 / N);
+  const pos = [], idx = [], NX = xs.length, NV = vs.length;
+  for (const x of xs) for (const v of vs) { const y = b + v * yMax(x); pos.push(x, y, dz(x, y)); }
+  const id = (i, j) => i * NV + j;
+  const inHole = (i, j) => { const xm = (xs[i] + xs[i + 1]) / 2 * 1000 / mx, zm = (vs[j] + vs[j + 1]) / 2 * 77.5 + 77.5;
+    return xm > OUT[0] && xm < OUT[1] && zm > OUT[2] && zm < OUT[3]; };
+  for (let i = 0; i < NX - 1; i++) for (let j = 0; j < NV - 1; j++) {
+    if (inHole(i, j)) continue;
+    idx.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
+  }
+  // Rim edge down to the wall plane all round (the grid's outline), then a flat back.
+  const edge = [];
+  for (let i = 0; i < NX; i++) edge.push(id(i, 0));
+  for (let j = 1; j < NV; j++) edge.push(id(NX - 1, j));
+  for (let i = NX - 2; i >= 0; i--) edge.push(id(i, NV - 1));
+  for (let j = NV - 2; j > 0; j--) edge.push(id(0, j));
+  const base = pos.length / 3;
+  for (const e of edge) pos.push(pos[e * 3], pos[e * 3 + 1], -D / 2);
+  const ne = edge.length;
+  for (let k = 0; k < ne; k++) { const o0 = edge[k], o1 = edge[(k + 1) % ne], b0 = base + k, b1 = base + (k + 1) % ne; idx.push(o0, b1, b0, o0, o1, b1); }
+  const back = pos.length / 3;
+  pos.push(0, b, -D / 2);
+  for (let k = 0; k < ne; k++) idx.push(back, base + k, base + (k + 1) % ne);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const g = new THREE.Group();
+  g.name = entry.name || 'vmc-vent-bahia';
+  const face = new THREE.Mesh(geo, white);
+  face.material.side = THREE.DoubleSide;
+  g.add(face);
+  // The recess: four bevels from the dish down to the sensor window at RECESS mm.
+  const P = (x, z, d) => [x * mx / 1000, z * mz / 1000, d === undefined ? dz(x * mx / 1000, z * mz / 1000) : -D / 2 + d * md / 1000];
+  const quad = (q, mat) => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute([...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]], 3));
+    geom.computeVertexNormals();
+    g.add(new THREE.Mesh(geom, mat));
+  };
+  const bev = new THREE.MeshStandardMaterial({ color: 0xeceeeb, roughness: 0.5, side: THREE.DoubleSide });
+  const [ox0, ox1, oz0, oz1] = OUT, [ix0, ix1, iz0, iz1] = IN;
+  quad([P(ox0, oz1), P(ox1, oz1), P(ix1, iz1, RECESS), P(ix0, iz1, RECESS)], bev); // top
+  quad([P(ox0, oz0), P(ix0, iz0, RECESS), P(ix1, iz0, RECESS), P(ox1, oz0)], bev); // bottom
+  quad([P(ox0, oz0), P(ox0, oz1), P(ix0, iz1, RECESS), P(ix0, iz0, RECESS)], bev); // left
+  quad([P(ox1, oz0), P(ix1, iz0, RECESS), P(ix1, iz1, RECESS), P(ox1, oz1)], bev); // right
+  // Flat parts: the sensor window and its opening at the recess bottom; the logo and icon on the face.
+  const patch = (x0, x1, z0, z1, mat, d) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry((x1 - x0) * mx / 1000, (z1 - z0) * mz / 1000), mat);
+    const xm = (x0 + x1) / 2, zm = (z0 + z1) / 2;
+    m.position.set(...P(xm, zm, d ?? depthMm(xm * mx, zm * mz) / md + 0.6));
+    g.add(m);
+  };
+  patch(ix0, ix1, iz0, iz1, frame, RECESS);         // sensor window, 54–102 across, 81–120 up
+  patch(-17, 17, 86, 115, dark, RECESS + 0.5);      // its opening
+  patch(-10, 10, 46.5, 49.5, grey);                 // logo
+  patch(53, 58, 100, 110, grey);                    // icon
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
-  'vmc-easyhome': vmcEasyhome,
+  'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia,
 };
 
 export function isProcedural(entry) {

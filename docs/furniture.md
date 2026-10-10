@@ -337,6 +337,18 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   down). Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
   scale, sit on the drawing's lines (overlay); bounding box 457.5 × 187.6 × 459.0 mm against the
   drawing's 459 × 187 × 460; 3 028 triangles. Not yet seen in AR, View 3D or on device.
+- `aldes-bahia-curve-s`: Aldes Bahia Curve S humidity-controlled extract vent, Ø80 (BW21, Aldes
+  11015144: the bathroom-with-WC model; the kit lists "3x Bouches Bdh" without a model name, so which
+  vent the kit holds is a Hypothesis), builder `vmc-vent-bahia`. On a wall, face toward the room:
+  155 × 155 × 44 mm (sheet "H 155, L 48, Ø 80"). Outline and the rim's depth profile measured on the
+  sheet's orthographic front and side views (p. 2, 600 dpi, 3.28 px/mm); the face is **concave**
+  (owner, 2026-10-09), 9 mm below the rim, with a recess down to the sensor window at 26 mm (both read
+  from the side view's inner lines: estimates). The Ø75.6 barrel behind the face is not built. Low
+  poly on purpose (owner: "the curve don't matter that much"): 624 triangles. The drawing puts the
+  opening above the logo, Aldes's store photo 3516 (a sister model) below it: built as drawn.
+  `-ceiling`: the same vent on a ceiling, face down (155 × 44 × 155). Proven in a scratch browser
+  preview: front and side renders, orthographic at the drawing's scale, sit on its outline; bounding
+  box 155.0 × 155.0 × 43.3 mm. Not yet seen in AR, View 3D or on device.
 
 ## IKEA kitchen units assembled from part models (2026-10-04)
 

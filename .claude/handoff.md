@@ -20,11 +20,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-09 (session 40, continued; the Quest reachable again on 10-09)
-**Status:** Proven (git): the code head is `c29de11` (Aldes EasyHOME furniture); `daf3bf9` (docs) is
-pushed and served (live `version.json`) and in the headset precache (`update-app`, 10-09); this
-handoff + the item-65 doc block are the next commit. Proven (`quest-storage read` after each write,
-byte-identical): the headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's
-unit-A swap and item 65 (upper WC at 60 cm, drain option A, column r122; written 2026-10-09). Scratchpad backups are session-local; no save slot
+**Status:** Proven (git): the code head is the commit carrying this line (vent model `vmc-vent-bahia`,
+item 66); `ccadff3` (docs) was served and in the headset precache (`update-app`, 10-09). Proven
+(`quest-storage read` after each write, byte-identical): the headset plan carries every session-40 edit
+(items 49, 53, 59, 60), item 63's unit-A swap and item 65 (upper WC at 60 cm, drain option A, column
+r122; written 2026-10-09). Item 66 (the upper vent) is drafted, not written: it waits for the deploy,
+`update-app`, then the owner's yes. Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -691,6 +692,19 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     (scratchpad, session-local): `duofix/opa.mjs` (option A top, north-wall face, 3D sketch); the Chinese
     `duofix/wc60-zh.mjs` drawings show the superseded layout C.
 
+66. **Upper bathroom VMC vent: settled, model built, NOT yet written** (owner, 2026-10-09/10: "Ok, I will
+    settle for this design"). New furniture `aldes-bahia-curve-s` (+ `-ceiling`), builder `vmc-vent-bahia`
+    (Aldes BW21 11015144, measured on the sheet's orthographic views; concave face per the owner; low
+    poly per the owner; `docs/furniture.md`). Design (`docs/plumbing-workflow.md` "Upper bathroom vent"):
+    the vent on boxing r220's south face, facing south, centre 17 cm from the bare west wall at 2.35 m;
+    half wall r210 and boxing r220 flush at 25 cm (c1414 0.25; the WC bowl 3 cm forward, the frame and
+    drains unchanged); the Ø80 duct in the trench at 8.5 cm, leaning 8.5 cm east up the boxing, two 45°
+    into the vent. The edit is scratch `edit-vent.mjs` (session-local): r220 y 0.28 h 0.25, c1414, new
+    zone r223 (the vent, foot 2.2725), nodes pn45/46/48/58 moved, new pn72/pn73 and pipes p65/p66, p39
+    re-ended. Proven: it solved on the 2026-10-09 headset plan with no conflicts, no dimension dropped;
+    only r210, r212, r220 move. Write order: deploy, `update-app`, the owner's yes, then backup, fresh
+    read == base, `write --base`, read back.
+
 ## Next step
 
 **Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
@@ -698,8 +712,7 @@ none drawn in the plan:
 - Item 64, the ground shower room swap (exact geometry there).
 - Unit B to the laundry (`docs/plumbing-workflow.md` "Unit B in the laundry"): needs a new catalog
   entry `aldes-easyhome-hygro-compact-wall-out-up` (OUT up), a push, `update-app`, then the write;
-  with it the laundry vent ≥ 20 cm from the walls and the upper shower vent moved onto boxing r220's
-  south face (widened).
+  with it the laundry vent ≥ 20 cm from the walls (the upper vent is settled: item 66).
 - The WC stack's roof vent (still drawn): keep it, or a Ø100 air valve on the riser in boxing r220
   at 1.30–1.49 m behind a grille hatch, once the contractor says where the network's open vent is.
 - The upper shower's Ø40 route and branch (item 65 advice), the upper sink (optional), and the slab's

@@ -650,5 +650,32 @@
     },
     "source": "procedural: Aldes EasyHOME Hygro Compact on a wall, kitchen Ø125 + an Ø80 up, OUT Ø160 down; same sources as aldes-easyhome-hygro-compact (builder vmcEasyhome)",
     "registeredAt": "2026-10-08T00:00:00.000Z"
+  },
+  "aldes-bahia-curve-s": {
+    "name": "aldes-bahia-curve-s",
+    "article": "aldes-bahia-curve-s",
+    "sizeMm": [
+      155,
+      155,
+      44
+    ],
+    "procedural": "vmc-vent-bahia",
+    "source": "procedural: Aldes Bahia Curve S hygro extract vent BW21 Ø80 (Aldes 11015144; no manufacturer 3D model); face and depth profile from the product sheet's orthographic drawing (p. 2) + Aldes store photo 3516 (sources in the builder vmcVentBahia); on a wall, face toward the room",
+    "registeredAt": "2026-10-09T00:00:00.000Z"
+  },
+  "aldes-bahia-curve-s-ceiling": {
+    "name": "aldes-bahia-curve-s-ceiling",
+    "article": "aldes-bahia-curve-s-ceiling",
+    "sizeMm": [
+      155,
+      44,
+      155
+    ],
+    "procedural": "vmc-vent-bahia",
+    "params": {
+      "ceiling": true
+    },
+    "source": "procedural: Aldes Bahia Curve S hygro extract vent BW21 Ø80 (Aldes 11015144; no manufacturer 3D model); face and depth profile from the product sheet's orthographic drawing (p. 2) + Aldes store photo 3516 (sources in the builder vmcVentBahia); on a ceiling, face down",
+    "registeredAt": "2026-10-09T00:00:00.000Z"
   }
 }

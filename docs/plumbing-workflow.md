@@ -303,6 +303,30 @@ upper shower vent (−4.625, 0.42) is 7.5 cm / 11 cm from two walls: move it ont
 widened boxing r220 (one bend less than a ceiling vent fed from below), ≥ 20 cm from the west wall and
 the ceiling. The laundry vent as drawn is 16 cm from the north wall.
 
+**Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; not yet
+written):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
+of boxing r220**, facing south, centre at 2.35 m and **17 cm from the bare west wall** (owner: "The guide says
+20cm, but I will allow getting closer to the west wall"; the wall is bare today, its finish still to come,
+2.5 cm assumed, which leaves the vent's edge 6.75 cm off it). Boxing r220 and half wall r210 both go from 22
+to **25 cm deep**, one flat face (owner: "I would rather it be flat, 25cm all along"; dimension c1414). The
+Geberit frame stays where it is, its front now 5 cm behind the face (Geberit allows 1–6 cm), so no drain
+moves; the WC bowl comes 3 cm forward (front edge 77.9 cm from the north wall).
+The Ø80 duct runs in the trench at **8.5 cm** from the wall (the sockets ≈ 1 cm from lintel 1), turns up
+5 cm from the north wall, **leans 8.5 cm east** over its 2.2 m rise (≈ 2.2°) and turns south with **two 45°**
+into the vent's sleeve. The lean costs no fittings and strains no joint (Hypothesis, geometry): the floor
+pair is turned about the trench pipe's axis so its outlet already leans, and the top pair works in a plane
+tilted by the same angle. Why 17 cm (Hypothesis, sockets Ø80 ≈ 88 mm, Ø100 ≈ 112 mm, the valve ≈ 147 ×
+132 mm, ≥ 1 cm gap): with the roof vent the WC riser (28 cm) runs beside the top pair, which limits the vent
+to ≈ 17 cm (pipe to pipe 2 cm, socket to socket 1 cm); with the valve the limit is the valve at 1.49 m, ≈ 19–20
+cm. At 17 cm both WC options stay open; at the valve the duct passes 2.5 cm away. The valve hatch (14–36 cm
+on the face) shows the duct at its back left.
+Why two 45° need the 25 cm (Nicoll F/F Ø80: 45° Z 26.5, 87°30′ Z 61, socket 47): two 45° need ≈ 18 cm from the
+duct axis to the outlet socket's mouth, which a 22 cm boxing cannot give; one 87°30′ (≈ 11 cm) fits 22 cm
+but costs ≈ 0.6 Pa more at boost. Rejected: a jog (two more 45°, ≈ 1.2 Pa) to shift the duct sideways, since the
+lean does it free; the vent facing up (Aldes: a vertical wall high up, or a ceiling, ≥ 1.80 m); a ceiling vent
+fed from below (two 90° turns and a void above the ceiling). The drawn ceiling vent V0 (inside the boxing's
+top) is replaced.
+
 **WC stack vent (owner, 2026-10-09):** the contractor says the roof vent is not needed. Hypothesis
 (secondary summaries of DTU 60.11, not the text): one open vent to outside per network is required; an air
 admission valve is tolerated only with one; a vent far down the line does not protect a stack whose top is
