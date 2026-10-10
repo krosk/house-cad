@@ -377,6 +377,38 @@ the stack only through the Ø40 and a one-fixture valve, so a flush would pull t
 seal under a 9.3 cm tray, typical) and the basin's: smell after idle days, gurgling. A Ø100 valve on a Ø100 pipe
 that the vanity drain joins would work but only moves the riser, through 5.6–11 cm behind the frame. Not drawn: the
 plan still shows the roof vent above the riser.
+**Open vent and collector (owner, 2026-10-10):** the house's collector (the horizontal main drain the stacks
+join) is **outside the house, under a paved area within the property, along the south face**, from the east
+end (≈ 1 m above the basement floor, "I believe") to the west, **falling west**. The kitchen, the ground-floor
+WC and the bathroom all leave south to join it. The basement's inside south face (laundry r66) is y −4.89,
+x −0.14 → −4.62 (4.48 m; Proven: 2026-10-10 headset plan). Not in the plan yet; its exit and depth below
+the paving are unknown. The drafted upper stack run (p58) stops in r66 at (−3.95, −2.40), 1.90 m up: it must
+still cross the south wall, likely below outside ground (a sealed sleeve; Hypothesis), to join it. **No existing stack reaches the roof or the attic (owner, 2026-10-10): the network has no open vent today.**
+So the upper riser's roof vent (drawn, p60/p61) is the network's only candidate open vent (Hypothesis: with it, the
+Ø100 air valve on that riser is not needed, valves stay possible on the other stacks). The riser at (−4.42, 0.456)
+is 0.38 m (plan) from upper window r115 and 0.93 m from r114 (west wall, heads 2.43 m; Proven, headset plan): a
+roof outlet straight above it, on the slope near the west eave, may be inside the window-distance rule; offsetting
+it in the attic toward the ridge clears it (Hypothesis; roof shape and height not in the plan). **Façade vent option (owner question, 2026-10-10):** a Ø100 pipe teed onto the top of the outside collector at the
+paving, rising up the south façade as the network's open vent, with the Ø100 valve kept on the upper riser
+(the valve covers suction at the stack top, the façade vent the pressure and the gases). Hypothesis: accepted if it
+ends above the roof edge away from openings (the sources disagree whether the eaves suffice or the ridge is required:
+ask the contractor); UV-proof or painted pipe, guarded low down, bracketed. Proven (headset plan): the ground and
+upper floors have no south window; the basement's south window r146 is x −3.10…−1.84 (sill 1.32, head 1.98 m above
+the basement floor); the nearest others are the west-wall windows r80/r113 (from y −4.25, 1.15 m from the south
+face) and the east-wall r111 (x 3.27, from y −4.22). Owner, same day: the east part (kitchen, living room) is single-storey, its roof ≈ 3 m up; can the façade vent end
+there? Proven (headset plan): the upper floor spans x −4.70 → 0.40 (its east wall r189, no opening in it); the ground
+floor runs on to x 5.42, with no south window. Hypothesis: an outlet above that low roof, ≥ 3 m east of the two-storey
+wall and clear of the east wing's openings and roof windows, meets the opening rules; the doubt is whether a vent may end
+below a taller part of the same building (eddies off that wall push the plume down; some rules ask for the highest part).
+Ask the contractor. The owner confirms no opening on the south side on the ground and upper floors. Hypothesis: that frees the pipe's
+route, not its end: it still ends above the roof edge of the part it climbs (≈ 30–40 cm, or the ridge if the contractor
+requires it), since a low outlet blows sewer air onto the paving and is outside the roof-exit rule. The attic is closed: the
+open vent may not end in it ("hors combles", RSDT art. 42 per secondary sources, Hypothesis), so an open vent
+leaves through the roof covering (a vent tile / sleeved outlet), or an attic air valve backed by an open vent
+elsewhere. Window distance: the sources disagree (1 m, 3 m, "+40 cm"); none allows "slightly above" instead
+(Hypothesis; the UK rule is ≥ 0.9 m above any opening within 3 m). The collector's height is set by its exit
+(the invert at the wall or the connection box) plus its fall (≥ 1 %) back to the upstream end; a basement
+fixture or floor drain below it needs a pump (Hypothesis).
 
 **Upper WC position and its drain (owner, 2026-10-09; drain option A chosen and written to the headset the same day, read back identical):**
 - **Slab constraint (owner, corrected 2026-10-09):** along the whole west wall of the upper floor, a 14 cm
@@ -480,6 +512,9 @@ the pipes are **composite (multilayer)**. Owner decisions:
 - **Hybrid layout, manifold at the boiler:**
   - every ground-floor radiator on its **own pair** from the manifold, run along the basement ceiling
     (every joint within reach), then straight up through the floor;
+  - (owner, 2026-10-10: the kitchen's pair also feeds the east basement room r74, teed in r74's ceiling; the ground
+    bedroom's pair also feeds the laundry r66, teed in the laundry ceiling; both basement rooms at 15 °C,
+    `docs/heat-loss.md` "Laundry heater"; not drawn yet)
   - the **kitchen and ground shower-room radiators on their own lines too** (owner chose them over
     one shared pair split on the basement ceiling). There is no basement under them: both pairs go up
     into the slab together at the south edge of the east basement room; one short trench (≈ 1.3 m,

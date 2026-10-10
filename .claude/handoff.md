@@ -20,11 +20,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-10 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `538fb43` (tray `sensea-neo-100x80`, item 69; before it `e096cfe`, item 67),
-served and in the headset precache (`update-app` 10-10, "installed 538fb43"); later commits are docs only. Proven
-(`quest-storage read` after each write, byte-identical): the headset plan carries every session-40 edit
-(items 49, 53, 59, 60), item 63's unit-A swap and item 65 (upper WC at 60 cm, drain option A, column
-r122; written 2026-10-09), item 66 (the upper vent; written 2026-10-10) and item 67 (unit B hung under the laundry ceiling; app `e096cfe`, written 2026-10-10) and item 68 (boxing r220 a half wall; written 2026-10-10, 236 846 chars). Scratchpad backups are session-local; no save slot
+**Status:** Proven (git): the code head is `26aaad7` (Duofix product, see-through half walls, boxing tiles above
+a half wall: item 70; before it `6aab97c` stacked half walls, `538fb43` tray), served and in the headset precache
+(`update-app` 10-10, "installed 26aaad7"). Proven (`quest-storage read` after each write, byte-identical): the
+headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
+60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
+ceiling), item 68 (boxing r220 a half wall) and item 71 (Lucia tiles on boxing r220; written 2026-10-10, 237 136
+chars), all 2026-10-10. Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -753,9 +755,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       headset frames r221/r222 yet (they are plain boxes); the scratch share link puts it on both.
     - Tiles on half walls: `halfWallFace` (`src/core/flooring.js`) now shows a half wall's side above a lower
       neighbouring half wall (segment `z0`), so a boxing on a half wall can be tiled above it. Proven in Node:
-      r220's east face gives 1.15–2.70 m. Drafted, NOT written: `edit-tile.mjs` adds Lucia ivory to r220's four
-      sides; best written with the stand-alone column (`edited-col-tile.json`), since with the overlap r210's
-      south-face tiles and r220's would sit on the same plane over 0–1.15 m.
+      r220's east face gives 1.15–2.70 m. The tiles themselves were written as item 71.
     - View 3D button "🧱 Half walls" (overview and POV, shared links too): in-room half walls turn faint
       (`halfWallGlassMaterial`) and their finishes hide, to see a frame inside. Built split by
       `buildArchitecturalFloor(…, { splitHalfWalls })`; AR (`mr.js`) does not pass it and is unchanged. Proven in
@@ -763,6 +763,24 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       Then the owner saw the boxing stay solid: a half wall against a wall is merged with it into one box, whose
       centre lay in the wall. Boxes are now cut on the half walls' outlines before sorting; Proven in Node: r220 is
       wholly in the see-through part (x −4.70…−4.33, 0–2.70 m), solid + see-through = the old total on every floor.
+
+71. **Lucia ivory tiles on boxing r220: written** (owner, 2026-10-10: "Apply tile to the boxing"; backup, fresh read
+    unchanged, `--base`, read back identical, 237 136 chars; AR assumed closed, not checked). Scratch `edit-tile.mjs`:
+    `lucia_ivory_30x90` on r220's left/right/bottom/top sides (as r210 has). Only finishes change (Proven: no
+    conflict, no dimension, nothing moves). With r210 still running under r220, r210's south-face tiles and r220's
+    lie on the same plane over x −4.70…−4.33, 0–1.15 m: same material and plan-anchored UVs, so no visible flicker
+    (Hypothesis), but the tile takeoff counts that ≈ 0.43 m² twice. The stand-alone column (item 68's draft
+    `edit-col.mjs`, then re-apply on the new base) removes the overlap; it still waits for the owner's yes, and so
+    does setting the Duofix on frames r221/r222.
+72. **Answers, no plan change (owner, 2026-10-10):** the WC network's open vent and two basement radiators.
+    - Vent: the collector is outside under the south paving, falls west; the kitchen, ground WC and bathroom join it;
+      **no stack reaches the roof or attic** (owner), so the network has no open vent today. Option studied: a Ø100
+      façade pipe teed onto the collector, up the windowless south façade of the single-storey wing to ≈ 0.3–0.4 m
+      above its ≈ 3 m roof edge (or the ridge if the contractor requires it), with the Ø100 valve kept on the upper
+      riser. Not chosen, not drawn. `docs/plumbing-workflow.md` "Open vent and collector".
+    - Heating: laundry r66 and east room r74 at 15 °C (radiators sized for 17 °C: ≈ 1600 / 1400 W rated);
+      **pairs: bedroom r51 + laundry (tee in the laundry ceiling); kitchen + r74 (tee in r74's ceiling); shower
+      room alone** (option A); thermostatic valves only. Not drawn. `docs/heat-loss.md` "Laundry heater".
 
 ## Next step
 
@@ -775,7 +793,7 @@ none drawn in the plan:
 - The WC stack vent: **owner, 2026-10-10: "keep the solution with a 100 pipe and 100 valve" for now**, i.e. the
   Ø100 riser over the tee in boxing r220 with a Ø100 WC-rated air valve at ≈ 1.30–1.49 m behind a grille hatch
   (not the contractor's idea of a vent at the vanity, nor the roof vent). The plan still draws the roof vent
-  (p60/p61 to pn68): not redrawn yet. Still ask the contractor where the network's open vent is.
+  (p60/p61 to pn68): not redrawn yet. No open vent exists (item 72): one is needed, the roof vent or the façade pipe.
 - The upper shower's Ø40 route and branch (item 65 advice), the upper sink (optional), and the slab's
   make-up (the drain trench is ≈ 15 cm deep).
 - The unit choice for B: Classic (curve unpublished) or HP (speed 4 within margin); Ø80 only.
@@ -796,7 +814,9 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`e096cfe`, 10-10; relaunch it); item 67: unit B upside down
+- **First, with the Quest:** the app is updated (`26aaad7`, 10-10; relaunch it); items 68/71: boxing r220 a
+  tiled half wall to the ceiling over r210's west end; View 3D "🧱 Half walls" shows frames through half walls
+  (no AR equivalent); item 67: unit B upside down
   under laundry r66's ceiling near the west wall (lid toward the floor, MATERIAL · FURNITURE), the grey Ø80
   coming diagonally from the column then straight south onto its north spigot, the Ø160 OUT straight to the
   south wall west of window r146, a 20 cm laundry stub west; nothing left on the r76 wall; item 66: the Bahia Curve

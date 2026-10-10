@@ -464,3 +464,50 @@ depend on the unknown wall, slab and lining R. Unverified on the Quest.
   beams, lintels and cantilevers are not in the plan and not counted; wall corners are left out, as in the DPE.
 
 Open: the earth level, the masonry material, slab construction, attic R once blown, and the R of the existing linings.
+
+## Laundry heater (owner, 2026-10-10: "it does not need to reach 22 deg, but just enough to reduce humidity … such as 15")
+
+Laundry r66 (basement, 12.3 m², 25.3 m³) heated to **15 °C**, the rest of the basement unheated (6 °C), −7 °C outside,
+earth −0.4 m (project settings). **Proven** (Node, `floorHeatLoss` on the 2026-10-10 headset plan with only the
+Basement's `heated` and `tRoom` changed, scratch script): r66 alone **543 W**: walls 178 (19.8 m², 18.2 in the earth;
+south, west and east are exterior, the north side is partitions), window r146 22, thermal bridges 212, floor on earth 38,
+air 94 (0.5 ach from outside). The model cannot see the two neighbours the heated-basement run hides, so by hand
+(Hypothesis; U from the project's λ 1.5, Rsi 0.13 each side): **+ ≈ 150 W** through the north partitions to the unheated
+basement (≈ 17 W/K: 46 cm to r67, 7 cm plaster and door r120 to r68, 40 cm to the stair), **− ≈ 75 W** gained from the
+heated ground floor through its insulated ceiling (R 0.9: ≈ 0.87 W/m²K × 12.3 m² × 7 K). Air: the laundry's VMC extract
+(30 m³/h assumed) drawing basement air at 6 °C ≈ 92 W, about the model's 94; drawn from outside ≈ 225 W.
+**Design loss ≈ 620 W** (≈ 750 W if the replacement air comes from outside), plus ≈ 70 W on average to evaporate a
+load a day (≈ 2.5 kg of water after a 1200 rpm spin, Hypothesis). At 12 °C: ≈ 350 W.
+Sizing (owner, same day: "Hot water", a radiator on the house circuit). The project's radiator ΔT 24 K is above
+a 22 °C room, so the mean water is ≈ 46 °C and in a 15 °C laundry the radiator sees ≈ 31 K: (31/50)^1.3 ≈ 0.54 of its
+EN 442 rating. **≈ 1150 W rated** for 620 W (≈ 1400 W if the air comes from outside), with a thermostatic valve set
+to ≈ 15 °C; its flow and return cross the unheated basement, so insulate them (Hypothesis). Heat lowers relative humidity (air saturated at 6 °C
+is ≈ 54 % at 15 °C) but removes no water: the VMC extract (or a dehumidifier) does. The bridges (212 W) are the largest
+uncertainty: the ψ table is meant for walls above ground.
+Shared pair (owner, same day, corrected: "one pipe for the ground floor bedroom and the laundry room, with tees"):
+one 16 × 2 flow + return pair, each radiator teed off with its own valves (two-pipe). The ground bedroom r51 (13.9 m²
+with r133) lies right above the laundry (Proven, headset plan), so the tees sit on the laundry ceiling. Load at −7 °C
+≈ 1.45 kW: bedroom 835 W at 22 °C (Proven: Node, headset plan) + laundry ≈ 620 W. Hypothesis (12 mm bore, water ≈ 45 °C):
+10 K drop (boiler) ≈ 125 l/h, ≈ 0.31 m/s, ≈ 0.15 kPa/m; 5 K drop (a future heat pump) ≈ 250 l/h, ≈ 0.61 m/s, ≈ 0.5 kPa/m:
+fine now, at the noise limit with a heat pump on a long run. Each radiator sees the same water, so the laundry stays
+≈ 1150 W rated. ~~Hall + laundry, in series~~: a misreading (the owner meant the bedroom, with tees).
+East basement room r74 (owner, same day: "the same rule as laundry room", 15 °C), 7.75 m² (x 0.69…4.31, y −0.87…1.27).
+Proven (Node, same run as the laundry): 501 W: walls 130, openings 85, bridges 185, floor 24, ceiling 17, air 59. By hand
+(Hypothesis): + ≈ 148 W through the north partition to r72 (27 cm, door r75) at 6 °C; − ≈ 50 W because door r73 opens
+onto the unheated basement, not outside (the model counts it exterior); − ≈ 46 W gained from the heated ground floor
+above (7.5 m², R 0.9). **≈ 550 W**, so ≈ 1000 W rated at the house water (31 K over 15 °C). On the kitchen + ground
+shower pair (owner question): ≈ 1.5 kW in all; 16 × 2 ≈ 130 l/h at a 10 K drop, ≈ 260 l/h (≈ 0.64 m/s) at 5 K: fine on
+the boiler, at the noise limit with a heat pump. Those two pairs already rise at r74's south edge, so its tee sits in its
+own ceiling (reachable), r74 first on the pair (Hypothesis).
+**Owner, same day: the ground shower room keeps its own pair; the kitchen and r74 share one** (and the bedroom + laundry
+share one, thermostatic valves only, no lockshields). Kitchen + r74 ≈ 1.2 kW: ≈ 105 l/h at 10 K, ≈ 210 l/h (≈ 0.52 m/s) at
+5 K, fine (Hypothesis). The tee is in r74's ceiling; the slab trench keeps its two pairs; the tightest room, the shower,
+is on nobody else's flow. Not drawn in the plan yet.
+At **17 °C** instead (owner question, same day): Proven (Node, same run) r66 659 W, r74 592 W; with the same hand
+corrections (Hypothesis) **laundry ≈ 800 W, r74 ≈ 690 W**; the house water is then 29 K over the room, ×0.49 of the rating:
+≈ **1600 W** and ≈ **1400 W** rated. Pairs at 5 K (heat pump): bedroom + laundry ≈ 1.64 kW, ≈ 280 l/h, ≈ 0.69 m/s (over the
+≈ 0.6 m/s noise limit); kitchen + r74 ≈ 1.36 kW, ≈ 0.58 m/s. Fine on the boiler (10 K). Relative humidity of air
+saturated at 6 °C: ≈ 54 % at 15 °C, ≈ 48 % at 17 °C.
+Owner, same day: **A kept** (kitchen + r74, shower alone). ~~B: r74 + shower, kitchen alone~~: evener loads (≈ 0.42 m/s
+at 5 K) but the shower room, the tightest room, would share with r74, first on the pair and slow to warm (buried
+masonry, ≈ 1400 W rated), so it would warm last on a cold start.
