@@ -19,12 +19,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-09 (session 40, continued; the Quest reachable again on 10-09)
-**Status:** Proven (git): the code head is `5202df3` (vent model `vmc-vent-bahia`, item 66),
-served and in the headset precache (`update-app` 10-10); later commits are docs only. Proven
+**Date:** 2026-10-10 (session 40, continued; the Quest reachable)
+**Status:** Proven (git): the code head is `e096cfe` (hung Aldes `aldes-easyhome-hygro-compact-hung`, item 67),
+served and in the headset precache (`update-app` 10-10, "installed e096cfe"); later commits are docs only. Proven
 (`quest-storage read` after each write, byte-identical): the headset plan carries every session-40 edit
 (items 49, 53, 59, 60), item 63's unit-A swap and item 65 (upper WC at 60 cm, drain option A, column
-r122; written 2026-10-09) and item 66 (the upper vent; app `5202df3`, written 2026-10-10). Scratchpad backups are session-local; no save slot
+r122; written 2026-10-09), item 66 (the upper vent; written 2026-10-10) and item 67 (unit B hung under the laundry ceiling; app `e096cfe`, written 2026-10-10, 236 833 chars). Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -703,15 +703,16 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     zone r223 (the vent, foot 2.2725), nodes pn45/46/48/58 moved, new pn72/pn73 and pipes p65/p66, p39
     re-ended. Proven: it solved on the 2026-10-09 headset plan with no conflicts, no dimension dropped;
     only r210, r212, r220 move.
-67. **Unit B hung under the laundry ceiling: drafted, NOT written** (owner, 2026-10-10: "Yes" to drawing and
-    drafting it). New furniture `aldes-easyhome-hygro-compact-hung` (builder `vmcEasyhome` `params.hung`, the
-    flat box turned 180° about its front axis; uncommitted at drafting time). Design in
+67. **Unit B hung under the laundry ceiling: written** (owner, 2026-10-10: "Yes"; app `e096cfe` installed by
+    `update-app`; AR closed, backup, fresh read unchanged, `--base`, read back identical, 236 833 chars). New furniture `aldes-easyhome-hygro-compact-hung` (builder `vmcEasyhome` `params.hung`, the
+    flat box turned 180° about its front axis; commit `e096cfe`). Design in
     `docs/plumbing-workflow.md` "Unit B hung under the laundry ceiling": no turn down into the unit, OUT Ø160
     straight south, the upper Ø80 at 4½ pairs and 8.97 m, ≈ 20–23 Pa at boost (Hypothesis). The edit is scratch
     `edit-bhung.mjs` (session-local): r219 → the hung Aldes at (−3.99, −2.77) foot 1.858; pipes p44–p52 and
     nodes pn44, pn50–pn57 removed; new pn74–pn79, p67–p70. Proven (`chk-bhung.mjs` on the 2026-10-10 headset
     plan): no conflicts, no dimension dropped, only r219 moves, no dangling node; the hung model's spigot ends
-    land on the nodes (node check). To write: push the catalog entry, `update-app`, then the usual write.
+    land on the nodes (node check). To check in AR: the box lid-down under r66's ceiling, the duct onto its
+    north spigot, OUT south.
 
 ## Next step
 
@@ -721,15 +722,21 @@ none drawn in the plan:
 - ~~Unit B to the laundry on the wall~~ (needed an OUT-up entry and a turn down into the unit):
   replaced by item 67, B hung under the laundry ceiling. Still open there: the laundry vent (≥ 20 cm from
   the ceiling too), the machines' place and headroom under the box.
-- The WC stack's roof vent (still drawn): keep it, or a Ø100 air valve on the riser in boxing r220
-  at 1.30–1.49 m behind a grille hatch, once the contractor says where the network's open vent is.
+- The WC stack vent: **owner, 2026-10-10: "keep the solution with a 100 pipe and 100 valve" for now**, i.e. the
+  Ø100 riser over the tee in boxing r220 with a Ø100 WC-rated air valve at ≈ 1.30–1.49 m behind a grille hatch
+  (not the contractor's idea of a vent at the vanity, nor the roof vent). The plan still draws the roof vent
+  (p60/p61 to pn68): not redrawn yet. Still ask the contractor where the network's open vent is.
 - The upper shower's Ø40 route and branch (item 65 advice), the upper sink (optional), and the slab's
   make-up (the drain trench is ≈ 15 cm deep).
 - The unit choice for B: Classic (curve unpublished) or HP (speed 4 within margin); Ø80 only.
 - Item 66's open points: the west-wall finish thickness (2.5 cm assumed; the vent at 17 cm leaves its edge
   6.75 cm off it); a real Girpi 45° M/F elbow's size (Nicoll F/F values used); which vent the kit's
   "3x Bouches Bdh" actually is (the Bahia Curve S BW21 is assumed); the 17 cm keeps both WC options (roof
-  vent: 1–2 cm to the riser; valve: 2.5 cm), so the roof-or-valve choice no longer moves the VMC vent.
+  vent: 1–2 cm to the riser; valve: 2.5 cm). With the owner's valve choice (2026-10-10) the vent could move
+  to ≈ 19–20 cm (Aldes asks 20) at some cost in lean: offered, not studied.
+- Unit B (item 67): the boost pressure assumes the HP at speed 4 (≈ 87–100 Pa at the vent, Hypothesis);
+  one 90° behind the vent instead of the 2×45° would allow a ≈ 21–22 cm half wall (≈ 82–97 Pa): owner's
+  question, not chosen. Commissioning: read the upper vent's pressure during a boost.
 - Unit A's lid needs 440 × 340 mm above it to open (notice p. 5); flat under a 2.70 ceiling it has
   5 cm: an access plan (hatch, or another orientation) is open.
 
@@ -739,7 +746,10 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`5202df3`, 10-10; relaunch it); item 66: the Bahia Curve
+- **First, with the Quest:** the app is updated (`e096cfe`, 10-10; relaunch it); item 67: unit B upside down
+  under laundry r66's ceiling near the west wall (lid toward the floor, MATERIAL · FURNITURE), the grey Ø80
+  coming diagonally from the column then straight south onto its north spigot, the Ø160 OUT straight to the
+  south wall west of window r146, a 20 cm laundry stub west; nothing left on the r76 wall; item 66: the Bahia Curve
   vent on boxing r220's south face at 2.35 m, 17 cm from the west wall, facing the room (its 3D look is
   unseen anywhere but a scratch preview); half wall + boxing one flat 25 cm face, the WC bowl 3 cm
   further south; HEATING · PIPE: the grey Ø80 rising at a slight lean and turning south into the vent.
@@ -749,8 +759,9 @@ skip `update-app` and say so.
   the riser at 28 cm, then the run under the floor in bay 1 to the stack.
   - VMC (item 59): the two units (MATERIAL · FURNITURE), boxing r220 and the frames r221/r222 in place;
     HEATING · PIPE shows the grey ducts at their width, and a selected duct reads its unit's total
-    and per-diameter lengths (A, the Aldes since item 63: Ø80 2.30 · Ø125 0.89 · Ø160 1.04 m; B: Ø80 ≈ 9.26 · Ø125 2.36 m;
-    the B Ø80 figure is a Hypothesis: 9.38 before item 66, whose route is ≈ 0.12 m shorter).
+    and per-diameter lengths (A, the Aldes since item 63: Ø80 2.30 · Ø125 0.89 · Ø160 1.04 m; B since item 67: Ø80 ≈ 9.18
+    (upper 8.97 + laundry stub 0.21) · Ø160 2.10 m, Proven by `chk-bhung.mjs` node lengths; how the AR
+    readout sums them is unchecked).
   - WC stack + VMC riser (item 60): in place in AR (HEATING · PIPE: brown stack and vent, grey VMC
     against the wall; column r122 deeper; boxing r220 wider); the basement wall face (x −4.55) is a
     survey question the owner will correct.

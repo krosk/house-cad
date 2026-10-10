@@ -496,6 +496,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] MATERIAL · OUTLET on a SHUTTER outlet: the reticle picks it, the Ovalis product applies (teal square) and LEFT X shows the plate in its place; on m164/m144 (upper floor), see whether it touches the CTXM15A above it
 - [ ] Cycle to `habitat-moder-ii-110`, then `habitat-moder-ii-155`: a 110 cm round footprint, then 155 × 110; with LEFT X on, an oak table 75 cm high, one seam across the round top, two seams and the leaf's fold on the long one, four splayed legs
 - [ ] Cycle to `sensea-neo-120x80`: an 80 × 120 cm footprint on the floor; with LEFT X on, a thin white slab (27 mm) with the drain cover at the back end; does the drawn step and cover read at a glance
+- [ ] NEW 2026-10-10: cycle to `sensea-neo-100x80`: an 80 × 100 cm footprint, the same thin white slab, the drain cover centred on a short end
 
 ## IKEA kitchen units (`metod-*`)  ⬜ NEW (2026-10-04) — scratch-render verified only
 

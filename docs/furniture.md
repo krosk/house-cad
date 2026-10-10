@@ -209,6 +209,15 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   different lighting. Proven in a scratch browser preview (bounding box 0.800 × 0.027 × 1.200 m, top-down
   and perspective views beside the photos); the photo-measured positions are estimates; not yet seen in
   AR, View 3D or on device.
+- `sensea-neo-100x80` (owner, 2026-10-10, for the ground shower room): the same series in 100 × 80 cm
+  (Leroy Merlin 95043620, "Neo 2 blc", same builder). Spec table: 2.7 cm thick, 4 cm rim, grille 21 × 13 cm,
+  90 mm waste, 30.5 kg, the same manual 5349234 as the 120 × 80. Its dimension drawing (media 5347464) puts
+  the drain centre 10.5 cm from the short edge and centred across (40 cm); the 120 × 80's measured layout
+  gives 37 + 136 / 2 = 105 mm, so the cover and step `params` are copied from it. Its own top-down render
+  (media 5368963, 0.81 mm/px) draws the cover larger, ≈ 239 × 150 mm with the step ≈ 197 mm from the
+  edge (Hypothesis: the render is not to scale there; the spec table and the drawing win). Not to be
+  confused with the thicker "Neo" (3 cm, a 69.5 × 12.5 cm channel grille, Leroy Merlin 82002227).
+  Not yet seen in a preview, AR, View 3D or on device.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives

@@ -295,7 +295,7 @@ full boxes; one unit at A for all four rooms is possible (4 sanitaries max) at �
 ground-floor crossing (north route through the hall and corridors ≈ 5.9 m, or south along room r51
 ≈ 6.6 m; scratchpad plot only). Owner chose to keep two units and to drop VMR (per-room fans).
 
-**Unit B hung under the laundry ceiling (owner, 2026-10-10; drawn, scratch `bhung.png`):** furniture
+**Unit B hung under the laundry ceiling (owner, 2026-10-10; written to the headset 2026-10-10, read back identical):** furniture
 `aldes-easyhome-hygro-compact-hung` on r219, centre (−3.99, −2.77), base screwed to the 2.05 m ceiling (5 mm
 silentbloc gap, top 2.045), lid down (underside 1.86 m, 34 cm free under the lid to open it), facing 0: OUT
 south, the back Ø80 north, the two side Ø80 west, the lug east. The Aldes notice (3963727 pp. 4–5) shows the box
@@ -362,6 +362,14 @@ under a 9.3 cm tray, first). Valve size: it must be a Ø100 rated for a WC stack
 Nicoll CEP100 147 × 132 × 190 mm, with the French DTA approval); Ø32–40 mini valves serve one fixture
 branch only. In boxing r220 at ≈ 1.30–1.49 m (above the 0.90 vanity rim), behind a hatch with a grille
 (it draws room air; the moisture it moves is negligible next to the VMC and goes down the drain).
+**Owner, 2026-10-10: keep the Ø100 riser and a Ø100 valve** ("I would still for now keep the solution with a 100
+pipe and 100 valve"). The contractor proposed instead that the WC needs no riser and a vent could go at the vanity
+(r132, 0.8–1.6 m east of the tee). Hypothesis (same secondary sources): the vent requirement is on the stack's
+top, and here that top is the WC branch itself. A Ø32/40 mini valve under the basin, on its Ø40 drain, would vent
+the stack only through the Ø40 and a one-fixture valve, so a flush would pull the shower's low trap (≈ 30 mm
+seal under a 9.3 cm tray, typical) and the basin's: smell after idle days, gurgling. A Ø100 valve on a Ø100 pipe
+that the vanity drain joins would work but only moves the riser, through 5.6–11 cm behind the frame. Not drawn: the
+plan still shows the roof vent above the riser.
 
 **Upper WC position and its drain (owner, 2026-10-09; drain option A chosen and written to the headset the same day, read back identical):**
 - **Slab constraint (owner, corrected 2026-10-09):** along the whole west wall of the upper floor, a 14 cm
