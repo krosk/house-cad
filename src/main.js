@@ -202,6 +202,15 @@ function setRuler(on) {
   view3dRuler.textContent = on ? '📏 Ruler on' : '📏 Ruler';
 }
 view3dRuler.addEventListener('click', () => setRuler(!view.ruler.enabled));
+// Half walls see-through (owner, 2026-10-10): to look at a WC frame inside its half wall.
+// View-only and session-only, in both camera modes; shared links have it too.
+const view3dHalfWalls = document.getElementById('view3d-halfwalls');
+view3dHalfWalls.addEventListener('click', () => {
+  const on = !view.halfWallsSeeThrough;
+  view.setHalfWallsSeeThrough(on);
+  view3dHalfWalls.setAttribute('aria-pressed', String(on));
+  view3dHalfWalls.textContent = on ? '🧱 Half walls: see-through' : '🧱 Half walls';
+});
 function showTiltState(on) {
   view3dTilt.setAttribute('aria-pressed', String(on));
   view3dTilt.textContent = on ? '◉ Tilt look' : '◎ Tilt look';
@@ -378,6 +387,7 @@ function rebuildView() {
       productDoors: new Set(doorProducts.map((d) => d.rectId)),
       openDoors: true, // every door leaf swung open (the AR 3D view does the same)
       productWindows: new Set(windowProducts.map((d) => d.rectId)),
+      splitHalfWalls: true, // the see-through half walls button
     }),
     doorProducts,
     windowProducts,

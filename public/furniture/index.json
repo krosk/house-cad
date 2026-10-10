@@ -713,5 +713,17 @@
     },
     "source": "procedural: Aldes Bahia Curve S hygro extract vent BW21 Ø80 (Aldes 11015144; no manufacturer 3D model); face and depth profile from the product sheet's orthographic drawing (p. 2) + Aldes store photo 3516 (sources in the builder vmcVentBahia); on a ceiling, face down",
     "registeredAt": "2026-10-09T00:00:00.000Z"
+  },
+  "geberit-duofix-111333": {
+    "name": "geberit-duofix-111333",
+    "article": "111.333.00.6",
+    "sizeMm": [
+      500,
+      1120,
+      120
+    ],
+    "procedural": "geberit-duofix",
+    "source": "procedural: Geberit Duofix 111.333.00.6 WC frame, 112 cm, Sigma 12 cm cistern (no 3D model stored: code only); measured on Geberit's CAD views 111.333.00.6_A/_L/_G.dxf (cdn.data.geberit.com/cad), heights from the manual 972.363.00.0; the outlet bend reaches 24 mm behind the 120 mm footprint; feet and wall brackets left out",
+    "registeredAt": "2026-10-10T00:00:00.000Z"
   }
 }

@@ -648,7 +648,8 @@ export const halfWallTop = (floor, rect) => Math.min(rect.sill ?? 1.1, ceilingHe
 
 // A side of an in-room half wall as a face (edgeFace's shape: `inward` points away from
 // the half wall, into the room). Exposed where just in front of it is room floor, not a
-// wall, lining or another half wall; a side against a wall has no segments.
+// wall, lining or another half wall; a side against a wall has no segments. A segment in
+// front of a lower half wall starts at that half wall's top (`z0`).
 export function halfWallFace(floor, rect, edge) {
   const b = rect.bounds;
   const vertical = edge === 'left' || edge === 'right';
@@ -656,10 +657,14 @@ export function halfWallFace(floor, rect, edge) {
   const inward = edge === 'left' || edge === 'bottom' ? -1 : 1;
   const lo = vertical ? b.y0 : b.x0, hi = vertical ? b.y1 : b.x1;
   const rooms = roomBoxesOf(floor);
+  // Each blocker hides the side up to its top: a wall or lining all of it, a lower half
+  // wall only up to its own top (a boxing on a half wall shows above it, owner 2026-10-10).
+  const top = halfWallTop(floor, rect);
   const blockers = (floor.rectangles || []).filter((r) => r !== rect
-    && ['wall', 'insulation', 'halfwall'].includes(zoneKind(r))).map((r) => r.bounds);
+    && ['wall', 'insulation', 'halfwall'].includes(zoneKind(r)))
+    .map((r) => ({ b: r.bounds, top: zoneKind(r) === 'halfwall' ? halfWallTop(floor, r) : Infinity }));
   const cuts = new Set([lo, hi]);
-  for (const q of [...rooms, ...blockers]) {
+  for (const q of [...rooms, ...blockers.map((k) => k.b)]) {
     for (const v of vertical ? [q.y0, q.y1] : [q.x0, q.x1]) if (v > lo && v < hi) cuts.add(v);
   }
   const C = [...cuts].sort((p, q) => p - q);
@@ -668,9 +673,12 @@ export function halfWallFace(floor, rect, edge) {
   for (let i = 0; i < C.length - 1; i++) {
     const m = (C[i] + C[i + 1]) / 2;
     const px = vertical ? probe : m, py = vertical ? m : probe;
-    if (!rooms.some((q) => within(q, px, py)) || blockers.some((q) => within(q, px, py))) continue;
+    if (!rooms.some((q) => within(q, px, py))) continue;
+    const z0 = Math.max(0, ...blockers.filter((k) => within(k.b, px, py)).map((k) => k.top));
+    if (z0 >= top - EPS) continue;
     const last = segments[segments.length - 1];
-    if (last && Math.abs(last.b - C[i]) <= EPS) last.b = C[i + 1]; else segments.push({ a: C[i], b: C[i + 1], inset: 0 });
+    if (last && Math.abs(last.b - C[i]) <= EPS && (last.z0 || 0) === z0) last.b = C[i + 1];
+    else segments.push({ a: C[i], b: C[i + 1], inset: 0, ...(z0 > 0 ? { z0 } : {}) });
   }
   return { vertical, at, inward, segments, halfWall: true };
 }
@@ -692,7 +700,7 @@ export function wallFaceBoxes(floor, rect, edge) {
   if (zoneKind(rect) === 'halfwall') {
     if (edge === CAP) return halfWallCap(floor, rect);
     const face = halfWallFace(floor, rect, edge), top = halfWallTop(floor, rect);
-    return { face, boxes: face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: top, inset: 0 })) };
+    return { face, boxes: face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: s.z0 || 0, y1: top, inset: 0 })) };
   }
   const face = edgeFace(floor, rect, edge);
   const H = ceilingHeight(floor, 2.8); // up to the ceiling, not the storey height
@@ -748,7 +756,7 @@ export function finishSurfaces(project, floor) {
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;
     const rect = floor.rectangles.find((r) => r.id === f.target.rect);
-    walls.push({ material: f.material, ...wallFaceBoxes(floor, rect, f.target.edge) });
+    walls.push({ material: f.material, halfWall: zoneKind(rect) === 'halfwall', ...wallFaceBoxes(floor, rect, f.target.edge) });
   }
   return { floors, walls };
 }

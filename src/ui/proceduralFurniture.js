@@ -1564,11 +1564,76 @@ function vmcVentBahia(entry) {
   return g;
 }
 
+// Geberit Duofix 111.333.00.6, the WC frame with the Sigma 12 cm concealed cistern
+// (owner, 2026-10-10). Sources: Geberit CAD views 111.333.00.6_A (front), _L (side),
+// _G (top) .dxf from cdn.data.geberit.com/cad/ (a 3D _P .stp/.sat/.igs exists there
+// too, not used: code only); CAD z 80 mm = the finished floor, the manual 972.363.00.0
+// p.2 gives drain axis 23 cm, WC rods 33 cm, top 112 cm. Measured on the views (mm):
+// posts 38 wide at ±212–250, 40 deep from the frame face; top rail 1090–1120; WC
+// bar 315–393 and lower bar 127–169 above the floor; cistern 417 wide, 642–1080 high,
+// 40–116 behind the face, its funnel to 580 and flush pipe to the WC bar; actuation
+// opening 271 × 156 mm at 922–1078; the PE Ø100 outlet bend drops 92 mm behind the face
+// (back reaching 144 mm, i.e. 24 mm behind a 120 mm zone) and its connector stands
+// 25 mm proud of the face at 230 mm; two M12 rods 180 apart at 330 mm, 150 mm proud.
+// Kept (owner, 2026-10-10): the frame, the outlet pipe, the flush button's height and
+// the wall brackets, the basic shape (two posts on legs and foot plates to the raw slab,
+// 80 mm below the floor, the top rail and the two cross beams), plus the cistern as one
+// box; the funnel, the flush pipe, the supply valve and small parts are left out:
+// 17 boxes and 2 eight-sided pipes. Origin: footprint centre, y 0 = the finished floor, front (room side) +Z.
+function geberitDuofix(entry) {
+  const [W, H, D] = (entry.sizeMm || [500, 1120, 120]).map((v) => v / 1000);
+  const mm = (v) => v / 1000;
+  const zf = D / 2;                                 // frame face
+  const d = (v) => zf - mm(v);                      // a depth behind the face
+  const steel = new THREE.MeshStandardMaterial({ color: 0xa7adb3, roughness: 0.45, metalness: 0.6 });
+  const plastic = new THREE.MeshStandardMaterial({ color: 0xe4e6e8, roughness: 0.7 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x3a6ea5, roughness: 0.6 });
+  const pe = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.6 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'geberit-duofix';
+  // Two posts on telescopic legs (to the raw slab, 80 mm under the finished floor) with
+  // foot plates, as in the front view; the top rail and two cross beams between them.
+  for (const s of [-1, 1]) {
+    const x = (a, b) => (s < 0 ? [mm(-b), mm(-a)] : [mm(a), mm(b)]);
+    const [p0, p1] = x(212, 250), [l0, l1] = x(212, 246), [f0, f1] = x(150, 250);
+    g.add(box([p0, mm(57), d(40)], [p1, H, zf], steel));
+    g.add(box([l0, mm(-72), d(34)], [l1, mm(57), d(6)], steel));
+    g.add(box([f0, mm(-80), d(60)], [f1, mm(-72), zf], steel));
+  }
+  g.add(box([mm(-212), mm(1090), d(40)], [mm(212), H, zf], steel));
+  g.add(box([mm(-212), mm(315), d(40)], [mm(212), mm(393), zf], steel));
+  g.add(box([mm(-212), mm(127), d(40)], [mm(212), mm(169), zf], steel));
+  // Wall brackets (owner: "the part that attach to the back wall"): an arm back from
+  // each post at the top to a plate on the wall, 182 mm behind the face as drawn
+  // (adjustable on site); the plate turns out to ±295 mm.
+  for (const s of [-1, 1]) {
+    g.add(box([s < 0 ? mm(-250) : mm(214), mm(1075), d(176)], [s < 0 ? mm(-214) : mm(250), mm(1105), d(40)], steel));
+    g.add(box([s < 0 ? mm(-295) : mm(214), mm(1060), d(182)], [s < 0 ? mm(-214) : mm(295), mm(1120), d(176)], steel));
+  }
+  // Cistern: one box (it sets the depth behind the posts, 116 mm from the face).
+  g.add(box([mm(-207), mm(642), d(116)], [mm(210), mm(1080), d(40)], plastic));
+  // Actuation opening = the flush button's height (the plate goes on the finished wall).
+  g.add(box([mm(-134), mm(922), d(42)], [mm(137), mm(1078), zf + mm(2)], blue));
+  // Outlet, low poly (owner, 2026-10-10: "simplifications" accepted): the leg into the
+  // slab and the connector to the WC as 8-sided pipes meeting at the drain axis. The
+  // leg's back sets how deep the frame needs behind it (144 mm from the face).
+  const rOut = mm(52), axis = mm(230), back = d(92);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(rOut, rOut, axis + rOut + mm(80), 8), pe);
+  leg.position.set(0, (axis + rOut - mm(80)) / 2, back);
+  g.add(leg);
+  const conn = new THREE.Mesh(new THREE.CylinderGeometry(mm(45), mm(45), zf + mm(25) - back, 8), pe);
+  conn.rotation.x = Math.PI / 2;
+  conn.position.set(0, axis, (back + zf + mm(25)) / 2);
+  g.add(conn);
+  for (const s of [-1, 1]) g.add(box([s * mm(90) - mm(6), mm(324), zf], [s * mm(90) + mm(6), mm(336), zf + mm(150)], steel));
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
-  'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia,
+  'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'geberit-duofix': geberitDuofix,
 };
 
 export function isProcedural(entry) {

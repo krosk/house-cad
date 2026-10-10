@@ -537,7 +537,35 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const ceilingGeometry = floorGeometry?.clone() || null;
   if (ceilingGeometry) ceilingGeometry.translate(0, ceilingHeight(floor) + slabThickness, 0);
   const wallBoxes = architecturalWallBoxes(floor, opts);
-  const wallGeometry = boxesGeometry(wallBoxes);
+  // `splitHalfWalls` (View 3D, owner 2026-10-10: half walls can be shown see-through):
+  // the boxes standing on an in-room half wall's footprint go to `halfWallGeometry`.
+  let halfWallGeometry = null, solidBoxes = wallBoxes;
+  if (opts.splitHalfWalls) {
+    const halves = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'halfwall' && validBounds(r.bounds))
+      .map((r) => r.bounds).filter((b) => pointInFootprint((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, roomFootprint));
+    const onHalf = (b) => {
+      const mx = (b.x0 + b.x1) / 2, my = (b.y0 + b.y1) / 2;
+      return halves.some((h) => mx > h.x0 - EPS && mx < h.x1 + EPS && my > h.y0 - EPS && my < h.y1 + EPS);
+    };
+    // A half wall against a wall is merged with it into one box (a boxing on the west
+    // wall): cut every box on the half walls' outlines first, then sort the pieces.
+    const pieces = wallBoxes.flatMap((b) => {
+      const xs = new Set([b.x0, b.x1]), ys = new Set([b.y0, b.y1]);
+      for (const h of halves) {
+        for (const x of [h.x0, h.x1]) if (x > b.x0 + EPS && x < b.x1 - EPS) xs.add(x);
+        for (const y of [h.y0, h.y1]) if (y > b.y0 + EPS && y < b.y1 - EPS) ys.add(y);
+      }
+      if (xs.size === 2 && ys.size === 2) return [b];
+      const X = [...xs].sort((p, q) => p - q), Y = [...ys].sort((p, q) => p - q), out = [];
+      for (let i = 0; i < X.length - 1; i++) {
+        for (let j = 0; j < Y.length - 1; j++) out.push({ ...b, x0: X[i], x1: X[i + 1], y0: Y[j], y1: Y[j + 1] });
+      }
+      return out;
+    });
+    solidBoxes = pieces.filter((b) => !onHalf(b));
+    halfWallGeometry = boxesGeometry(pieces.filter(onHalf));
+  }
+  const wallGeometry = boxesGeometry(solidBoxes);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
@@ -545,7 +573,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip, { openDoors: !!opts.openDoors });
   const stairGeometry = stairsGeometry(floor, opts);
   return {
-    floorGeometry, wallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
+    floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
     outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, wallBoxes),
   };
 }
@@ -637,9 +665,9 @@ export function finishGeometries(surfaces) {
   // One bucket per (role, material): floor overlays keep the 'floor' role (POV tap
   // target), wall overlays the 'walls' role, so the viewer treats them like the surface.
   const byMaterial = new Map();
-  const bucket = (role, id) => {
-    const key = `${role}|${id}`;
-    return byMaterial.get(key) ?? byMaterial.set(key, { role, material: id, pos: [], uv: [], normal: [] }).get(key);
+  const bucket = (role, id, halfWall = false) => {
+    const key = `${role}|${id}|${halfWall}`;
+    return byMaterial.get(key) ?? byMaterial.set(key, { role, material: id, halfWall, pos: [], uv: [], normal: [] }).get(key);
   };
   const quad = (b, corners, uvs, n) => {
     for (const i of [0, 1, 2, 0, 2, 3]) {
@@ -665,7 +693,7 @@ export function finishGeometries(surfaces) {
     }
   }
   for (const wall of surfaces?.walls || []) {
-    const b = bucket('walls', wall.material);
+    const b = bucket('walls', wall.material, !!wall.halfWall);
     const { face } = wall;
     if (face.cap) { // a half wall's top: (u = along it, v = across) at its height
       for (const r of wall.boxes) {
@@ -691,6 +719,6 @@ export function finishGeometries(surfaces) {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(b.normal, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
-    return { material: b.material, role: b.role, geometry };
+    return { material: b.material, role: b.role, halfWall: b.halfWall, geometry };
   });
 }

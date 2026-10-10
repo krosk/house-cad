@@ -747,6 +747,23 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     and a possible slab ring beam where the drop passes ≈ 1 cm from the wall's inner face; the window handle reach;
     the drain end; the box top at 1.15 or level with the 1.30 sill.
 
+70. **Duofix product, boxing tiles, see-through half walls (2026-10-10, code, not yet published when written):**
+    - `geberit-duofix-111333` (builder `geberit-duofix`, 268 triangles; `docs/furniture.md`): the frame, outlet pipe,
+      button height and wall brackets the owner asked for, on two legs with the two cross beams. Not set on the
+      headset frames r221/r222 yet (they are plain boxes); the scratch share link puts it on both.
+    - Tiles on half walls: `halfWallFace` (`src/core/flooring.js`) now shows a half wall's side above a lower
+      neighbouring half wall (segment `z0`), so a boxing on a half wall can be tiled above it. Proven in Node:
+      r220's east face gives 1.15–2.70 m. Drafted, NOT written: `edit-tile.mjs` adds Lucia ivory to r220's four
+      sides; best written with the stand-alone column (`edited-col-tile.json`), since with the overlap r210's
+      south-face tiles and r220's would sit on the same plane over 0–1.15 m.
+    - View 3D button "🧱 Half walls" (overview and POV, shared links too): in-room half walls turn faint
+      (`halfWallGlassMaterial`) and their finishes hide, to see a frame inside. Built split by
+      `buildArchitecturalFloor(…, { splitHalfWalls })`; AR (`mr.js`) does not pass it and is unchanged. Proven in
+      a local browser on the scratch link: the button toggles and the frame shows through in the overview.
+      Then the owner saw the boxing stay solid: a half wall against a wall is merged with it into one box, whose
+      centre lay in the wall. Boxes are now cut on the half walls' outlines before sorting; Proven in Node: r220 is
+      wholly in the see-through part (x −4.70…−4.33, 0–2.70 m), solid + see-through = the old total on every floor.
+
 ## Next step
 
 **Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,

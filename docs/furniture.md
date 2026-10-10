@@ -218,6 +218,16 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   edge (Hypothesis: the render is not to scale there; the spec table and the drawing win). Not to be
   confused with the thicker "Neo" (3 cm, a 69.5 × 12.5 cm channel grille, Leroy Merlin 82002227).
   Not yet seen in a preview, AR, View 3D or on device.
+- `geberit-duofix-111333` (owner, 2026-10-10): Geberit Duofix 111.333.00.6 WC frame, 112 cm, Sigma 12 cm
+  cistern. 500 × 1120 × 120 mm footprint (`sizeMm`; front = room side, +Z). Builder `geberit-duofix`, low poly by
+  the owner's choice (268 triangles: 17 boxes, 2 eight-sided pipes): "the frame, the pipe, the height of the button
+  push, and the part that attach to the back wall", keeping the basic shape (two posts on legs with foot plates to the
+  raw slab 80 mm under the floor, top rail, two cross beams). Measured on Geberit's CAD views 111.333.00.6_A/_L/_G.dxf
+  (cdn.data.geberit.com/cad/; a 3D `_P` STEP/SAT/IGES exists, not stored: code only), heights from the manual
+  972.363.00.0 p.2; every value is in the builder's comment. The outlet bend's back reaches 144 mm behind the face,
+  24 mm behind the footprint, and the wall brackets 182 mm (adjustable): real parts that stick out of the zone.
+  Proven in a scratch browser preview (bounding box 590 × 1200 × 332 mm with brackets, legs and rods; front, side,
+  top and 3D beside the CAD views). Not yet seen in View 3D, AR or on device; inside a half wall it is hidden.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives
