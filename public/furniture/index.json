@@ -651,6 +651,21 @@
     "source": "procedural: Aldes EasyHOME Hygro Compact on a wall, kitchen Ø125 + an Ø80 up, OUT Ø160 down; same sources as aldes-easyhome-hygro-compact (builder vmcEasyhome)",
     "registeredAt": "2026-10-08T00:00:00.000Z"
   },
+  "aldes-easyhome-hygro-compact-hung": {
+    "name": "aldes-easyhome-hygro-compact-hung",
+    "article": "aldes-easyhome-hygro-compact-hung",
+    "sizeMm": [
+      360,
+      187,
+      361
+    ],
+    "procedural": "vmc-easyhome",
+    "params": {
+      "hung": true
+    },
+    "source": "procedural: Aldes EasyHOME Hygro Compact hung under a ceiling, lid down (notice 3963727 p. 4-5), OUT Ø160 and the back Ø80 keep their sides, the two side Ø80 toward -X; same sources as aldes-easyhome-hygro-compact (builder vmcEasyhome)",
+    "registeredAt": "2026-10-10T00:00:00.000Z"
+  },
   "aldes-bahia-curve-s": {
     "name": "aldes-bahia-curve-s",
     "article": "aldes-bahia-curve-s",

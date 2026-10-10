@@ -334,7 +334,11 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   2.37 px/mm); colours and the lid's blue rim, HYGRO badge and logo from photos 1703321 (straight top)
   and 6045647 (rim height, badge and logo sizes are estimates). Wall versions: `-wall` (base on the
   wall, the two side Ø80 up, OUT sideways) and `-wall-out-down` (kitchen Ø125 + an Ø80 up, OUT Ø160
-  down). Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
+  down), and `-hung` (owner, 2026-10-10: unit B under the laundry ceiling): base screwed to the ceiling, lid down, the
+  flat box turned 180° about its front axis, so OUT and the back Ø80 keep their sides, the two side Ø80 point
+  the other way, spigot axes 90 mm (OUT 95) below the top (the notice, pp. 4–5, shows the box hung in a false ceiling).
+  Proven in node (`buildProceduralFurniture` placed at the plan's r219): the spigot ends land on the duct nodes
+  within 4 mm. Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
   scale, sit on the drawing's lines (overlay); bounding box 457.5 × 187.6 × 459.0 mm against the
   drawing's 459 × 187 × 460; 3 028 triangles. Not yet seen in AR, View 3D or on device.
 - `aldes-bahia-curve-s`: Aldes Bahia Curve S humidity-controlled extract vent, Ø80 (BW21, Aldes

@@ -270,7 +270,9 @@ holds ≈ 120 Pa (speed 3) / ≈ 130 Pa (speed 4) flat to ≈ 250 m³/h; the Cla
 curve is not published (Aldes page, notice pp. 11–13). Owner's duct: Girpi PVC downpipe Ø80 (Leroy
 Merlin 61477423), push-fit male/female, ≈ 77–78 mm bore (owner; ≈ 1.4 mm wall from the packed weight:
 Hypothesis), 45° pairs at every turn, rigid to the ends (no flexible pieces). Loss of B's upper duct with
-B in the laundry, ≈ 9 m and 5 pairs (Hypothesis: Colebrook, smooth PVC, a pair ≈ 0.3 × dynamic pressure):
+B in the laundry, ≈ 9 m and 5 pairs (Hypothesis: Colebrook, smooth PVC, a pair ≈ 0.3 × dynamic pressure; set
+2026-10-09, before the vent moved onto boxing r220's face, which added a pair behind it: **superseded by B hung**,
+below):
 
 | Vent flow | Duct loss | Vent sees, HP speed 3 / 4 (minus ≈ 10–20 Pa of room depression behind the window inlets at boost, ≈ 1–8 Pa otherwise) |
 |---|---|---|
@@ -293,18 +295,36 @@ full boxes; one unit at A for all four rooms is possible (4 sanitaries max) at �
 ground-floor crossing (north route through the hall and corridors ≈ 5.9 m, or south along room r51
 ≈ 6.6 m; scratchpad plot only). Owner chose to keep two units and to drop VMR (per-room fans).
 
-**Unit B in the laundry (owner, 2026-10-09; not drawn):** on the north wall of r66, west corner (x ≈ −4.6…−4.2),
+**Unit B hung under the laundry ceiling (owner, 2026-10-10; drawn, scratch `bhung.png`):** furniture
+`aldes-easyhome-hygro-compact-hung` on r219, centre (−3.99, −2.77), base screwed to the 2.05 m ceiling (5 mm
+silentbloc gap, top 2.045), lid down (underside 1.86 m, 34 cm free under the lid to open it), facing 0: OUT
+south, the back Ø80 north, the two side Ø80 west, the lug east. The Aldes notice (3963727 pp. 4–5) shows the box
+hung under a ceiling and asks **400 mm free in front of each spigot end** (100 mm at the lug): the north end and
+the west ends are exactly 40 cm from the walls. Why: the spigots are horizontal and 9 cm under the ceiling (axis
+1.955 m), level with the duct along the ceiling (1.97), so the upper Ø80 pushes straight onto the north spigot
+(**no turn down into the unit**) and the Ø160 OUT runs straight south 2.1 m through the outside wall at 1.95 m,
+80.5 cm west of window r146 (no bend either). Upper route: the column-bottom pair aimed south-east (pn58 →
+pn74, 0.75 m diagonal), **one 45°** at (−4.085, −0.83), then 1.71 m south through the r67/r66 wall: 8.97 m and
+4½ pairs from the vent. Laundry: a 20 cm stub west from the north-west Ø80, its vent end 20 cm from the west
+wall but only ≈ 9 cm under the ceiling (Aldes asks ≥ 20 cm from adjacent walls; open point, the vent type too).
+Loss to the upper vent (Hypothesis, as above, Ø77 bore): **≈ 20–23 Pa at boost** with the 2×45° behind the vent
+(the vent sees ≈ 87–100 Pa at speed 4, ≈ 77–90 at speed 3), ≈ 23–28 Pa with one 90° there (≈ 82–97 / 72–87),
+≈ 3 Pa at 15 m³/h. Open: the machines' place (from outlets m103/m101: the box overhangs their fronts by
+≈ 21 cm at 1.86 m: headroom), Aldes on whether any Ø80 port takes the bathroom vent, insulation of the basement
+ducts (R ≥ 0.6, above). Removed: the Agalina on the r76 wall, its Ø125 OUT to the garage-door wall, the old
+laundry duct along r67. Superseded: ~~**Unit B in the laundry, on the wall (owner, 2026-10-09; not drawn):** on the north wall of r66, west corner (x ≈ −4.6…−4.2),
 lid toward the room; the outlet through the **south wall, west of window r146**, axis at x ≈ −3.9 (≥ 0.6 m
 from the window edge −3.10, in case its frame has an inlet), as high as possible (≈ 1.9 m); the Ø160
 runs ≈ 2.9 m across the ceiling east of the machines; the upper duct continues from the column along
 today's laundry-duct path (+2.1 m, +1 pair); the laundry vent becomes a ≈ 0.5 m stub ≥ 20 cm from the
-walls. Needs a wall version with OUT up (`aldes-easyhome-hygro-compact-wall-out-up`, not built). The
+walls. Needs a wall version with OUT up (`aldes-easyhome-hygro-compact-wall-out-up`, not built)~~ (6 pairs, a turn
+down into the unit and bends on the OUT; hanging it removes both). The
 upper shower vent (−4.625, 0.42) is 7.5 cm / 11 cm from two walls: move it onto the south face of a
 widened boxing r220 (one bend less than a ceiling vent fed from below), ≥ 20 cm from the west wall and
 the ceiling. The laundry vent as drawn is 16 cm from the north wall.
 
-**Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; not yet
-written):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
+**Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
+headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
 of boxing r220**, facing south, centre at 2.35 m and **17 cm from the bare west wall** (owner: "The guide says
 20cm, but I will allow getting closer to the west wall"; the wall is bare today, its finish still to come,
 2.5 cm assumed, which leaves the vent's edge 6.75 cm off it). Boxing r220 and half wall r210 both go from 22
@@ -322,7 +342,8 @@ cm. At 17 cm both WC options stay open; at the valve the duct passes 2.5 cm away
 on the face) shows the duct at its back left.
 Why two 45° need the 25 cm (Nicoll F/F Ø80: 45° Z 26.5, 87°30′ Z 61, socket 47): two 45° need ≈ 18 cm from the
 duct axis to the outlet socket's mouth, which a 22 cm boxing cannot give; one 87°30′ (≈ 11 cm) fits 22 cm
-but costs ≈ 0.6 Pa more at boost. Rejected: a jog (two more 45°, ≈ 1.2 Pa) to shift the duct sideways, since the
+but costs ≈ 1.4 Pa more at boost mid-run (≈ 0.6 Pa at 30 m³/h), and ≈ 2–4 Pa right behind the vent, where the
+vent's jet hits the bend (Hypothesis: loss counted 1.5–2 ×, no Aldes data). Rejected: a jog (two more 45°, ≈ 1.2 Pa) to shift the duct sideways, since the
 lean does it free; the vent facing up (Aldes: a vertical wall high up, or a ceiling, ≥ 1.80 m); a ceiling vent
 fed from below (two 90° turns and a void above the ceiling). The drawn ceiling vent V0 (inside the boxing's
 top) is replaced.

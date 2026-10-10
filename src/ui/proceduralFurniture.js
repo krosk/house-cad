@@ -954,8 +954,22 @@ function vmcAgalina(entry) {
 // `params.wall` (owner's unit B is wall-mounted): the same box with its base against the wall
 // (−Z). `params.up` picks the face that points up: 'right' (default: the two right Ø80 up, OUT
 // sideways toward +X, the left lug down) or 'back' (kitchen Ø125 + an Ø80 up, OUT down).
+// `params.hung` (owner, 2026-10-10: unit B under the laundry ceiling): base screwed to the ceiling,
+// lid down; the flat box turned 180° about its front axis, so the front (OUT) and back keep their
+// sides, the two right Ø80 point toward −X and the spigot axes sit 90 mm (OUT 95) below the top.
+// The notice (media 3963727 p. 4–5) shows the box hung under a ceiling in a false ceiling.
 function vmcEasyhome(entry) {
   const p = entry.params || {};
+  if (p.hung) {
+    const flat = vmcEasyhome({ ...entry, params: { ...p, hung: false } });
+    const H = (entry.sizeMm || [360, 187, 361])[1] / 1000;
+    flat.rotation.z = Math.PI;
+    flat.position.y = H;
+    const g = new THREE.Group();
+    g.name = entry.name || 'vmc-easyhome-hung';
+    g.add(flat);
+    return g;
+  }
   if (p.wall) {
     const right = (p.up || 'right') === 'right';
     const [W, H, D] = (entry.sizeMm || (right ? [361, 360, 187] : [360, 361, 187])).map((v) => v / 1000);
