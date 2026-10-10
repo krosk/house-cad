@@ -402,7 +402,12 @@ wall and clear of the east wing's openings and roof windows, meets the opening r
 below a taller part of the same building (eddies off that wall push the plume down; some rules ask for the highest part).
 Ask the contractor. The owner confirms no opening on the south side on the ground and upper floors. Hypothesis: that frees the pipe's
 route, not its end: it still ends above the roof edge of the part it climbs (≈ 30–40 cm, or the ridge if the contractor
-requires it), since a low outlet blows sewer air onto the paving and is outside the roof-exit rule. The attic is closed: the
+requires it), since a low outlet blows sewer air onto the paving and is outside the roof-exit rule. **Chosen and drawn (owner, 2026-10-10): no roof vent; a façade vent "where I happen to already have rain collector
+pipes", separate from them (waste, not rain), at the corner where the wing's roof ridge meets the upper floor's
+east wall (the south bedroom's south-east corner).** Drawn: Ø100 from the collector (not drawn; tee at (0.62, −5.75),
+1.0 m above the basement floor) to the façade at y −5.62 and up to 3.40 m above the ground floor (ridge assumed
+3.0 + 0.4: the ridge height is not measured). The WC riser now stops at the Ø100 air valve, 1.49 m in boxing r220
+(roof stub p61 removed). The attic is closed: the
 open vent may not end in it ("hors combles", RSDT art. 42 per secondary sources, Hypothesis), so an open vent
 leaves through the roof covering (a vent tile / sleeved outlet), or an attic air valve backed by an open vent
 elsewhere. Window distance: the sources disagree (1 m, 3 m, "+40 cm"); none allows "slightly above" instead
@@ -502,6 +507,27 @@ unit B has no kitchen duct (its kitchen port needs a Ø125 plug, the kit has Ø8
 only two of its five inlets: whether the self-regulated flows still hold with that split (Sauter).
 
 ## Heating pipes: radiator layout (2026-10-08, sketch, not in the plan)
+
+**Drawn (owner, 2026-10-10: "The whole network"; written to the headset, read back identical, 261 295 chars).**
+Manifold on the basement north wall west of the boiler ("next to the water heater"; x 0.88…1.56, y 4.45, 1.20 m;
+Hypothesis for "left of the column": no column is drawn there). Nine 16×2 pairs, mitred so supply (red, right of
+travel) and return (blue, left, 5 cm higher off the basement ceiling) never cross; lanes 8 cm apart at 1.97 m
+(the ceiling 2.05). West pairs go along the north wall, then south across r70 at x −2.40…−2.08 (east of the garage
+door's area), then west in r76/r77; r204 rises south of the door's area at (−4.50, 1.40) and runs the living-room
+skirting. Bedroom + laundry: tee under bedroom radiator r205's east end (unit B hangs under its west part), laundry
+radiator r224 (EASY 1200 × 600, 1930 W) under window r146, its pipes down beside the window. Kitchen + r74: tee in
+r74's ceiling, radiator r225 (EASY 900 × 600, 1448 W) on its south wall, branches dipping to 1.91 m under the
+shower pair. Kitchen and shower pairs up into the slab at r74's south edge and along the trench (≈ 10 cm down).
+Proven (scratch `clash.mjs` on the written plan): no pipe within its neighbours' radii + 6 mm insulation + 3 mm;
+≈ 103 m supply + 106 m return. **Upper pairs (owner, same day: "Do 1, I will adjust according to real setup";
+written, read back identical, 266 704 chars):** the upper slab at the old column had no room (the VMC duct fills the
+west-wall trench, lintel 1 is never crossed, the WC drain fills bay 1 inside it), so **column r122 grows 13 cm east
+and 7 cm north** (c227 36 → 49 cm, passage r56 1.275 → 1.145 m; c1443 90 → 83 cm): x −4.705…−4.20, y −0.37…−0.16.
+The four pipes rise in one row at y −0.19, x −4.35…−4.23: east of the WC stack and the bay-1 drain (≈ 0.6 cm), west
+of lintel 2 (≈ 0.6 cm), north of the basement waste run at y −0.30. Upstairs, on the floor (supply 5 cm, return
+10 cm): the south pair west then down the west wall (bathroom r208 teed, bedroom r207), the north pair north
+between the VMC duct's lean and the WC riser (≈ 1 / 2 cm) to bedroom r209. Not checked: pipes against walls,
+lintels and the slab build-up (only pipe-to-pipe).
 
 Owner: "my default was a star topology, but I wonder if there is an opportunity to share some pipes";
 the pipes are **composite (multilayer)**. Owner decisions:

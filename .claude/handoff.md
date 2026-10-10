@@ -21,12 +21,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 
 **Date:** 2026-10-10 (session 40, continued; the Quest reachable)
 **Status:** Proven (git): the code head is `26aaad7` (Duofix product, see-through half walls, boxing tiles above
-a half wall: item 70; before it `6aab97c` stacked half walls, `538fb43` tray), served and in the headset precache
-(`update-app` 10-10, "installed 26aaad7"). Proven (`quest-storage read` after each write, byte-identical): the
+a half wall: item 70; before it `6aab97c` stacked half walls, `538fb43` tray); docs since (`b55fad3`), served and in
+the headset precache (`update-app` 10-10, "installed b55fad3"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
 60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
-ceiling), item 68 (boxing r220 a half wall) and item 71 (Lucia tiles on boxing r220; written 2026-10-10, 237 136
-chars), all 2026-10-10. Scratchpad backups are session-local; no save slot
+ceiling), item 68 (boxing r220 a half wall), item 71 (Lucia tiles on boxing r220) and item 73 (heating network,
+façade vent, valve, basement radiators, column r122 widened; 266 704 chars), all 2026-10-10. Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -780,7 +780,15 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       riser. Not chosen, not drawn. `docs/plumbing-workflow.md` "Open vent and collector".
     - Heating: laundry r66 and east room r74 at 15 °C (radiators sized for 17 °C: ≈ 1600 / 1400 W rated);
       **pairs: bedroom r51 + laundry (tee in the laundry ceiling); kitchen + r74 (tee in r74's ceiling); shower
-      room alone** (option A); thermostatic valves only. Not drawn. `docs/heat-loss.md` "Laundry heater".
+      room alone** (option A); thermostatic valves only. Drawn in item 73. `docs/heat-loss.md` "Laundry heater".
+73. **Heating network, façade vent, valve and two basement radiators: written** (owner, 2026-10-10: "Yes", "The whole
+    network"; backup `quest-backup-1010-heat`, fresh read identical to the base, `--base`, read back identical,
+    261 295 chars; AR assumed closed, not checked). Scratch `edit-heat.mjs` (re-runnable on a fresh read, it checks
+    pn67 first), `clash.mjs` (0 pipe clashes). Riser stops at the Ø100 valve (1.49 m; p61/pn68 removed); waste Ø100
+    façade vent at the upper floor's south-east corner to 3.40 m (ridge height assumed); r224 laundry and r225 r74
+    radiators; manifold + 9 pairs. Then (owner: "Do 1") `edit-upper.mjs`: column r122 +13 cm east, +7 cm north
+    (c227 −0.49, c1443 −0.83) and the two upper pairs up it (backup `quest-backup-1010-upper`, read back identical,
+    266 704 chars); 0 pipe clashes. Open: the collector itself is not drawn; the owner adjusts to the real setup. `docs/plumbing-workflow.md` "Heating pipes" / "Open vent".
 
 ## Next step
 
@@ -793,7 +801,7 @@ none drawn in the plan:
 - The WC stack vent: **owner, 2026-10-10: "keep the solution with a 100 pipe and 100 valve" for now**, i.e. the
   Ø100 riser over the tee in boxing r220 with a Ø100 WC-rated air valve at ≈ 1.30–1.49 m behind a grille hatch
   (not the contractor's idea of a vent at the vanity, nor the roof vent). The plan still draws the roof vent
-  (p60/p61 to pn68): not redrawn yet. No open vent exists (item 72): one is needed, the roof vent or the façade pipe.
+  (p60/p61 to pn68): redrawn in item 73 (riser to the valve; the façade vent chosen, no roof vent).
 - The upper shower's Ø40 route and branch (item 65 advice), the upper sink (optional), and the slab's
   make-up (the drain trench is ≈ 15 cm deep).
 - The unit choice for B: Classic (curve unpublished) or HP (speed 4 within margin); Ø80 only.
