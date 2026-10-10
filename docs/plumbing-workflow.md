@@ -323,6 +323,13 @@ upper shower vent (−4.625, 0.42) is 7.5 cm / 11 cm from two walls: move it ont
 widened boxing r220 (one bend less than a ceiling vent fed from below), ≥ 20 cm from the west wall and
 the ceiling. The laundry vent as drawn is 16 cm from the north wall.
 
+**Boxings are half walls (owner, 2026-10-10: "Boxing is a half wall from my definition"):** a pipe or duct boxing is
+drawn as a `halfwall` zone from the floor to its top, never as a plain furniture box (View 3D draws a furniture zone
+only when it carries a catalog product, so a plain box is invisible there). Boxing r220 was converted and written
+the same day (read back identical). A taller half wall standing on a lower one is drawn whole in View 3D and AR 3D: the lower one's
+band above its top skips the taller one's footprint (`src/core/architectural3d.js`, 2026-10-10; before that fix
+r210's band cut r220 away above 1.15 m, so the boxing looked missing).
+
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
 of boxing r220**, facing south, centre at 2.35 m and **17 cm from the bare west wall** (owner: "The guide says

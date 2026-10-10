@@ -20,11 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-10 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `e096cfe` (hung Aldes `aldes-easyhome-hygro-compact-hung`, item 67),
-served and in the headset precache (`update-app` 10-10, "installed e096cfe"); later commits are docs only. Proven
+**Status:** Proven (git): the code head is `538fb43` (tray `sensea-neo-100x80`, item 69; before it `e096cfe`, item 67),
+served and in the headset precache (`update-app` 10-10, "installed 538fb43"); later commits are docs only. Proven
 (`quest-storage read` after each write, byte-identical): the headset plan carries every session-40 edit
 (items 49, 53, 59, 60), item 63's unit-A swap and item 65 (upper WC at 60 cm, drain option A, column
-r122; written 2026-10-09), item 66 (the upper vent; written 2026-10-10) and item 67 (unit B hung under the laundry ceiling; app `e096cfe`, written 2026-10-10, 236 833 chars). Scratchpad backups are session-local; no save slot
+r122; written 2026-10-09), item 66 (the upper vent; written 2026-10-10) and item 67 (unit B hung under the laundry ceiling; app `e096cfe`, written 2026-10-10) and item 68 (boxing r220 a half wall; written 2026-10-10, 236 846 chars). Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -713,12 +713,45 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     plan): no conflicts, no dimension dropped, only r219 moves, no dangling node; the hung model's spigot ends
     land on the nodes (node check). To check in AR: the box lid-down under r66's ceiling, the duct onto its
     north spigot, OUT south.
+68. **Boxing r220 is a half wall: written** (owner, 2026-10-10: "Boxing is a half wall from my definition", then
+    "Yes"; AR closed, backup, fresh read unchanged, `--base`, read back identical, 236 846 chars). r220 was a plain
+    furniture zone (1.15–2.70 m), and View 3D draws only furniture zones carrying a catalog product
+    (`furnitureProductPlacements`, `src/core/model.js`), so the owner did not see it. Now kind `halfwall`, sill 2.70
+    (the ceiling), floor to ceiling over r210. Proven (scratch `edit-box.mjs`/`chk-box.mjs`): no conflicts, no
+    dimension dropped, nothing moves; r220 flush with r210 at y 0.28, the vent r223 still on its face. Still
+    invisible in View 3D for the same reason: the plain boxes r217 (outdoor unit), r221/r222 (Duofix frames).
+    Then the owner saw it "transparent": r210's half-wall band (1.15 m → ceiling) cut r220 away above 1.15 m.
+    Fixed in `src/core/architectural3d.js` (a half wall's band skips the footprint of any taller half wall).
+    Proven in Node on the 10-10 headset plan: r220 now solid 1.15–2.70; Upper wall volume +0.1434 m³
+    (= 0.37 × 0.25 × 1.55), Basement and Ground unchanged; build clean. Not yet seen on device.
+    Owner then proposed the column on its own (no overlapping half walls): drafted, NOT written (scratch
+    `edit-col.mjs`): r210 x −4.33…−3.80 (c1413 0.53, still ending 0.90 from the wall), c1411 now on r220's left,
+    new c1444–c1449 pin r220 (west and north walls, 0.37 × 0.25, r210 against its east face) and the vent r223 on
+    its face (both were undimensioned). Proven in Node: no conflicts, nothing else moves, same Upper volume with
+    the old or the new 3D code.
+69. **Ground shower room, WC under the east window: proposed, not in the plan** (owner, 2026-10-10: "the toilet be
+    under the window, and the back frame against the window"; then "The shower becomes a 80 by 100", "Rotate it,
+    put radiator north"). Replaces item 64's WC on the north wall. Geometry (scratch `wc-window.mjs`, drawing sent;
+    `wcwin-link.mjs` builds a 3D share link on the 10-10 plan, no conflicts):
+    - window r110: east wall, 66 cm (y −0.88…−0.22), sill 1.30, so the 1.12 m frame and a 1.15 m box fit under it;
+    - the frame cannot touch the wall: the Ø100 outlet bend reaches 144 mm behind the frame face (Proven, Geberit
+      CAD 111.333.00.6_L side view), so the frame face is 15 cm off the wall and the box 17 cm (2 cm cladding):
+      r139 x 3.745–3.915, y −1.02…−0.02; frame r221 x 3.765–3.885, y −0.80…−0.30; WC r211 facing 270 (west) centred
+      on the window, x 3.216–3.745; 99 cm free in front, axis 47 cm from wall r172; drain at x ≈ 3.86 over basement r74;
+    - shower: new catalog `sensea-neo-100x80` (Leroy Merlin 95043620, commit `538fb43`) across the back of alcove
+      r107, x 2.225–3.225, y −2.07…−1.27, on plinth r213; drain end by the west wall in the link (facing 90): the
+      owner has not chosen the end; the VMC vent pn39 is 15 cm north of the tray;
+    - towel radiator r202 on the north wall x 3.0–3.5; outlet m210 to the west wall above the vanity (c997 −0.22);
+    - the 14 dimensions on the moved zones are dropped (c879 c1002–c1005 c1259 c1395 c1396 c1415 c1416 c1419–c1422).
+    Open: the basement's east wall under the window (r74 runs 13 cm past the ground wall's outer face in the plan)
+    and a possible slab ring beam where the drop passes ≈ 1 cm from the wall's inner face; the window handle reach;
+    the drain end; the box top at 1.15 or level with the 1.30 sill.
 
 ## Next step
 
 **Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
 none drawn in the plan:
-- Item 64, the ground shower room swap (exact geometry there).
+- ~~Item 64, the ground shower room swap~~: replaced by item 69 (WC under the east window), still not drawn.
 - ~~Unit B to the laundry on the wall~~ (needed an OUT-up entry and a turn down into the unit):
   replaced by item 67, B hung under the laundry ceiling. Still open there: the laundry vent (≥ 20 cm from
   the ceiling too), the machines' place and headroom under the box.

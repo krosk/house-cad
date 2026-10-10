@@ -181,6 +181,20 @@ function piercedBounds(b, sources) {
   return { ...b, [N0]: n0, [N1]: n1 };
 }
 
+// a − b for axis-aligned plan boxes: up to four boxes (south and north strips full
+// width, then the west and east strips between them).
+function rectMinus(a, b) {
+  const x0 = Math.max(a.x0, b.x0), x1 = Math.min(a.x1, b.x1);
+  const y0 = Math.max(a.y0, b.y0), y1 = Math.min(a.y1, b.y1);
+  if (x1 - x0 <= EPS || y1 - y0 <= EPS) return [a];
+  return [
+    { x0: a.x0, x1: a.x1, y0: a.y0, y1: y0 },
+    { x0: a.x0, x1: a.x1, y0: y1, y1: a.y1 },
+    { x0: a.x0, x1: x0, y0, y1 },
+    { x0: x1, x1: a.x1, y0, y1 },
+  ].filter((r) => r.x1 - r.x0 > EPS && r.y1 - r.y0 > EPS);
+}
+
 function splitWallByOpenings(source, storeyHeight, openings) {
   const overlaps = openings.flatMap((opening) => {
     const b = opening.bounds;
@@ -260,13 +274,25 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
   // Ground r139 against the 7 cm gap wall to r106). A half wall authored in the wall
   // line (outside the room area) still pierces, like any other opening.
   const insideRoom = (b) => pointInFootprint((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, circulationFootprint);
+  // A taller half wall standing on a lower one (owner, 2026-10-10: a boxing is a half wall,
+  // e.g. Upper r220 up to the ceiling on top of the 1.15 m r210): the lower one's band above
+  // its top must not cut the taller one away, so its opening skips the taller footprints.
+  const halfwalls = rectangles.filter((r) => zoneKind(r) === 'halfwall' && validBounds(r.bounds));
   const openings = rectangles.flatMap((rect) => {
     const band = openingBand(rect, height);
     if (!band || !validBounds(rect.bounds)) return [];
     // A recess is the reveal itself: it cuts its own footprint, never through the wall.
     const bounds = (zoneKind(rect) === 'halfwall' && insideRoom(rect.bounds)) || zoneKind(rect) === 'recess'
       ? rect.bounds : piercedBounds(rect.bounds, sources);
-    return [{ rect, bounds, z0: band[0], z1: band[1] }];
+    let pieces = [bounds];
+    if (zoneKind(rect) === 'halfwall') {
+      for (const other of halfwalls) {
+        if (other !== rect && (other.sill ?? 1.1) > (rect.sill ?? 1.1)) {
+          pieces = pieces.flatMap((p) => rectMinus(p, other.bounds));
+        }
+      }
+    }
+    return pieces.map((b) => ({ rect, bounds: b, z0: band[0], z1: band[1] }));
   });
   return sources.flatMap((source) => splitWallByOpenings(source, height, openings));
 }
