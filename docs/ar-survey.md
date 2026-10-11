@@ -394,16 +394,19 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   cycles the scenario (normal 30/15, inlets 25 @20 Pa; night 15/15, inlets 44; every sanitary vent at 45; kitchen
   135; every vent at boost); the readout gives the extract, the suction range at the inlets and the assumptions,
   and warns of vents no inlet reaches. No envelope leakage (an airtight house); all flows are Hypothesis.
-  **3D map (owner, 2026-10-11: "Ok" to a per-floor 3D map driven by the network):** trigger on the floor (not
-  on a window) computes the active floor in a worker (`src/core/airflow3d.js`, `src/ui/airflow3d.worker.js`;
-  the readout shows the progress): potential flow on a ≤ 20 cm grid whose lines include every room and opening
-  edge (a 7 cm wall is its own cells, a shut door its 1 cm undercut layer), walls / half walls / furniture solid,
-  the network's inlet, vent and stairwell flows as the floor's sources, then the age of the air since it entered
-  the floor (D = 0.0005 m²/s). The plan is tinted green → red by age ÷ the floor's fully-mixed age (red ≥ 2.5×)
-  at 1.5 m; trigger on the floor again switches to under the ceiling; the readout gives the age under the
-  reticle. A scenario or inlet change makes the map stale (the readout says so). Node, plan of 2026-10-10,
-  Normal, 5 EHB²: Basement 6.8 s, Ground 12.4 s (60 135 air cells; hob 394 min against 190 fully mixed),
-  Upper 5.3 s on the Steam Deck; the Quest is slower (Hypothesis: 3–5×). No heat, no people: Hypothesis.
+  **3D map (owner, 2026-10-11: "Ok" to a 3D map driven by the network, then "the whole house instead, not
+  per floor"):** trigger on the floor (not on a window) computes the WHOLE HOUSE in a worker
+  (`src/core/airflow3d.js` `solveHouse3d`, `src/ui/airflow3d.worker.js`; the readout shows the progress). Each floor:
+  potential flow on a ≤ 20 cm grid whose lines include every room and opening edge (a 7 cm wall is its own cells, a
+  shut door its 1 cm undercut layer), walls / half walls / furniture solid, the network's inlet, vent and stairwell
+  flows as its sources (the network carries the stack effect, which a potential field cannot). Then ONE age system
+  over every floor: air arriving by a stairwell carries the age of the air leaving the other floor there, so the map
+  shows the age since the air came in from OUTSIDE (D = 0.0005 m²/s). The active floor is tinted green → red by
+  age ÷ the house's fully-mixed age (red ≥ 2.5×) at 1.5 m; trigger again: under the ceiling; switching floors shows
+  the same result. A scenario or inlet change makes it stale. Node, plan of 2026-10-10, 5 EHB², Steam Deck: Normal
+  38 s (125 003 air cells, 425 m³, fully mixed 340 min; hob 410, laundry 727, upper bedrooms 187 / 273 min); Night
+  51 s (upper bedrooms ≈ 1 600–1 900 min: at −7 °C their inlets draw ≈ 1.5 m³/h). The Quest is slower (Hypothesis:
+  3–5×). No heat, no people: Hypothesis.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.

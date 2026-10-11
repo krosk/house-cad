@@ -350,7 +350,8 @@ that the plume favours a vent beside the hob further. **Inlets (owner, 2026-10-1
 the window, jet toward the ceiling). In the plan a window zone stores its inlet as `airInlet`
 (`src/core/airInlets.js`), set in AR HEATING · AIR INLET (`docs/ar-survey.md`), which also runs the whole-house network live
 (`src/core/airflow.js`, the scratch network made part of the app, with the stairs between storeys) and, on demand,
-the 3D age-of-air map of the active floor (`src/core/airflow3d.js`); not yet written to the headset. One EHB² on every dry-room window (owner, 2026-10-11): Proven from the plan that this is
+the whole house's 3D age-of-air map (`src/core/airflow3d.js`: each floor's field from the network's flows, one
+age system across the stairs, so ages count from outside); not yet written to the headset. One EHB² on every dry-room window (owner, 2026-10-11): Proven from the plan that this is
 5 inlets, r108 and r109 (living), r80 (ground bedroom r51), r113 (upper bedroom r85), r115 (upper bedroom r88);
 the wet rooms' windows r110, r111, r114, r146 have none, and the basement has no dry-room window. A whole-house
 network (rooms as nodes, those 5 inlets; an EHB² taken as an orifice of its humidity-set flow at

@@ -794,9 +794,13 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     2026-10-10/11). Decisions: unit B stays a Classic (no HP); kitchen vent to the ceiling at (1.10, −4.60) (not drawn);
     every dry-room window carries one Aldes EHB² 6–44 (r80, r108, r109, r113, r115; not written to the headset).
     Code (this commit): window `airInlet` (`src/core/airInlets.js`), AR HEATING · AIR INLET (`vmc_inlet`), live
-    whole-house network `src/core/airflow.js`, per-floor 3D age map `src/core/airflow3d.js` in
-    `src/ui/airflow3d.worker.js`. Proven: build, Node runs on the 10-10 plan copy (network converges, ≈ 31 ms; 3D
-    5–12 s per floor on the Deck), worker protocol via a Node stand-in. Not seen in a browser or on the Quest; owner:
+    whole-house network `src/core/airflow.js`, whole-house 3D age map `src/core/airflow3d.js` (owner: "the whole
+    house instead, not per floor": each floor's field from the network's flows, one age system across the stairs,
+    ages since outside) in `src/ui/airflow3d.worker.js`. Proven: build, Node runs on the 10-10 plan copy (network
+    converges, ≈ 31 ms; 3D 38 s Normal / 51 s Night on the Deck, 125 003 air cells), worker protocol via a Node
+    stand-in. Hypothesis to check when unparked: on a −7 °C night the upper bedrooms' inlets draw ≈ 1.5 m³/h (stack
+    effect; airtight house, one humidity for all rooms). A single stacked grid with pressure inlets was weighed and
+    not built (≈ 5–10 pressure solves for little gain). Not seen in a browser or on the Quest; owner:
     "I did not try, park it". Results and assumptions: `docs/plumbing-workflow.md` "Air paths computed",
     `docs/ar-survey.md` AIR INLET, QA in `docs/ar-qa-checklist.md`.
 

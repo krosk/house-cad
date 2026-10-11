@@ -55,7 +55,7 @@ import { deriveCircuits, circuitDiagnostics } from '../core/circuits.js';
 import { diffAgainstSnapshot } from '../core/planDiff.js';
 import { AIR_INLETS, nextAirInlet } from '../core/airInlets.js';
 import { runAirflow, AIRFLOW_SCENARIOS } from '../core/airflow.js';
-import { floorAirInput, solveFloor3d } from '../core/airflow3d.js';
+import { houseAirInput, solveHouse3d } from '../core/airflow3d.js';
 import { floorHeatLoss, houseHeatLoss, houseBalance, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
@@ -2537,15 +2537,17 @@ export function setupMR(view, project, getFootprint) {
       mesh.position.y = 0.006;
       planGroup.add(mesh);
     }
-    if (air3d?.status === 'done' && air3d.key === air3dKey() && air3d.out?.floorId === floor.id) addAirSlice(air3d.out);
+    const air3dFloor = air3d?.status === 'done' && air3d.key === air3dKey() ? air3d.out.floors.find((f) => f.floorId === floor.id) : null;
+    if (air3dFloor) addAirSlice(air3dFloor, air3d.out.nominal);
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
-  // 3D map of the active floor (core/airflow3d.js, in a worker): the age of the air since it entered
-  // the floor, at head height (1.5 m) or under the ceiling. Trigger on the floor computes it, then
+  // 3D map of the whole house (core/airflow3d.js, in a worker; owner, 2026-10-11: "the whole house instead,
+  // not per floor"): the age of the air since it came in from outside, shown on the active floor at head
+  // height (1.5 m) or under the ceiling. Trigger on the floor computes it (once for every floor), then
   // switches the slice; any change of scenario or inlet makes it stale. Session-only.
   let air3d = null, air3dWorker = null, air3dJob = 0, airHoverAge = null;
   const inletSignature = () => project.floors.flatMap((f) => f.rectangles.filter((r) => r.airInlet).map((r) => `${r.id}:${r.airInlet}`)).sort().join(',');
-  const air3dKey = () => `${AIRFLOW_SCENARIOS[airScenario].id}|${project.activeFloor.id}|${inletSignature()}`;
+  const air3dKey = () => `${AIRFLOW_SCENARIOS[airScenario].id}|${inletSignature()}`;
   const air3dSliceZ = (out) => (air3d?.slice === 'ceiling' ? out.zs[out.NZ] - 0.2 : 1.5);
   const airAgeColor = (r) => { const q = Math.max(0, Math.min(1, r / 2.5)); return [Math.min(1, 2 * q), Math.min(1, 2 * (1 - q)), 0.24]; };
   const air3dMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
@@ -2554,14 +2556,14 @@ export function setupMR(view, project, getFootprint) {
     const i = find(out.xs, px), j = find(out.ys, py), k = find(out.zs, z);
     return i < 0 || j < 0 || k < 0 ? -1 : k * out.NX * out.NY + j * out.NX + i;
   };
-  function addAirSlice(out) {
+  function addAirSlice(out, nominal) {
     const z = air3dSliceZ(out), k0 = air3dCell(out, out.xs[0] + 1e-6, out.ys[0] + 1e-6, z);
     if (k0 < 0) return;
     const k = Math.floor(k0 / (out.NX * out.NY)), pos = [], col = [];
     for (let j = 0; j < out.NY; j++) for (let i = 0; i < out.NX; i++) {
       const c = k * out.NX * out.NY + j * out.NX + i, a = out.age[c];
       if (!(out.vol[c] > 0.3) || !Number.isFinite(a)) continue;
-      const [r, g, b] = airAgeColor(a / out.nominal), x0 = out.xs[i], x1 = out.xs[i + 1], y0 = out.ys[j], y1 = out.ys[j + 1];
+      const [r, g, b] = airAgeColor(a / nominal), x0 = out.xs[i], x1 = out.xs[i + 1], y0 = out.ys[j], y1 = out.ys[j + 1];
       for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { pos.push(x, 0, -y); col.push(r, g, b); }
     }
     if (!pos.length) return;
@@ -2574,16 +2576,16 @@ export function setupMR(view, project, getFootprint) {
   }
   function startAir3d() {
     if (!airResult || airResult.noInlets) return;
-    const floor = project.activeFloor, input = floorAirInput(project, floor, airResult), key = air3dKey(), job = ++air3dJob;
+    const input = houseAirInput(project, airResult), key = air3dKey(), job = ++air3dJob;
     air3d = { key, status: 'computing', progress: 0, slice: air3d?.slice || 'head', started: performance.now() };
-    rlog('air 3d start', { floor: floor.id, scenario: AIRFLOW_SCENARIOS[airScenario].id, sources: input.sources.length });
+    rlog('air 3d start', { scenario: AIRFLOW_SCENARIOS[airScenario].id, floors: input.floors.length });
     const finish = (out, error) => {
       if (job !== air3dJob) return;
       air3d = { ...air3d, status: error || !out ? 'error' : 'done', out, error, seconds: (performance.now() - air3d.started) / 1000 };
-      rlog('air 3d done', { floor: floor.id, cells: out?.cells, seconds: air3d.seconds, error });
+      rlog('air 3d done', { cells: out?.cells, seconds: air3d.seconds, error });
       buildPlan(); applyPlanMatrix();
     };
-    if (typeof Worker === 'undefined') { try { finish(solveFloor3d(input)); } catch (err) { finish(null, String(err)); } return; }
+    if (typeof Worker === 'undefined') { try { finish(solveHouse3d(input)); } catch (err) { finish(null, String(err)); } return; }
     air3dWorker ??= new Worker(new URL('./airflow3d.worker.js', import.meta.url), { type: 'module' });
     air3dWorker.onmessage = (e) => {
       const m = e.data; if (m.id !== air3dJob) return;
@@ -11009,7 +11011,7 @@ export function setupMR(view, project, getFootprint) {
         if (modeId === 'heat_r') heatHoverZone = project.rectangles.find((r) => isThermalZone(r) && inside(r)) || null;
         else if (modeId === 'vmc_inlet') {
           heatHoverZone = project.rectangles.find((r) => isInletZone(r) && inside(r)) || null;
-          const o = air3d?.status === 'done' && air3d.key === air3dKey() ? air3d.out : null, c = o ? air3dCell(o, px, py, air3dSliceZ(o)) : -1;
+          const o = air3d?.status === 'done' && air3d.key === air3dKey() ? air3d.out.floors.find((f) => f.floorId === project.activeFloor.id) : null, c = o ? air3dCell(o, px, py, air3dSliceZ(o)) : -1;
           airHoverAge = c >= 0 && Number.isFinite(o.age[c]) && o.vol[c] > 0.3 ? o.age[c] : null;
         }
         else {
