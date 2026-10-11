@@ -777,7 +777,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       **no stack reaches the roof or attic** (owner), so the network has no open vent today. Option studied: a Ø100
       façade pipe teed onto the collector, up the windowless south façade of the single-storey wing to ≈ 0.3–0.4 m
       above its ≈ 3 m roof edge (or the ridge if the contractor requires it), with the Ø100 valve kept on the upper
-      riser. Not chosen, not drawn. `docs/plumbing-workflow.md` "Open vent and collector".
+      riser. Then chosen (no roof vent): at the corner where the wing's ridge meets the upper floor, drawn in item 73.
+      `docs/plumbing-workflow.md` "Open vent and collector".
     - Heating: laundry r66 and east room r74 at 15 °C (radiators sized for 17 °C: ≈ 1600 / 1400 W rated);
       **pairs: bedroom r51 + laundry (tee in the laundry ceiling); kitchen + r74 (tee in r74's ceiling); shower
       room alone** (option A); thermostatic valves only. Drawn in item 73. `docs/heat-loss.md` "Laundry heater".
@@ -789,6 +790,15 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     radiators; manifold + 9 pairs. Then (owner: "Do 1") `edit-upper.mjs`: column r122 +13 cm east, +7 cm north
     (c227 −0.49, c1443 −0.83) and the two upper pairs up it (backup `quest-backup-1010-upper`, read back identical,
     266 704 chars); 0 pipe clashes. Open: the collector itself is not drawn; the owner adjusts to the real setup. `docs/plumbing-workflow.md` "Heating pipes" / "Open vent".
+74. **VMC airflow: kitchen vent V2, EHB² inlets, AIR INLET tool, network + 3D map: PARKED, untried** (owner,
+    2026-10-10/11). Decisions: unit B stays a Classic (no HP); kitchen vent to the ceiling at (1.10, −4.60) (not drawn);
+    every dry-room window carries one Aldes EHB² 6–44 (r80, r108, r109, r113, r115; not written to the headset).
+    Code (this commit): window `airInlet` (`src/core/airInlets.js`), AR HEATING · AIR INLET (`vmc_inlet`), live
+    whole-house network `src/core/airflow.js`, per-floor 3D age map `src/core/airflow3d.js` in
+    `src/ui/airflow3d.worker.js`. Proven: build, Node runs on the 10-10 plan copy (network converges, ≈ 31 ms; 3D
+    5–12 s per floor on the Deck), worker protocol via a Node stand-in. Not seen in a browser or on the Quest; owner:
+    "I did not try, park it". Results and assumptions: `docs/plumbing-workflow.md` "Air paths computed",
+    `docs/ar-survey.md` AIR INLET, QA in `docs/ar-qa-checklist.md`.
 
 ## Next step
 
@@ -822,7 +832,12 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`26aaad7`, 10-10; relaunch it); items 68/71: boxing r220 a
+- **First, with the Quest:** the app is updated (`c276b7b`, 10-10; relaunch it); item 73 first: HEATING · PIPE shows
+  the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
+  basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
+  with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall
+  and north to r209; the WC riser stopping at 1.49 m (the valve) and the brown Ø100 vent up the south façade at the
+  upper floor's corner to 3.40 m. The owner adjusts these to the real setup. Then items 68/71: boxing r220 a
   tiled half wall to the ceiling over r210's west end; View 3D "🧱 Half walls" shows frames through half walls
   (no AR equivalent); item 67: unit B upside down
   under laundry r66's ceiling near the west wall (lid toward the floor, MATERIAL · FURNITURE), the grey Ø80

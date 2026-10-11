@@ -468,6 +468,9 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] PLAN · EDIT on an INSULATION zone opens the pad as R (m²K/W) too; a room's `area:` HUD line adds its watts
 - [ ] Settings survive SAVE/LOAD and an APK relaunch (project data, autosaved)
 - [ ] Not offered in ALL FLOORS
+- [ ] ⬜ NEW (2026-10-11) HEATING · AIR INLET follows PIPE in the cycle; every window shows `—` (grey); trigger on one shows `EHB²` (orange) and the readout `WINDOW · Aldes EHB² 6–44 m³/h · humidity-controlled`; trigger again returns to `—`; doors and sliding doors are not aimed; the inlet survives SAVE/LOAD (Node: clone and save/load round trip kept, a retype to door dropped it); not offered in ALL FLOORS
+- [ ] ⬜ NEW (2026-10-11) AIR INLET airflow: with EHB² on r80, r108, r109 (Ground) and r113, r115 (Upper), Normal shows on Ground `EHB² 16/17`, blue received air per room (living 45, kitchen 30), arrows through r117 (kitchen ← living), r64, r78, r56, `stairs ↑ 10`; on Upper `EHB² 12`, `stairs ↑ 10`; readout `extract 75 m³/h · suction 4.9–9.2 Pa` (Node, plan of 2026-10-10); thumbstick ↕ cycles Night / sanitary boost / kitchen boost (suction 38–45 Pa) / all boost; arrows point the way the air goes; the AR frame rate holds while toggling an inlet
+- [ ] ⬜ NEW (2026-10-11) AIR INLET 3D map: trigger on the Ground floor (not a window): the readout counts `3D map: computing n %` while AR stays fluid; then the plan is tinted (kitchen's south end red with today's vent, hall green), readout `3D map: age of the air at 1.5 m · if fully mixed 190 min · … cells · n s` (note n: the Quest's time) and `here x min (y×)` under the reticle; trigger again: under the ceiling; thumbstick ↕ or an inlet toggle: `out of date`
 - [ ] Owner sanity check: a room's watts against an existing radiator that keeps it warm
 
 ## PROJECT · LANG (`lang`)  ✅ session 14

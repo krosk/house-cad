@@ -159,7 +159,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 }
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -183,6 +183,8 @@ export class Rectangle {
       // Thermal transmittance U (W/m²K) from the label (Uw / Ud), for the heat-loss
       // calculation (docs/heat-loss.md); absent = the project's window / door U.
       if (OPENING_KINDS.has(this.kind) && Number.isFinite(uValue) && uValue > 0) this.uValue = uValue;
+      // A window's fresh-air inlet (core/airInlets.js key; owner, 2026-10-11); absent = none.
+      if (this.kind === 'window' && typeof airInlet === 'string' && airInlet) this.airInlet = airInlet;
     } else if (this.kind === 'furniture') {
       // A furniture placeholder carries a solid [foot, top] body band (the dual of
       // an aperture opening). Explicit values win on deserialize/clone.
@@ -222,6 +224,7 @@ export class Rectangle {
     if (ZONE_KINDS.includes(kind)) this.kind = kind;
     if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
+    if (this.kind !== 'window') delete this.airInlet;
     if (this.kind !== 'room') delete this.outdoor;
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];

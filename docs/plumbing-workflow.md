@@ -323,6 +323,47 @@ upper shower vent (−4.625, 0.42) is 7.5 cm / 11 cm from two walls: move it ont
 widened boxing r220 (one bend less than a ceiling vent fed from below), ≥ 20 cm from the west wall and
 the ceiling. The laundry vent as drawn is 16 cm from the north wall.
 
+**Unit B stays a Classic (owner, 2026-10-10: "I am not to switch to the HP mode"):** the HP lever above is
+dropped. Proven (notice 3963727, Classic product sheet and p. 11 wiring): the Classic is single speed (L/N only);
+its one published point is **122 Pa at 144 m³/h** (0.040 m³/s), 28 W at 221 m³/h max. The notice gives no duct
+length or bend limit (searched). B's flow with both vents at boost is ≤ ≈ 90 m³/h, below that point; a single-speed
+fan usually gives more pressure at less flow, so ≥ 122 Pa is assumed at B (Hypothesis: Aldes publishes no curve).
+Budget to the upper vent at boost (Hypothesis, Colebrook, Ø77 bore, recomputed 2026-10-10: 2.68 m/s, 1.6 Pa/m,
+8.97 m ≈ 14.4 Pa + 4½ pairs ≈ 5.8 Pa, ≈ 20–23 Pa with the pair behind the vent; Ø160 OUT 2.1 m + wall terminal
+≈ 1–3 Pa; room depression 10–20 Pa): the vent sees **≈ 76–91 Pa** (≈ 105 Pa at 30 m³/h, ≈ 115 at 15). The low
+end is just under the 80 Pa floor, only during a boost with the window inlets at their least favourable; below
+80 Pa a vent acts as an orifice (flow ∝ √Δp, Hypothesis), so 76 Pa gives ≈ 44 instead of 45 m³/h. Verdict: the
+length is reasonable for B in the laundry; the levers left are the seals, generous window inlets, and fewer
+pairs. Commissioning still reads the upper vent's Δp during a boost.
+
+**Air paths computed (2026-10-10/11, scratch scripts, not in the repo):** owner: "I generally agree for V2", i.e.
+move the kitchen vent from (1.25, −1.30), 22 cm inside passage r117 (the kitchen's only opening), to the ceiling
+at **(1.10, −4.60)**, ≈ 0.9 m west of the hob (not drawn yet; ≈ +2.5 m of Ø125 and one pair from unit A,
+≈ 3–5 Pa at boost, Hypothesis). Proven (script runs on the headset copy of 2026-10-10): a potential-flow + age-of-air
+model of the kitchen (2D, then 3D with the furniture at ≈ 15 cm cells with open fractions; the ranking is the same
+from 2.5 to 30 cm cells) gives the air above the hob an age of 4.2× the kitchen's nominal 46 min with today's vent
+(1.75× with more mixing) against 1.16× (1.02×) at V2; a spot east of the hob above the tall oven is a tie but
+leaves only 22 cm under the vent. Adding the hall, the ground shower room and the living room changes neither the
+ranking nor the other rooms (each hygro vent pulls a set flow). No heat in the model (no hob plume): Hypothesis
+that the plume favours a vent beside the hob further. **Inlets (owner, 2026-10-11): Aldes EHB² hygro, 6–44 m³/h**
+(Proven, Aldes sheet 11014233: same Avis Technique 14.5/17-2266 as the EasyHOME units; dry rooms only, high on
+the window, jet toward the ceiling). In the plan a window zone stores its inlet as `airInlet`
+(`src/core/airInlets.js`), set in AR HEATING · AIR INLET (`docs/ar-survey.md`), which also runs the whole-house network live
+(`src/core/airflow.js`, the scratch network made part of the app, with the stairs between storeys) and, on demand,
+the 3D age-of-air map of the active floor (`src/core/airflow3d.js`); not yet written to the headset. One EHB² on every dry-room window (owner, 2026-10-11): Proven from the plan that this is
+5 inlets, r108 and r109 (living), r80 (ground bedroom r51), r113 (upper bedroom r85), r115 (upper bedroom r88);
+the wet rooms' windows r110, r111, r114, r146 have none, and the basement has no dry-room window. A whole-house
+network (rooms as nodes, those 5 inlets; an EHB² taken as an orifice of its humidity-set flow at
+20 Pa, opening 6 → 44 m³/h between 35 and 65 % RH; 1 cm door undercuts; stack effect; all Hypothesis) gives:
+the upper floor is not ventilated by its own bathroom vent alone (15 m³/h for two bedrooms) but through the
+stairs: at night with the bedrooms humid each upper bedroom draws ≈ 19–20 m³/h and ≈ 23–26 m³/h goes down the
+stairs to the ground-floor vents; with the living room occupied instead, ≈ 10 each. House depression ≈ 5–9 Pa in
+normal running, ≈ 14–17 Pa with the upper bath boost (matches the 10–20 Pa assumed above), but ≈ 45–65 Pa with a
+kitchen boost if the inlets were the only openings, so in a very airtight house the inlets would cap the kitchen
+boost. With the envelope leaking 100 m³/h at 4 Pa the boost depression falls to ≈ 4–8 Pa, but on a winter night
+the upper inlets then carry ≈ 0 (stack effect: the leaks low in the house take the air). Open: the house's real
+airtightness, the inlet count per window, the EHB²'s Δp reference and humidity curve, the kitchen vent's flows.
+
 **Boxings are half walls (owner, 2026-10-10: "Boxing is a half wall from my definition"):** a pipe or duct boxing is
 drawn as a `halfwall` zone from the floor to its top, never as a plain furniture box (View 3D draws a furniture zone
 only when it carries a catalog product, so a plain box is invisible there). Boxing r220 was converted and written

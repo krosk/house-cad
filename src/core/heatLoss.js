@@ -492,7 +492,7 @@ function neighbourPieces(foot, neighbour) {
 // walls, floor, ceiling and air (its area is no longer taken out of the room's).
 const STAIR_KINDS = new Set(['stairs_up', 'stairs_down']);
 const DOOR_KINDS = new Set(['door', 'sliding', 'garage']);
-function heatComponents(floor) {
+export function heatComponents(floor) {
   const rects = floor.rectangles;
   const doors = rects.filter((r) => DOOR_KINDS.has(zoneKind(r)));
   const doorBetween = (a, b) => {

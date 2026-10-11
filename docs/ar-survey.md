@@ -377,6 +377,33 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   pad opens on the one set; a typed λ labels the zone `λ x` in orange. An insulation R or λ can also be
   typed on the PLAN · EDIT band pad (same SWAP toggle).
   Not offered in ALL FLOORS.
+- **HEATING · AIR INLET** (`id: vmc_inlet`, owner 2026-10-11: "more a VMC tool"; it sits after PIPE, where the
+  VMC ducts are drawn) — every WINDOW zone of the active floor shows its VMC fresh-air inlet at its centre
+  (orange `EHB²` = fitted, grey `—` = none); the readout names the aimed window's inlet and flow range.
+  Trigger on a window steps none → each catalog inlet (`src/core/airInlets.js`; today only the Aldes EHB²
+  6–44 m³/h) → none. Stored as the window zone's `airInlet` (additive in the file, dropped if the zone stops
+  being a window). Not offered in ALL FLOORS.
+  **Airflow (owner, 2026-10-11: "drive the simulation in AR"):** every change re-runs the whole-house air
+  network (`src/core/airflow.js`): each space (a floor's connected rooms with their open stairs, as in HEAT LOSS)
+  is one pressure node; an inlet is an orifice of its scenario opening at 20 Pa; a door / sliding / garage door
+  between two spaces is its 1 cm undercut, a passage its open band; storeys join where their stair zones overlap;
+  every open end of a `vmc` duct that is not at a VMC unit (article easyhome / agalina / vmc, within 15 cm) and
+  not an outlet (≥ Ø160) is a vent of fixed flow (Ø ≥ 125 a kitchen vent), in the space that contains it; the
+  stack effect uses HEAT LOSS's outdoor and room temperatures. On the plan: each window `EHB² q`, each space's
+  received air (blue), an arrow + flow across each door and passage, `stairs ↑/↓ q`, `vent q`. Thumbstick up/down
+  cycles the scenario (normal 30/15, inlets 25 @20 Pa; night 15/15, inlets 44; every sanitary vent at 45; kitchen
+  135; every vent at boost); the readout gives the extract, the suction range at the inlets and the assumptions,
+  and warns of vents no inlet reaches. No envelope leakage (an airtight house); all flows are Hypothesis.
+  **3D map (owner, 2026-10-11: "Ok" to a per-floor 3D map driven by the network):** trigger on the floor (not
+  on a window) computes the active floor in a worker (`src/core/airflow3d.js`, `src/ui/airflow3d.worker.js`;
+  the readout shows the progress): potential flow on a ≤ 20 cm grid whose lines include every room and opening
+  edge (a 7 cm wall is its own cells, a shut door its 1 cm undercut layer), walls / half walls / furniture solid,
+  the network's inlet, vent and stairwell flows as the floor's sources, then the age of the air since it entered
+  the floor (D = 0.0005 m²/s). The plan is tinted green → red by age ÷ the floor's fully-mixed age (red ≥ 2.5×)
+  at 1.5 m; trigger on the floor again switches to under the ceiling; the readout gives the age under the
+  reticle. A scenario or inlet change makes the map stale (the readout says so). Node, plan of 2026-10-10,
+  Normal, 5 EHB²: Basement 6.8 s, Ground 12.4 s (60 135 air cells; hob 394 min against 190 fully mixed),
+  Upper 5.3 s on the Steam Deck; the Quest is slower (Hypothesis: 3–5×). No heat, no people: Hypothesis.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.
