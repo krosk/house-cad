@@ -838,7 +838,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       `docs/plumbing-workflow.md`, `docs/ar-survey.md` HEATING · PIPE / PIPE DIMS / PIPE EDIT.
     - `ac1c277`: the owner's share link opened on a portrait phone turned 90° from the plan; owner: "Keep the
       plan". The overview no longer turns a wide house on a portrait screen (`frameModel`, CLAUDE.md updated).
-76. **Garden split level, RAMP, PLATFORM, GATE, GARDEN WALL + fence (2026-10-12; code committed, NOT yet on the headset plan):**
+76. **Garden split level, RAMP, PLATFORM, GATE, GARDEN WALL, FENCE (2026-10-12; `23ac94a` published + installed, the FENCE zone uncommitted; NOT yet on the headset plan):**
     - Owner: the garden is a floor between the basement and the ground; it has three levels: the main garden at
       the earth level (HEAT LOSS `earth` −0.90 m), the garage side at the basement floor (the driveway is a slope),
       the front entrance at the ground floor (stairs from the garden to a platform). Gates and the low walls are
@@ -846,6 +846,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     - Code: a floor's optional `level` makes it a split level outside the stacking (`isSplitLevel`, `floorBelow`/
       `floorAbove`/`floorRises`, `model.js`); RAMP, PLATFORM, GATE, GARDEN WALL (`top` + optional `fence`) zone
       kinds. Mechanics: `docs/ar-survey.md` "Multi-floor"; decision: `docs/product-intent.md`.
+    - Fence: `23ac94a` put a `fence` height on the garden wall; the owner then wanted "separate pieces, so that
+      I can apply a fence material and have it have a separate thickness": a FENCE zone (band [foot, top], foot
+      absent = on the garden wall under it) + MATERIAL · FENCE (`docs/materials.md` "Fences"); the field is gone.
+      Proven: Node (fence on r237 stands at 0.73, each material fills 0.73 → 1.60 within its 4 cm, save/load and
+      share keep it, heat loss unchanged); build.
     - Prepared write (scratch `editGarden.mjs` on a 10-12 read, session-local): new floor `f4` Garden (level −0.90,
       height 2.5, unheated) between Basement and Ground; Basement `r236 r237 r239–r244` move to it with their 26
       dims (`c1498`/`c1499`, r239↔r238, dropped: the garden is then pinned to nothing); `r239` → RAMP climbing

@@ -31,12 +31,34 @@
 // the glass tint, `frameDepth`/`sashDepth` the published profile depths. The zone's
 // width, sill, head and hinge (both = two leaves) size it. No takeoff.
 //
+// Fence materials (`surface: 'fence'`, `pattern: 'fence'`) go on a FENCE zone the same way
+// (owner, 2026-10-12): `design` picks the build in architectural3d.js fenceParts — 'slats'
+// (vertical boards `w` wide, `joint` apart), 'boards' (horizontal boards `w` high, `joint`
+// apart), 'bars' (vertical bars `w` square, `joint` apart, between two rails) — and `color`
+// its colour. The zone gives the length, thickness, bottom and top. Generic looks, not
+// products (sizes are typical, Hypothesis). No takeoff.
+//
 // Switch products (`surface: 'switch'`, `pattern: 'device'`) go on a switch MARKER
 // (`marker.product`, not a finish): `design` picks the builder in src/ui/deviceProducts.js,
 // which draws only the visible plate and rocker; sizes are `*Mm` fields. Outlet products
 // (`surface: 'outlet'`) go on socket outlet markers the same way. No takeoff.
 
 export const BUILTIN_MATERIALS = [
+  {
+    id: 'fence_wood_slats', surface: 'fence', pattern: 'fence', design: 'slats', w: 0.09, h: 0, joint: 0.03,
+    color: 0x9a7b55,
+    name: { en: 'Wood slats (vertical)', fr: 'Lames bois (verticales)', zh: '木条（竖向）' },
+  },
+  {
+    id: 'fence_composite_boards', surface: 'fence', pattern: 'fence', design: 'boards', w: 0.15, h: 0, joint: 0.01,
+    color: 0x6b6b6b,
+    name: { en: 'Composite boards (horizontal)', fr: 'Lames composite (horizontales)', zh: '复合板（横向）' },
+  },
+  {
+    id: 'fence_metal_bars', surface: 'fence', pattern: 'fence', design: 'bars', w: 0.02, h: 0, joint: 0.1,
+    color: 0x374151,
+    name: { en: 'Metal bars (anthracite)', fr: 'Barreaux métal (anthracite)', zh: '金属栏杆（炭灰）' },
+  },
   {
     id: 'oak_plank', surface: 'floor', pattern: 'stagger', w: 1.2, h: 0.19, joint: 0,
     color: 0xc8a26b, accent: 0x8a6a3b, pack: { pieces: 8 },
@@ -268,6 +290,12 @@ export function allMaterials(project) {
   return [...BUILTIN_MATERIALS, ...(project?.materials || [])];
 }
 
+// The material set on a zone of `floor` (a door, window or fence: a `{rect}` finish), or null.
+export function zoneMaterial(project, floor, rect) {
+  const f = (floor?.finishes || []).find((x) => !x.target?.edge && x.target?.rect === rect?.id);
+  return f ? materialById(project, f.material) : null;
+}
+
 export function materialById(project, id) {
   if (!id) return null;
   return allMaterials(project).find((m) => m.id === id) || null;
@@ -275,7 +303,9 @@ export function materialById(project, id) {
 
 // Materials offered for a surface ('floor' | 'wall'), catalog order.
 export function materialsFor(project, surface) {
-  return allMaterials(project).filter((m) => m.surface === surface || m.surface === 'both');
+  // `both` is floor and wall (a tile laid on either), never a door, window or fence product.
+  return allMaterials(project).filter((m) => m.surface === surface
+    || (m.surface === 'both' && (surface === 'floor' || surface === 'wall')));
 }
 
 // The product a marker carries (`marker.product`), if it suits the marker's type:

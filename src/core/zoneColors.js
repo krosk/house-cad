@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'gate', 'halfwall', 'gardenwall', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'ramp', 'platform', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'gate', 'halfwall', 'gardenwall', 'fence', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'ramp', 'platform', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -16,7 +16,8 @@ export const ZONE_COLORS = {
   passage: 0xbef264, // pale lime — an open doorway (no leaf); door-family
   garage:  0x16a34a, // dark green — motorized sectional garage door
   gate:    0x65a30d, // olive — an outdoor gate: a free-standing leaf, no wall around it
-  gardenwall: 0x78716c, // stone — an outdoor low wall (boundary), optionally with a fence on top
+  gardenwall: 0x78716c, // stone — an outdoor low wall (boundary)
+  fence:   0xa16207, // brown — an outdoor fence: its own piece, often on a garden wall
   halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
@@ -120,18 +121,23 @@ export function apertureBounds(rect) {
 // mesh — so both bounds are authored. Default: a floor-standing ~0.9 m box.
 export const FURNITURE_BAND = { foot: 0, top: 0.9 };
 // A GARDEN WALL (owner, 2026-10-12: the garden's boundary walls, "different from the half
-// wall indoors"): an outdoor low wall, solid from the ground to `top`, with an optional
-// fence on it up to `fence`. Unlike a half wall it never opens a house wall, is not capped
-// by the floor's ceiling, and heat loss, ventilation and finishes ignore it.
+// wall indoors"): an outdoor low wall, solid from the ground to `top`. Unlike a half wall it
+// never opens a house wall, is not capped by the floor's ceiling, and heat loss, ventilation
+// and finishes ignore it.
 export const GARDEN_WALL_TOP = 1.0;
+// A FENCE (owner, 2026-10-12: "separate pieces, so that I can apply a fence material and
+// have it have a separate thickness"): its own zone, drawn as thick as the fence; band
+// [foot, top], foot absent = standing on the garden wall under it (fenceFoot,
+// architectural3d.js). Outdoors like a garden wall.
+export const FENCE_TOP = 1.8;
 
 // The editable vertical bounds of any rect that carries a band, in pad order, as
 // property names on the rect: apertures → [sill?, head?]; a furniture placeholder →
 // [foot, top]; everything else → []. This is what the AR band pad iterates over.
 export function verticalBandFields(rect) {
   if (rect?.kind === 'furniture') return ['foot', 'top'];
-  // A garden wall's height, then the top of the fence on it (0 / empty = no fence).
-  if (rect?.kind === 'gardenwall') return ['top', 'fence'];
+  if (rect?.kind === 'gardenwall') return ['top'];
+  if (rect?.kind === 'fence') return ['foot', 'top'];
   return apertureBounds(rect);
 }
 

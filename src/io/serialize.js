@@ -34,7 +34,6 @@ function serializeRect(r) {
   if (r.head !== undefined) out.head = r.head;
   if (r.hinge !== undefined) out.hinge = r.hinge;
   if (r.swing !== undefined) out.swing = r.swing;
-  if (r.fence !== undefined) out.fence = r.fence; // a fence's top on a half wall
   if (r.climb !== undefined) out.climb = r.climb; // stairs ascent, once rotated
   // Furniture placeholders carry a solid body band [foot, top]; omit elsewhere.
   if (r.foot !== undefined) out.foot = r.foot;
@@ -54,7 +53,7 @@ function serializeRect(r) {
 // Every stored Rectangle field (the constructor validates), for load and paste.
 const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
-  hinge: r.hinge, swing: r.swing, fence: r.fence, foot: r.foot, top: r.top, climb: r.climb,
+  hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
   article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, lambda: r.lambda, uValue: r.uValue,
   outdoor: r.outdoor, airInlet: r.airInlet, sleepers: r.sleepers,
 });

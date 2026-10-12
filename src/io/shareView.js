@@ -77,7 +77,6 @@ export function serializeView(project, { markers = false, furniture = true } = {
         const rc = [mm(r.x), mm(r.y), mm(r.w), mm(r.h), r.op === 'subtract' ? 1 : 0, kinds.indexOf(r.kind || 'room')];
         for (const key of APERTURE_KEYS) rc.push(r[key] == null ? null : mm(r[key]));
         rc.push(furniture && r.article ? furnitureArticles.indexOf(r.article) : null);
-        rc.push(r.fence == null ? null : mm(r.fence)); // after the product slot (2026-10-12)
         while (rc.length > 6 && rc.at(-1) == null) rc.pop();
         return rc;
       });
@@ -130,7 +129,6 @@ export function loadView(project, view) {
       kind: view.k?.[r[5]] || 'room',
       ...Object.fromEntries(APERTURE_KEYS.flatMap((key, index) => r[index + 6] == null ? [] : [[key, r[index + 6]]])),
       ...(typeof view.a?.[r[ARTICLE_SLOT]] === 'string' ? { article: view.a[r[ARTICLE_SLOT]] } : {}),
-      ...(typeof r[ARTICLE_SLOT + 1] === 'number' ? { fence: r[ARTICLE_SLOT + 1] } : {}),
     })),
     markers: (f[3] || []).map((m) => ({
       t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
@@ -159,7 +157,7 @@ export function loadView(project, view) {
       rectangles: (f.rects || []).map((rc) => ({
         id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
         op: rc.op || 'add', kind: rc.kind || 'room',
-        sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, fence: rc.fence, foot: rc.foot, top: rc.top, climb: rc.climb,
+        sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
         article: rc.article, facing: rc.facing,
       })),
       constraints: [], // a view carries no parametric relationships (solver is a no-op)

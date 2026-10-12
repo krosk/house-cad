@@ -382,30 +382,6 @@ function apertureInsertBox(rect, z0, z1, depth = 0.035) {
     : { x0: cx - depth / 2, x1: cx + depth / 2, y0: b.y0, y1: b.y1, z0, z1 };
 }
 
-// A FENCE on a garden wall (owner, 2026-10-12): vertical slats along the wall's long axis on
-// its centre line, from the wall's top up to `fence`, with a top rail; drawn with the doors.
-// Slat size and spacing are a generic picket fence (Hypothesis, not measured).
-const FENCE_SLAT = 0.07, FENCE_GAP = 0.05, FENCE_T = 0.02, FENCE_RAIL = 0.04;
-function fenceBoxes(rect, z0, z1) {
-  const b = rect.bounds, alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
-  const lo = alongX ? b.x0 : b.y0, hi = alongX ? b.x1 : b.y1;
-  const c = alongX ? (b.y0 + b.y1) / 2 : (b.x0 + b.x1) / 2;
-  const box = (s0, s1, a0, a1, za, zb) => (alongX
-    ? { x0: s0, x1: s1, y0: a0, y1: a1, z0: za, z1: zb }
-    : { x0: a0, x1: a1, y0: s0, y1: s1, z0: za, z1: zb });
-  const out = [];
-  const n = Math.max(1, Math.round((hi - lo + FENCE_GAP) / (FENCE_SLAT + FENCE_GAP)));
-  const pitch = (hi - lo) / n, w = Math.min(FENCE_SLAT, pitch * 0.6);
-  for (let i = 0; i < n; i++) {
-    const m = lo + pitch * (i + 0.5);
-    out.push(box(m - w / 2, m + w / 2, c - FENCE_T / 2, c + FENCE_T / 2, z0, z1));
-  }
-  // The rail behind the slats, just under their top.
-  const rz = Math.max(z0, z1 - 0.12);
-  out.push(box(lo, hi, c + FENCE_T / 2, c + FENCE_T / 2 + FENCE_RAIL / 2, rz - FENCE_RAIL, rz));
-  return out;
-}
-
 // A plain DOOR zone's leaf swung 90° open (View 3D, `openDoors`): a leaf per hinge
 // (`hinge: 'both'` = two half-width leaves), standing at its hinge jamb and reaching
 // from the opening's centre line to the swing side (`resolveApertureOrient`, the same
@@ -439,8 +415,6 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
     } else if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
       if (head > EPS) doors.push(apertureInsertBox(rect, 0.015, Math.max(0.015, head - 0.015)));
-    } else if (kind === 'gardenwall' && rect.fence > (rect.top ?? 0)) {
-      doors.push(...fenceBoxes(rect, rect.top ?? 0, rect.fence));
     } else if (kind === 'gate') {
       // Free-standing and outdoors: the leaf, closed, up to its own head (no ceiling clip).
       const head = Math.max(0, rect.head ?? 1.2);
@@ -595,6 +569,69 @@ function rampPlatformGeometries(floor, fillDepth) {
   });
 }
 
+// FENCE zones (owner, 2026-10-12: its own piece, its own material and thickness). Where a
+// fence stands from: its `foot`, or else the top of the tallest garden wall under its centre
+// (it sits on the wall), or else the ground.
+export function fenceFoot(floor, rect) {
+  if (Number.isFinite(rect?.foot)) return rect.foot;
+  const b = rect.bounds, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  let foot = 0;
+  for (const r of floor?.rectangles || []) {
+    if (zoneKind(r) !== 'gardenwall' || !validBounds(r.bounds)) continue;
+    const w = r.bounds;
+    if (cx >= w.x0 - EPS && cx <= w.x1 + EPS && cy >= w.y0 - EPS && cy <= w.y1 + EPS) foot = Math.max(foot, r.top ?? 0);
+  }
+  return foot;
+}
+// The default look (no material): vertical wood slats.
+const FENCE_DEFAULT = { design: 'slats', w: 0.09, joint: 0.03, color: 0x9a7b55 };
+// One fence's boxes for its material `def` (materials.js "Fence materials"). Pieces run
+// along the zone's long axis and fill its depth (the drawn thickness).
+export function fenceBoxes(floor, rect, def = null) {
+  const d = def?.surface === 'fence' ? def : FENCE_DEFAULT;
+  const b = rect.bounds, alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+  const lo = alongX ? b.x0 : b.y0, hi = alongX ? b.x1 : b.y1;
+  const a0 = alongX ? b.y0 : b.x0, a1 = alongX ? b.y1 : b.x1; // across: the thickness
+  const z0 = fenceFoot(floor, rect), z1 = rect.top ?? 1.8;
+  if (!(z1 - z0 > EPS) || !(hi - lo > EPS)) return [];
+  const box = (s0, s1, za, zb, c0 = a0, c1 = a1) => (alongX
+    ? { x0: s0, x1: s1, y0: c0, y1: c1, z0: za, z1: zb }
+    : { x0: c0, x1: c1, y0: s0, y1: s1, z0: za, z1: zb });
+  const piece = Math.max(0.005, d.w || 0.09), gap = Math.max(0, d.joint ?? 0.03);
+  const out = [];
+  if (d.design === 'boards') {
+    const n = Math.max(1, Math.round((z1 - z0 + gap) / (piece + gap)));
+    const pitch = (z1 - z0) / n, h = Math.max(0.005, pitch - gap);
+    for (let i = 0; i < n; i++) out.push(box(lo, hi, z0 + pitch * i, z0 + pitch * i + h));
+    return out;
+  }
+  // slats / bars: vertical pieces evenly spread along the run.
+  const n = Math.max(1, Math.round((hi - lo + gap) / (piece + gap)));
+  const pitch = (hi - lo) / n, w = Math.min(piece, pitch);
+  const c = (a0 + a1) / 2, t = Math.min(a1 - a0, d.design === 'bars' ? piece : a1 - a0);
+  for (let i = 0; i < n; i++) {
+    const m = lo + pitch * (i + 0.5);
+    out.push(box(m - w / 2, m + w / 2, z0, z1, c - t / 2, c + t / 2));
+  }
+  if (d.design === 'bars') { // a rail at the bottom and the top, the fence's full depth
+    const r = Math.min(0.04, (z1 - z0) / 4);
+    out.push(box(lo, hi, z0, z0 + r), box(lo, hi, z1 - r, z1));
+  }
+  return out;
+}
+// Every fence of the floor, grouped by colour: [{ color, geometry }].
+function fenceParts(floor, materialOf) {
+  const byColor = new Map();
+  for (const rect of floor?.rectangles || []) {
+    if (zoneKind(rect) !== 'fence' || !validBounds(rect.bounds)) continue;
+    const def = materialOf?.(rect) || null;
+    const color = def?.surface === 'fence' ? def.color : FENCE_DEFAULT.color;
+    const boxes = fenceBoxes(floor, rect, def);
+    if (boxes.length) (byColor.get(color) ?? byColor.set(color, []).get(color)).push(...boxes);
+  }
+  return [...byColor].map(([color, boxes]) => ({ color, geometry: boxesGeometry(boxes) }));
+}
+
 export function buildArchitecturalFloor(floor, opts = {}) {
   const rooms = (floor?.rectangles || []).filter((rect) => zoneKind(rect) === 'room');
   const stairs = (floor?.rectangles || []).filter((rect) => {
@@ -653,7 +690,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
-    outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
+    outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial), markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
   };
 }
 

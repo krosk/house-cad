@@ -816,6 +816,23 @@ a time, and stops at the first degree where the sash or its lever touches someth
   of the plan); View 3D in a local browser showed the leaves open. Hypothesis: the hinge position and
   the handle are estimates (a few degrees either way); not yet seen in AR.
 
+## Fences (fence materials)
+
+Owner, 2026-10-12: a fence is its own FENCE zone (thickness = its drawn depth, band [foot, top],
+standing on the garden wall under it by default; `docs/ar-survey.md` "Multi-floor"), and a fence
+material gives its look. A fence material (`surface: 'fence'`, `pattern: 'fence'`) is set on the zone
+as a `{rect}` finish, like a door product, in AR **MATERIAL · FENCE**. `design`:
+
+- `slats`: vertical boards `w` wide, `joint` apart, the fence's full thickness;
+- `boards`: horizontal boards `w` high, `joint` apart;
+- `bars`: vertical square bars `w` wide, `joint` apart, between a bottom and a top rail.
+
+`color` is its colour (one Standard/Lambert material per colour, no texture). Built-ins: wood slats
+9 cm / 3 cm, composite boards 15 cm / 1 cm, anthracite metal bars 2 cm / 10 cm. These are generic
+looks with typical sizes (Hypothesis, not a product); a real product would be a new entry. No takeoff.
+`materialsFor(project, 'fence')` lists only fence materials: a `both` material is a floor or wall
+finish only (2026-10-12; before, door and window lists also offered it).
+
 ## Switches and outlets (device products)
 
 Owner decisions (2026-09-27): a switch product is **a new material category that applies only to

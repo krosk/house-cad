@@ -25,9 +25,9 @@ import { buildDeviceProduct } from './deviceProducts.js';
 import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight, stairRises, isSplitLevel, floorBelow, floorAbove } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
-import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
+import { materialsFor, materialById, zoneMaterial, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
-import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from '../core/architectural3d.js';
+import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements, fenceFoot } from '../core/architectural3d.js';
 import { windowSwings, leafDirection } from '../core/windowSwing.js';
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
@@ -3275,11 +3275,12 @@ export function setupMR(view, project, getFootprint) {
     // styling: floor→sill and floor→head as two side-by-side dims, offset along the
     // aperture's wall axis. A zero sill and an open top (head:null) are omitted.
     for (const r of project.activeFloor.rectangles || []) {
-      if (r.kind === 'gardenwall') { // a garden wall's top and its fence's top
+      if (r.kind === 'gardenwall' || r.kind === 'fence') { // a garden wall's top; a fence's bottom and top
         const b = r.bounds, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
         const [dx, dy] = b.x1 - b.x0 >= b.y1 - b.y0 ? [0.04, 0] : [0, 0.04];
-        if (r.top > 1e-4) batch.add(cx - dx, cy - dy, 0, r.top, r.top, dimMat, '#79c0ff');
-        if (r.fence > 1e-4) batch.add(cx + dx, cy + dy, 0, r.fence, r.fence, dimMat, '#79c0ff');
+        const foot = r.kind === 'fence' ? fenceFoot(project.activeFloor, r) : 0;
+        if (foot > 1e-4) batch.add(cx - dx, cy - dy, 0, foot, foot, dimMat, '#79c0ff');
+        if (r.top > 1e-4) batch.add(cx + dx, cy + dy, 0, r.top, r.top, dimMat, '#79c0ff');
         continue;
       }
       if (!isAperture(r.kind)) continue;
@@ -4438,10 +4439,10 @@ export function setupMR(view, project, getFootprint) {
   let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null; // after = one-shot grip request
   let matDeviceHoverId = null; // the sticky yellow device (gripCycle)
   const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet' }; // mode → catalog surface
-  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
   // Zone material modes → the zone kind they edit (door/window: that materials surface;
   // furniture: the furniture catalog, stored as the zone's `article`).
-  const APT_KIND = { mat_door: 'door', mat_window: 'window', mat_furniture: 'furniture' };
+  const APT_KIND = { mat_door: 'door', mat_window: 'window', mat_fence: 'fence', mat_furniture: 'furniture' };
   const FURN_TINT = 0xa78bfa; // a FURNITURE zone with a product (the FURNISH colour)
   let matHighlightKey = '';
   const MAT_NONE_COLOR = 0x94a3b8;
@@ -4516,7 +4517,7 @@ export function setupMR(view, project, getFootprint) {
       }
       matFaces.push({ rect, edge: CAP, face: { cap: true, segments: [] }, comp: null });
     }
-    matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'window', 'furniture'].includes(zoneKindOf(r)));
+    matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'window', 'fence', 'furniture'].includes(zoneKindOf(r)));
     // A target that has a material shows one small swatch badge at the centre of its plan
     // box, not a coloured fill (owner, 2026-09-27: full overlays made the plan hard to read).
     const arr = [], colors = [];
@@ -4809,6 +4810,17 @@ export function setupMR(view, project, getFootprint) {
         [rect.article ? furnitureLabel(rect.article) : t('mat.none'), rect.article ? 0xe2e8f0 : MAT_NONE_COLOR],
         ...(size ? [[size, 0xe2e8f0]] : []),
         ...(rect.article ? [[t('mat.furnitureTurn'), 0xfbbf24]] : []),
+      ];
+    }
+    if (modeId === 'mat_fence') {
+      const rect = matSelDoor || matHoverDoor;
+      if (!rect) return [[t('mat.pickFence'), 0xe2e8f0]];
+      const mat = materialById(project, doorMaterialId(rect));
+      const b = rect.bounds, along = Math.max(b.x1 - b.x0, b.y1 - b.y0), thick = Math.min(b.x1 - b.x0, b.y1 - b.y0);
+      return [
+        [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
+        [`${fmt(along)} × ${fmt(thick)} ${unitLabel()}`, 0xe2e8f0],
+        [`${fmt(fenceFoot(project.activeFloor, rect))} → ${fmt(rect.top ?? 1.8)} ${unitLabel()}`, 0xe2e8f0],
       ];
     }
     if (APT_KIND[modeId]) {
@@ -5252,6 +5264,10 @@ export function setupMR(view, project, getFootprint) {
     stairs: new THREE.MeshLambertMaterial({ color: 0xd6c3a5, side: THREE.DoubleSide }),
     outlines: new THREE.LineBasicMaterial({ color: 0x475569 }),
   };
+  // One Lambert per fence colour (a fence's look is its material, materials.js); never disposed.
+  const fenceMats = new Map();
+  const fenceLambert = (color) => fenceMats.get(color)
+    || fenceMats.set(color, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })).get(color);
   const arch3dFinishMats = new Map(); // catalog entry (JSON) → material; never disposed
   // One painted texture per catalog entry, shared by the AR 3D view and the material
   // card, painted in the texture worker (textureWorker.js: a finish takes up to 2 s of
@@ -5304,6 +5320,7 @@ export function setupMR(view, project, getFootprint) {
       const windowProducts = windowProductPlacements(floor, (id) => materialById(project, id));
       const a = buildArchitecturalFloor(floor, {
         ...stairRises(project, floor),
+        fenceMaterial: (rect) => zoneMaterial(project, floor, rect),
         productDoors: new Set(doorProducts.map((d) => d.rectId)),
         openDoors: true, // door leaves swung open, as in View 3D (owner, 2026-09-27)
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
@@ -5317,6 +5334,7 @@ export function setupMR(view, project, getFootprint) {
           [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
           [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
           [a.ceilingGeometry, arch3dMats.ceiling],
+          ...a.fenceParts.map((p) => [p.geometry, fenceLambert(p.color)]),
         ],
         finish: finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),
@@ -6828,6 +6846,7 @@ export function setupMR(view, project, getFootprint) {
       if (!rect) return hint();
       const def = materialById(project, doorMaterialId(rect));
       if (!def) return none(t('mode.' + modeId));
+      if (modeId === 'mat_fence') return none(materialName(def, lang)); // seen in the 3D view
       // The zone's own placement (its width and heights), built closed and at the origin.
       const isWindow = APT_KIND[modeId] === 'window';
       const place = (isWindow ? windowProductPlacements : doorProductPlacements)(project.activeFloor, (id) => materialById(project, id))
@@ -7985,6 +8004,7 @@ export function setupMR(view, project, getFootprint) {
   // Field labels are namespaced by which band the field belongs to.
   const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambdaField')
     : selectedRect?.kind === 'gardenwall' ? t(`gardenwall.${f}`)
+    : selectedRect?.kind === 'fence' ? t(`fence.${f}`)
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
   const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
@@ -8003,6 +8023,7 @@ export function setupMR(view, project, getFootprint) {
     if (!fs.includes(bandField)) bandField = fs[0]; // clamp after a retype
     bandBuffer = !selectedRect ? ''
       : THERMAL_FIELDS.has(bandField) ? (selectedRect[bandField] != null ? String(selectedRect[bandField]) : '')
+      : selectedRect.kind === 'fence' && bandField === 'foot' ? fmt(fenceFoot(project.activeFloor, selectedRect))
       : fmt(selectedRect[bandField] ?? 0);
     bandPristine = true;
     redrawBandPad();
@@ -8048,13 +8069,18 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     const val = parseFloat(bandBuffer);
-    if (bandField === 'fence' && (bandBuffer.trim() === '' || val === 0)) {
-      // 0 or an empty ENTER removes the fence from the half wall.
-      delete selectedRect.fence;
-      project.touch(); buildArch3d();
-      rlog('fence removed', { id: selectedRect.id });
+    if (selectedRect.kind === 'fence' && bandField === 'foot' && bandBuffer.trim() === '') {
+      // An empty ENTER puts the fence back on the garden wall under it (fenceFoot).
+      delete selectedRect.foot;
+      project.touch(); if (!allFloorsView) buildZDims(); buildArch3d();
+      rlog('fence foot on its wall', { id: selectedRect.id });
       refreshBandPad();
       return;
+    }
+    if (selectedRect.kind === 'fence') {
+      // Keep foot < top against the derived foot too (a fence on a wall has no stored foot).
+      const foot = fenceFoot(project.activeFloor, selectedRect), m = toMeters(val);
+      if (bandField === 'top' && !(m > foot)) { rlog('fence top rejected (<= foot)', { id: selectedRect.id, m }); return; }
     }
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
     const m = toMeters(val);
@@ -8580,6 +8606,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => { matSelDoor = matHoverDoor; },
     },
     {
+      id: 'mat_fence', color: 0x2dd4bf,
+      // Trigger selects the FENCE zone under the reticle (none deselects).
+      onTouch: () => { matSelDoor = matHoverDoor; },
+    },
+    {
       id: 'mat_furniture', color: 0x2dd4bf,
       // Trigger selects the FURNITURE zone under the reticle (none deselects); thumbstick-y
       // cycles its product, A/X turns it, B/Y clears it (docs/furniture.md "merge").
@@ -8875,7 +8906,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit', 'ruler',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check',
     'marker_pipe', 'pipe_dims', 'pipe_edit', 'vmc_inlet', 'heat', 'heat_r',
-    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
+    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -8884,7 +8915,7 @@ export function setupMR(view, project, getFootprint) {
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', outlet_dims: 'marker',
     // HEATING (owner, 2026-10-01): the pipe network, room heat loss and insulation R.
     marker_pipe: 'heating', pipe_dims: 'heating', pipe_edit: 'heating', vmc_inlet: 'heating', heat: 'heating', heat_r: 'heating',
-    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_fence: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',

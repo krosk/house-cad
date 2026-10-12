@@ -391,6 +391,18 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
+      // Fences (FENCE zones): one mesh per colour, the colour of their fence material.
+      for (const part of entry.fenceParts || []) {
+        const mesh = new THREE.Mesh(part.geometry, this._fenceMaterial(part.color));
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.position.y = elevation || 0;
+        mesh.userData.floorId = floorId || null;
+        mesh.userData.floorName = name || '';
+        mesh.userData.architecturalRole = 'doors';
+        mesh.visible = this._meshVisible(mesh);
+        this.house.add(mesh);
+      }
       // Surface finishes (docs/materials.md): textured overlays, one mesh per material
       // and role, treated like the floor/wall they cover (visibility, POV tap target).
       for (const finish of entry.finishGeometries || []) {
@@ -883,6 +895,17 @@ export class View3D {
   // Its textures are painted in the texture worker (textureWorker.js): the material shows the
   // finish's flat colour until they arrive; main.js holds the 3D view until every
   // background texture job is done (owner, 2026-10-03).
+  // A fence's colour (its fence material, materials.js); cached, never disposed.
+  _fenceMaterial(color) {
+    this.fenceMaterials ??= new Map();
+    let material = this.fenceMaterials.get(color);
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0, side: THREE.DoubleSide });
+      this.fenceMaterials.set(color, material);
+    }
+    return material;
+  }
+
   _finishMaterial(def) {
     this.finishMaterials ??= new Map();
     const key = JSON.stringify(def || {});

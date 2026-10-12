@@ -6,7 +6,7 @@ import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements } from './core/architectural3d.js';
 import { windowSwings } from './core/windowSwing.js';
 import { finishSurfaces } from './core/flooring.js';
-import { materialById, markerProductDraws } from './core/materials.js';
+import { materialById, markerProductDraws, zoneMaterial } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
 import { setupMR } from './ui/mr.js';
@@ -382,6 +382,7 @@ function rebuildView() {
     return {
     ...buildArchitecturalFloor(f, {
       ...stairRises(project, f),
+      fenceMaterial: (rect) => zoneMaterial(project, f, rect),
       productDoors: new Set(doorProducts.map((d) => d.rectId)),
       openDoors: true, // every door leaf swung open (the AR 3D view does the same)
       productWindows: new Set(windowProducts.map((d) => d.rectId)),
@@ -627,7 +628,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', ramp: '◢ Ramp', platform: '▬ Platform', gate: '⛩ Gate', gardenwall: '🧱 Garden wall', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', ramp: '◢ Ramp', platform: '▬ Platform', gate: '⛩ Gate', gardenwall: '🧱 Garden wall', fence: '▥ Fence', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;

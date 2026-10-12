@@ -45,6 +45,8 @@ const STRINGS = {
   'mode.stairs_up':   { en: 'STAIRS UP', fr: 'ESCALIER MONTANT', zh: '上行楼梯' },
   'mode.stairs_down': { en: 'STAIRS DOWN', fr: 'ESCALIER DESCENDANT', zh: '下行楼梯' },
   'mode.gardenwall':  { en: 'GARDEN WALL', fr: 'MURET', zh: '院墙' },
+  'mode.fence':       { en: 'FENCE', fr: 'CLÔTURE', zh: '围栏' },
+  'mode.mat_fence':   { en: 'FENCE', fr: 'CLÔTURE', zh: '围栏' },
   'mode.gate':        { en: 'GATE', fr: 'PORTAIL', zh: '院门' },
   'mode.ramp':        { en: 'RAMP', fr: 'RAMPE', zh: '坡道' },
   'mode.platform':    { en: 'PLATFORM', fr: 'PALIER', zh: '平台' },
@@ -250,6 +252,11 @@ const STRINGS = {
     fr: 'Choisissez un modèle de fenêtre pour une zone FENÊTRE. Gâchette : sélectionner la fenêtre visée ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface. Sur mesure : la fenêtre prend la largeur, l’allège et la hauteur de la zone ; ses paumelles choisissent les vantaux (des deux côtés = deux vantaux). Visible dans la vue 3D (GAUCHE X). Au sol, le débattement de chaque vantail : vert jusqu’où il s’ouvre, rouge au-delà de ce qui l’arrête, avec le vantail dessiné à cet angle.',
     zh: '为窗区域选择窗款。扳机选择准星下的窗；摇杆上/下循环窗款（首项为无）；B/Y 清除。按尺寸定制：窗采用该区域的宽度、窗台和窗头高度；铰链决定扇数（两侧 = 双扇）。在三维视图中显示（左 X）。地面显示每扇的开启范围：绿色为可开启角度，红色为被阻挡之后的范围，并以该角度画出窗扇。',
   },
+  'help.mat_fence': {
+    en: 'Choose a fence material for a FENCE zone. Trigger selects the fence under the reticle; thumbstick up/down cycles the material (none first); B/Y clears it. The fence keeps its drawn thickness, bottom and top; the material sets its look (slats, boards or bars) and colour. Shown in the 3D view (LEFT X).',
+    fr: 'Choisissez un matériau de clôture pour une zone CLÔTURE. Gâchette : sélectionner la clôture visée ; joystick haut/bas : faire défiler le matériau (aucun d’abord) ; B/Y l’efface. La clôture garde l’épaisseur dessinée, son bas et son haut ; le matériau donne son aspect (lames, planches ou barreaux) et sa couleur. Visible dans la vue 3D (GAUCHE X).',
+    zh: '为围栏区域选择围栏材料。扳机选择准星下的围栏；摇杆上/下循环材料（首项为无）；B/Y 清除。围栏保持所画厚度、底部和顶部高度；材料决定外观（竖条、横板或栏杆）和颜色。在三维视图中显示（左 X）。',
+  },
   'help.mat_switch': {
     en: 'Choose a switch product for a switch. Trigger selects the switch under the reticle; where switches overlap (a double switch is two markers), grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
     fr: 'Choisissez un modèle pour un interrupteur. Gâchette : sélectionner l’interrupteur visé ; s’ils se superposent (un double interrupteur = deux repères), grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
@@ -370,7 +377,8 @@ const STRINGS = {
   'aperture.sill': { en: 'sill', fr: 'seuil',   zh: '下沿' },
   'aperture.head': { en: 'head', fr: 'linteau', zh: '上沿' },
   'gardenwall.top':   { en: 'wall top', fr: 'haut du muret', zh: '墙顶' },
-  'gardenwall.fence': { en: 'fence top', fr: 'haut de clôture', zh: '围栏顶' },
+  'fence.foot':       { en: 'fence bottom', fr: 'bas de clôture', zh: '围栏底' },
+  'fence.top':        { en: 'fence top', fr: 'haut de clôture', zh: '围栏顶' },
   // --- furniture band (PLAN EDIT placeholder) + foot elevation (FURNISH) -------
   'furniture.foot': { en: 'foot', fr: 'pied',    zh: '底' },
   'furniture.top':  { en: 'top',  fr: 'sommet',  zh: '顶' },
@@ -498,6 +506,7 @@ const STRINGS = {
   'mat.pickWall':  { en: 'PICK WALL',   fr: 'CHOISIR MUR',    zh: '选择墙面' },
   'mat.pickDoor':  { en: 'PICK DOOR',   fr: 'CHOISIR PORTE',  zh: '选择门' },
   'mat.pickWindow': { en: 'PICK WINDOW', fr: 'CHOISIR FENÊTRE', zh: '选择窗' },
+  'mat.pickFence':  { en: 'PICK FENCE', fr: 'CHOISIR CLÔTURE', zh: '选择围栏' },
   'mat.pickFurniture': { en: 'PICK FURNITURE', fr: 'CHOISIR MOBILIER', zh: '选择家具' },
   'mat.leaf':      { en: 'LEAF', fr: 'VANTAIL', zh: '门扇' },
   'mat.groutKg':   { en: 'kg grout', fr: 'kg joint', zh: 'kg 填缝剂' },

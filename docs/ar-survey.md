@@ -1000,12 +1000,19 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   network, floor finishes and window swings ignore it (none of their kind lists name it). Plan symbol:
   the door's leaf and swing.
 - **GARDEN WALL zone** (owner, 2026-10-12: the garden's low walls must be "different from the half
-  wall indoors"). Solid from the ground to its `top`, with an optional **fence** on it up to `fence`
-  (slats on the wall's centre line plus a rail, drawn with the doors; slat size is a generic picket
-  fence, Hypothesis). The band pad edits WALL TOP and, after SWAP, FENCE TOP (0 or an empty ENTER
-  removes the fence); AR shows both heights as blue dims. Unlike a HALF WALL it never opens a house
-  wall, is not capped by the floor's ceiling, takes no wall finish, and heat loss and ventilation
-  ignore it; a window leaf swinging over it still stops on it. Plan symbol: the half wall's hatch.
+  wall indoors"). Solid from the ground to its `top` (band pad WALL TOP, a blue dim in AR). Unlike a
+  HALF WALL it never opens a house wall, is not capped by the floor's ceiling, takes no wall finish,
+  and heat loss and ventilation ignore it; a window leaf swinging over it still stops on it. Plan
+  symbol: the half wall's hatch.
+- **FENCE zone** (owner, 2026-10-12: "separate pieces, so that I can apply a fence material and have
+  it have a separate thickness"; a first version put a `fence` height on the garden wall and was
+  replaced the same day). Its own zone: the drawn depth is its thickness, its band is [`foot`, `top`]
+  (band pad FENCE BOTTOM / FENCE TOP). With no stored `foot` it stands on the tallest garden wall
+  under its centre, else on the ground (`fenceFoot`, `architectural3d.js`); an empty ENTER on FENCE
+  BOTTOM puts it back on its wall. **MATERIAL · FENCE** sets its look like MATERIAL · DOOR (a `{rect}`
+  finish): vertical slats, horizontal boards or metal bars between rails, in the material's colour
+  (`docs/materials.md` "Fences"); no material = wood slats. Outdoors: heat loss and ventilation ignore
+  it. Plan symbol: its outline.
 - **Stacking gotcha**: a storey's elevation is driven by the floor *below*. To lift the Upper
   overlay, edit the **Ground** height; to drop the Basement, edit the **Basement's** height.
   Editing the topmost floor's own height moves nothing.

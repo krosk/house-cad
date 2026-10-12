@@ -108,8 +108,9 @@ ray; the editor is **not** rebuilt as a separate 3D system.
   stack. The garden has three levels: the main garden on that floor, the garage-door side at the
   basement's floor (a RAMP drawn on the garden slopes down to it) and the front entrance at the
   ground floor (a PLATFORM drawn on Ground, reached by stairs from the garden). Its gates are GATE
-  zones, outdoor fixtures rather than doors in a wall, and its low walls are GARDEN WALL zones
-  (optionally with a fence on top), not indoor half walls. Mechanics:
+  zones, outdoor fixtures rather than doors in a wall, its low walls are GARDEN WALL zones, not
+  indoor half walls, and a fence is its own FENCE zone (its own thickness and fence material),
+  standing on a garden wall. Mechanics:
   `docs/ar-survey.md` "Multi-floor".
 - `Project.rectangles/constraints/height` are **getters onto the active floor** (a facade), so
   consumers didn't need rewriting. Don't reintroduce raw fields.

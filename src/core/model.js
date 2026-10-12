@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, snapM } from './constraints.js';
-import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, STAIR_CLIMBS, hasClimb, stairClimb } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, FENCE_TOP, STAIR_CLIMBS, hasClimb, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
 import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
@@ -162,7 +162,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 export const SLEEPERS_MAX = 4;
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, fence, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -201,10 +201,13 @@ export class Rectangle {
       if (Array.isArray(productMm) && productMm.length === 3 && productMm.every((v) => v > 0)) this.productMm = [...productMm];
       if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
     } else if (this.kind === 'gardenwall') {
-      // Its top, and the FENCE on it (zoneColors.js GARDEN_WALL_TOP): slats from the wall's
-      // top up to `fence`, m above the floor; absent = no fence.
-      this.top = Number.isFinite(top) && top >= 0 ? top : GARDEN_WALL_TOP;
-      if (Number.isFinite(fence) && fence > this.top) this.fence = fence;
+      this.top = Number.isFinite(top) && top >= 0 ? top : GARDEN_WALL_TOP; // zoneColors.js
+    } else if (this.kind === 'fence') {
+      // A FENCE (zoneColors.js FENCE_TOP): its own piece, thickness = its drawn depth; it
+      // stands from `foot` (absent = on top of the garden wall under it, else the ground)
+      // up to `top`, m above the floor. Its look is its material (docs/materials.md "Fences").
+      this.top = Number.isFinite(top) && top > 0 ? top : FENCE_TOP;
+      if (Number.isFinite(foot) && foot >= 0 && foot < this.top) this.foot = foot;
     } else if (this.kind === 'insulation' || this.kind === 'wall') {
       // Thermal resistance R (m²K/W) from the product label or the wall's build-up, for
       // the heat-loss calculation (docs/heat-loss.md); or its material's conductivity λ
@@ -236,7 +239,6 @@ export class Rectangle {
     if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     if (this.kind !== 'window') delete this.airInlet;
-    if (this.kind !== 'gardenwall') delete this.fence;
     if (this.kind !== 'room') { delete this.outdoor; delete this.sleepers; }
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
@@ -251,6 +253,7 @@ export class Rectangle {
       delete this.sill; delete this.head; delete this.hinge; delete this.swing;
       if (this.kind === 'furniture') { this.foot = FURNITURE_BAND.foot; this.top = FURNITURE_BAND.top; }
       else if (this.kind === 'gardenwall') { delete this.foot; this.top = GARDEN_WALL_TOP; }
+      else if (this.kind === 'fence') { delete this.foot; this.top = FENCE_TOP; }
       else { delete this.foot; delete this.top; }
     }
     return this;
@@ -521,7 +524,7 @@ export class Project {
     const snap = (o, keys) => { for (const k of keys) if (typeof o[k] === 'number') o[k] = snapM(o[k]); };
     for (const f of this.floors) {
       snap(f, ['height', 'slab', 'level']);
-      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'fence', 'foot', 'top']);
+      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top']);
       for (const c of f.constraints) snap(c, ['value']);
       for (const m of f.markers || []) snap(m, ['x', 'y', 'z']);
     }

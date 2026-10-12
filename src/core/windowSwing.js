@@ -56,7 +56,8 @@ export function windowSwings(floor, materialOf = () => null) {
     if (kind === 'wall' || kind === 'insulation') solids.push({ r, kind, b: r.bounds, z0: 0, z1: ceil, structural: true });
     else if (kind === 'furniture' || kind === 'cabinet') solids.push({ r, kind, b: r.bounds, z0: r.foot ?? 0, z1: r.top ?? 0.9 });
     else if (kind === 'halfwall') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.sill ?? 1 });
-    else if (kind === 'gardenwall') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.fence ?? r.top ?? 1 });
+    else if (kind === 'gardenwall') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.top ?? 1 });
+    else if (kind === 'fence') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.top ?? 1.8 });
   }
   // What stands at plan (x, y) between heights z0..z1 (null = free).
   const blocker = (x, y, z0, z1) => {
