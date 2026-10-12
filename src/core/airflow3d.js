@@ -7,7 +7,7 @@
 // door its 1 cm undercut (a layer of its own). Then ONE age-of-air system over every floor: the air a
 // stairwell brings into a floor carries the age of the air leaving the other floor there, so each
 // cell's age is the time since that air came in from OUTSIDE through an inlet. A little turbulent
-// mixing D. No heat (no plumes), no people: Hypothesis. Pure functions: houseAirInput runs on the page,
+// mixing D. The walls' leaks enter or leave spread over their rooms. No heat (no plumes), no people: Hypothesis. Pure functions: houseAirInput runs on the page,
 // solveHouse3d in a worker.
 import { zoneKind } from './zoneColors.js';
 import { ceilingHeight } from './storey.js';
@@ -47,6 +47,14 @@ function floorAirInput(floor, result, { hmax, doorsOpen }) {
     // Air arrives from below through the floor, leaves upward under the ceiling (and the reverse).
     sources.push({ box: l.box, z0: upper ? 0 : H - 0.3, z1: upper ? 0.3 : H, q, kind: 'stairs', link });
   });
+  // Envelope leaks (Hypothesis: spread over the space's rooms in the leak's height band, as a stand-in
+  // for its outside walls / ceiling): in or out, by the room's share of the space's area.
+  for (const l of result.leaks || []) if (l.floor === floor && Math.abs(l.q) > 1e-6) {
+    const rooms = l.zone.rects.filter((r) => zoneKind(r) === 'room').map((r) => r.bounds);
+    const area = rooms.reduce((a, b) => a + (b.x1 - b.x0) * (b.y1 - b.y0), 0);
+    const z0 = Math.max(0, Math.min(l.zLocal, H) - H / 4), z1 = Math.min(H, z0 + H / 2);
+    for (const b of rooms) sources.push({ box: b, z0, z1, q: l.q / 3600 * (b.x1 - b.x0) * (b.y1 - b.y0) / area, kind: 'leak' });
+  }
   return { floorId: floor.id, H, fluid, solid, cutsX, cutsY, cutsZ, sources, hmax };
 }
 
@@ -124,7 +132,7 @@ function floorField(inp, progress) {
         if (x > s.box.x0 && x < s.box.x1 && y > s.box.y0 && y < s.box.y1 && z > s.z0 && z < s.z1) { const a = cv(c) * vol[c]; cells.push([c, a]); w += a; } }
       const list = cells.map(([c, a]) => [c, s.q * a / w]);
       for (const [c, q] of list) src[c] += q;
-      stairs.push({ link: s.link, cells: list });
+      if (s.link != null) stairs.push({ link: s.link, cells: list });
       continue;
     }
     let best = -1, bd = Infinity;

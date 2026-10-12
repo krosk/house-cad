@@ -365,6 +365,41 @@ boost. With the envelope leaking 100 m³/h at 4 Pa the boost depression falls to
 the upper inlets then carry ≈ 0 (stack effect: the leaks low in the house take the air). Open: the house's real
 airtightness, the inlet count per window, the EHB²'s Δp reference and humidity curve, the kitchen vent's flows.
 
+**Occupancy, leakage and bedroom CO₂ (2026-10-12; owner: "What I fear is the renewal is too low", then "Assume two
+people per room", "House is being renovated", no setting on the kitchen vent's minimum):** the app's network
+(`src/core/airflow.js`) now takes (1) a room's `sleepers` (0–4, AR AIR INLET, trigger on a room); in the night
+scenarios each EHB² opens with its space's sleepers (empty 6, one 25, two 44 m³/h at 20 Pa: Hypothesis, no
+published humidity curve), the other scenarios keep one opening for every inlet; (2) a per-scenario outdoor
+temperature (5 °C typical, `nightCold` at the heating design −7 °C; Hypothesis); (3) envelope leakage, heat
+setting `airtight` = Q4Pa-surf (default **1.7 m³/h·m²**, Hypothesis for a renovated house without a test; the
+new-build limit is 0.6), over each heated space's outside walls with their openings above the earth (half at a
+quarter, half at three quarters of the storey) and its ceiling under the attic (at the ceiling), exponent 0.67;
+the plan's envelope is ≈ 254 m², ≈ 98 of it the two upper bedrooms; (4) each space's steady CO₂ (well mixed,
+420 ppm outside, 15 L/h per sleeper: Hypothesis). The 3D map spreads each leak over its space's rooms in its
+height band (Hypothesis) and now recomputes on its own.
+Why the first night results looked so bad (Proven, model runs on the 10-10 copy): the old night scenario opened
+every inlet to 44, so the empty living room took the weak night suction, and with no leaks and the −7 °C stack
+effect the upper bedroom inlets carried 1.5 m³/h (air age ≈ 1 500–2 000 min). Opening only the occupied bedrooms'
+inlets alone gives them ≈ 15–23 m³/h. Results with two sleepers in r51, r85 and r88, doors shut, 5 °C (Proven
+as model output; every input above Hypothesis):
+
+| Leakage Q4 (m³/h·m²) | r51 (ground) | r85 (upper S) | r88 (upper N) |
+|---|---|---|---|
+| 0 (airtight) | 1 850 ppm | 2 260 | 2 260 |
+| 0.6 | 2 080 | 4 850 | 4 480 |
+| 1.7 (default) | 2 210 | 2 020 | 1 870 |
+| 3 | 2 300 | 1 500 | 1 400 |
+
+At 1.7 the 3D map gives the upper bedrooms ≈ 160–190 min (fully mixed house 214 min, 33 s on the Deck). Leaks
+change the pattern: more air comes in through the walls than through the inlets, the stack effect pushes air out
+high (the upper bedroom inlets reverse, ≈ −8 m³/h), and the upper bedrooms are fed from the landing under their
+doors. What-ifs at 1.7 (model): bedroom doors open 1 360 / 1 670 / 1 520 ppm; sanitary vents at 30 overnight or
+two EHB² per bedroom change little (± 10 %); in a tight house (0.6) sanitary vents at 45 overnight bring the upper
+bedrooms to ≈ 2 000. No tweak gets every two-sleeper bedroom under ≈ 1 400 ppm (Hypothesis: the usual guidance
+band is 1 000–1 400) across the leakage range. Open: the house's real Q4 (a blower-door test after the works),
+the real distribution of its leaks, wind (not modelled), and a measured overnight CO₂ in a bedroom, which would
+settle the question for this house.
+
 **Boxings are half walls (owner, 2026-10-10: "Boxing is a half wall from my definition"):** a pipe or duct boxing is
 drawn as a `halfwall` zone from the floor to its top, never as a plain furniture box (View 3D draws a furniture zone
 only when it carries a catalog product, so a plain box is invisible there). Boxing r220 was converted and written

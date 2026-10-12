@@ -22,7 +22,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
-import { Rectangle, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight } from '../core/model.js';
+import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
@@ -1330,6 +1330,7 @@ export function setupMR(view, project, getFootprint) {
     { key: 'tOut', step: 1, min: -25, max: 10, unit: '°C' },
     { key: 'tRoom', step: 1, min: 10, max: 28, unit: '°C' },
     { key: 'ach', step: 0.1, min: 0, max: 3 },
+    { key: 'airtight', step: 0.1, min: 0, max: 6, unit: 'm³/h·m²' }, // envelope leakage Q4Pa-surf, for the VMC air network (core/airflow.js)
     { key: 'wallDepth', step: 0.01, min: 0.05, max: 1, unit: 'm' },
     { key: 'wallLambda', step: 0.05, min: 0.05, max: 3 },
     { key: 'windowU', step: 0.1, min: 0.5, max: 6, u: true },
@@ -2489,12 +2490,17 @@ export function setupMR(view, project, getFootprint) {
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
   // HEATING · INLET (owner, 2026-10-11): each WINDOW's fresh-air inlet (core/airInlets.js) at its
-  // centre: orange = the inlet's short name, grey = none. Trigger on a window steps none → each inlet.
+  // centre: orange = the inlet's short name, grey = none. Trigger on a window steps none → each inlet;
+  // on a room, its sleepers 0 → SLEEPERS_MAX → 0 (owner, 2026-10-12, for the night scenarios).
   const isInletZone = (r) => zoneKindOf(r) === 'window';
-  // The whole-house air network (core/airflow.js) runs on every rebuild of these labels: each
-  // inlet's flow, the air each space receives, the flow through each door / passage (an arrow
-  // toward where it goes) and up or down the stairs, and each vent's flow. Session-only.
-  let airScenario = 0, airResult = null;
+  const isSleeperRoom = (r) => zoneKindOf(r) === 'room' && !r.outdoor;
+  let airHoverRoom = null;
+  // The whole-house air network (core/airflow.js), recomputed when the project changes (heatRev) or the
+  // scenario does: each inlet's flow, the air each space receives and, at night, its CO₂; the flow
+  // through each door / passage (an arrow toward where it goes) and up or down the stairs, each vent's
+  // flow, the walls' leaks. Session-only.
+  let airScenario = 0, airResult = null, airResultKey = null;
+  const airKey = () => `${heatRev}|${AIRFLOW_SCENARIOS[airScenario].id}`;
   const airArrowMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false });
   function addAirArrow(arr, cx, cy, nx, ny) {
     const seg = (x0, y0, x1, y1) => {
@@ -2506,15 +2512,24 @@ export function setupMR(view, project, getFootprint) {
     seg(cx - nx * L, cy - ny * L, tx, ty);
     for (const s of [1, -1]) seg(tx, ty, tx - nx * 0.12 + s * -ny * 0.08, ty - ny * 0.12 + s * nx * 0.08);
   }
+  // CO₂ colour: under 1000 ppm blue, to 1400 amber, above red (Hypothesis: the usual guidance bands).
+  const co2Color = (c) => (c < 1000 ? '#7dd3fc' : c < 1400 ? '#fbbf24' : '#f87171');
   function addInletLabels(floor) {
-    airResult = runAirflow(project, AIRFLOW_SCENARIOS[airScenario].id);
+    if (airResultKey !== airKey()) { airResult = runAirflow(project, AIRFLOW_SCENARIOS[airScenario].id); airResultKey = airKey(); }
     const q = (v) => `${Math.round(Math.abs(v))} m³/h`;
     const flowOf = new Map(airResult.inlets.map((i) => [i.rect.id, i.q]));
     const labels = floor.rectangles.filter(isInletZone).map((z) => {
       const b = z.bounds, inlet = AIR_INLETS[z.airInlet], f = flowOf.get(z.id);
       return makeDimLabel(inlet ? (f != null ? `${inlet.short} ${Math.round(f)}` : inlet.short) : '—', inlet ? '#fb923c' : '#aab4c0', (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
     });
-    for (const z of airResult.zones) if (z.floor === floor && z.supply > 0.5) labels.push(makeDimLabel(q(z.supply), '#7dd3fc', z.label.x, z.label.y));
+    for (const z of airResult.zones) if (z.floor === floor && z.supply > 0.5) {
+      const co2 = z.co2 != null && z.sleepers ? ` · CO₂ ${Math.round(z.co2)}` : '';
+      labels.push(makeDimLabel(`${q(z.supply)}${co2}`, co2 ? co2Color(z.co2) : '#7dd3fc', z.label.x, z.label.y));
+    }
+    for (const r of floor.rectangles) if (isSleeperRoom(r) && r.sleepers) {
+      const b = r.bounds;
+      labels.push(makeDimLabel(`${r.sleepers} ${t('air.sleepers')}`, '#e2e8f0', (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2 - 0.35));
+    }
     for (const v of airResult.vents) if (v.floor === floor) labels.push(makeDimLabel(`${t('air.vent')} ${v.q}`, '#e2e8f0', v.x, v.y));
     const arr = [];
     for (const l of airResult.links) {
@@ -2539,16 +2554,17 @@ export function setupMR(view, project, getFootprint) {
     }
     const air3dFloor = air3d?.status === 'done' && air3d.key === air3dKey() ? air3d.out.floors.find((f) => f.floorId === floor.id) : null;
     if (air3dFloor) addAirSlice(air3dFloor, air3d.out.nominal);
+    else scheduleAir3d();
     if (labels.length) addDimLabelBatch(labels, planGroup, 30);
   }
   // 3D map of the whole house (core/airflow3d.js, in a worker; owner, 2026-10-11: "the whole house instead,
   // not per floor"): the age of the air since it came in from outside, shown on the active floor at head
-  // height (1.5 m) or under the ceiling. Trigger on the floor computes it (once for every floor), then
-  // switches the slice; any change of scenario or inlet makes it stale. Session-only.
-  let air3d = null, air3dWorker = null, air3dJob = 0, airHoverAge = null;
-  const inletSignature = () => project.floors.flatMap((f) => f.rectangles.filter((r) => r.airInlet).map((r) => `${r.id}:${r.airInlet}`)).sort().join(',');
-  const air3dKey = () => `${AIRFLOW_SCENARIOS[airScenario].id}|${inletSignature()}`;
-  const air3dSliceZ = (out) => (air3d?.slice === 'ceiling' ? out.zs[out.NZ] - 0.2 : 1.5);
+  // height (1.5 m). It follows the network on its own (the trigger now steps sleepers, 2026-10-12):
+  // 1.5 s after the last change it starts, and a newer change cancels a running one. Session-only.
+  let air3d = null, air3dWorker = null, air3dJob = 0, airHoverAge = null, air3dTimer = null;
+  const air3dKey = airKey;
+  const AIR3D_HEAD = 1.5;
+  const air3dSliceZ = () => AIR3D_HEAD;
   const airAgeColor = (r) => { const q = Math.max(0, Math.min(1, r / 2.5)); return [Math.min(1, 2 * q), Math.min(1, 2 * (1 - q)), 0.24]; };
   const air3dMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
   const air3dCell = (out, px, py, z) => {
@@ -2574,16 +2590,23 @@ export function setupMR(view, project, getFootprint) {
     mesh.position.y = 0.0025;
     planGroup.add(mesh);
   }
+  function scheduleAir3d() {
+    if (!airResult || airResult.noInlets) return;
+    if (air3d?.key === air3dKey() && air3d.status !== 'error') return; // computing or done already
+    clearTimeout(air3dTimer);
+    air3dTimer = setTimeout(() => { if (heatLabels === 'i' && airResultKey === air3dKey()) startAir3d(); }, 1500);
+  }
   function startAir3d() {
     if (!airResult || airResult.noInlets) return;
+    if (air3d?.status === 'computing' && air3dWorker) { air3dWorker.terminate(); air3dWorker = null; } // a newer change wins
     const input = houseAirInput(project, airResult), key = air3dKey(), job = ++air3dJob;
-    air3d = { key, status: 'computing', progress: 0, slice: air3d?.slice || 'head', started: performance.now() };
+    air3d = { key, status: 'computing', progress: 0, started: performance.now() };
     rlog('air 3d start', { scenario: AIRFLOW_SCENARIOS[airScenario].id, floors: input.floors.length });
     const finish = (out, error) => {
       if (job !== air3dJob) return;
       air3d = { ...air3d, status: error || !out ? 'error' : 'done', out, error, seconds: (performance.now() - air3d.started) / 1000 };
       rlog('air 3d done', { cells: out?.cells, seconds: air3d.seconds, error });
-      buildPlan(); applyPlanMatrix();
+      if (heatLabels === 'i') { buildPlan(); applyPlanMatrix(); }
     };
     if (typeof Worker === 'undefined') { try { finish(solveHouse3d(input)); } catch (err) { finish(null, String(err)); } return; }
     air3dWorker ??= new Worker(new URL('./airflow3d.worker.js', import.meta.url), { type: 'module' });
@@ -2594,17 +2617,11 @@ export function setupMR(view, project, getFootprint) {
     air3dWorker.onerror = (e) => finish(null, e.message || 'worker error');
     air3dWorker.postMessage({ id: job, input });
   }
-  function touchAirFloor() {
-    const current = air3d && air3d.key === air3dKey();
-    if (current && air3d.status === 'computing') return;
-    if (current && air3d.status === 'done') { air3d.slice = air3d.slice === 'head' ? 'ceiling' : 'head'; buildPlan(); applyPlanMatrix(); return; }
-    startAir3d();
-  }
   function air3dLines() {
-    if (!air3d || air3d.key !== air3dKey()) return [t(air3d ? 'air.mapStale' : 'air.mapHint')];
+    if (!air3d || air3d.key !== air3dKey()) return [t('air.mapStale')];
     if (air3d.status === 'computing') return [`${t('air.mapComputing')} ${Math.round(100 * air3d.progress)} %`];
     if (air3d.status === 'error') return [`⚠ ${t('air.mapError')}: ${air3d.error || ''}`];
-    const o = air3d.out, lines = [`${t(air3d.slice === 'head' ? 'air.mapHead' : 'air.mapCeiling')} · ${t('air.nominal')} ${Math.round(o.nominal)} min · ${o.cells} ${t('air.cells')} · ${air3d.seconds.toFixed(0)} s`];
+    const o = air3d.out, lines = [`${t('air.mapHead')} · ${t('air.nominal')} ${Math.round(o.nominal)} min · ${o.cells} ${t('air.cells')} · ${air3d.seconds.toFixed(0)} s`];
     if (airHoverAge != null) lines.push(`${t('air.here')} ${Math.round(airHoverAge)} min (${(airHoverAge / o.nominal).toFixed(2)}×)`);
     return lines;
   }
@@ -2616,11 +2633,14 @@ export function setupMR(view, project, getFootprint) {
   function airLines() {
     const r = airResult;
     if (!r) return [];
-    const sc = AIRFLOW_SCENARIOS[airScenario];
+    const sc = r.scenario;
     const lines = [`${t(`air.scenario.${sc.id}`)} · ${t('air.cycle')}`];
     if (r.noInlets) return [...lines, t('air.noInlets')];
     lines.push(`${t('air.extract')} ${r.extract} m³/h · ${t('air.suction')} ${r.suction.min.toFixed(1)}–${r.suction.max.toFixed(1)} Pa`);
-    lines.push(`${t('air.doorsShut')} · ${t('air.inletsAt')} ${sc.inletOpen} m³/h @20 Pa · ${t('air.outdoor')} ${heatSettings(project).tOut} °C`);
+    lines.push(`${t('air.doorsShut')} · ${sc.inlets === 'sleepers' ? t('air.inletsSleepers') : `${t('air.inletsAt')} ${sc.inlets} m³/h @20 Pa`} · ${t('air.outdoor')} ${r.tOut} °C`);
+    const q4 = heatSettings(project).airtight;
+    if (q4 > 0) lines.push(`${t('air.leaks')} Q4 ${q4} m³/h·m² · ${t('air.leakIn')} ${Math.round(r.leakIn)} · ${t('air.leakOut')} ${Math.round(r.leakOut)} m³/h`);
+    if (sc.night) lines.push(t('air.co2Note'));
     if (r.starved.length) lines.push(`⚠ ${t('air.starved')}: ${r.starved.length}`);
     if (r.lost.length) lines.push(`⚠ ${t('air.lost')}: ${r.lost.length}`);
     if (!r.ok) lines.push(`⚠ ${t('air.noSolve')}`);
@@ -2630,12 +2650,25 @@ export function setupMR(view, project, getFootprint) {
     const inlet = AIR_INLETS[zone.airInlet];
     return [`${t('mode.window')} · ${inlet ? `${inlet.name} ${inlet.flowMin}–${inlet.flowMax} m³/h${inlet.hygro ? ` · ${t('inlet.hygro')}` : ''}` : t('inlet.none')}`, t('inlet.toggle')];
   }
+  // The aimed room: its sleepers and its space's air (from outside, all in, CO₂).
+  function sleeperLines(room) {
+    const z = airResult?.zones.find((zz) => zz.ids.has(room.id));
+    const air = z ? ` · ${Math.round(z.fresh)} m³/h ${t('air.fresh')} / ${Math.round(z.supply)}${z.co2 != null && z.sleepers ? ` · CO₂ ${Math.round(z.co2)} ppm` : ''}` : '';
+    return [`${t('air.room')} · ${room.sleepers || 0} ${t('air.sleepers')}${air}`, t('air.sleepersStep')];
+  }
   function toggleAirInlet(zone) {
     const next = nextAirInlet(zone.airInlet);
     if (next) zone.airInlet = next; else delete zone.airInlet;
     project.touch(); // autosave
     rlog('air inlet', { id: zone.id, airInlet: zone.airInlet ?? null });
     buildPlan(); applyPlanMatrix(); // the inlet labels
+  }
+  function stepSleepers(room) {
+    const n = ((room.sleepers || 0) + 1) % (SLEEPERS_MAX + 1);
+    if (n) room.sleepers = n; else delete room.sleepers;
+    project.touch(); // autosave
+    rlog('sleepers', { id: room.id, sleepers: n });
+    buildPlan(); applyPlanMatrix();
   }
 
   function buildActivePlan(withDims = true) {
@@ -8468,8 +8501,12 @@ export function setupMR(view, project, getFootprint) {
     {
       id: 'vmc_inlet', color: 0xcbd5e1,
       // A window's VMC air inlet (owner, 2026-10-11: "more a VMC tool"): every WINDOW of the active
-      // floor shows its inlet; trigger on one steps none → each catalog inlet (core/airInlets.js).
-      onTouch: () => { if (heatHoverZone && isInletZone(heatHoverZone)) toggleAirInlet(heatHoverZone); else touchAirFloor(); },
+      // floor shows its inlet; trigger on one steps none → each catalog inlet (core/airInlets.js); on a
+      // room, how many people sleep there (owner, 2026-10-12).
+      onTouch: () => {
+        if (heatHoverZone && isInletZone(heatHoverZone)) toggleAirInlet(heatHoverZone);
+        else if (airHoverRoom) stepSleepers(airHoverRoom);
+      },
     },
     {
       id: 'copy_floor', color: 0x34d399,
@@ -10049,7 +10086,7 @@ export function setupMR(view, project, getFootprint) {
       ? (heatSelZone || heatHoverZone ? heatZoneLines(heatSelZone || heatHoverZone).join('\n') : t('heat.aimZone'))
       : null;
     const inletStatus = modes[currentMode].id === 'vmc_inlet'
-      ? [...(heatHoverZone ? inletLines(heatHoverZone) : [t('inlet.aim')]), ...airLines(), ...air3dLines()].join('\n') : null;
+      ? [...(heatHoverZone ? inletLines(heatHoverZone) : airHoverRoom ? sleeperLines(airHoverRoom) : [t('inlet.aim')]), ...airLines(), ...air3dLines()].join('\n') : null;
     // HEATING · HEAT LOSS: the heat map's value under the reticle.
     const heatStatus = modes[currentMode].id === 'heat' && !hoverHeatRow ? heatMapLines().join('\n') : null;
     const translateStatus = modes[currentMode].id === 'translate' && !translateEdge
@@ -11011,6 +11048,7 @@ export function setupMR(view, project, getFootprint) {
         if (modeId === 'heat_r') heatHoverZone = project.rectangles.find((r) => isThermalZone(r) && inside(r)) || null;
         else if (modeId === 'vmc_inlet') {
           heatHoverZone = project.rectangles.find((r) => isInletZone(r) && inside(r)) || null;
+          airHoverRoom = heatHoverZone ? null : project.rectangles.find((r) => isSleeperRoom(r) && inside(r)) || null;
           const o = air3d?.status === 'done' && air3d.key === air3dKey() ? air3d.out.floors.find((f) => f.floorId === project.activeFloor.id) : null, c = o ? air3dCell(o, px, py, air3dSliceZ(o)) : -1;
           airHoverAge = c >= 0 && Number.isFinite(o.age[c]) && o.vol[c] > 0.3 ? o.age[c] : null;
         }
@@ -11024,7 +11062,7 @@ export function setupMR(view, project, getFootprint) {
       } else {
         reticle.visible = false;
         if (!panelHit && !hoverKey) { // aiming at a panel keeps it shown
-          heatHoverRoom = heatHoverZone = heatHoverCol = heatHoverPiece = null;
+          heatHoverRoom = heatHoverZone = heatHoverCol = heatHoverPiece = airHoverRoom = null;
           heatHoverJunctions = [];
         }
       }

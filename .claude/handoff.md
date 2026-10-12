@@ -19,10 +19,10 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-10 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `26aaad7` (Duofix product, see-through half walls, boxing tiles above
-a half wall: item 70; before it `6aab97c` stacked half walls, `538fb43` tray); docs since (`b55fad3`), served and in
-the headset precache (`update-app` 10-10, "installed b55fad3"). Proven (`quest-storage read` after each write, byte-identical): the
+**Date:** 2026-10-12 (session 40, continued; the Quest reachable)
+**Status:** Proven (git): the code head is `54d4d22` (VMC whole-house 3D air map; before it `1844a8c` window air
+inlets, AR AIR INLET tool, airflow network: item 74, parked and untried), pushed, served (`version.json` 54d4d22) and in
+the headset precache (`update-app` 10-11, "installed 54d4d22 1011-0907Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
 60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
 ceiling), item 68 (boxing r220 a half wall), item 71 (Lucia tiles on boxing r220) and item 73 (heating network,
@@ -574,7 +574,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -790,8 +790,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     radiators; manifold + 9 pairs. Then (owner: "Do 1") `edit-upper.mjs`: column r122 +13 cm east, +7 cm north
     (c227 −0.49, c1443 −0.83) and the two upper pairs up it (backup `quest-backup-1010-upper`, read back identical,
     266 704 chars); 0 pipe clashes. Open: the collector itself is not drawn; the owner adjusts to the real setup. `docs/plumbing-workflow.md` "Heating pipes" / "Open vent".
-74. **VMC airflow: kitchen vent V2, EHB² inlets, AIR INLET tool, network + 3D map: PARKED, untried** (owner,
-    2026-10-10/11). Decisions: unit B stays a Classic (no HP); kitchen vent to the ceiling at (1.10, −4.60) (not drawn);
+74. **VMC airflow: kitchen vent V2, EHB² inlets, AIR INLET tool, network + 3D map: unparked 2026-10-12, untried on
+    the Quest** (owner, 2026-10-10/11; 2026-10-12: "What I fear is the renewal is too low", "Unpark item 74 then"). Decisions: unit B stays a Classic (no HP); kitchen vent to the ceiling at (1.10, −4.60) (not drawn);
     every dry-room window carries one Aldes EHB² 6–44 (r80, r108, r109, r113, r115; not written to the headset).
     Code (this commit): window `airInlet` (`src/core/airInlets.js`), AR HEATING · AIR INLET (`vmc_inlet`), live
     whole-house network `src/core/airflow.js`, whole-house 3D age map `src/core/airflow3d.js` (owner: "the whole
@@ -800,14 +800,28 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     converges, ≈ 31 ms; 3D 38 s Normal / 51 s Night on the Deck, 125 003 air cells), worker protocol via a Node
     stand-in. Hypothesis to check when unparked: on a −7 °C night the upper bedrooms' inlets draw ≈ 1.5 m³/h (stack
     effect; airtight house, one humidity for all rooms). A single stacked grid with pressure inlets was weighed and
-    not built (≈ 5–10 pressure solves for little gain). Not seen in a browser or on the Quest; owner:
-    "I did not try, park it". Results and assumptions: `docs/plumbing-workflow.md` "Air paths computed",
+    not built (≈ 5–10 pressure solves for little gain).
+    2026-10-12 (uncommitted until "c p"): room `sleepers` (owner: "Assume two people per room"; AR trigger on a
+    room), night inlets opening with their room's sleepers, a per-scenario outdoor temperature (5 °C; `nightCold`
+    at −7 °C), envelope leakage (heat setting `airtight` Q4Pa-surf, default 1.7: owner "House is being renovated",
+    untested), per-space CO₂, leaks in the 3D map, the 3D map recomputing on its own (the ceiling slice dropped).
+    Proven (Node on the 10-10 copy, sleepers 2 in r51 / r85 / r88): the 1.5 m³/h night came from opening every
+    inlet to 44 with no leaks; bedroom CO₂ on a 5 °C night is ≈ 1 400–2 300 ppm at Q4 0.6–3 (4 850 in the upper
+    bedrooms at 0.6) and no tested tweak (doors open, sanitary 30/45 overnight, two EHB² per bedroom) brings every
+    bedroom under ≈ 1 400. Hypothesis: the inputs (inlet curve, leak distribution, 15 L/h per sleeper, no wind).
+    Not seen in a browser or on the Quest. Results and assumptions: `docs/plumbing-workflow.md` "Air paths computed",
     `docs/ar-survey.md` AIR INLET, QA in `docs/ar-qa-checklist.md`.
 
 ## Next step
 
 **Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
 none drawn in the plan:
+- **Item 74, VMC airflow (unparked 2026-10-12; the owner fears too little renewal)**: try AR HEATING · AIR INLET on
+  the Quest (QA items in `docs/ar-qa-checklist.md`; time the 3D map), then on the owner's yes write the five EHB²
+  (r80, r108, r109, r113, r115) and two sleepers in r51, r85, r88, and draw the kitchen vent at V2 (1.10, −4.60)
+  with its Ø125 rerouted from unit A. The model says two-sleeper bedrooms run ≈ 1 400–2 300 ppm whatever the
+  tweak: the decisive evidence is a measured overnight CO₂ in a bedroom and a blower-door Q4 after the works.
+  Open: the kitchen vent's real flows (no setting on its minimum: 15 assumed), the EHB² humidity curve, wind.
 - ~~Item 64, the ground shower room swap~~: replaced by item 69 (WC under the east window), still not drawn.
 - ~~Unit B to the laundry on the wall~~ (needed an OUT-up entry and a turn down into the unit):
   replaced by item 67, B hung under the laundry ceiling. Still open there: the laundry vent (≥ 20 cm from
@@ -836,7 +850,7 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`c276b7b`, 10-10; relaunch it); item 73 first: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`54d4d22`, 10-11; relaunch it); item 73 first: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
   basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall

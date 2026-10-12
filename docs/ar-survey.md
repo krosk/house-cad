@@ -382,31 +382,40 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (orange `EHB²` = fitted, grey `—` = none); the readout names the aimed window's inlet and flow range.
   Trigger on a window steps none → each catalog inlet (`src/core/airInlets.js`; today only the Aldes EHB²
   6–44 m³/h) → none. Stored as the window zone's `airInlet` (additive in the file, dropped if the zone stops
-  being a window). Not offered in ALL FLOORS.
+  being a window). Trigger on a room (not a window) steps how many people sleep there, 0 → 4 → 0 (owner,
+  2026-10-12), stored as the ROOM zone's `sleepers` (additive, dropped if it stops being a room); the plan shows
+  `n asleep` and the readout the aimed room's sleepers, air from outside / all air in and, at night, its CO₂.
+  Not offered in ALL FLOORS.
   **Airflow (owner, 2026-10-11: "drive the simulation in AR"):** every change re-runs the whole-house air
   network (`src/core/airflow.js`): each space (a floor's connected rooms with their open stairs, as in HEAT LOSS)
   is one pressure node; an inlet is an orifice of its scenario opening at 20 Pa; a door / sliding / garage door
   between two spaces is its 1 cm undercut, a passage its open band; storeys join where their stair zones overlap;
   every open end of a `vmc` duct that is not at a VMC unit (article easyhome / agalina / vmc, within 15 cm) and
   not an outlet (≥ Ø160) is a vent of fixed flow (Ø ≥ 125 a kitchen vent), in the space that contains it; the
-  stack effect uses HEAT LOSS's outdoor and room temperatures. On the plan: each window `EHB² q`, each space's
-  received air (blue), an arrow + flow across each door and passage, `stairs ↑/↓ q`, `vent q`. Thumbstick up/down
-  cycles the scenario (normal 30/15, inlets 25 @20 Pa; night 15/15, inlets 44; every sanitary vent at 45; kitchen
-  135; every vent at boost); the readout gives the extract, the suction range at the inlets and the assumptions,
-  and warns of vents no inlet reaches. No envelope leakage (an airtight house); all flows are Hypothesis.
+  stack effect uses the scenario's outdoor temperature and HEAT LOSS's room temperature; the walls leak per HEAT
+  LOSS's `airtight` row (Q4Pa-surf, default 1.7; 0 = airtight; `docs/plumbing-workflow.md` "Occupancy, leakage
+  and bedroom CO₂"). On the plan: each window `EHB² q` (negative = air leaving through it), each space's received
+  air (blue; at night `· CO₂ ppm` in blue < 1000, amber < 1400, red above), an arrow + flow across each door and
+  passage, `stairs ↑/↓ q`, `vent q`. Thumbstick up/down cycles the scenario (normal 30/15, inlets 25 @20 Pa, 5 °C;
+  night 15/15, inlets by sleepers, 5 °C; night at the design cold; every sanitary vent at 45; kitchen 135; every
+  vent at boost); the readout gives the extract, the suction range at the inlets, the leaks in / out and the
+  assumptions, and warns of vents no inlet reaches. All flows are Hypothesis.
   **3D map (owner, 2026-10-11: "Ok" to a 3D map driven by the network, then "the whole house instead, not
-  per floor"):** trigger on the floor (not on a window) computes the WHOLE HOUSE in a worker
+  per floor"):** 1.5 s after the last change it computes the WHOLE HOUSE in a worker (2026-10-12: the trigger
+  on the floor now steps sleepers, so the map follows on its own; a newer change cancels a running one)
   (`src/core/airflow3d.js` `solveHouse3d`, `src/ui/airflow3d.worker.js`; the readout shows the progress). Each floor:
   potential flow on a ≤ 20 cm grid whose lines include every room and opening edge (a 7 cm wall is its own cells, a
   shut door its 1 cm undercut layer), walls / half walls / furniture solid, the network's inlet, vent and stairwell
   flows as its sources (the network carries the stack effect, which a potential field cannot). Then ONE age system
   over every floor: air arriving by a stairwell carries the age of the air leaving the other floor there, so the map
   shows the age since the air came in from OUTSIDE (D = 0.0005 m²/s). The active floor is tinted green → red by
-  age ÷ the house's fully-mixed age (red ≥ 2.5×) at 1.5 m; trigger again: under the ceiling; switching floors shows
-  the same result. A scenario or inlet change makes it stale. Node, plan of 2026-10-10, 5 EHB², Steam Deck: Normal
-  38 s (125 003 air cells, 425 m³, fully mixed 340 min; hob 410, laundry 727, upper bedrooms 187 / 273 min); Night
-  51 s (upper bedrooms ≈ 1 600–1 900 min: at −7 °C their inlets draw ≈ 1.5 m³/h). The Quest is slower (Hypothesis:
-  3–5×). No heat, no people: Hypothesis.
+  age ÷ the house's fully-mixed age (red ≥ 2.5×) at 1.5 m (the under-the-ceiling slice went with the trigger);
+  switching floors shows the same result. Any project change or a scenario change makes it stale. The walls' leaks
+  enter or leave spread over their space's rooms in their height band. Node, plan of 2026-10-10, 5 EHB²,
+  Steam Deck, before leaks and sleepers: Normal 38 s (fully mixed 340 min); old Night 51 s (upper bedrooms
+  ≈ 1 600–1 900 min, an artefact of every inlet at 44 and no leaks). With two sleepers in r51 / r85 / r88 and the
+  default leakage, Night 33 s: fully mixed 214 min, upper bedrooms 161 / 191, ground bedroom 145, laundry 631. The
+  Quest is slower (Hypothesis: 3–5×). No heat, no people moving: Hypothesis.
 - **MARKER · DIMS** (`id: outlet_dims`) — marker pins only. The first reference must be a marker's
   projected floor icon; only then do plan edges become eligible for the second reference. Plan
   dimensions cannot be selected or changed.

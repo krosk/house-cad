@@ -26,6 +26,10 @@ export const HEAT_DEFAULTS = {
   tMean: 12,     // °C annual mean outdoor (Paris area), for ground losses
   tRoom: 19,     // °C indoor design temperature
   ach: 0.5,      // air changes per hour: single-flow VMC
+  // Envelope air leakage for the VMC air network (core/airflow.js): Q4Pa-surf, m³/h per m² of envelope
+  // at 4 Pa. Hypothesis: a renovated house with no test (owner, 2026-10-12: "being renovated"); the new-build
+  // limit is 0.6, untreated older houses are often 2–3. A blower-door test gives the real figure.
+  airtight: 1.7,
   wallDepth: 0.2, // m, the placeholder wall where no WALL zone is drawn
   wallLambda: 0.8, // W/mK for a wall with no R set: R = depth / λ (20 cm → 0.25, ≈ concrete block)
   lambda: 0.04,  // W/mK for an insulation zone with no R set: R = drawn depth / λ

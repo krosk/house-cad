@@ -158,8 +158,11 @@ function applyProduct(rect, key, entry, { seedFoot }) {
   if (rect.productMm) rect.top = rect.foot + rect.productMm[1] / 1000;
 }
 
+// The most sleepers a room can hold (AR AIR INLET steps 0 → SLEEPERS_MAX → 0).
+export const SLEEPERS_MAX = 4;
+
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -203,11 +206,14 @@ export class Rectangle {
       // (W/mK), R = drawn depth / λ. One or the other (R wins); neither = the project's λ.
       if (Number.isFinite(rValue) && rValue >= 0) this.rValue = rValue;
       else if (Number.isFinite(lambda) && lambda > 0) this.lambda = lambda;
-    } else if (this.kind === 'room' && outdoor === true) {
+    } else if (this.kind === 'room') {
       // An OUTDOOR room (owner, 2026-10-05: an unheated glazed veranda "as a room, because its
       // measurements matter"): measured and drawn like any room, but outside for heat loss
       // (docs/heat-loss.md) and never merged with an indoor room it touches.
-      this.outdoor = true;
+      if (outdoor === true) this.outdoor = true;
+      // How many people sleep in the room (owner, 2026-10-12, for the VMC air network's night
+      // scenarios, core/airflow.js); absent = none.
+      else if (Number.isInteger(sleepers) && sleepers > 0) this.sleepers = Math.min(SLEEPERS_MAX, sleepers);
     } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
@@ -225,7 +231,7 @@ export class Rectangle {
     if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     if (this.kind !== 'window') delete this.airInlet;
-    if (this.kind !== 'room') delete this.outdoor;
+    if (this.kind !== 'room') { delete this.outdoor; delete this.sleepers; }
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
     // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.
