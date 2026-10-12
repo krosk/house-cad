@@ -15,7 +15,8 @@ editor (`docs/product-intent.md`).
 ```text
 SETUP    · REGISTER → FLOOR → LEVEL → RECAL → TELEPORT
 PLAN     · ADD → EDGE → DIMS → EDIT → RULER
-MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK → PIPE
+MARKER   · EDIT → DIMS → LINK → CONDUIT → CONDUIT DIMS → CONDUIT EDIT → WIRE → CHECK
+HEATING  · PIPE → PIPE DIMS → PIPE EDIT → AIR INLET → HEAT LOSS → R / U
 MATERIAL · FLOOR → WALL → DOOR → WINDOW → FURNITURE → SWITCH → OUTLET → ETHERNET
 PROJECT  · TRANSLATE → SAVE → LOAD → EXPORT → UNIT → LANG → PERF
 ```
@@ -26,7 +27,7 @@ presentation adds hierarchy without remapping any contextual buttons or thumbsti
 The single source of truth for order is `MODE_ORDER` (which sorts the `modes` array) and `MODE_GROUP`;
 IDs in that traversal order are `register`, `floor`, `level`, `recal`, `teleport`, `drop`, `edge`,
 `plan_dims`, `edit`, `ruler`, `marker`, `outlet_dims`, `marker_link`, `marker_conduit`, `conduit_dims`,
-`conduit_edit`, `marker_wire`, `marker_pipe`, the MATERIAL modes, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
+`conduit_edit`, `marker_wire`, `circuit_check`, `marker_pipe`, `pipe_dims`, `pipe_edit`, `vmc_inlet`, `heat`, `heat_r`, the MATERIAL modes, `copy_floor`, `paste_floor`, `move_up`, `move_down`,
 `translate`, `save`, `load`, `export`, `unit`, `lang`. **`MODE_HIDDEN`** = `{copy_floor, paste_floor,
 move_up, move_down}` — those four stay fully defined and functional (drivable programmatically) but
 are removed from the thumbstick-x cycle to keep the list short, so they do **not** appear in the
@@ -333,23 +334,36 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   (`buildCheckOverlay`), rebuilt on mode entry, filter change, or view change; never one object per
   device, since 90+ devices are flagged mid-survey. Available in ALL FLOORS. In a single-floor view only
   the active floor's devices get rings, though the counts are whole-house.
-- **HEATING · PIPE** (`id: marker_pipe`; the HEATING group since 2026-10-01, was MARKER · PIPE) — author a separate whole-house plumbing graph. Trigger a
-  fixture, existing pipe node, or empty space to start a pen; empty space creates a free junction,
-  and subsequent triggers create segments and advance the pen for bends, branches, loops, and
-  cross-floor risers. Grip cycles overlapping marker/node targets, or lifts the pen on empty space.
-  Thumbstick up/down chooses or retypes
-  the service: cold water (blue), hot water (red), heating supply (orange), or heating return
-  (purple). The selected pipe and both fixtures highlight yellow; B/Y deletes the selected pipe.
-  Fixture-bound nodes store `{markerId, role}` and their role is inferred from the service (`cold`,
-  `hot`, `supply`, or `return`), so one boiler/radiator/appliance marker can carry multiple logical
-  ports without spatial connector geometry. Free nodes store floor-relative `{x,y,z,floorId}`;
-  pipe segments reference two node ids. The graph persists in saves and floor-copy intra-floor
-  subsets, and renders as ribbons at the stored 16 mm diameter. Retyping one segment propagates
-  through its connected component. Joining unlike services uses source-wins semantics but is guarded:
-  the first trigger highlights the destination component warning-red without mutation; trigger the
-  same target again to convert/connect, or grip to cancel. Editable diameters, valves/manifolds, fixture
-  role validation, derived networks, and output layers are intentionally deferred; see
+- **HEATING · PIPE** (`id: marker_pipe`; the HEATING group since 2026-10-01, was MARKER · PIPE) — author a separate
+  whole-house plumbing graph, **with MARKER · CONDUIT's interaction** (owner, 2026-10-12). Trigger a fixture, existing
+  pipe junction, or empty space to start a pen; empty space creates a free junction, and subsequent triggers create
+  segments and advance the pen for bends, branches, loops, and cross-floor risers. **Trigger an existing pipe** (picked
+  by its floor projection; it turns yellow and the preview snaps to the split point) to **branch from it**:
+  `splitPipe` inserts a T-junction at the pipe's height (`conduitSplitPoint`), both halves keeping the service and
+  diameter. Grip cycles overlapping fixtures, junctions and pipes (`pipeTargetAtFloorPoint`), or lifts the pen on
+  empty space. Thumbstick up/down chooses or retypes the service (cold, hot, heating supply/return, refrigerant,
+  VMC, waste). **B/Y undoes the last pen step** (`undoPipePenStep`, as `undoConduitPenStep`). The pen junction is
+  amber, the target yellow. Fixture-bound nodes store `{markerId, role}` and their role is inferred from the service
+  (`cold`, `hot`, `supply`, or `return`), so one boiler/radiator/appliance marker can carry multiple logical ports
+  without spatial connector geometry. Free nodes store floor-relative `{x,y,z,floorId}` (+ `zDatum` once a height is
+  typed); pipe segments reference two node ids. The graph persists in saves and floor-copy intra-floor subsets, and
+  renders as ribbons at the stored diameter (batched, see "Draw calls"). Retyping one segment propagates through its
+  connected component. Joining unlike services uses source-wins semantics but is guarded: the first trigger
+  highlights the destination component warning-red without mutation (checked before any split, so nothing is left
+  behind); trigger the same target again to convert/connect, or grip to cancel. Editable diameters,
+  valves/manifolds, fixture role validation, derived networks, and output layers are intentionally deferred; see
   `docs/plumbing-workflow.md`.
+- **HEATING · PIPE DIMS** (`id: pipe_dims`) — CONDUIT · DIMS for pipe junctions: trigger a bare junction, then a
+  wall edge; the numpad sets the distance (A/X flips, B/Y removes the pin). The pin is a `{node}` endpoint
+  (`dimDomain` → `'pipeNode'` when the id is a pipe node, so CONDUIT DIMS and PIPE DIMS each pick only their own
+  pins), resolved one-way in `solveConduitNodes`. Not offered in ALL FLOORS (like CONDUIT DIMS).
+- **HEATING · PIPE EDIT** (`id: pipe_edit`) — CONDUIT · EDIT for pipes: with nothing selected, grip cycles the
+  junctions and pipes under the reticle (`pipeEditTargetAtFloorPoint`), trigger selects. A selected free junction
+  opens the same height pad as a conduit junction (`padNodeObj`) and is grip-dragged with `applyPipeNodeGripDrag`
+  (direct/remote by `WAYPOINT_GRAB_M`; a defined height holds). A selected pipe reads `<service> · <network length>`;
+  thumbstick retypes its network. B/Y deletes the selected pipe, or the selected junction (`removePipeNode`: a
+  pass-through junction re-joins its two pipes). Fixture-bound nodes cannot move. Junction heights show as cyan Z-dims
+  while the pipe network is shown.
 - **HEATING · HEAT LOSS** (`id: heat`; method and defaults in `docs/heat-loss.md`) — every heated room
   of the active floor shows its loss in W at its largest rect's centre. A panel holds WHAT IF (NOT SAVED:
   wall insulation, attic insulation, windows, reveals insulated; the house W and kWh/yr under the title; `docs/heat-loss.md`
@@ -1155,8 +1169,10 @@ teleport reticle; no last-active routing remains.
   content. `makeLabel` guards it; the pads and menus redraw only on hover change; the debug HUD
   refreshes at ~2 Hz.
 - **Still per-object:**
-  - adjacent-floor targets in conduit/wire/pipe modes: a 12x12 sphere each, 119 on the owner's house;
   - furniture and switch→light links.
+
+  (The adjacent-floor targets in conduit/wire/pipe modes were listed here; `buildAdjacentTargets` already
+  draws them as two InstancedMeshes, checked 2026-10-12.)
 
   Hypothesis: these are the next costs if a mode drops frames. Measure first with PERF.
 - **PLAN EDGE picking is deliberate**: every edge inside the reticle is ordered by fixed plan

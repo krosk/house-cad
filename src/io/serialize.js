@@ -127,7 +127,7 @@ function serializePipe(pipe) {
   return { id: pipe.id, service: pipe.service, diameter: pipe.diameter, a: pipe.a, b: pipe.b };
 }
 function serializePipeNode(node) {
-  return { id: node.id, x: node.x, y: node.y, z: node.z || 0, floorId: node.floorId || null,
+  return { id: node.id, x: node.x, y: node.y, z: node.z || 0, ...verticalFields(node), floorId: node.floorId || null,
     markerId: node.markerId || null, role: node.role || null };
 }
 
@@ -293,6 +293,16 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
     return [copy];
   });
 
+  const pipeNodeIds = new Map();
+  const pipeNodes = srcPipeNodes.flatMap((node) => {
+    const markerId = node.markerId ? markerIds.get(node.markerId) : null;
+    if (node.markerId && !markerId) return [];
+    const copy = { id: nextPipeNodeId(), x: node.x, y: node.y, z: node.z || 0, ...verticalFields(node),
+      floorId: target.id, markerId: markerId || null, role: node.role || null };
+    pipeNodeIds.set(node.id, copy.id);
+    return [copy];
+  });
+
   const remapEndpoint = (ep) => {
     if (!ep || typeof ep !== 'object') return null;
     if (ep.marker) {
@@ -300,7 +310,7 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       return id ? { ...ep, marker: id } : null;
     }
     if (ep.node) {
-      const id = nodeIds.get(ep.node);
+      const id = nodeIds.get(ep.node) || pipeNodeIds.get(ep.node); // a conduit or a pipe junction
       return id ? { ...ep, node: id } : null; // node didn't cross → drop the dim
     }
     if (ep.rect === ORIGIN_ID) return { ...ep };
@@ -347,15 +357,6 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
       type: WIRE_TYPES.includes(w.type) ? w.type : 'electrical', via,
       ...wireRockerFields(w),
     }];
-  });
-  const pipeNodeIds = new Map();
-  const pipeNodes = srcPipeNodes.flatMap((node) => {
-    const markerId = node.markerId ? markerIds.get(node.markerId) : null;
-    if (node.markerId && !markerId) return [];
-    const copy = { id: nextPipeNodeId(), x: node.x, y: node.y, z: node.z || 0,
-      floorId: target.id, markerId: markerId || null, role: node.role || null };
-    pipeNodeIds.set(node.id, copy.id);
-    return [copy];
   });
   const pipes = srcPipes.flatMap((pipe) => {
     const a = pipeNodeIds.get(pipe.a), b = pipeNodeIds.get(pipe.b);
@@ -543,7 +544,7 @@ export function deserializeInto(project, data) {
 
   project.pipeNodes = (data.pipeNodes || []).flatMap((node) => {
     if (node.markerId && !project.findMarker(node.markerId)) return [];
-    return [{ id: node.id || nextPipeNodeId(), x: node.x || 0, y: node.y || 0, z: node.z || 0,
+    return [{ id: node.id || nextPipeNodeId(), x: node.x || 0, y: node.y || 0, z: node.z || 0, ...verticalFields(node),
       floorId: node.floorId || fallbackFloorId, markerId: node.markerId || null, role: node.role || null }];
   });
   const validPipeNodeIds = new Set(project.pipeNodes.map((node) => node.id));

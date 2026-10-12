@@ -1862,7 +1862,7 @@ export function setupMR(view, project, getFootprint) {
         // like an outlet pin. Cyan label marks it as conduit (vs the amber outlet pin).
         const nodeEnd = c.a.node ? c.a : c.b;
         const edgeEnd = c.a.node ? c.b : c.a;
-        const node = project.conduitNodes.find((n) => n.id === nodeEnd.node);
+        const node = netNodeById(nodeEnd.node);
         const le = edgeLine(edgeEnd, floor.rectangles);
         if (!node || node.markerId || !le) continue; // marker-bound nodes aren't pinned
         const conflict = !!c.conflict;
@@ -3264,6 +3264,12 @@ export function setupMR(view, project, getFootprint) {
       if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
       batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
     }
+    // Pipe junctions the same way, while the pipe network is shown (HEATING · PIPE modes).
+    for (const n of pipeGroup.visible ? project.pipeNodes || [] : []) {
+      if (n.markerId || !n.zDatum || !((n.z || 0) > 1e-4)) continue;
+      if (project.pipeNodeFloorId(n) !== project.activeFloorId) continue;
+      batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
+    }
     // Apertures (door/garage/window/half-wall/heater/sliding) use the blue structural dim
     // styling: floor→sill and floor→head as two side-by-side dims, offset along the
     // aperture's wall axis. A zero sill and an open top (head:null) are omitted.
@@ -3793,6 +3799,17 @@ export function setupMR(view, project, getFootprint) {
         .sort((a, b) => (b.p.z || 0) - (a.p.z || 0))
         .map(({ n }) => ({ kind: 'node', id: n.id }));
     }
+    if (modes[currentMode].id === 'pipe_dims') {
+      const anchor = pipeNodeAtFloorPoint(px, py, { bare: true });
+      if (!anchor) return [];
+      const p0 = pipeNodePos(anchor);
+      return project.pipeNodes
+        .filter((n) => !n.markerId && project.pipeNodeFloorId(n) === project.activeFloorId)
+        .map((n) => ({ n, p: pipeNodePos(n) }))
+        .filter(({ p }) => samePlanPoint(p, p0))
+        .sort((a, b) => (b.p.z || 0) - (a.p.z || 0))
+        .map(({ n }) => ({ kind: 'node', id: n.id }));
+    }
     if (modes[currentMode].id === 'outlet_dims') {
       const anchor = markerAtFloorPoint(px, py);
       if (!anchor) return [];
@@ -3969,6 +3986,10 @@ export function setupMR(view, project, getFootprint) {
     cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1, waste: 0xa16207,
   };
   const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
+  // A `{node}` constraint endpoint: a conduit or a pipe junction (ids never collide).
+  function netNodeById(id) {
+    return project.conduitNodes.find((n) => n.id === id) || (project.pipeNodes || []).find((n) => n.id === id);
+  }
   function pipeNodePos(node) {
     if (node?.markerId) {
       const found = project.findMarker(node.markerId);
@@ -4050,6 +4071,7 @@ export function setupMR(view, project, getFootprint) {
     pipeGroup.add(spheres);
     pipeBatch = { runs, runIndex, quads, overlay, overlayKey: '', spheres, nodeIndex, nodePos, styleKey: new Map() };
     for (const node of nodes) stylePipeNode(node.id, 0xffffff, 1);
+    if (!allFloorsView) buildZDims(); // junction height dims follow (as buildConduits)
   }
   function stylePipeNode(id, color, scale = 1) {
     const b = pipeBatch;
@@ -4112,20 +4134,21 @@ export function setupMR(view, project, getFootprint) {
   // Diameter of a new segment drawn in AR (no diameter editor yet): a VMC duct starts at
   // Ø80 (a wet-room extract), a waste pipe at Ø100 (a WC); written plans carry the real one.
   const newPipeDiameter = (service) => (service === 'vmc' ? 0.08 : service === 'waste' ? 0.1 : 0.016);
-  function pipeAtFloorPoint(px, py) {
-    const rank = pickRanker();
-    let best = null, bestD = WIRE_PICK_M, bestR = Infinity;
+
+  // Every pipe with world-Z ends, shaped like conduitNetworkSegments so conduitSplitPoint
+  // and the plan-projection picking serve both networks.
+  function pipeNetworkSegments() {
     const nodeById = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
-    for (const pipe of project.pipes || []) {
+    return (project.pipes || []).flatMap((pipe) => {
       const an = nodeById.get(pipe.a), bn = nodeById.get(pipe.b);
-      const a = an && pipeNodePos(an), b = bn && pipeNodePos(bn);
-      const r = a && b ? Math.min(rank(a.floorId), rank(b.floorId)) : Infinity;
-      if (r === Infinity) continue;
-      const d = planPointToSegment(px, py, a, b);
-      if (d <= WIRE_PICK_M && (r < bestR || (r === bestR && d < bestD))) { bestR = r; bestD = d; best = pipe; }
-    }
-    return best;
+      if (!an || !bn) return [];
+      const a = pipeNodePos(an), b = pipeNodePos(bn);
+      return [{ id: pipe.id, pipe, a, b, aFloorId: a.floorId, bFloorId: b.floorId }];
+    });
   }
+  // HEATING · PIPE pick stack, as MARKER · CONDUIT's: fixtures, junctions, then pipes to
+  // split into a T (not near a pipe's end, nor a pipe already on the pen node). Grip sets
+  // afterKey and the next candidate after it is the target.
   function pipeTargetAtFloorPoint(px, py, afterKey = null) {
     const candidates = [];
     const rank = pickRanker();
@@ -4147,12 +4170,95 @@ export function setupMR(view, project, getFootprint) {
       if (distance <= RETICLE_OUTER) candidates.push({ kind: 'node', item: node, rank: r,
         key: `node:${node.id}`, distance, z: p.z || 0, order });
     });
+    pipeNetworkSegments().forEach((seg, order) => {
+      const r = segRank(rank, seg);
+      if (r === Infinity) return;
+      if (pipePenNodeId && (seg.pipe.a === pipePenNodeId || seg.pipe.b === pipePenNodeId)) return;
+      const distance = planPointToSegment(px, py, seg.a, seg.b);
+      if (distance > WIRE_PICK_M) return;
+      const split = conduitSplitPoint(seg, px, py);
+      if (split) candidates.push({ kind: 'segment', item: split, rank: r,
+        key: `segment:${seg.id}`, distance, z: split.worldZ, order });
+    });
+    const KIND_RANK = { marker: 0, node: 1, segment: 2 };
     candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
-      || (a.kind === b.kind ? 0 : a.kind === 'marker' ? -1 : 1) || b.z - a.z || a.order - b.order);
+      || KIND_RANK[a.kind] - KIND_RANK[b.kind] || b.z - a.z || a.order - b.order);
     if (!candidates.length) return null;
     const current = candidates.findIndex((candidate) => candidate.key === afterKey);
     return candidates[(current + 1) % candidates.length];
   }
+  // HEATING · PIPE EDIT selection stack: junctions (bound ones too) and pipes by plan
+  // distance; grip steps the ring before trigger selects (conduitEditTargetAtFloorPoint).
+  function pipeEditTargetAtFloorPoint(px, py, currentKey = null, cycleAfterKey = null) {
+    const candidates = [];
+    const rank = pickRanker();
+    (project.pipeNodes || []).forEach((node, order) => {
+      const p = pipeNodePos(node);
+      const r = rank(p.floorId);
+      if (r === Infinity) return;
+      const distance = Math.hypot(px - p.x, py - p.y);
+      if (distance <= RETICLE_OUTER) candidates.push({
+        kind: 'node', id: node.id, key: `node:${node.id}`, rank: r, distance, z: p.z || 0, order,
+      });
+    });
+    pipeNetworkSegments().forEach((seg, order) => {
+      const r = segRank(rank, seg);
+      if (r === Infinity) return;
+      const distance = planPointToSegment(px, py, seg.a, seg.b);
+      if (distance <= WIRE_PICK_M) candidates.push({
+        kind: 'segment', id: seg.id, key: `segment:${seg.id}`, rank: r,
+        distance, z: Math.max(seg.a.z || 0, seg.b.z || 0), order,
+      });
+    });
+    candidates.sort((a, b) => a.rank - b.rank || a.distance - b.distance
+      || (a.kind === b.kind ? 0 : a.kind === 'node' ? -1 : 1)
+      || b.z - a.z || a.order - b.order);
+    return gripCycle(candidates, currentKey, cycleAfterKey);
+  }
+  // Nearest bare pipe junction under the reticle (PIPE DIMS, and the selected node's grab).
+  function pipeNodeAtFloorPoint(px, py, { bare = false } = {}) {
+    const rank = pickRanker();
+    let best = null, bestD = RETICLE_OUTER, bestR = Infinity;
+    for (const node of project.pipeNodes || []) {
+      if (bare && node.markerId) continue;
+      const p = pipeNodePos(node);
+      const r = rank(p.floorId);
+      if (r === Infinity) continue;
+      const d = Math.hypot(px - p.x, py - p.y);
+      if (d <= RETICLE_OUTER && (r < bestR || (r === bestR && d < bestD))) { bestR = r; bestD = d; best = node; }
+    }
+    return best;
+  }
+  // World position of a drawn junction sphere (the grab's near/far test), or null.
+  function pipeNodeWorldPos(id, target) {
+    const i = pipeBatch?.nodeIndex.get(id);
+    if (i == null) return null;
+    pipeGroup.updateWorldMatrix(true, false);
+    return target.copy(pipeBatch.nodePos[i]).applyMatrix4(pipeGroup.matrixWorld);
+  }
+  // Live pipe-junction drag, as applyConduitNodeGripDrag: 'direct' carries it with the tip
+  // in 3D (a defined height holds), 'remote' lets the floor reticle drive X/Y.
+  function applyPipeNodeGripDrag(inputSource) {
+    if (gripDrag?.kind !== 'pipeNode') return;
+    const n = project.pipeNodes.find((node) => node.id === gripDrag.nodeId);
+    if (!n || n.markerId) return;
+    let nx = n.x, ny = n.y, nz = n.z || 0;
+    if (gripDrag.mode === 'direct') {
+      const tip = tipPosition(inputSource);
+      if (!tip) return;
+      const plan = worldToPlan(tip);
+      const floorElevation = project.floorById(project.pipeNodeFloorId(n))?.elevation || 0;
+      nx = plan.px; ny = plan.py; nz = n.zDatum ? (n.z || 0) : Math.max(0, tip.y - groundY() - floorElevation);
+    } else {
+      const hit = rayFloorHit(inputSource);
+      if (!hit) return;
+      const plan = worldToPlan(hit);
+      nx = plan.px; ny = plan.py;
+    }
+    project.movePipeNode(n.id, { x: nx, y: ny, z: nz }, { emit: false });
+    buildPipes();
+  }
+
 
   // All routed wires whose plan projection passes within WIRE_PICK_M, nearest first.
   // Multiple wires commonly share exactly one conduit, so the MARKER · WIRE grip cycle
@@ -5340,7 +5446,7 @@ export function setupMR(view, project, getFootprint) {
   // readout line when 2+ targets share the reticle (owner request): WIRE, CONDUIT and
   // CONDUIT · EDIT set it each frame. { mode, label, index, size } or null.
   let gripPick = null;
-  const GRIP_PICK_MODES = new Set(['marker', 'marker_link', 'marker_wire', 'marker_conduit', 'conduit_edit',
+  const GRIP_PICK_MODES = new Set(['marker', 'marker_link', 'marker_wire', 'marker_conduit', 'conduit_edit', 'pipe_edit',
     'mat_switch', 'mat_outlet', 'mat_ethernet']);
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
@@ -5376,6 +5482,12 @@ export function setupMR(view, project, getFootprint) {
   let selectedPipe = null;
   let hoverPipe = null;
   let currentPipeService = PIPE_SERVICES[0];
+  // HEATING · PIPE mirrors MARKER · CONDUIT: a trigger on a pipe splits it (T), B/Y undoes pen steps.
+  let hoverPipeSplit = null; // the pipe (and split point) the pen would T into this frame
+  let pipePenHistory = [];   // pen steps, undone by B/Y (undoPipePenStep)
+  // HEATING · PIPE EDIT mirrors CONDUIT · EDIT: a selected junction (pad, grip-drag) or pipe (selectedPipe).
+  let selectedPipeNodeId = null;
+  let pipeEditHoverKey = null, pipeEditPickAfterKey = null;
   let markerBuffer = '';     // OUTLET height pad: typed digits (prefilled with the marker's z)
   let markerPristine = false; // markerBuffer holds a prefilled value; first key replaces it
   // Datum for the marker / node height pads: 'floor' = a defined height above the floor
@@ -5775,17 +5887,22 @@ export function setupMR(view, project, getFootprint) {
   // --- PLAN DIMS / OUTLET DIMS (S2 numpad) helpers ---
 
   const isXEdge = (e) => e === 'left' || e === 'right';
-  const isDimMode = (id) => id === 'plan_dims' || id === 'outlet_dims' || id === 'conduit_dims';
+  const isDimMode = (id) => id === 'plan_dims' || id === 'outlet_dims' || id === 'conduit_dims' || id === 'pipe_dims';
+  // A pipe junction's pin is a `{node}` endpoint too; its domain tells the two networks apart.
+  const isPipeNodeId = (id) => (project.pipeNodes || []).some((n) => n.id === id);
   // A distance constraint's authoring domain, matched against the active DIMS mode.
-  const dimDomain = (c) => isMarkerConstraint(c) ? 'marker' : isNodeConstraint(c) ? 'node' : 'plan';
-  // The DIMS domain each mode owns (plan_dims → 'plan', outlet_dims → 'marker', conduit_dims → 'node').
-  const modeDomain = (id) => id === 'outlet_dims' ? 'marker' : id === 'conduit_dims' ? 'node' : 'plan';
+  const dimDomain = (c) => isMarkerConstraint(c) ? 'marker'
+    : isNodeConstraint(c) ? (isPipeNodeId(c.a.node || c.b.node) ? 'pipeNode' : 'node') : 'plan';
+  // The DIMS domain each mode owns (plan_dims → 'plan', outlet_dims → 'marker', conduit_dims → 'node',
+  // pipe_dims → 'pipeNode'; both node domains pick `kind: 'node'` refs).
+  const modeDomain = (id) => id === 'outlet_dims' ? 'marker' : id === 'conduit_dims' ? 'node'
+    : id === 'pipe_dims' ? 'pipeNode' : 'plan';
   let bufferPristine = false; // buffer holds a prefilled value; first key replaces it
 
   // A reference is a rect EDGE, the plan ORIGIN axis, a MARKER, or a conduit NODE
   // (both markers and bare junctions pin one-way to a wall).
   const markerOf = (ref) => project.markers.find((m) => m.id === ref.markerId);
-  const nodeOf = (ref) => project.conduitNodes.find((n) => n.id === ref.nodeId);
+  const nodeOf = (ref) => netNodeById(ref.nodeId);
   const refLabel = (ref) => (!ref ? '?'
     : ref.kind === 'origin' ? t('ref.origin')
     : ref.kind === 'marker' ? t(`marker.${markerOf(ref)?.type ?? 'outlet'}`)
@@ -5920,7 +6037,8 @@ export function setupMR(view, project, getFootprint) {
   function dimTitle() {
     if (!dimRefA) {
       const id = modes[currentMode]?.id;
-      return t(id === 'outlet_dims' ? 'dim.pickOutlet' : id === 'conduit_dims' ? 'dim.pickNode' : 'dim.pickPlan');
+      return t(id === 'outlet_dims' ? 'dim.pickOutlet' : id === 'conduit_dims' ? 'dim.pickNode'
+        : id === 'pipe_dims' ? 'dim.pickPipeNode' : 'dim.pickPlan');
     }
     if (!dimRefB) return refLabel(dimRefA) + '  <->  ?';
     return refLabel(dimRefA) + '  <->  ' + refLabel(dimRefB) + (editingId ? '  ' + t('dim.edit') : '');
@@ -6033,7 +6151,7 @@ export function setupMR(view, project, getFootprint) {
   function setDimLabelPosition(c, px, py) {
     const endpointCoord = (ep) => {
       if (ep.marker) return project.markers.find((m) => m.id === ep.marker)?.[c.axis];
-      if (ep.node) return project.conduitNodes.find((n) => n.id === ep.node)?.[c.axis];
+      if (ep.node) return netNodeById(ep.node)?.[c.axis];
       if (ep.rect === ORIGIN_ID) return 0;
       const rect = project.rectangles.find((r) => r.id === ep.rect);
       return rect ? edgeCoord(rect, ep.edge) : null;
@@ -6376,11 +6494,20 @@ export function setupMR(view, project, getFootprint) {
   // follows the device), so selecting one just arms it for deletion.
   const selectedConduitNodeObj = () =>
     (selectedConduitNodeId ? project.conduitNodes.find((n) => n.id === selectedConduitNodeId) : null) || null;
+  // The same pad edits a selected pipe junction in HEATING · PIPE EDIT.
+  const selectedPipeNodeObj = () =>
+    (selectedPipeNodeId ? project.pipeNodes.find((n) => n.id === selectedPipeNodeId) : null) || null;
+  const pipePadMode = () => modes[currentMode].id === 'pipe_edit';
+  const padNodeObj = () => (pipePadMode() ? selectedPipeNodeObj() : selectedConduitNodeObj());
+  function setPadNodeVertical(id, datum, value) {
+    if (pipePadMode()) { project.setPipeNodeVertical(id, datum, value); buildPipes(); }
+    else { project.setConduitNodeVertical(id, datum, value); buildConduits(); }
+  }
   const nodePadTitle = () => `${t('conduit.node')}  ·  ${datumWord(nodeDatum)}`;
   const redrawNodePad = () => numpad.draw(nodePadTitle(), nodeBuffer, hoverKey, datumSwapLabel(nodeDatum));
 
   function refreshNodePad() {
-    const n = selectedConduitNodeObj();
+    const n = padNodeObj();
     nodeDatum = n?.zDatum ?? 'free'; // no datum = free in the 3D carry
     nodeBuffer = n ? fmt(n.z || 0) : '';
     nodePristine = true;
@@ -6409,15 +6536,28 @@ export function setupMR(view, project, getFootprint) {
     deactivateNumpad();
   }
 
+  // PIPE EDIT selection: a free junction opens the height pad; a pipe or a bound node doesn't.
+  function selectPipeNode(id) {
+    selectedPipeNodeId = id;
+    selectedPipe = null;
+    const n = selectedPipeNodeObj();
+    if (n && !n.markerId) activateNodePad();
+    else deactivateNumpad();
+  }
+  function selectPipeEdit(pipe) {
+    selectedPipeNodeId = null;
+    selectedPipe = pipe;
+    deactivateNumpad();
+  }
+
   function commitNodeHeight() {
-    const n = selectedConduitNodeObj();
+    const n = padNodeObj();
     if (!n || n.markerId) return;
     const val = parseFloat(nodeBuffer);
     if (!Number.isFinite(val) || val < 0) return; // 0 = on the floor / at the ceiling; negatives rejected
     const datum = nodeDatum === 'free' ? 'floor' : nodeDatum; // entering a value DEFINES it (default floor)
-    project.setConduitNodeVertical(n.id, datum, toMeters(val));
-    rlog('conduit node height', { id: n.id, datum, m: +toMeters(val).toFixed(3) });
-    buildConduits();
+    setPadNodeVertical(n.id, datum, toMeters(val));
+    rlog('node height', { id: n.id, datum, m: +toMeters(val).toFixed(3) });
     refreshNodePad(); // keep it selected so it can be repositioned again
   }
 
@@ -6427,11 +6567,10 @@ export function setupMR(view, project, getFootprint) {
       nodeDatum = nextDatum(nodeDatum); nodePristine = false; redrawNodePad(); return;
     }
     if (k === 'del') { // DEL clears the Z DIM (frees Z for the 3D carry); B/Y deletes the node
-      const n = selectedConduitNodeObj();
+      const n = padNodeObj();
       if (n && !n.markerId) {
-        project.setConduitNodeVertical(n.id, 'free');
-        rlog('conduit node z freed', { id: n.id });
-        buildConduits();
+        setPadNodeVertical(n.id, 'free');
+        rlog('node z freed', { id: n.id });
         refreshNodePad(); // now reads ⊘ free
       }
       return;
@@ -6471,7 +6610,7 @@ export function setupMR(view, project, getFootprint) {
     if (!dimRefA) {
       // First pick must be the domain's dependent target: plan = edge/origin,
       // marker = an outlet, node = a bare conduit junction.
-      const pinKind = domain === 'marker' ? 'marker' : domain === 'node' ? 'node' : null;
+      const pinKind = domain === 'marker' ? 'marker' : domain === 'node' || domain === 'pipeNode' ? 'node' : null;
       if (pinKind ? hoverRef.kind !== pinKind : (hoverRef.kind === 'marker' || hoverRef.kind === 'node')) return;
       dimRefA = hoverRef;
       planDimPickKey = null; // begin the second reference at its stable first candidate
@@ -6482,7 +6621,7 @@ export function setupMR(view, project, getFootprint) {
     // Second pick: plan pairs edge/origin; a marker/node pin must anchor to a wall edge.
     if (domain === 'plan' && (hoverRef.kind === 'marker' || hoverRef.kind === 'node')) return;
     if (domain === 'marker' && (dimRefA.kind !== 'marker' || hoverRef.kind !== 'edge')) return;
-    if (domain === 'node' && (dimRefA.kind !== 'node' || hoverRef.kind !== 'edge')) return;
+    if ((domain === 'node' || domain === 'pipeNode') && (dimRefA.kind !== 'node' || hoverRef.kind !== 'edge')) return;
     if (refsEqual(hoverRef, dimRefA) || !refsCompatible(dimRefA, hoverRef)) return;
     dimRefB = hoverRef;
     dimOffsetPt = hoverFloorPt; // where the tip stands as the pair completes -> new dim's default line
@@ -8416,17 +8555,44 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => {},
     },
     {
-      id: 'marker_pipe', color: 0x38bdf8,
+      id: 'marker_pipe', color: 0x38bdf8, // build the plumbing graph, as MARKER · CONDUIT
+      // Pen model (penNodeId → pipePenNodeId): trigger a fixture/junction to start or join;
+      // empty space drops a junction; an existing pipe splits into a T and the pen joins it.
+      // Joining a network of another service asks first (red); B/Y undoes the last step.
       onTouch: (pos) => {
         if (!placed) return;
-        if (selectedPipe) { selectedPipe = null; pendingPipeMerge = null; return; }
+        const prevPen = pipePenNodeId;
+        const nodesBefore = new Set(project.pipeNodes.map((n) => n.id));
+        const pipesBefore = new Set(project.pipes.map((p) => p.id));
         const sourceService = pipePenNodeId
           ? project.pipeServiceAtNode(pipePenNodeId, currentPipeService) : currentPipeService;
         let targetNodeId = hoverPipeNode?.id || null;
         if (!targetNodeId && hoverMarker) {
           targetNodeId = project.ensurePipeNodeAtMarker(hoverMarker.id, sourceService)?.id || null;
         }
-        if (!targetNodeId && !pipePenNodeId && hoverPipe) { selectedPipe = hoverPipe; return; }
+        const splitSource = !targetNodeId && !hoverMarker && hoverPipeSplit
+          ? project.pipes.find((p) => p.id === hoverPipeSplit.segmentId) : null;
+        // The network a trigger would join: checked before any split, so a pending merge leaves nothing behind.
+        const probeId = targetNodeId || splitSource?.a || null;
+        let networksDiffer = false;
+        if (pipePenNodeId && probeId && probeId !== pipePenNodeId) {
+          networksDiffer = !project.pipeComponent(pipePenNodeId).nodeIds.has(probeId)
+            && project.pipeComponent(probeId).pipes.some((pipe) => pipe.service !== sourceService);
+          const samePending = pendingPipeMerge?.sourceNodeId === pipePenNodeId
+            && pendingPipeMerge?.targetNodeId === probeId && pendingPipeMerge?.service === sourceService;
+          if (networksDiffer && !samePending) {
+            pendingPipeMerge = { sourceNodeId: pipePenNodeId, targetNodeId: probeId, service: sourceService };
+            setModeInfo();
+            rlog('pipe merge warning', { from: pipePenNodeId, to: probeId, service: sourceService });
+            return;
+          }
+        }
+        let split = null;
+        if (splitSource) {
+          split = { a: splitSource.a, b: splitSource.b };
+          const { x, y, z, floorId } = hoverPipeSplit;
+          targetNodeId = project.splitPipe(splitSource.id, { x, y, z, floorId })?.id || null;
+        }
         if (!targetNodeId) {
           const { px, py } = worldToPlan(pos);
           let floor = project.activeFloor;
@@ -8442,30 +8608,41 @@ export function setupMR(view, project, getFootprint) {
           }
           targetNodeId = project.addPipeNode({ x: px, y: py, z, floorId: floor.id, emit: false }).id;
         }
+        let pipe = null;
         if (pipePenNodeId && pipePenNodeId !== targetNodeId) {
-          const sourceComponent = project.pipeComponent(pipePenNodeId);
-          const targetComponent = project.pipeComponent(targetNodeId);
-          const networksDiffer = !sourceComponent.nodeIds.has(targetNodeId)
-            && targetComponent.pipes.some((pipe) => pipe.service !== sourceService);
-          const samePending = pendingPipeMerge?.sourceNodeId === pipePenNodeId
-            && pendingPipeMerge?.targetNodeId === targetNodeId
-            && pendingPipeMerge?.service === sourceService;
-          if (networksDiffer && !samePending) {
-            pendingPipeMerge = { sourceNodeId: pipePenNodeId, targetNodeId, service: sourceService };
-            setModeInfo();
-            rlog('pipe merge warning', { from: pipePenNodeId, to: targetNodeId, service: sourceService });
-            return;
-          }
           if (networksDiffer) project.setPipeComponentService(targetNodeId, sourceService, { emit: false });
-          project.addPipe(pipePenNodeId, targetNodeId, sourceService, newPipeDiameter(sourceService), { emit: false });
+          pipe = project.addPipe(pipePenNodeId, targetNodeId, sourceService, newPipeDiameter(sourceService), { emit: false }).pipe || null;
         }
+        pipePenHistory.push({
+          prevPen,
+          nodeId: nodesBefore.has(targetNodeId) ? null : targetNodeId,
+          pipeId: pipe && !pipesBefore.has(pipe.id) ? pipe.id : null,
+          split, // the pipe {a, b} this step split at nodeId, re-joined on undo
+        });
         pipePenNodeId = targetNodeId;
         currentPipeService = sourceService;
         pendingPipeMerge = null;
         pipePickAfterKey = null;
         project.touch(); buildPipes();
         setModeInfo();
-        rlog('pipe pen', { node: pipePenNodeId, service: currentPipeService });
+        rlog('pipe pen', { node: pipePenNodeId, service: currentPipeService, split: !!split });
+      },
+    },
+    {
+      id: 'pipe_edit', color: 0x38bdf8, // select/move/delete pipe junctions or pipes, as CONDUIT · EDIT
+      // With nothing selected, grip cycles overlapping junctions/pipes and trigger selects
+      // the highlighted one. A selected free junction opens the height pad and can be
+      // grip-dragged; thumbstick retypes a selected pipe's network; B/Y deletes the selection.
+      onTouch: () => {
+        if (!placed) return;
+        if (selectedPipeNodeObj() && numpad.group.visible && hoverKey) { pressNodeKey(hoverKey); return; }
+        if (selectedPipeNodeId || selectedPipe) {
+          rlog('pipe deselect', { node: selectedPipeNodeId, pipe: selectedPipe?.id });
+          selectPipeNode(null);
+          return;
+        }
+        if (hoverPipeNode) { selectPipeNode(hoverPipeNode.id); rlog('pipe node select', { id: hoverPipeNode.id }); return; }
+        if (hoverPipe) { selectPipeEdit(hoverPipe); rlog('pipe select', { id: hoverPipe.id }); }
       },
     },
     {
@@ -8542,6 +8719,11 @@ export function setupMR(view, project, getFootprint) {
       // Conduit-node constraint domain: select a bare junction, then a wall edge, so the
       // junction is PINNED to that wall (one-way, like an outlet) and tracks it on every
       // edit. Marker-bound nodes are inert here (they follow their device).
+      onTouch: onNumpadTouch,
+    },
+    {
+      id: 'pipe_dims', color: 0x38bdf8,
+      // The same for a bare pipe junction (HEATING): pinned one-way to a wall edge.
       onTouch: onNumpadTouch,
     },
     {
@@ -8639,7 +8821,7 @@ export function setupMR(view, project, getFootprint) {
     'register', 'floor', 'level', 'recal', 'teleport',
     'drop', 'edge', 'plan_dims', 'edit', 'ruler',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check',
-    'marker_pipe', 'vmc_inlet', 'heat', 'heat_r',
+    'marker_pipe', 'pipe_dims', 'pipe_edit', 'vmc_inlet', 'heat', 'heat_r',
     'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
@@ -8648,7 +8830,7 @@ export function setupMR(view, project, getFootprint) {
     drop: 'plan', edge: 'plan', edit: 'plan', plan_dims: 'plan', ruler: 'plan',
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', outlet_dims: 'marker',
     // HEATING (owner, 2026-10-01): the pipe network, room heat loss and insulation R.
-    marker_pipe: 'heating', vmc_inlet: 'heating', heat: 'heating', heat_r: 'heating',
+    marker_pipe: 'heating', pipe_dims: 'heating', pipe_edit: 'heating', vmc_inlet: 'heating', heat: 'heating', heat_r: 'heating',
     mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
@@ -8712,6 +8894,8 @@ export function setupMR(view, project, getFootprint) {
     wireFromMarker = null; wireEndpointPickAfterKey = null; // ...and any pending wire pair/picker
     selectedRoutedWire = null; // ...and routed-wire selection (its cycle key is wireEndpointPickAfterKey)
     pipePenNodeId = null; pipePickAfterKey = null; hoverPipeNode = null; selectedPipe = null; pendingPipeMerge = null;
+    hoverPipeSplit = null; pipePenHistory = []; hoverPipe = null; // ...and the PIPE pen's split target + undo
+    selectedPipeNodeId = null; pipeEditHoverKey = null; pipeEditPickAfterKey = null; // ...and any PIPE EDIT selection
     penNodeId = null; conduitPickAfterKey = null; conduitPenHistory = []; hoverPenSplit = null; // ...and lift/reset the conduit pen picker + its undo
     selectedConduitNodeId = null; selectedConduitSegmentId = null;
     conduitEditHoverKey = null; conduitEditPickAfterKey = null; nodeBuffer = ''; // ...and any CONDUIT EDIT selection
@@ -8763,8 +8947,11 @@ export function setupMR(view, project, getFootprint) {
     materialGroup.visible = MAT_MODES.has(m.id);
     if (m.id === 'circuit_check') buildCheckOverlay();
     checkGroup.visible = m.id === 'circuit_check';
-    if (m.id === 'marker_pipe') buildPipes();
-    pipeGroup.visible = m.id === 'marker_pipe';
+    const showPipes = m.id === 'marker_pipe' || m.id === 'pipe_edit' || m.id === 'pipe_dims';
+    const pipesWereShown = pipeGroup.visible;
+    pipeGroup.visible = showPipes; // set first: buildZDims reads it for the junction dims
+    if (showPipes) buildPipes(); // also rebuilds the Z dims
+    else if (pipesWereShown && !allFloorsView) buildZDims(); // drop the junction dims
     // Cross-floor authoring targets: CONDUIT (risers) + WIRE (cross-floor wires) only.
     hoverAdjacent = null;
     buildAdjacentTargets(m.id);
@@ -8775,14 +8962,14 @@ export function setupMR(view, project, getFootprint) {
   // The stacked overview remains read-only for architecture and marker placement,
   // but the whole-house topology tools are deliberately available there: every
   // storey's existing devices/nodes can be joined without changing active floor.
-  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe']);
+  const ALL_FLOORS_TOPOLOGY = new Set(['marker_conduit', 'conduit_edit', 'marker_wire', 'circuit_check', 'marker_pipe', 'pipe_edit']);
   const modeAvailable = (index) => {
     const id = modes[index].id;
     if (MODE_HIDDEN.has(id)) return false; // parked tools: never a cycle stop
     const group = MODE_GROUP[id];
     // TRANSLATE now lives in PROJECT but still rigidly edits the active floor, so it
     // stays out of the read-only ALL FLOORS overview alongside PLAN/MARKER.
-    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'material' || id === 'translate' || id === 'heat' || id === 'heat_r' || id === 'vmc_inlet')
+    if (allFloorsView && (group === 'plan' || group === 'marker' || group === 'material' || id === 'translate' || id === 'heat' || id === 'heat_r' || id === 'vmc_inlet' || id === 'pipe_dims')
         && !ALL_FLOORS_TOPOLOGY.has(id)) return false;
     return true;
   };
@@ -9167,6 +9354,14 @@ export function setupMR(view, project, getFootprint) {
       gripDrag = { kind: 'conduitNode', nodeId: hoverConduitNode.id, mode: near ? 'direct' : 'remote' };
       rlog('grip-drag conduit node', { id: hoverConduitNode.id, mode: gripDrag.mode });
     }
+    if (id === 'pipe_edit' && selectedPipeNodeId
+        && hoverPipeNode?.id === selectedPipeNodeId && !hoverPipeNode.markerId) {
+      if (!pipeNodeWorldPos(hoverPipeNode.id, _dp)) return;
+      const tip = tipPosition(event.data); // near → carry in 3D; far → floor reticle X/Y
+      const near = tip && tip.distanceTo(_dp) < WAYPOINT_GRAB_M;
+      gripDrag = { kind: 'pipeNode', nodeId: hoverPipeNode.id, mode: near ? 'direct' : 'remote' };
+      rlog('grip-drag pipe node', { id: hoverPipeNode.id, mode: gripDrag.mode });
+    }
   }
 
   // Grip RELEASE: end any grip-drag (persist via touch); if none, onReset already ran.
@@ -9182,6 +9377,7 @@ export function setupMR(view, project, getFootprint) {
       // A conduit-node drag rewrote the network geometry: rebuild it once and, for a
       // direct 3D carry (which also changed z), refresh the height pad.
       if (gripDrag.kind === 'conduitNode') { buildConduits(); if (numpad.group.visible) refreshNodePad(); }
+      if (gripDrag.kind === 'pipeNode') { buildPipes(); if (numpad.group.visible) refreshNodePad(); }
     }
     gripDrag = null;
   }
@@ -9221,6 +9417,29 @@ export function setupMR(view, project, getFootprint) {
     conduitPickAfterKey = null;
     buildConduits(); buildAdjacentTargets('marker_conduit');
     rlog('conduit pen undo', { segmentId, nodeId, pen: penNodeId });
+    return true;
+  }
+
+  // HEATING · PIPE B/Y, as undoConduitPenStep: remove the pipe the newest step made, then
+  // its new junction if nothing else uses it; a T step re-joins the split pipe (removing a
+  // two-pipe junction rejoins its neighbours). A service change from a confirmed merge stays.
+  function undoPipePenStep() {
+    const step = pipePenHistory.pop();
+    if (!step) return false;
+    const pipeId = step.pipeId && project.pipes.some((p) => p.id === step.pipeId) ? step.pipeId : null;
+    if (pipeId) project.removePipe(pipeId);
+    const nodeLive = step.nodeId && project.pipeNodes.some((n) => n.id === step.nodeId);
+    const incident = nodeLive ? project.pipes.filter((p) => p.a === step.nodeId || p.b === step.nodeId) : [];
+    let nodeId = null;
+    if (nodeLive && !incident.length) nodeId = step.nodeId;
+    else if (nodeLive && step.split && incident.length === 2 && incident.every((p) =>
+      [p.a, p.b].includes(step.split.a) || [p.a, p.b].includes(step.split.b))) nodeId = step.nodeId; // the two halves
+    if (nodeId) project.removePipeNode(nodeId);
+    pipePenNodeId = step.prevPen && project.pipeNodes.some((n) => n.id === step.prevPen) ? step.prevPen : null;
+    pipePickAfterKey = null;
+    pendingPipeMerge = null;
+    buildPipes();
+    rlog('pipe pen undo', { pipeId, nodeId, pen: pipePenNodeId });
     return true;
   }
 
@@ -9297,20 +9516,23 @@ export function setupMR(view, project, getFootprint) {
       buildRoutedWires();
       return true;
     }
-    if (mode.id === 'marker_pipe') {
-      if (selectedPipe) {
+    if (mode.id === 'marker_pipe') return undoPipePenStep();
+    if (mode.id === 'pipe_edit') {
+      if (selectedPipe) { // one pipe, leaving its end junctions
+        rlog('pipe delete', { id: selectedPipe.id });
         project.removePipe(selectedPipe.id);
         selectedPipe = null;
         buildPipes();
         return true;
       }
-      const node = project.pipeNodes.find((n) => n.id === pipePenNodeId);
-      if (node && !node.markerId) {
-        project.removePipeNode(node.id);
-        pipePenNodeId = null;
+      if (selectedPipeNodeId) { // a pass-through junction rejoins its neighbours
+        rlog('pipe node delete', { id: selectedPipeNodeId });
+        project.removePipeNode(selectedPipeNodeId);
+        selectPipeNode(null);
         buildPipes();
         return true;
       }
+      return false;
     }
     return false;
   }
@@ -9454,16 +9676,19 @@ export function setupMR(view, project, getFootprint) {
         setModeInfo();
         return;
       }
-      if (selectedPipe) { selectedPipe = null; return; }
-      if (hoverMarker) {
-        pipePickAfterKey = `marker:${hoverMarker.id}`;
-        return;
-      }
-      if (hoverPipeNode) {
-        pipePickAfterKey = `node:${hoverPipeNode.id}`;
-        return;
-      }
+      // Over a target, grip steps the fixture/junction/pipe stack; on empty space it lifts the pen.
+      if (hoverMarker) { pipePickAfterKey = `marker:${hoverMarker.id}`; return; }
+      if (hoverPipeNode) { pipePickAfterKey = `node:${hoverPipeNode.id}`; return; }
+      if (hoverPipeSplit) { pipePickAfterKey = `segment:${hoverPipeSplit.segmentId}`; return; }
       if (pipePenNodeId) { pipePenNodeId = null; pipePickAfterKey = null; return; }
+      return;
+    }
+    if (mode.id === 'pipe_edit') {
+      if (selectedPipeNodeId || selectedPipe) return;
+      if (hoverPipeNode) pipeEditPickAfterKey = `node:${hoverPipeNode.id}`;
+      else if (hoverPipe) pipeEditPickAfterKey = `segment:${hoverPipe.id}`;
+      if (pipeEditPickAfterKey) rlog('pipe edit target cycle', { after: pipeEditPickAfterKey });
+      return;
     }
     if (mode.id === 'edge') {
       if (selectedEdge) { // cancel a pending locked edge (no rect removal)
@@ -9922,7 +10147,7 @@ export function setupMR(view, project, getFootprint) {
       }
       else if (modeId === 'circuit_check') cycleCheckFilter(stickY < 0 ? 1 : -1); // filter one issue
       else if (MAT_MODES.has(modeId)) cycleMaterial(modeId, stickY < 0 ? 1 : -1);
-      else if (modeId === 'marker_pipe') cyclePipeService(stickY < 0 ? 1 : -1);
+      else if (modeId === 'marker_pipe' || modeId === 'pipe_edit') cyclePipeService(stickY < 0 ? 1 : -1);
       else if (modeId === 'vmc_inlet') cycleAirScenario(stickY < 0 ? -1 : 1);
       else if (modeId === 'drop') cycleZoneKind(stickY < 0 ? 1 : -1); // pick zone type
       else if (isDimMode(modeId) && conflictNav) { // a shown conflict: suspects ⇄ routes (down = next)
@@ -10159,8 +10384,11 @@ export function setupMR(view, project, getFootprint) {
     const pipeStatus = modes[currentMode].id === 'marker_pipe'
       ? pendingPipeMerge
         ? `${t(`pipe.service.${project.pipeServiceAtNode(pendingPipeMerge.targetNodeId)}`)} → ${t(`pipe.service.${pendingPipeMerge.service}`)} · ${t('pipe.confirmMerge')}`
-        : `${t(`pipe.service.${selectedPipe?.service || currentPipeService}`)} · ${pipePenNodeId ? t('conduit.run') : t('pipe.pickStart')}`
-          + (selectedPipe && !pipePenNodeId ? ` · ${pipeLengthText(selectedPipe)}` : '')
+        : `${t(`pipe.service.${currentPipeService}`)} · ${pipePenNodeId ? t('pipe.run') : t('pipe.pickStart')}`
+      : modes[currentMode].id === 'pipe_edit'
+      ? selectedPipe
+        ? `${t(`pipe.service.${selectedPipe.service}`)} · ${pipeLengthText(selectedPipe)}\n${t('pipe.editSeg')}`
+        : selectedPipeNodeId ? t('conduit.editNode') : t('pipe.pickTarget')
       : null;
     // HEATING · R: the zone under the reticle (or being typed): its R and its source.
     const heatRStatus = modes[currentMode].id === 'heat_r'
@@ -10489,7 +10717,7 @@ export function setupMR(view, project, getFootprint) {
               if (dimStackPick && !stack.some((s) => s.id === dimStackPick)) dimStackPick = null;
               const picked = stack.find((s) => s.id === dimStackPick) || stack[0];
               if (picked) {
-                hoverRef = modeId === 'conduit_dims'
+                hoverRef = modeId === 'conduit_dims' || modeId === 'pipe_dims'
                   ? { kind: 'node', nodeId: picked.id }
                   : { kind: 'marker', markerId: picked.id };
               }
@@ -10503,7 +10731,7 @@ export function setupMR(view, project, getFootprint) {
       // CONDUIT DIMS: highlight referenced nodes as well as edges. In particular, a
       // hovered value panel previews BOTH endpoints in cyan; previously its edge lit
       // up but its node was omitted from the node-state loop.
-      if (modeId === 'conduit_dims') {
+      if (modeId === 'conduit_dims' || modeId === 'pipe_dims') {
         const selectedNodeIds = new Set([dimRefA, dimRefB]
           .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
         const hoverNodeIds = new Set([hoverRef]
@@ -10511,12 +10739,15 @@ export function setupMR(view, project, getFootprint) {
         const panelNodeIds = new Set((hoverDim
           ? [hoverDim.userData.refA, hoverDim.userData.refB] : [])
           .filter((r) => r?.kind === 'node').map((r) => r.nodeId));
-        restyleConduitNodes((id) => [
+        const nodeStyle = (id) => [
           panelNodeIds.has(id) ? 0x22d3ee
             : selectedNodeIds.has(id) ? 0xfbbf24
             : hoverNodeIds.has(id) ? 0xffe14d : CONDUIT_NODE_COLOR,
           panelNodeIds.has(id) || selectedNodeIds.has(id) || hoverNodeIds.has(id) ? 1.5 : 1,
-        ]);
+        ];
+        if (modeId === 'pipe_dims') {
+          for (const id of pipeBatch?.nodeIndex.keys() ?? []) stylePipeNode(id, ...nodeStyle(id));
+        } else restyleConduitNodes(nodeStyle);
       }
       // Highlights: ref A (amber), then ref B if set (amber) else the hover (yellow).
       // When hovering a dim panel, preview BOTH its references (cyan) so you see how it's defined.
@@ -10812,10 +11043,12 @@ export function setupMR(view, project, getFootprint) {
       for (const [id, issue] of checkDiag?.wireIssue || []) if (checkShows(issue)) emphasis.push([id, CHECK_COLORS[issue]]);
       styleRoutedWires(emphasis);
     } else if (modeId === 'marker_pipe') {
+      // PIPE authoring, as MARKER · CONDUIT: fixtures, junctions and pipes (to split) share
+      // one pick stack; grip steps it, trigger commits. The pen node is amber, the target
+      // yellow; a merge into another service's network previews it red.
       hoverKey = null;
       numpadCursor.visible = false;
-      hoverMarker = null; hoverAdjacent = null; hoverPipe = null; hoverPipeNode = null;
-      if (selectedPipe && !project.pipes.includes(selectedPipe)) selectedPipe = null;
+      hoverMarker = null; hoverAdjacent = null; hoverPipe = null; hoverPipeNode = null; hoverPipeSplit = null;
       if (pipePenNodeId && !project.pipeNodes.some((n) => n.id === pipePenNodeId)) pipePenNodeId = null;
       const hit = rayFloorHit(editCtl);
       if (hit) {
@@ -10825,20 +11058,19 @@ export function setupMR(view, project, getFootprint) {
         const target = pipeTargetAtFloorPoint(px, py, pipePickAfterKey);
         if (target?.kind === 'marker') hoverMarker = target.item;
         else if (target?.kind === 'node') hoverPipeNode = target.item;
+        else if (target?.kind === 'segment') hoverPipeSplit = target.item;
         else pipePickAfterKey = null;
-        if (!target && !pipePenNodeId && !selectedPipe) hoverPipe = pipeAtFloorPoint(px, py);
       } else reticle.visible = false;
       highlightAdjacentTargets();
       const warningComponent = pendingPipeMerge
         ? project.pipeComponent(pendingPipeMerge.targetNodeId) : null;
-      const hotNodeId = hoverPipeNode?.id || pipePenNodeId;
       for (const id of pipeBatch?.nodeIndex.keys() ?? []) {
         const warning = warningComponent?.nodeIds.has(id);
-        stylePipeNode(id, warning ? 0xff1744 : id === hotNodeId ? 0xffe14d : 0xffffff, warning || id === hotNodeId ? 1.5 : 1);
+        const hot = id === pipePenNodeId || id === hoverPipeNode?.id;
+        stylePipeNode(id, warning ? 0xff1744 : id === pipePenNodeId ? 0xfbbf24 : hot ? 0xffe14d : 0xffffff, warning || hot ? 1.5 : 1);
       }
       const emphasis = (warningComponent?.pipes || []).map((pipe) => [pipe.id, 0xff1744]);
-      const activePipeId = selectedPipe?.id || hoverPipe?.id;
-      if (activePipeId && !emphasis.some(([id]) => id === activePipeId)) emphasis.push([activePipeId, 0xffe14d]);
+      if (hoverPipeSplit && !emphasis.some(([id]) => id === hoverPipeSplit.segmentId)) emphasis.push([hoverPipeSplit.segmentId, 0xffe14d]);
       emphasisePipes(emphasis);
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
@@ -10846,14 +11078,6 @@ export function setupMR(view, project, getFootprint) {
       const penMarker = penNode?.markerId ? project.findMarker(penNode.markerId)?.marker : null;
       outlineMarker(penMarker, 'floor', pipeColor({ service: currentPipeService }));
       outlineMarker(penMarker, 'wall', pipeColor({ service: currentPipeService }));
-      if (selectedPipe) {
-        for (const markerId of [selectedPipe.a, selectedPipe.b]
-          .map((id) => project.pipeNodes.find((n) => n.id === id)?.markerId).filter(Boolean)) {
-          const marker = project.findMarker(markerId)?.marker;
-          outlineMarker(marker, 'floor', 0xffe14d);
-          outlineMarker(marker, 'wall', 0xffe14d);
-        }
-      }
       if (!pipePreviewLine) {
         pipePreviewLine = makeRouteLine([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], pipeColor({ service: currentPipeService }));
         pipePreviewLine.frustumCulled = false;
@@ -10864,13 +11088,78 @@ export function setupMR(view, project, getFootprint) {
       if (penNode && tipW) {
         const from = planLocalZ(pipeNodePos(penNode));
         const { px, py } = worldToPlan(tipW);
-        const to = { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
+        const to = hoverPipeSplit // the T-junction point on a hovered pipe
+          ? planLocalZ({ x: hoverPipeSplit.x, y: hoverPipeSplit.y, z: hoverPipeSplit.worldZ })
+          : { x: px, y: py, z: Math.max(0, tipW.y - overlayY()) };
         pipePreviewLine.material.color.setHex(pipeColor({ service: currentPipeService }));
         pipePreviewLine.visible = true;
         pipePreviewLine.geometry.setFromPoints([from, to].map((p) => new THREE.Vector3(p.x, p.z, -p.y)));
         pipePreviewLine.computeLineDistances();
       } else {
         pipePreviewLine.visible = false;
+      }
+    } else if (modeId === 'pipe_edit') {
+      // PIPE EDIT, as CONDUIT EDIT: grip cycles the junction/pipe stack while nothing is
+      // selected; trigger selects. A selected free junction can be grip-dragged and its
+      // height typed; B/Y deletes the selection.
+      hoverKey = null;
+      numpadCursor.visible = false;
+      const source = editCtl;
+      if (selectedPipeNodeId && !project.pipeNodes.some((n) => n.id === selectedPipeNodeId)) selectPipeNode(null);
+      if (selectedPipe && !project.pipes.includes(selectedPipe)) selectedPipe = null;
+      if (selectedPipeNodeObj() && numpad.group.visible) {
+        const panelHit = rayPanelHit(source);
+        if (panelHit) {
+          hoverKey = numpad.keyAt(panelHit.uv.x, panelHit.uv.y);
+          numpadCursor.position.copy(panelHit.point);
+          numpadCursor.visible = true;
+        }
+      }
+      if (gripDrag?.kind === 'pipeNode') applyPipeNodeGripDrag(source);
+      hoverPipeNode = null; hoverPipe = null; gripPick = null;
+      if (hoverKey) {
+        reticle.visible = false; // the pad owns the ray this frame
+      } else {
+        const hit = rayFloorHit(source);
+        if (hit) {
+          reticle.visible = true;
+          reticle.position.set(hit.x, hit.y + 0.002, hit.z);
+          const { px, py } = worldToPlan(hit);
+          if (!selectedPipeNodeId && !selectedPipe) {
+            const target = pipeEditTargetAtFloorPoint(px, py, pipeEditHoverKey, pipeEditPickAfterKey);
+            pipeEditPickAfterKey = null; // consume the explicit grip-cycle request
+            pipeEditHoverKey = target?.key || null;
+            if (target) gripPick = { mode: 'pipe_edit', index: target.index, size: target.size,
+              label: target.kind === 'segment' ? t('pipe.label') : pickTypeLabel(target.kind) };
+            if (target?.kind === 'node') hoverPipeNode = project.pipeNodes.find((n) => n.id === target.id) || null;
+            else if (target?.kind === 'segment') hoverPipe = project.pipes.find((p) => p.id === target.id) || null;
+            else pipeEditHoverKey = null;
+          } else if (selectedPipeNodeId) {
+            const node = pipeNodeAtFloorPoint(px, py);
+            if (node?.id === selectedPipeNodeId) hoverPipeNode = node;
+          }
+        } else {
+          reticle.visible = false;
+          if (!selectedPipeNodeId && !selectedPipe) pipeEditHoverKey = null;
+        }
+      }
+      if (selectedPipeNodeObj() && hoverKey !== prevHoverKey) { redrawNodePad(); prevHoverKey = hoverKey; }
+      // Selected amber, the candidate yellow; a selected pipe's end fixtures outline amber.
+      for (const id of pipeBatch?.nodeIndex.keys() ?? []) {
+        const on = id === selectedPipeNodeId || id === hoverPipeNode?.id;
+        stylePipeNode(id, id === selectedPipeNodeId ? 0xfbbf24 : on ? 0xffe14d : 0xffffff, on ? 1.5 : 1);
+      }
+      const emphasis = [];
+      if (selectedPipe) emphasis.push([selectedPipe.id, 0xfbbf24]);
+      else if (hoverPipe) emphasis.push([hoverPipe.id, 0xffe14d]);
+      emphasisePipes(emphasis);
+      for (const pipe of [selectedPipe].filter(Boolean)) {
+        for (const id of [pipe.a, pipe.b]) {
+          const markerId = project.pipeNodes.find((n) => n.id === id)?.markerId;
+          const marker = markerId ? project.findMarker(markerId)?.marker : null;
+          outlineMarker(marker, 'floor', 0xfbbf24);
+          outlineMarker(marker, 'wall', 0xfbbf24);
+        }
       }
     } else if (modeId === 'marker_conduit') {
       // CONDUIT authoring: aim the floor reticle. Nodes and markers share one nearest-

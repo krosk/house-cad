@@ -155,8 +155,8 @@ export function makeMarkerOriginDistance(marker, axis) {
   };
 }
 
-// ---- conduit-node pins (bare junctions dimensioned to a wall) ----
-// A node endpoint is { node: <conduitNodeId> } (no edge). A node distance pins a
+// ---- conduit/pipe-node pins (bare junctions dimensioned to a wall) ----
+// A node endpoint is { node: <conduitNodeId | pipeNodeId> } (no edge). A node distance pins a
 // bare conduit junction's X or Y to a rect edge (or the origin) — same signed shape
 // as a marker pin, so the numpad/flip logic transfers. Resolved ONE-WAY in
 // solveConduitNodes (the node follows; it never moves the wall), excluded from the
@@ -507,7 +507,9 @@ export function solveMarkers(floor) {
  * z is never touched — it is inherent, edited on the CONDUIT·EDIT height pad.
  */
 export function solveConduitNodes(project) {
-  const nodes = project.conduitNodes || [];
+  // Bare pipe junctions pin the same way (HEATING · PIPE DIMS); their ids (`pn…`) never
+  // collide with conduit node ids (`cn…`), so one `{node}` endpoint serves both networks.
+  const nodes = [...(project.conduitNodes || []), ...(project.pipeNodes || [])];
   if (!nodes.length) return;
   const byId = new Map(nodes.map((n) => [n.id, n]));
   for (const n of nodes) n._locked = { x: false, y: false };

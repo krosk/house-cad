@@ -1085,12 +1085,51 @@ export class Project {
     return { ok: true, pipe };
   }
 
+  // Remove a node and its pipes. Like removeConduitNode, a pass-through node (exactly two
+  // pipes) keeps the run: its neighbours are rejoined by one pipe with the first pipe's
+  // service and diameter. A branch node (3+ pipes) loses them all.
   removePipeNode(id) {
     if (!this.pipeNodes.some((n) => n.id === id)) return false;
+    const incident = this.pipes.filter((p) => p.a === id || p.b === id);
     this.pipeNodes = this.pipeNodes.filter((n) => n.id !== id);
     this.pipes = this.pipes.filter((p) => p.a !== id && p.b !== id);
+    if (incident.length === 2) {
+      const [a, b] = incident.map((p) => (p.a === id ? p.b : p.a));
+      this.addPipe(a, b, incident[0].service, incident[0].diameter, { emit: false }); // no-op when a === b
+    }
     this._emit();
     return true;
+  }
+
+  // Move a bare pipe junction (marker-bound nodes follow their device). See moveConduitNode.
+  movePipeNode(id, { x, y, z }, { emit = true } = {}) {
+    const n = this.pipeNodes.find((node) => node.id === id);
+    if (!n || n.markerId) return;
+    n.x = x; n.y = y; n.z = z || 0;
+    if (emit) this._emit();
+  }
+
+  // A bare pipe junction's height against a datum (see setMarkerVertical).
+  setPipeNodeVertical(id, datum, value) {
+    const n = this.pipeNodes.find((node) => node.id === id);
+    if (!n || n.markerId) return;
+    setVertical(n, datum, value);
+    this._emit();
+  }
+
+  // Split a pipe with a new junction at p (a T to branch from), keeping its service and
+  // diameter on both halves. The junction defaults to end a's floor (see splitConduitSegment).
+  splitPipe(id, { x, y, z = 0, floorId } = {}) {
+    const pipe = this.pipes.find((p) => p.id === id);
+    if (!pipe) return null;
+    const aNode = this.pipeNodes.find((n) => n.id === pipe.a);
+    const node = { id: nextPipeNodeId(), x, y, z: z || 0, floorId: floorId ?? this.pipeNodeFloorId(aNode), markerId: null, role: null };
+    this.pipeNodes.push(node);
+    this.pipes = this.pipes.filter((p) => p.id !== id);
+    this.pipes.push({ id: nextPipeId(), service: pipe.service, diameter: pipe.diameter, a: pipe.a, b: node.id });
+    this.pipes.push({ id: nextPipeId(), service: pipe.service, diameter: pipe.diameter, a: node.id, b: pipe.b });
+    this._emit();
+    return node;
   }
 
   // Return the complete plumbing component reachable from one node. Service behaves

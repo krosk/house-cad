@@ -15,7 +15,7 @@ chooses one of seven services:
 - heating return
 - refrigerant (owner, 2026-10-07): an air-conditioning line from the outdoor unit to one
   indoor unit, drawn as one run standing for the liquid + gas pipes and the connection
-  cable. Each line is its own network (its own nodes), so selecting any segment reads that
+  cable. Each line is its own network (its own nodes), so selecting any segment (PIPE EDIT) reads that
   line's length: the readout adds the 3D length of the selected pipe's whole network,
   risers included (`pipeComponentLength`). Buy that plus slack per line.
 - VMC (owner, 2026-10-07; `vmc`, light grey): a ventilation extract duct. Its `diameter` is
@@ -33,14 +33,28 @@ service (`cold`, `hot`, `supply`, or `return`), so one radiator or boiler marker
 both supply and return nodes and both follow the marker when moved.
 
 Available plumbing fixture markers are radiator, boiler, sink, and washing machine.
-Trigger a fixture, existing node, or empty space to start the pen. Empty space creates a
-free junction; each later trigger creates a segment and advances the pen, enabling bends,
-branches, and loops. Grip cycles overlapping markers/nodes, or lifts the pen over empty
-space. Trigger an existing pipe with no active pen to select it; thumbstick changes its
-service and B/Y deletes it. B/Y on the current free pen node removes that junction and its
-incident segments. In ALL FLOORS, aiming down favours your own storey and aiming up
-the one above, and grip reaches farther storeys (the `docs/ar-survey.md` reticle rule). Join them
-to create risers.
+
+**The pipe tools work like the conduit tools** (owner, 2026-10-12: "Make the same interaction as conduits"):
+
+- **HEATING · PIPE** (draw, as MARKER · CONDUIT). Trigger a fixture, an existing junction or empty space to
+  start the pen. Empty space drops a free junction; each later trigger adds a segment and advances the pen,
+  for bends, branches and loops. **Triggering an existing pipe splits it** into a T at the pipe's height,
+  with the same service and diameter on both halves (`splitPipe`), and the pen joins it. Grip cycles
+  overlapping fixtures/junctions/pipes, or lifts the pen over empty space. **B/Y undoes the last pen step**
+  (`undoPipePenStep`; a T step re-joins the split pipe). A service change made by a confirmed merge is
+  not undone. PIPE no longer selects pipes: that is PIPE EDIT's job.
+- **HEATING · PIPE DIMS** (as CONDUIT · DIMS): pin a bare junction to a wall edge, one way. The pin is a
+  `{node}` constraint endpoint like a conduit junction's (pipe ids `pn…` never collide with conduit ids `cn…`),
+  solved by `solveConduitNodes`, kept by save/load and floor copy/paste.
+- **HEATING · PIPE EDIT** (as CONDUIT · EDIT): grip cycles overlapping junctions and pipes, trigger selects.
+  A selected free junction opens the height pad (SWAP free/floor, DEL frees Z) and can be grip-dragged
+  (near = carried in 3D, far = the floor reticle moves X/Y; a defined height holds). A selected pipe reads its
+  whole network's length (`pipeLengthText`); thumbstick retypes its network. B/Y deletes the selection; a
+  junction between exactly two pipes re-joins them (`removePipeNode`), a branch junction loses them all.
+
+In ALL FLOORS, aiming down favours your own storey and aiming up the one above, and grip reaches farther
+storeys (the `docs/ar-survey.md` reticle rule); PIPE and PIPE EDIT work there, PIPE DIMS does not. Join
+storeys to create risers.
 
 Colors are blue (cold), red (hot), orange (heating supply), purple (heating return), green (refrigerant), light grey (VMC), and brown (waste).
 
