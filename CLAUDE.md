@@ -73,8 +73,8 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 accepted; do not silently change exports when editing the viewer.
 
 Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is locked top-down: a
-drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and on a portrait
-screen a house wider than deep is turned 90° so it fills the screen; tapping a room animates the camera
+drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
+the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a
 floor walks there (door leaves, drawn swung open in View 3D, don't block, so a tap through a doorway enters the next room), and the
 Overview button returns to the saved overview. The overview also has a **📏 Ruler** (owner, 2026-10-08;

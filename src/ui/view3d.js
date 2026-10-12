@@ -1233,11 +1233,10 @@ export class View3D {
     if (!box) return;
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    // On a portrait screen a house wider than it is deep is turned 90° so its long
-    // side runs down the long side of the screen (view-only; the plan is unchanged).
+    // Always the plan's orientation (owner, 2026-10-12: "Keep the plan"; a portrait screen
+    // used to turn a wide house 90°). Plan X across the screen, plan Y up it.
     this.overviewPortrait = this.camera.aspect < 1;
-    const turned = this.overviewPortrait && size.x > size.z;
-    const [across, down] = turned ? [size.z, size.x] : [size.x, size.z];
+    const [across, down] = [size.x, size.z];
     this.camera.fov = OVERVIEW_FOV;
     this.camera.updateProjectionMatrix();
     const vFov = THREE.MathUtils.degToRad(this.camera.fov);
@@ -1250,8 +1249,7 @@ export class View3D {
     this.overviewPlaneY = box.max.y;
     this.navigationMode = 'overview';
     this.cameraTransition = null;
-    if (turned) this.camera.up.set(-1, 0, 0);
-    else this.camera.up.set(0, 0, -1);
+    this.camera.up.set(0, 0, -1);
     this.camera.position.set(center.x, box.max.y + distance, center.z);
     this.camera.lookAt(center.x, center.y, center.z);
     this.camera.updateMatrixWorld();
@@ -1273,7 +1271,7 @@ export class View3D {
       this.composer.setPixelRatio(this.renderer.getPixelRatio());
       this.composer.setSize(w, h);
     }
-    // Phone rotated while in the overview: re-frame so the turn rule re-applies.
+    // Phone rotated while in the overview: re-frame so the house fits the new shape.
     if (!this.renderer.xr.isPresenting && this.desktopActive && this.navigationMode === 'overview'
         && this.overviewPortrait != null && this.overviewPortrait !== (this.camera.aspect < 1)) {
       this.frameModel();
