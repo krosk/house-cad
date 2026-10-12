@@ -1144,6 +1144,9 @@ teleport reticle; no last-active routing remains.
   - conduit: one vertex-coloured run mesh plus InstancedMesh spheres/dots, styled via
     `styleConduitNode`/`styleConduitSegment`;
   - routed wires: a static base mesh plus an emphasis overlay (`styleRoutedWires`).
+  - pipes (2026-10-12): one RGBA vertex-coloured run mesh, an emphasis overlay (`emphasisePipes`) and
+    InstancedMesh nodes (`stylePipeNode`). Per object they were 482 draw calls on the owner's house in ALL
+    FLOORS (227 pipes + 255 nodes, × 2 eyes) and the owner saw the frame rate tank there.
 
   Labels and markers keep **invisible proxy `Object3D`s** carrying position + userData for picking,
   grab and drag. They are not Sprites, so code must not assume `.material`. After moving proxies,
@@ -1153,7 +1156,7 @@ teleport reticle; no last-active routing remains.
   refreshes at ~2 Hz.
 - **Still per-object:**
   - adjacent-floor targets in conduit/wire/pipe modes: a 12x12 sphere each, 119 on the owner's house;
-  - pipes, furniture, and switch→light links.
+  - furniture and switch→light links.
 
   Hypothesis: these are the next costs if a mode drops frames. Measure first with PERF.
 - **PLAN EDGE picking is deliberate**: every edge inside the reticle is ordered by fixed plan

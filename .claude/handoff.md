@@ -20,13 +20,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-12 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `54d4d22` (VMC whole-house 3D air map; before it `1844a8c` window air
-inlets, AR AIR INLET tool, airflow network: item 74, parked and untried), pushed, served (`version.json` 54d4d22) and in
-the headset precache (`update-app` 10-11, "installed 54d4d22 1011-0907Z"). Proven (`quest-storage read` after each write, byte-identical): the
+**Status:** Proven (git): the code head is `b7be815` (VMC network: room sleepers, envelope leakage, bedroom CO₂;
+before it `54d4d22` whole-house 3D air map and `1844a8c` window air inlets + AR AIR INLET: item 74, unparked
+2026-10-12, untried on the Quest), pushed, served (`version.json` b7be815) and in the headset precache
+(`update-app` 10-12, "installed b7be815 1012-0000Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
 60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
 ceiling), item 68 (boxing r220 a half wall), item 71 (Lucia tiles on boxing r220) and item 73 (heating network,
-façade vent, valve, basement radiators, column r122 widened; 266 704 chars), all 2026-10-10. Scratchpad backups are session-local; no save slot
+façade vent, valve, basement radiators, column r122 widened; 266 704 chars), all 2026-10-10, and item 69 (ground
+WC under the east window, shower 100 × 80, radiator north; 277 283 chars, 2026-10-12). Scratchpad backups are session-local; no save slot
 holds a pre-edit copy, so undo = reverse the edit in AR. Nothing from sessions 38–40 has been reported
 from the device (items 31–57 unwalked), except the version.json fix (item 46, Proven on the headset by CDP).
 Proven (owner, 2026-10-03, after `856592c`): their link's 3D view opens on their phone.
@@ -574,7 +576,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -731,7 +733,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     new c1444–c1449 pin r220 (west and north walls, 0.37 × 0.25, r210 against its east face) and the vent r223 on
     its face (both were undimensioned). Proven in Node: no conflicts, nothing else moves, same Upper volume with
     the old or the new 3D code.
-69. **Ground shower room, WC under the east window: proposed, not in the plan** (owner, 2026-10-10: "the toilet be
+69. **Ground shower room, WC under the east window: written 2026-10-12** (owner, 2026-10-10: "the toilet be
     under the window, and the back frame against the window"; then "The shower becomes a 80 by 100", "Rotate it,
     put radiator north"). Replaces item 64's WC on the north wall. Geometry (scratch `wc-window.mjs`, drawing sent;
     `wcwin-link.mjs` builds a 3D share link on the 10-10 plan, no conflicts):
@@ -745,9 +747,17 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       owner has not chosen the end; the VMC vent pn39 is 15 cm north of the tray;
     - towel radiator r202 on the north wall x 3.0–3.5; outlet m210 to the west wall above the vanity (c997 −0.22);
     - the 14 dimensions on the moved zones are dropped (c879 c1002–c1005 c1259 c1395 c1396 c1415 c1416 c1419–c1422).
-    Open: the basement's east wall under the window (r74 runs 13 cm past the ground wall's outer face in the plan)
-    and a possible slab ring beam where the drop passes ≈ 1 cm from the wall's inner face; the window handle reach;
-    the drain end; the box top at 1.15 or level with the 1.30 sill.
+    **Written 2026-10-12** (owner's yes, AR closed, backup `quest-backup-1012-0221`, fresh read unchanged, `--base`,
+    read back identical, 277 283 chars; scratch `edit69.mjs`, session-local). Owner, 10-12: **box top stays 1.15**;
+    **drain at the east end** (tray r131 facing 270: the drain is the back edge, opposite `facing`). Also written,
+    owner's yes: item 73's shower-room heating legs rerouted from the old radiator spot north in the slab (supply
+    pn212→pn213→pn221 up at x 3.05, y 0.055; return pn219→new pn297→pn222 up at x 3.45, y 0.095; new pipe p265;
+    same wall offsets as before). Not written: the Duofix product on frames r221/r222 (not approved; still boxes).
+    Proven in Node before the write: no conflicts, no dimension deleted, nothing else moved, every pipe has both ends.
+    Hypothesis: the ≈ ±0.2 m pipe-length change is negligible for the heating balance (not recomputed). Not yet
+    seen on the Quest. Open: the basement's east wall under the window (r74 runs 13 cm past the ground wall's outer
+    face in the plan) and a possible slab ring beam where the drop passes ≈ 1 cm from the wall's inner face; the
+    window handle reach.
 
 70. **Duofix product, boxing tiles, see-through half walls (2026-10-10, code, not yet published when written):**
     - `geberit-duofix-111333` (builder `geberit-duofix`, 268 triangles; `docs/furniture.md`): the frame, outlet pipe,
@@ -801,7 +811,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     stand-in. Hypothesis to check when unparked: on a −7 °C night the upper bedrooms' inlets draw ≈ 1.5 m³/h (stack
     effect; airtight house, one humidity for all rooms). A single stacked grid with pressure inlets was weighed and
     not built (≈ 5–10 pressure solves for little gain).
-    2026-10-12 (uncommitted until "c p"): room `sleepers` (owner: "Assume two people per room"; AR trigger on a
+    2026-10-12 (`b7be815`): room `sleepers` (owner: "Assume two people per room"; AR trigger on a
     room), night inlets opening with their room's sleepers, a per-scenario outdoor temperature (5 °C; `nightCold`
     at −7 °C), envelope leakage (heat setting `airtight` Q4Pa-surf, default 1.7: owner "House is being renovated",
     untested), per-space CO₂, leaks in the 3D map, the 3D map recomputing on its own (the ceiling slice dropped).
@@ -814,15 +824,17 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 
 ## Next step
 
-**Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
-none drawn in the plan:
+**Active:**
 - **Item 74, VMC airflow (unparked 2026-10-12; the owner fears too little renewal)**: try AR HEATING · AIR INLET on
   the Quest (QA items in `docs/ar-qa-checklist.md`; time the 3D map), then on the owner's yes write the five EHB²
   (r80, r108, r109, r113, r115) and two sleepers in r51, r85, r88, and draw the kitchen vent at V2 (1.10, −4.60)
   with its Ø125 rerouted from unit A. The model says two-sleeper bedrooms run ≈ 1 400–2 300 ppm whatever the
   tweak: the decisive evidence is a measured overnight CO₂ in a bedroom and a blower-door Q4 after the works.
   Open: the kitchen vent's real flows (no setting on its minimum: 15 assumed), the EHB² humidity curve, wind.
-- ~~Item 64, the ground shower room swap~~: replaced by item 69 (WC under the east window), still not drawn.
+
+**Parked by the owner (2026-10-09: "park in handoff the rest as we are still considering options")**,
+none drawn in the plan:
+- ~~Item 64, the ground shower room swap~~: replaced by item 69 (WC under the east window), written 2026-10-12.
 - ~~Unit B to the laundry on the wall~~ (needed an OUT-up entry and a turn down into the unit):
   replaced by item 67, B hung under the laundry ceiling. Still open there: the laundry vent (≥ 20 cm from
   the ceiling too), the machines' place and headroom under the box.
@@ -850,7 +862,7 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`54d4d22`, 10-11; relaunch it); item 73 first: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`b7be815`, 10-12; relaunch it); item 73 first: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
   basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall

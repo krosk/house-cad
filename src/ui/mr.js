@@ -3979,32 +3979,112 @@ export function setupMR(view, project, getFootprint) {
     return { x: node?.x || 0, y: node?.y || 0,
       z: (floor?.elevation || 0) + (node?.z || 0), floorId: floor?.id || project.activeFloorId };
   }
+  // BATCHED like the conduit layer (buildConduits): runs are one vertex-coloured mesh (RGBA, base
+  // alpha 0.62), emphasised pipes (hover / selected / merge warning) one overlay rebuilt only when
+  // the list changes, nodes one InstancedMesh. Per object, the owner's house (227 pipes, 255 nodes)
+  // was ≈ 480 draw calls in ALL FLOORS and the frame rate tanked (owner, 2026-10-12).
+  let pipeBatch = null; // { runs, runIndex, quads, overlay, overlayKey, spheres, nodeIndex, nodePos, styleKey }
+  const PIPE_BASE_ALPHA = 0.62;
   function buildPipes() {
     for (const child of [...pipeGroup.children]) {
-      pipeGroup.remove(child); child.geometry?.dispose(); child.material?.dispose();
+      pipeGroup.remove(child);
+      if (child.isInstancedMesh) child.dispose(); // instance buffers; the sphere geometry is shared
+      else child.geometry?.dispose();
+      child.material?.dispose();
     }
+    pipeBatch = null;
     pipePreviewLine = null;
+    const nodeById = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
+    const positions = [], colors = [], indices = [];
+    const runIndex = new Map(), quads = new Map();
     for (const pipe of project.pipes || []) {
-      const aNode = project.pipeNodes.find((n) => n.id === pipe.a);
-      const bNode = project.pipeNodes.find((n) => n.id === pipe.b);
+      const aNode = nodeById.get(pipe.a), bNode = nodeById.get(pipe.b);
       const aWorld = aNode && pipeNodePos(aNode), bWorld = bNode && pipeNodePos(bNode);
       const a = aWorld && planLocalZ(aWorld), b = bWorld && planLocalZ(bWorld);
       if (!a || !b || (!allFloorsView && aWorld.floorId !== project.activeFloorId && bWorld.floorId !== project.activeFloorId)) continue;
-      const ribbon = makeConduitRibbon(a, b, pipeColor(pipe), pipe.diameter || 0.016);
-      ribbon.userData.pipeId = pipe.id;
-      ribbon.userData.baseColor = pipeColor(pipe);
-      pipeGroup.add(ribbon);
+      const quad = makeConduitRibbon(a, b, 0, pipe.diameter || 0.016);
+      const pos = quad.geometry.attributes.position.array;
+      const base = positions.length / 3;
+      runIndex.set(pipe.id, base);
+      const own = [];
+      for (const i of [0, 1, 2, 0, 2, 3]) own.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+      quads.set(pipe.id, own);
+      for (const n of pos) positions.push(n);
+      _cc.setHex(pipeColor(pipe));
+      for (let k = 0; k < 4; k++) colors.push(_cc.r, _cc.g, _cc.b, PIPE_BASE_ALPHA);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      quad.geometry.dispose(); quad.material.dispose();
     }
-    for (const node of project.pipeNodes || []) {
-      const pWorld = pipeNodePos(node);
-      if (!allFloorsView && pWorld.floorId !== project.activeFloorId) continue;
-      const p = planLocalZ(pWorld);
-      const mesh = new THREE.Mesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
-        color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
-      }));
-      mesh.position.set(p.x, p.z, -p.y); mesh.renderOrder = 17;
-      mesh.userData.pipeNodeId = node.id; pipeGroup.add(mesh);
+    const pipeMaterial = () => new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+    });
+    let runs = null;
+    if (positions.length) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4)); // RGBA → vertexAlphas
+      geometry.setIndex(indices);
+      runs = new THREE.Mesh(geometry, pipeMaterial());
+      runs.renderOrder = 14;
+      runs.frustumCulled = false;
+      pipeGroup.add(runs);
     }
+    const overlay = new THREE.Mesh(new THREE.BufferGeometry(), pipeMaterial());
+    overlay.renderOrder = 17;
+    overlay.frustumCulled = false;
+    overlay.visible = false;
+    pipeGroup.add(overlay);
+    const nodes = (project.pipeNodes || []).filter((node) => allFloorsView || pipeNodePos(node).floorId === project.activeFloorId);
+    const spheres = new THREE.InstancedMesh(conduitNodeGeom, new THREE.MeshBasicMaterial({
+      color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.95,
+    }), Math.max(1, nodes.length));
+    const nodeIndex = new Map(), nodePos = [];
+    nodes.forEach((node, i) => {
+      const p = planLocalZ(pipeNodePos(node));
+      nodeIndex.set(node.id, i);
+      nodePos.push(new THREE.Vector3(p.x, p.z, -p.y));
+    });
+    spheres.count = nodes.length;
+    spheres.renderOrder = 17;
+    spheres.frustumCulled = false;
+    pipeGroup.add(spheres);
+    pipeBatch = { runs, runIndex, quads, overlay, overlayKey: '', spheres, nodeIndex, nodePos, styleKey: new Map() };
+    for (const node of nodes) stylePipeNode(node.id, 0xffffff, 1);
+  }
+  function stylePipeNode(id, color, scale = 1) {
+    const b = pipeBatch;
+    const i = b?.nodeIndex.get(id);
+    if (i == null) return;
+    const key = color * 4 + scale;
+    if (b.styleKey.get(id) === key) return;
+    b.styleKey.set(id, key);
+    _cc.setHex(color);
+    _cs.setScalar(scale);
+    b.spheres.setMatrixAt(i, _cm.compose(b.nodePos[i], _cq, _cs));
+    b.spheres.setColorAt(i, _cc);
+    b.spheres.instanceMatrix.needsUpdate = true;
+    b.spheres.instanceColor.needsUpdate = true;
+  }
+  // Emphasised pipes, [pipeId, colorHex] pairs drawn opaque over the base mesh; cheap when unchanged.
+  function emphasisePipes(emphasis) {
+    const b = pipeBatch;
+    if (!b) return;
+    const key = emphasis.map(([id, color]) => `${id}:${color}`).join(',');
+    if (key === b.overlayKey) return;
+    b.overlayKey = key;
+    const positions = [], colors = [];
+    for (const [id, color] of emphasis) {
+      const own = b.quads.get(id);
+      if (!own) continue;
+      _cc.setHex(color);
+      for (const n of own) positions.push(n);
+      for (let v = 0; v < own.length / 3; v++) colors.push(_cc.r, _cc.g, _cc.b, 1);
+    }
+    b.overlay.geometry.dispose();
+    b.overlay.geometry = new THREE.BufferGeometry();
+    b.overlay.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    b.overlay.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+    b.overlay.visible = positions.length > 0;
   }
   // Length of the network a pipe belongs to (3D, risers included): a refrigerant line's
   // length to buy before slack (docs/plumbing-workflow.md).
@@ -4035,8 +4115,9 @@ export function setupMR(view, project, getFootprint) {
   function pipeAtFloorPoint(px, py) {
     const rank = pickRanker();
     let best = null, bestD = WIRE_PICK_M, bestR = Infinity;
+    const nodeById = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
     for (const pipe of project.pipes || []) {
-      const an = project.pipeNodes.find((n) => n.id === pipe.a), bn = project.pipeNodes.find((n) => n.id === pipe.b);
+      const an = nodeById.get(pipe.a), bn = nodeById.get(pipe.b);
       const a = an && pipeNodePos(an), b = bn && pipeNodePos(bn);
       const r = a && b ? Math.min(rank(a.floorId), rank(b.floorId)) : Infinity;
       if (r === Infinity) continue;
@@ -10750,21 +10831,15 @@ export function setupMR(view, project, getFootprint) {
       highlightAdjacentTargets();
       const warningComponent = pendingPipeMerge
         ? project.pipeComponent(pendingPipeMerge.targetNodeId) : null;
-      for (const ribbon of pipeGroup.children) {
-        if (ribbon === pipePreviewLine) continue;
-        if (ribbon.userData.pipeNodeId) {
-          const hot = ribbon.userData.pipeNodeId === (hoverPipeNode?.id || pipePenNodeId);
-          const warning = warningComponent?.nodeIds.has(ribbon.userData.pipeNodeId);
-          ribbon.material.color.setHex(warning ? 0xff1744 : hot ? 0xffe14d : 0xffffff);
-          ribbon.scale.setScalar(warning || hot ? 1.5 : 1);
-          continue;
-        }
-        const warning = warningComponent?.pipes.some((pipe) => pipe.id === ribbon.userData.pipeId);
-        const active = ribbon.userData.pipeId === (selectedPipe?.id || hoverPipe?.id);
-        ribbon.material.color.setHex(warning ? 0xff1744 : active ? 0xffe14d : ribbon.userData.baseColor);
-        ribbon.material.opacity = warning || active ? 1 : 0.62;
-        ribbon.renderOrder = warning || active ? 17 : 14;
+      const hotNodeId = hoverPipeNode?.id || pipePenNodeId;
+      for (const id of pipeBatch?.nodeIndex.keys() ?? []) {
+        const warning = warningComponent?.nodeIds.has(id);
+        stylePipeNode(id, warning ? 0xff1744 : id === hotNodeId ? 0xffe14d : 0xffffff, warning || id === hotNodeId ? 1.5 : 1);
       }
+      const emphasis = (warningComponent?.pipes || []).map((pipe) => [pipe.id, 0xff1744]);
+      const activePipeId = selectedPipe?.id || hoverPipe?.id;
+      if (activePipeId && !emphasis.some(([id]) => id === activePipeId)) emphasis.push([activePipeId, 0xffe14d]);
+      emphasisePipes(emphasis);
       outlineMarker(hoverMarker, 'floor', 0xffe14d);
       outlineMarker(hoverMarker, 'wall', 0xffe14d);
       const penNode = project.pipeNodes.find((n) => n.id === pipePenNodeId);
