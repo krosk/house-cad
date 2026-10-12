@@ -20,11 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-12 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `ac1c277` (View 3D overview keeps the plan's orientation on a portrait
-screen; before it `e6ef977` the pipe tools like the conduit tools and `42220b3` the batched pipe layer: item 75, all
-untried on the Quest; and `b7be815` / `54d4d22` / `1844a8c`, item 74's VMC airflow, untried too), pushed, served
-(`version.json` ac1c277 1012-1850Z; `e6ef977`'s own Pages deploy failed with a GitHub 500, `ac1c277` carries it)
-and in the headset precache (`update-app` 10-12, "installed ac1c277 1012-1850Z"). Proven (`quest-storage read` after each write, byte-identical): the
+**Status:** Proven (git): the code head is `eed5dc1` (FENCE zone + fence materials) after `23ac94a` (garden split
+level, RAMP, PLATFORM, GATE, GARDEN WALL): item 76, untried on the Quest, and its garden edit NOT yet written to
+the headset plan. Before them `ac1c277` / `e6ef977` / `42220b3` (item 75) and `b7be815` / `54d4d22` / `1844a8c`
+(item 74), all untried on the Quest. Pushed, served (`version.json` eed5dc1 1012-2007Z) and in the headset
+precache (`update-app` 10-12, "installed eed5dc1 1012-2007Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
 60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
 ceiling), item 68 (boxing r220 a half wall), item 71 (Lucia tiles on boxing r220) and item 73 (heating network,
@@ -581,7 +581,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -838,13 +838,13 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       `docs/plumbing-workflow.md`, `docs/ar-survey.md` HEATING · PIPE / PIPE DIMS / PIPE EDIT.
     - `ac1c277`: the owner's share link opened on a portrait phone turned 90° from the plan; owner: "Keep the
       plan". The overview no longer turns a wide house on a portrait screen (`frameModel`, CLAUDE.md updated).
-76. **Garden split level, RAMP, PLATFORM, GATE, GARDEN WALL, FENCE (2026-10-12; `23ac94a` published + installed, the FENCE zone uncommitted; NOT yet on the headset plan):**
+76. **Garden split level, RAMP, PLATFORM, GATE, GARDEN WALL, FENCE (2026-10-12; `23ac94a` + `eed5dc1` published and installed; the garden edit NOT yet on the headset plan):**
     - Owner: the garden is a floor between the basement and the ground; it has three levels: the main garden at
       the earth level (HEAT LOSS `earth` −0.90 m), the garage side at the basement floor (the driveway is a slope),
       the front entrance at the ground floor (stairs from the garden to a platform). Gates and the low walls are
       outdoor fixtures, "different from the half wall indoors"; a fence sits on the garden walls.
     - Code: a floor's optional `level` makes it a split level outside the stacking (`isSplitLevel`, `floorBelow`/
-      `floorAbove`/`floorRises`, `model.js`); RAMP, PLATFORM, GATE, GARDEN WALL (`top` + optional `fence`) zone
+      `floorAbove`/`floorRises`, `model.js`); RAMP, PLATFORM, GATE, GARDEN WALL (`top`), FENCE zone
       kinds. Mechanics: `docs/ar-survey.md` "Multi-floor"; decision: `docs/product-intent.md`.
     - Fence: `23ac94a` put a `fence` height on the garden wall; the owner then wanted "separate pieces, so that
       I can apply a fence material and have it have a separate thickness": a FENCE zone (band [foot, top], foot
@@ -864,9 +864,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 ## Next step
 
 **Active:**
-- **Item 76, the garden:** after the publish + `update-app` (an older app would stack the Garden and lift Ground and
-  Upper), on the owner's yes with AR closed: a fresh read equal to the base, re-run the garden edit on it (rebuild it
-  from item 76 if the scratch script is gone), `write --base`, read back. Then the four garden QA items.
+- **Item 76, the garden (next):** the app is published and installed (`eed5dc1`). The write still waits for the
+  owner's yes with AR closed: a fresh read equal to the base (the 10-12 read, 277 283 chars), re-run the garden edit
+  on it (rebuild it from item 76 if the scratch script is gone), full backup, `write --base`, read back. Then the
+  five garden QA items (`docs/ar-qa-checklist.md`, 2026-10-12). Never write it with an app older than `23ac94a`:
+  it would stack the Garden and lift Ground and Upper.
 - **Item 75 on the devices:** in AR, HEATING · PIPE in ALL FLOORS holds its frame rate (PERF `condt` a few
   calls), then the three new pipe QA items in `docs/ar-qa-checklist.md`; on the phone, the owner's share link (not
   stored; rebuild one from a fresh read with `encodeViewToHash`, Ground = floor 2) opens in the plan's orientation.
@@ -908,7 +910,7 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`ac1c277`, 10-12; relaunch it); item 75 (Active) first, then item 73: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`eed5dc1`, 10-12; relaunch it); item 76's write if the owner says yes, then item 75 (Active), then item 73: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
   basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall
