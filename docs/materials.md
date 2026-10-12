@@ -726,6 +726,48 @@ the right face.
     an 80 cm opening, beside the studio photo (panel layout and proportions agree). Not yet seen
     in View 3D on a real plan or in AR.
 
+### Garden gates (`mount: 'gate'`)
+
+Owner requests 2026-10-12: the garden gate and the driveway gate as products. Set on a **GATE** zone
+in MATERIAL · DOOR (which also picks GATE zones; a GATE zone cycles only `mount: 'gate'` products,
+and a gate product never goes on a DOOR or SLIDING zone). **The zone is the gate itself**: its leaf,
+or both leaves and the gap between them (`leaves: 2`), made to measure from it; the pillars stand
+beyond its ends with the product's play. Why: the owner drew the driveway GATE r242 3.010 m long,
+exactly the Bono's published width (two 1.495 m leaves + 20 mm), inside the 3.06 m ramp, its
+published width between pillars. Each leaf runs from 35 mm above the ground (the bottom bracket) up
+to the zone's `head` (no ceiling clip, as for the plain GATE leaf). A one-leaf gate's hinge stile is
+the zone's `hinge`; on a two-leaf gate the lock and lever are on the +X leaf (Hypothesis that it
+matches the real one: photo 3312854 shows the right leaf seen from the street). Like the plain GATE it
+always stands **closed** in View 3D and AR. One builder, `buildGate` in `src/ui/doorProducts.js`, with
+a profile set per `design` (`GATE_PROFILES`). **The full source list, every number's origin and the
+estimates are embedded in that code** (`docs/product-modelling.md` step 6). In short:
+
+- **Cap's JAX aluminium gate, anthracite** (`gate_jax_anthracite`, design `jax`), for the garden
+  gate r243: [Leroy Merlin 97503536](https://www.leroymerlin.fr/produits/portillon-battant-aluminium-cap-s-jax-gris-anthracite-klos-up-l-99-5-x-h-155-6-97503536.html),
+  99.5 × 155.6 cm standard, made to measure 50–150 × 95.6–185.9 cm; the exploded-view sheet (PDF
+  media 5386925): stiles 95 × 50, rails 95 × 30, open-work slats 90 × 15 mm; the manual (PDF media
+  5351363) p. 9: 20 / 25 mm play at the pillars, 35 mm under the leaf; the straight studio front
+  (media 5312131, 1.860 mm/px): rails 30 mm in from the stile ends, 13 slats with ≈ 10 mm gaps at the
+  standard height (14 at the plan's 1.70 m head), the lever 1.0 m above the leaf bottom.
+- **Bono aluminium driveway gate, 2 leaves, anthracite** (`gate_bono_anthracite`, design `bono`),
+  for the driveway gate r242: [Leroy Merlin 80118263](https://www.leroymerlin.fr/produits/portail-battant-aluminium-bono-gris-zinc-klos-up-l-299-x-h-168-5-cm-80118263.html),
+  299 × 168.5 cm, 306 between pillars, RAL 7016T, made to measure 150–500 × 75–200 cm; the
+  exploded-view sheet (PDF media 3581359): stiles 93 × 60, rails 92 × 36, slats 160 × 25, a 48 × 50
+  central cover strip, a 50 mm central stop; the dimension drawing (media 3312852): 1685 made,
+  1720 above ground, 3010 with 20 mm between the leaves; the straight studio front (media 3481086,
+  3.68 mm/px): rails 33 mm in, from the top a 70 mm cut slat, 4 slats, a reinforcing rail, 3 slats, a
+  cut slat, ≈ 9 mm gaps, the lever 1.0 m up. Another height keeps the slats and gaps; the cut slats
+  take the rest.
+- Estimates (both): slats and rails centred in the stile depth, the gate centred in the zone's
+  depth, hinge shapes simplified, the colour #5a636c (lit studio greys read lighter; the JAX photo
+  ≈ #6e7882).
+- Proven 2026-10-12: build; orthographic front renders at each photo's scale put every stile, rail
+  and slat edge within 2 px of the photo (≈ 4 mm JAX, ≈ 7 mm Bono; pixel runs along the same rows and
+  columns); three-quarter renders beside photos 5312132 and 3481094; Node: a placement exists only for
+  a gate product on a GATE zone; the Bono on a 3.010 × 0.05 zone, head 1.70, builds 44 meshes spanning
+  the zone (plus the hinge brackets 25 mm beyond, on the pillars) up to 1.74 m (the hinge covers).
+  Not yet seen in View 3D on a real plan or in AR (the garden is not on the headset yet).
+
 ## Windows (window products)
 
 Same model as doors: a window product is a **material of a WINDOW zone**, stored as a `{rect}` finish on

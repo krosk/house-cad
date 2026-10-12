@@ -21,7 +21,8 @@
 //            accent = the tozzetto colour, `grout` = the joint colour; pinwheel/stepped: 'aged-stone',
 //            accent = cloud, `light`, `pit`, `grout`, `edgeWobble` m); `roughness` optional (3D)
 //
-// Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone: `design`
+// Door products (`surface: 'door'`, `pattern: 'door'`) go on a DOOR zone (`mount: 'rail'`
+// on a SLIDING zone, `mount: 'gate'` on a GATE zone): `design`
 // picks the leaf drawing in src/ui/doorProducts.js, `color` is the leaf/frame colour,
 // `accent` the glass, `leafDepth` the leaf thickness (m). Made-to-measure: the size
 // comes from the zone. No takeoff.
@@ -209,6 +210,25 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, leafWidth: 0.83, leafHeight: 2.04, leafDepth: 0.04, roughness: 0.6, metalness: 0,
     color: 0xeeede8, accent: 0xeeede8, pack: null,
     name: { en: 'Postformé sliding door 83 on Indus rail, white', fr: 'Porte coulissante postformée 83 sur rail Indus, blanc', zh: '白色模压推拉门 83（Indus 轨道）' },
+  },
+  {
+    // Leroy Merlin Cap's JAX swing gate 99.5 × 155.6, anthracite (97503536, Klos'up): an
+    // aluminium garden gate with open-work slats, made to measure (the zone is the leaf); a
+    // GATE zone's product (`mount: 'gate'`). Sources and estimates: src/ui/doorProducts.js buildGate.
+    id: 'gate_jax_anthracite', surface: 'door', pattern: 'door', design: 'jax', mount: 'gate',
+    w: 0, h: 0, joint: 0, leafDepth: 0.05, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: "Cap's JAX aluminium gate, anthracite", fr: "Portillon aluminium Cap's JAX, anthracite", zh: "Cap's JAX 铝制花园小门（炭灰）" },
+  },
+  {
+    // Leroy Merlin Bono swing driveway gate 299 × 168.5, RAL 7016T (80118263, Klos'up): two
+    // aluminium leaves with open-work slats, made to measure (the zone is both leaves and the
+    // 20 mm gap between them); a GATE zone's product. Sources and estimates:
+    // src/ui/doorProducts.js buildGate.
+    id: 'gate_bono_anthracite', surface: 'door', pattern: 'door', design: 'bono', mount: 'gate', leaves: 2,
+    w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: 'Bono aluminium driveway gate, 2 leaves, anthracite', fr: 'Portail battant aluminium Bono 2 vantaux, anthracite', zh: 'Bono 铝制双开车道大门（炭灰）' },
   },
   {
     // Lapeyre Héméra PVC window, white, made to measure (FPC5837268, 2026-09-26): hidden

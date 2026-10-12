@@ -706,11 +706,13 @@ export function doorProductPlacements(floor, materialOf) {
   for (const f of floor?.finishes || []) {
     if (f.target?.edge) continue;
     const rect = (floor.rectangles || []).find((r) => r.id === f.target?.rect);
-    // A rail-hung product (`mount: 'rail'`) goes on a SLIDING zone; any other on a DOOR zone.
+    // A rail-hung product (`mount: 'rail'`) goes on a SLIDING zone, a gate (`mount: 'gate'`)
+    // on a GATE zone; any other on a DOOR zone.
     const kind = rect && zoneKind(rect);
-    if (!rect || (kind !== 'door' && kind !== 'sliding') || !validBounds(rect.bounds)) continue;
+    if (!rect || (kind !== 'door' && kind !== 'sliding' && kind !== 'gate') || !validBounds(rect.bounds)) continue;
     const def = materialOf(f.material);
-    if (def?.surface !== 'door' || (kind === 'sliding') !== (def.mount === 'rail')) continue;
+    if (def?.surface !== 'door' || (kind === 'sliding') !== (def.mount === 'rail')
+      || (kind === 'gate') !== (def.mount === 'gate')) continue;
     const b = rect.bounds;
     const alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
     const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
@@ -719,7 +721,8 @@ export function doorProductPlacements(floor, materialOf) {
       cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
       width: alongX ? b.x1 - b.x0 : b.y1 - b.y0,
       depth: alongX ? b.y1 - b.y0 : b.x1 - b.x0, // the wall thickness at the zone
-      head: clipped(rect.head ?? 2.1, 0, height),
+      // A gate is outdoors: its own head, no ceiling clip (as apertureInsertGeometries).
+      head: kind === 'gate' ? Math.max(0, rect.head ?? 1.2) : clipped(rect.head ?? 2.1, 0, height),
       hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
       swingZ: alongX ? -perp : perp,
       leafDepth: def.leafDepth || 0.07,

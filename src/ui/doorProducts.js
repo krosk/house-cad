@@ -149,6 +149,7 @@ function materialsFor(def, lambert) {
 // hinge line (View 3D and the AR 3D view both show doors open).
 export function buildDoorProduct(p, { lambert = false, open = false } = {}) {
   if (p.def.mount === 'rail') return buildRailDoor(p, { lambert, open });
+  if (p.def.mount === 'gate') return buildGate(p, { lambert });
   const m = materialsFor(p.def, lambert);
   // Local frame: X along the wall (−w/2..w/2), Y up, Z across the wall.
   const w = p.width, h = p.head;
@@ -209,6 +210,171 @@ function place(parts, p) {
     geometry.applyMatrix4(M);
     return new THREE.Mesh(geometry, material);
   });
+}
+
+// A garden gate (`mount: 'gate'`) on a GATE zone: the zone is the gate itself (its leaves
+// and, for two leaves, the gap between them), made to measure from it; the pillars stand
+// beyond its ends with the product's play. It stands closed (a GATE never opens in 3D).
+// Owner's plan, 2026-10-12: the driveway GATE r242 is drawn 3.010 m, exactly the Bono's
+// published width (two 1.495 m leaves + the 20 mm gap), inside a 3.06 m opening (its
+// published width between pillars). `def.design` picks the profile set (GATE_PROFILES).
+// Each leaf: two stiles, top and bottom rails set in from the stile ends, horizontal
+// open-work slats between them (`renfort`: a mid rail among them, `filler`: a cut slat
+// against each rail), a lever on both faces at the lock stile, the capped top hinge and
+// the bottom angle hinge at the hinge stile. Two leaves (`leaves: 2`) meet at the middle
+// under a cover strip (battue) with a ground stop (sabot); the active leaf, which carries
+// the lock, is the +X one.
+//
+// Sources (2026-10-12), JAX (design 'jax'):
+//   Leroy Merlin 97503536 "Portillon battant aluminium Cap's jax gris anthracite KLOS UP,
+//   l.99.5 x H.155.6" (Klos'up / Maison Cadiou, model JAX)
+//     https://www.leroymerlin.fr/produits/portillon-battant-aluminium-cap-s-jax-gris-anthracite-klos-up-l-99-5-x-h-155-6-97503536.html
+//     spec table: 99.5 × 155.6 cm; width between pillars 104 cm; operating play 5 cm;
+//     rails ("traverses") 95 × 30 mm; aluminium, powder-coated anthracite; open-work
+//     infill ("Ajouré"); lock; reversible; made to measure 50–150 × 95.6–185.9 cm.
+//   PDF media 5386925 (exploded view sheet): stiles ("montants") 95 × 50 mm, rails 95 × 30,
+//     open-work slats 90 × 15 mm, mortise lock fitted, a 7 mm × 88 mm square spindle (a
+//     lever on each face), steel top hinge with cover, bottom angle bracket.
+//   PDF media 5351363 (fitting manual) p. 9: 20 mm play on the lock side, 25 mm on the hinge
+//     side, 35 mm under the leaf; p. 7: top hinge cover over the stile top, bottom hinge an
+//     angle bracket under the stile; p. 10: the bottom pin 90–120 mm from the pillar corner.
+//   Photo media 5312131 (straight studio front, 1.860 mm/px from the published 995 mm width,
+//     its 1555 mm height agreeing): stiles 52 px = 97 mm (spec 95); the rails 30 mm in from
+//     the stile ends (16 px), 95 mm tall; 13 slats of 49 px = 91 mm (spec 90) with even gaps
+//     of 5–6 px ≈ 10 mm; lever axis 1003 mm above the leaf bottom, lever ≈ 130 mm long;
+//     lock plate ≈ 30 × 210 mm; top hinge cover ≈ 100 × 40 mm above the stile, its bottom
+//     bracket under it. Photos 5312128, 5312130, 5312087 (in context), 5312132 (three
+//     quarters), 5400248 (labelled parts) show the same frame and colour.
+// Sources (2026-10-12), BONO (design 'bono'):
+//   Leroy Merlin 80118263 "Portail battant aluminium Bono gris zinc Klos up!, l.299 x
+//   H.168.5 cm"
+//     https://www.leroymerlin.fr/produits/portail-battant-aluminium-bono-gris-zinc-klos-up-l-299-x-h-168-5-cm-80118263.html
+//     spec table: 299 × 168.5 cm; 306 cm between pillars; operating play 7 cm; rails
+//     92 × 36 mm; stiles 93 wide × 60 thick; integrated lock; 2 handles; adjustable top
+//     hinges, lacquered bottom angle brackets, a central stop ("sabot central"); RAL 7016T
+//     (the page's colour: anthracite; its title: gris zinc); 66 kg; made to measure
+//     150–500 × 75–200 cm.
+//   PDF media 3581359 (exploded view sheet): stiles 93 × 60, rails 92 × 36, open-work slats
+//     160 × 25 mm, central cover strip ("battement central") 48 × 50 mm, mortise lock, a
+//     50 mm high polyamide central stop.
+//   Photo media 3312852 (dimension drawing): fabrication height 1685, above ground 1720
+//     (+ 35 mm bottom bracket), width 3010 incl. 20 mm between the 2 leaves, 3060 between
+//     pillars, pillars 1825. Photo 3312854 (labelled parts): top rail, a reinforcing rail
+//     ("traverse de renfort") among the slats, the cover strip on the meeting stiles, the
+//     handle on the leaf to the right seen from the street.
+//   Photo media 3481086 (straight studio front of the 1685 × 3060 gate, 3.68 mm/px from
+//     the 1685 mm stile = 460 px, the 3010 mm width = 816 px agreeing): stiles 24–25 px =
+//     90 mm; the rails 9 px = 33 mm in from the stile ends, 25 px = 92 mm; from the top a
+//     cut slat 19 px = 70 mm against the top rail, 4 slats of 44 px = 160 mm, the reinforcing
+//     rail 25 px, 3 slats, a cut slat 19 px against the bottom rail, gaps ≈ 2.5 px = 9 mm;
+//     the cover strip 13 px = 48 mm over the meeting; the lever 273 px = 1005 mm above the
+//     leaf bottom, ≈ 33 px = 120 mm long; the black stop ≈ 120 × 50 mm under the meeting.
+//     Photos 3312790 (in context), 3481094 (three quarters), 3491424 (colour swatch).
+// Estimates (both): slats and rails centred in the stiles' depth; the leaf centred in the
+//   zone's depth; for another height the slat count keeps the slat and gap sizes (Bono:
+//   the cut slats take the rest, the reinforcing rail after half the slats, rounded up);
+//   the lever 1.0 m above the leaf bottom; hinge shapes simplified; colours (lit studio
+//   greys read lighter: JAX ≈ #6e7882 in its photo, #5a636c used under daylight).
+const GATE_PROFILES = {
+  jax: {
+    stile: 0.095, stileD: 0.05, rail: 0.095, railD: 0.03, railIn: 0.03,
+    slat: 0.09, slatD: 0.015, gap: 0.0097, playHinge: 0.025, under: 0.035, handleZ: 1.0,
+  },
+  bono: {
+    stile: 0.093, stileD: 0.06, rail: 0.092, railD: 0.036, railIn: 0.033,
+    slat: 0.16, slatD: 0.025, gap: 0.009, renfort: true, filler: 0.04, playHinge: 0.025,
+    under: 0.035, handleZ: 1.0, leafGap: 0.02, battue: [0.048, 0.05], sabot: [0.12, 0.05, 0.1],
+  },
+};
+// Powder-coated aluminium, no painted face: plain cached materials.
+const gateCache = new Map();
+function gateMaterials(def, lambert) {
+  const key = `${def.id}|${def.color}|${lambert}`;
+  if (!gateCache.has(key)) {
+    const M = lambert ? THREE.MeshLambertMaterial : THREE.MeshStandardMaterial;
+    const extra = lambert ? {} : { roughness: def.roughness ?? 0.55, metalness: def.metalness ?? 0.2 };
+    gateCache.set(key, {
+      body: new M({ color: def.color, ...extra }),
+      steel: new M({ color: 0x9ca3af, ...extra }),
+      black: new M({ color: 0x1d1d1f, ...extra }),
+    });
+  }
+  return gateCache.get(key);
+}
+function buildGate(p, { lambert }) {
+  const G = GATE_PROFILES[p.def.design] || GATE_PROFILES.jax;
+  const m = gateMaterials(p.def, lambert);
+  const parts = [];
+  const box = (sx, sy, sz, x, y, z, material = m.body) => {
+    const g = new THREE.BoxGeometry(sx, sy, sz);
+    g.translate(x, y, z);
+    parts.push([g, material]);
+  };
+  // From 35 mm above the ground up to the zone's head.
+  const y0 = G.under, H = Math.max(0.4, p.head - y0);
+  const W = Math.max(0.3, p.width);
+  const two = (p.def.leaves ?? 1) === 2;
+  // One leaf from `left` to `right`; `hx` = its hinge side (+1 = right), `lock` = it carries the lock.
+  const leaf = (left, right, hx, lock) => {
+    const L = right - left, cx = (left + right) / 2;
+    box(G.stile, H, G.stileD, left + G.stile / 2, y0 + H / 2, 0);
+    box(G.stile, H, G.stileD, right - G.stile / 2, y0 + H / 2, 0);
+    const inner = L - 2 * G.stile;
+    const railBot = y0 + G.railIn, railTop = y0 + H - G.railIn;
+    box(inner, G.rail, G.railD, cx, railBot + G.rail / 2, 0);
+    box(inner, G.rail, G.railD, cx, railTop - G.rail / 2, 0);
+    const lo = railBot + G.rail, span = (railTop - G.rail) - lo;
+    if (G.renfort) {
+      // Top down: cut slat, gap, ⌈n/2⌉ slats, reinforcing rail, ⌊n/2⌋ slats, gap, cut slat;
+      // every element separated by one gap.
+      const n = Math.max(0, Math.floor((span - G.rail - 2 * G.filler - (3 * G.gap)) / (G.slat + G.gap)));
+      const f = Math.max(0, (span - G.rail - n * G.slat - (n + 3) * G.gap) / 2);
+      const seq = [f, ...Array(Math.ceil(n / 2)).fill(G.slat), -G.rail, ...Array(Math.floor(n / 2)).fill(G.slat), f];
+      let y = lo + span;
+      seq.forEach((h, i) => {
+        const t = Math.abs(h);
+        if (t > 0.001) box(inner, t, h < 0 ? G.railD : G.slatD, cx, y - t / 2, 0);
+        y -= t + (i < seq.length - 1 ? G.gap : 0);
+      });
+    } else {
+      const n = Math.max(1, Math.floor((span - G.gap) / (G.slat + G.gap)));
+      const gap = (span - n * G.slat) / (n + 1);
+      for (let i = 0; i < n; i++) box(inner, G.slat, G.slatD, cx, lo + gap * (i + 1) + G.slat * (i + 0.5), 0);
+    }
+    if (lock) {
+      // The lock plate and a lever on each face, the lever pointing to the hinge.
+      const lockX = hx > 0 ? left + G.stile / 2 : right - G.stile / 2;
+      const leverY = y0 + Math.min(G.handleZ, H * 0.65);
+      for (const side of [1, -1]) {
+        const z = side * G.stileD / 2;
+        box(0.03, 0.21, 0.006, lockX, leverY - 0.04, z + side * 0.003);
+        const rose = new THREE.CylinderGeometry(0.009, 0.009, 0.045, 10).rotateX(Math.PI / 2);
+        rose.translate(lockX, leverY, z + side * 0.025);
+        parts.push([rose, m.body]);
+        box(0.13, 0.018, 0.016, lockX + hx * 0.06, leverY, z + side * 0.05);
+      }
+    }
+    // Hinges on the hinge stile: the top cover over its top, the bottom angle under it,
+    // fixed to the pillar past the play.
+    const hingeX = hx > 0 ? right - G.stile / 2 : left + G.stile / 2;
+    box(0.1, 0.04, G.stileD + 0.01, hingeX + hx * 0.02, y0 + H + 0.02, 0);
+    box(0.06, 0.006, 0.06, hingeX + hx * 0.02, y0 - 0.012, 0);
+    box(0.006, 0.07, 0.06, hingeX + hx * (G.stile / 2 + G.playHinge - 0.003), y0 + 0.02, 0);
+    const pin = new THREE.CylinderGeometry(0.006, 0.006, 0.04, 8);
+    pin.translate(hingeX, y0 - 0.005, 0);
+    parts.push([pin, m.steel]);
+  };
+  if (two) {
+    const half = (W - G.leafGap) / 2;
+    leaf(-W / 2, -W / 2 + half, -1, false);
+    leaf(W / 2 - half, W / 2, 1, true);
+    // The cover strip over the meeting stiles, full height; the stop under the gap.
+    box(G.battue[0], H, G.battue[1], 0, y0 + H / 2, 0);
+    box(G.sabot[0], G.sabot[1], G.sabot[2], 0, G.sabot[1] / 2, 0, m.black);
+  } else {
+    leaf(-W / 2, W / 2, p.hingeEnd === 'hi' ? 1 : -1, true);
+  }
+  return place(parts, p);
 }
 
 // A surface-mounted sliding door on a wall rail (`mount: 'rail'`), set on a SLIDING zone:

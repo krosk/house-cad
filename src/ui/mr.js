@@ -4517,7 +4517,7 @@ export function setupMR(view, project, getFootprint) {
       }
       matFaces.push({ rect, edge: CAP, face: { cap: true, segments: [] }, comp: null });
     }
-    matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'window', 'fence', 'furniture'].includes(zoneKindOf(r)));
+    matDoors = floor.rectangles.filter((r) => ['door', 'sliding', 'gate', 'window', 'fence', 'furniture'].includes(zoneKindOf(r)));
     // A target that has a material shows one small swatch badge at the centre of its plan
     // box, not a coloured fill (owner, 2026-09-27: full overlays made the plan hard to read).
     const arr = [], colors = [];
@@ -4668,9 +4668,9 @@ export function setupMR(view, project, getFootprint) {
   function matDoorAt(px, py, kind) {
     let best = null, bestD = Infinity;
     for (const rect of matDoors) {
-      // MATERIAL · DOOR also takes SLIDING zones (rail-hung door products).
+      // MATERIAL · DOOR also takes SLIDING zones (rail-hung door products) and GATE zones.
       const k = zoneKindOf(rect);
-      if (k !== kind && !(kind === 'door' && k === 'sliding')) continue;
+      if (k !== kind && !(kind === 'door' && (k === 'sliding' || k === 'gate'))) continue;
       const b = rect.bounds;
       const dx = Math.max(b.x0 - px, 0, px - b.x1), dy = Math.max(b.y0 - py, 0, py - b.y1);
       if (Math.hypot(dx, dy) > 0.3) continue;
@@ -4735,10 +4735,12 @@ export function setupMR(view, project, getFootprint) {
     if (APT_KIND[modeId]) {
       if (!matSelDoor) matSelDoor = matHoverDoor;
       if (!matSelDoor) return;
-      // A SLIDING zone cycles the rail-hung products only; a DOOR zone the others.
-      const sliding = zoneKindOf(matSelDoor) === 'sliding';
+      // A SLIDING zone cycles the rail-hung products only, a GATE zone the gates; a DOOR
+      // zone the others.
+      const zk = zoneKindOf(matSelDoor);
+      const mount = zk === 'sliding' ? 'rail' : zk === 'gate' ? 'gate' : undefined;
       const ids = [null, ...materialsFor(project, APT_KIND[modeId])
-        .filter((m) => APT_KIND[modeId] !== 'door' || (m.mount === 'rail') === sliding).map((m) => m.id)];
+        .filter((m) => APT_KIND[modeId] !== 'door' || m.mount === mount).map((m) => m.id)];
       const cur = ids.indexOf(doorMaterialId(matSelDoor));
       const next = ids[((Math.max(0, cur) + dir) % ids.length + ids.length) % ids.length];
       project.setDoorFinish(matSelDoor.id, next);
@@ -4830,7 +4832,7 @@ export function setupMR(view, project, getFootprint) {
       const mat = materialById(project, doorMaterialId(rect));
       const b = rect.bounds;
       const width = Math.max(b.x1 - b.x0, b.y1 - b.y0);
-      const tall = isWindow ? (rect.head ?? 2.1) - (rect.sill ?? 0.9) : (rect.head ?? 2.1);
+      const tall = isWindow ? (rect.head ?? 2.1) - (rect.sill ?? 0.9) : (rect.head ?? (zoneKindOf(rect) === 'gate' ? 1.2 : 2.1));
       return [
         [mat ? materialName(mat, getLang()) : t('mat.none'), mat ? 0xe2e8f0 : MAT_NONE_COLOR],
         [`${fmt(width)} × ${fmt(tall)} ${unitLabel()}`, 0xe2e8f0],
