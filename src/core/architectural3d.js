@@ -382,6 +382,30 @@ function apertureInsertBox(rect, z0, z1, depth = 0.035) {
     : { x0: cx - depth / 2, x1: cx + depth / 2, y0: b.y0, y1: b.y1, z0, z1 };
 }
 
+// A FENCE on a garden wall (owner, 2026-10-12): vertical slats along the wall's long axis on
+// its centre line, from the wall's top up to `fence`, with a top rail; drawn with the doors.
+// Slat size and spacing are a generic picket fence (Hypothesis, not measured).
+const FENCE_SLAT = 0.07, FENCE_GAP = 0.05, FENCE_T = 0.02, FENCE_RAIL = 0.04;
+function fenceBoxes(rect, z0, z1) {
+  const b = rect.bounds, alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+  const lo = alongX ? b.x0 : b.y0, hi = alongX ? b.x1 : b.y1;
+  const c = alongX ? (b.y0 + b.y1) / 2 : (b.x0 + b.x1) / 2;
+  const box = (s0, s1, a0, a1, za, zb) => (alongX
+    ? { x0: s0, x1: s1, y0: a0, y1: a1, z0: za, z1: zb }
+    : { x0: a0, x1: a1, y0: s0, y1: s1, z0: za, z1: zb });
+  const out = [];
+  const n = Math.max(1, Math.round((hi - lo + FENCE_GAP) / (FENCE_SLAT + FENCE_GAP)));
+  const pitch = (hi - lo) / n, w = Math.min(FENCE_SLAT, pitch * 0.6);
+  for (let i = 0; i < n; i++) {
+    const m = lo + pitch * (i + 0.5);
+    out.push(box(m - w / 2, m + w / 2, c - FENCE_T / 2, c + FENCE_T / 2, z0, z1));
+  }
+  // The rail behind the slats, just under their top.
+  const rz = Math.max(z0, z1 - 0.12);
+  out.push(box(lo, hi, c + FENCE_T / 2, c + FENCE_T / 2 + FENCE_RAIL / 2, rz - FENCE_RAIL, rz));
+  return out;
+}
+
 // A plain DOOR zone's leaf swung 90° open (View 3D, `openDoors`): a leaf per hinge
 // (`hinge: 'both'` = two half-width leaves), standing at its hinge jamb and reaching
 // from the opening's centre line to the swing side (`resolveApertureOrient`, the same
@@ -415,6 +439,12 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
     } else if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
       if (head > EPS) doors.push(apertureInsertBox(rect, 0.015, Math.max(0.015, head - 0.015)));
+    } else if (kind === 'gardenwall' && rect.fence > (rect.top ?? 0)) {
+      doors.push(...fenceBoxes(rect, rect.top ?? 0, rect.fence));
+    } else if (kind === 'gate') {
+      // Free-standing and outdoors: the leaf, closed, up to its own head (no ceiling clip).
+      const head = Math.max(0, rect.head ?? 1.2);
+      if (head > 0.03) doors.push(apertureInsertBox(rect, 0.02, head, 0.04));
     } else if (kind === 'window') {
       const sill = clipped(rect.sill ?? 0.9, 0, height);
       const head = clipped(rect.head ?? 2.1, 0, height);
@@ -437,7 +467,7 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
 // direction and the opening below readable while staying cheap on mobile GPUs.
 export const STAIR_RISER = 0.18; // m, fixed (owner)
 export const STAIR_GOING = 0.25; // m per tread in plan (a common going; Hypothesis)
-function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
+function stairsGeometry(floor, { downRise = floor?.height || 2.8, upRise = floor?.height || 2.8, fillDepth = 0 } = {}) {
   const geometries = [];
   for (const rect of floor?.rectangles || []) {
     const kind = zoneKind(rect);
@@ -449,7 +479,7 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
     const forward = climb[0] === '+';
     const run = alongX ? width : depth;
     const cross = alongX ? depth : width;
-    const maxRise = Math.max(STAIR_RISER, kind === 'stairs_down' ? downRise : (floor.height || 2.8));
+    const maxRise = Math.max(STAIR_RISER, kind === 'stairs_down' ? downRise : upRise);
     const count = Math.max(1, Math.min(Math.round(run / STAIR_GOING), Math.floor(maxRise / STAIR_RISER + 1e-6)));
     const treadRun = run / count;
     const slab = Math.min(0.05, STAIR_RISER * 0.3);
@@ -468,6 +498,7 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8 } = {}) {
       geometries.push(geometry);
     }
   }
+  geometries.push(...rampPlatformGeometries(floor, fillDepth));
   if (!geometries.length) return null;
   const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries);
   if (geometries.length > 1) geometries.forEach((geometry) => geometry.dispose());
@@ -519,6 +550,51 @@ export function wallMarkerPlacements(floor, wallBoxes = architecturalWallBoxes(f
   return placements;
 }
 
+// RAMP and PLATFORM zones (owner, 2026-10-12: the garden's driveway down to the garage door,
+// and the landing at the front door). Both reach down `fillDepth`, from this floor's level to
+// the nearest floor below (floorRises(...).fill, model.js). A ramp is a thin slab sloping from
+// this floor's level at its `climb` end down to the floor below at the other end; a platform
+// is a solid block from this floor's level down to it. Plain boxes, drawn with the stairs.
+export function rampPlatformBoxes(floor, fillDepth = 0) {
+  const out = [];
+  for (const rect of floor?.rectangles || []) {
+    const kind = zoneKind(rect);
+    if ((kind !== 'ramp' && kind !== 'platform') || !validBounds(rect.bounds)) continue;
+    const b = rect.bounds;
+    if (kind === 'platform') {
+      out.push({ kind, x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1, z0: -Math.max(RAMP_SLAB, fillDepth), z1: 0 });
+      continue;
+    }
+    const climb = stairClimb(rect);
+    out.push({ kind, x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1, climb, drop: Math.max(0, fillDepth) });
+  }
+  return out;
+}
+const RAMP_SLAB = 0.05;
+function rampPlatformGeometries(floor, fillDepth) {
+  return rampPlatformBoxes(floor, fillDepth).map((box) => {
+    const w = box.x1 - box.x0, d = box.y1 - box.y0;
+    if (box.kind === 'platform') {
+      const h = box.z1 - box.z0;
+      const g = new THREE.BoxGeometry(w, h, d);
+      g.translate((box.x0 + box.x1) / 2, box.z0 + h / 2, -(box.y0 + box.y1) / 2);
+      return g;
+    }
+    // Ramp: a slab whose top runs from −drop (low end) up to 0 (the `climb` end).
+    const alongX = box.climb[1] === 'x', forward = box.climb[0] === '+';
+    const run = alongX ? w : d;
+    const len = Math.hypot(run, box.drop);
+    const g = alongX ? new THREE.BoxGeometry(len, RAMP_SLAB, d) : new THREE.BoxGeometry(w, RAMP_SLAB, len);
+    g.translate(0, -RAMP_SLAB / 2, 0);
+    const angle = Math.atan2(box.drop, run);
+    // Tilt so the top rises toward the climb end. World: plan x → x, plan y → −z.
+    if (alongX) g.rotateZ(forward ? angle : -angle);
+    else g.rotateX(forward ? angle : -angle);
+    g.translate((box.x0 + box.x1) / 2, -box.drop / 2, -(box.y0 + box.y1) / 2);
+    return g;
+  });
+}
+
 export function buildArchitecturalFloor(floor, opts = {}) {
   const rooms = (floor?.rectangles || []).filter((rect) => zoneKind(rect) === 'room');
   const stairs = (floor?.rectangles || []).filter((rect) => {
@@ -565,7 +641,10 @@ export function buildArchitecturalFloor(floor, opts = {}) {
     solidBoxes = pieces.filter((b) => !onHalf(b));
     halfWallGeometry = boxesGeometry(pieces.filter(onHalf));
   }
-  const wallGeometry = boxesGeometry(solidBoxes);
+  // Garden walls: solid from the ground to their own top, outside the house's wall logic.
+  const gardenWalls = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'gardenwall' && validBounds(r.bounds) && (r.top ?? 0) > EPS)
+    .map((r) => ({ ...r.bounds, z0: 0, z1: r.top, source: 'garden' }));
+  const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls]);
   const outlineGeometry = boxesOutlineGeometry(wallBoxes);
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
@@ -574,7 +653,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
-    outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, wallBoxes),
+    outlineGeometry, stairGeometry, markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
   };
 }
 

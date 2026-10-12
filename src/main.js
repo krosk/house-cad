@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, Rectangle, furnitureProductPlacements, ceilingHeight } from './core/model.js';
+import { Project, Rectangle, furnitureProductPlacements, ceilingHeight, stairRises, isSplitLevel } from './core/model.js';
 import { loadFurnitureCatalog } from './ui/furnitureCatalog.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
@@ -24,7 +24,7 @@ import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOp
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
-import { ZONE_KINDS, isAperture, isStairs, stairClimb } from './core/zoneColors.js';
+import { ZONE_KINDS, isAperture, hasClimb, stairClimb } from './core/zoneColors.js';
 import { t, localizedFloorName, revLabels, getLang, LANGS, LANG_ORDER } from './core/i18n.js';
 import { checkForUpdate, onVersionStatus, startVersionChecks } from './core/versionCheck.js';
 
@@ -366,7 +366,7 @@ let view3dDirty = true; // the 3D view's model is stale (built only while shown 
 let rebuildQueued = false;
 function rebuildView() {
   view3dDirty = false;
-  const floorGeos = project.floors.map((f, index) => {
+  const floorGeos = project.floors.map((f) => {
     const doorProducts = doorProductPlacements(f, (id) => materialById(project, id));
     const windowProducts = windowProductPlacements(f, (id) => materialById(project, id));
     if (windowsOpen) {
@@ -381,9 +381,7 @@ function rebuildView() {
     }
     return {
     ...buildArchitecturalFloor(f, {
-      downRise: index > 0
-        ? Math.max(0.2, (f.elevation || 0) - (project.floors[index - 1].elevation || 0))
-        : (f.height || 2.8),
+      ...stairRises(project, f),
       productDoors: new Set(doorProducts.map((d) => d.rectId)),
       openDoors: true, // every door leaf swung open (the AR 3D view does the same)
       productWindows: new Set(windowProducts.map((d) => d.rectId)),
@@ -629,13 +627,13 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', ramp: '◢ Ramp', platform: '▬ Platform', gate: '⛩ Gate', gardenwall: '🧱 Garden wall', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;
   // Rotate control: only apertures, stairs and furniture products have an orientation. Show the current state so
   // it's clear what each click changes (door: hinge·swing, window: hinge side).
-  const stairs = isStairs(r.kind);
+  const stairs = hasClimb(r.kind);
   const furnished = r.kind === 'furniture' && !!r.article; // a product has a front to turn
   const aperture = (isAperture(r.kind) && r.hinge != null) || r.kind === 'garage' || stairs || furnished;
   pApertureRow.hidden = !aperture;
@@ -644,7 +642,7 @@ function updateProps() {
     const state = stairs ? `climbs ${{ '+x': '→', '-x': '←', '+y': '↑', '-y': '↓' }[stairClimb(r)]}`
       : furnished ? `faces ${{ 0: '↓', 90: '→', 180: '↑', 270: '←' }[r.facing || 0]}`
       : r.kind === 'garage' ? r.swing
-      : (r.kind === 'door' || r.kind === 'sliding') ? `${r.hinge} · ${r.swing}` : r.hinge;
+      : (r.kind === 'door' || r.kind === 'sliding' || r.kind === 'gate') ? `${r.hinge} · ${r.swing}` : r.hinge;
     pRot.textContent = `↻ Rotate (${state})`;
   }
   // A room is indoor or OUTDOOR (a veranda: outside for heat loss, docs/heat-loss.md).
@@ -708,7 +706,10 @@ function renderFloors() {
 
     const elev = document.createElement('span');
     elev.className = 'fc-elev';
-    elev.textContent = `${fmt(f.elevation)} ${unitLabel()}`;
+    elev.textContent = `${isSplitLevel(f) ? '⇕ ' : ''}${fmt(f.elevation)} ${unitLabel()}`;
+    elev.title = isSplitLevel(f)
+      ? 'Split level: double-click to change its elevation, or clear it to stack the floor again'
+      : 'Double-click to make it a split level (an elevation of its own, outside the stack)';
 
     const ground = document.createElement('button');
     ground.className = 'fc-ground' + (f.id === project.groundFloorId ? ' on' : '');
@@ -735,6 +736,16 @@ function renderFloors() {
       e.stopPropagation();
       const nn = prompt('Floor name', f.name);
       if (nn != null && nn.trim()) project.renameFloor(f.id, nn.trim());
+    });
+    elev.addEventListener('dblclick', (e) => {
+      // A split level (owner, 2026-10-12: the garden between the basement and the ground
+      // floor): its elevation from the ground floor's floor, outside the stacking.
+      e.stopPropagation();
+      if (f.id === project.groundFloorId) return; // the datum always stacks
+      const v = prompt(`Split level: elevation of "${f.name}" from the ground floor, in ${unitLabel()} (empty = stack it)`,
+        isSplitLevel(f) ? fmt(f.level) : '');
+      if (v == null) return;
+      project.setFloorLevel(f.id, v.trim() === '' ? null : toMeters(parseFloat(v)));
     });
     ground.addEventListener('click', (e) => {
       e.stopPropagation();

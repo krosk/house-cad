@@ -103,6 +103,14 @@ ray; the editor is **not** rebuilt as a separate 3D system.
   a 2.27 storey (slab 0.22). Before the slab existed, the owner typed 2.95 as Ground's height to make
   the floors stack, and everything drew and counted to 2.95. Exports (STL/OBJ/GLB massing) still use
   the storey height.
+- **A split level** (owner, 2026-10-12): the garden is a floor at its own elevation, the earth level
+  (−0.90 m, the HEAT LOSS earth setting), between the basement and the ground floor, and it does not
+  stack. The garden has three levels: the main garden on that floor, the garage-door side at the
+  basement's floor (a RAMP drawn on the garden slopes down to it) and the front entrance at the
+  ground floor (a PLATFORM drawn on Ground, reached by stairs from the garden). Its gates are GATE
+  zones, outdoor fixtures rather than doors in a wall, and its low walls are GARDEN WALL zones
+  (optionally with a fence on top), not indoor half walls. Mechanics:
+  `docs/ar-survey.md` "Multi-floor".
 - `Project.rectangles/constraints/height` are **getters onto the active floor** (a facade), so
   consumers didn't need rewriting. Don't reintroduce raw fields.
 

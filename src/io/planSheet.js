@@ -19,8 +19,8 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { isMarkerConstraint, isNodeConstraint, edgeCoord, ORIGIN_ID } from '../core/constraints.js';
 import { fmt, unitLabel } from '../core/units.js';
-import { zoneKind, isStairs } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
+import { zoneKind, hasClimb } from '../core/zoneColors.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints, linkRocker } from '../core/electrical.js';
 import { resolveOutputLayers } from './outputOptions.js';
 
@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', ramp: 'Ramp', platform: 'Platform', gate: 'Gate', gardenwall: 'Garden wall', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -427,8 +427,8 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
 
   if (kind === 'passage') {
     segs(passageSegments(w, h), 0.18);
-  } else if (kind === 'door') {
-    // Real architectural door: hinge-side leaf + swing arc (sampled — no arc primitive).
+  } else if (kind === 'door' || kind === 'gate') {
+    // Real architectural door (a gate draws the same leaf and swing): hinge-side leaf + swing arc (sampled — no arc primitive).
     // In the compact legend, cap the arc reach to the sample height so it can't
     // overflow into the row above.
     segs(doorSwingSegments(w, h, hingeEnd, { perp, reach: compact ? Math.min(w, h) : undefined }), 0.22);
@@ -440,7 +440,7 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
     segs(compact
       ? garageDoorSegments(w, 0, { depth: h, side, perp: 1 })
       : garageDoorSegments(w, h, { depth, side, perp }), 0.16);
-  } else if (kind === 'halfwall') {
+  } else if (kind === 'halfwall' || kind === 'gardenwall') {
     // Inverse of a door: a poché of uniform diagonal hatch = solid (but low) wall.
     segs(halfWallHatchSegments(w, h), 0.13);
   } else if (kind === 'heater') {
@@ -472,6 +472,10 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
     const { treads, arrow } = stairSegments(w, h, axis, dir, kind === 'stairs_up');
     segs(treads, 0.13);
     segs(arrow, 0.25);
+  } else if (kind === 'ramp') {
+    // A ramp: the arrow up the slope, no treads.
+    const { axis, dir } = stair ?? { axis: horizontal ? 'x' : 'y', dir: horizontal ? 1 : -1 };
+    segs(rampSegments(w, h, axis, dir), 0.25);
   } else if (kind === 'cabinet') {
     // Cabinet carcass/front: crossed diagonals distinguish it from openings.
     line(x, y, x1, y1);
@@ -500,7 +504,7 @@ function drawZones(be, L, floor, layers) {
       Math.min(sx0, sx1), Math.min(sy0, sy1),
       Math.abs(sx1 - sx0), Math.abs(sy1 - sy0),
       kind, hingeEnd, false, perp, over, Math.abs(L.X(1) - L.X(0)),
-      isStairs(kind) ? resolveStairOrient(rect, sx0, sx1, sy0, sy1) : null,
+      hasClimb(kind) ? resolveStairOrient(rect, sx0, sx1, sy0, sy1) : null,
     );
     // A furniture product's front: a 2 mm (paper) V on its front edge.
     if (kind === 'furniture') {

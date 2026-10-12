@@ -34,6 +34,7 @@ function serializeRect(r) {
   if (r.head !== undefined) out.head = r.head;
   if (r.hinge !== undefined) out.hinge = r.hinge;
   if (r.swing !== undefined) out.swing = r.swing;
+  if (r.fence !== undefined) out.fence = r.fence; // a fence's top on a half wall
   if (r.climb !== undefined) out.climb = r.climb; // stairs ascent, once rotated
   // Furniture placeholders carry a solid body band [foot, top]; omit elsewhere.
   if (r.foot !== undefined) out.foot = r.foot;
@@ -53,7 +54,7 @@ function serializeRect(r) {
 // Every stored Rectangle field (the constructor validates), for load and paste.
 const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
-  hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
+  hinge: r.hinge, swing: r.swing, fence: r.fence, foot: r.foot, top: r.top, climb: r.climb,
   article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, lambda: r.lambda, uValue: r.uValue,
   outdoor: r.outdoor, airInlet: r.airInlet, sleepers: r.sleepers,
 });
@@ -137,6 +138,9 @@ export function serializeFloor(f) {
     name: f.name,
     height: f.height,
     slab: f.slab || 0, // slab above the ceiling (ceiling = height − slab); older apps ignore it
+    // A split level's elevation from the ground floor (model.js isSplitLevel); older apps
+    // ignore it and stack the floor like a storey.
+    ...(Number.isFinite(f.level) ? { level: f.level } : {}),
     rectangles: f.rectangles.map(serializeRect),
     constraints: f.constraints.filter((c) => !c.measurement).map(serializeConstraint),
     markers: f.markers.map(serializeMarker),
@@ -475,6 +479,7 @@ export function deserializeInto(project, data) {
     name: f.name || 'Floor',
     height: typeof f.height === 'number' ? f.height : 2.8,
     slab: typeof f.slab === 'number' && f.slab >= 0 && f.slab < (f.height ?? 2.8) ? f.slab : 0,
+    level: Number.isFinite(f.level) ? f.level : undefined,
     rectangles: (f.rectangles || []).map((r) => new Rectangle({ id: r.id, ...rectFields(r) })),
     constraints: (f.constraints || []).map(makeConstraint),
     markers: (f.markers || []).map((m) => ({

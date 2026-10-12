@@ -251,6 +251,11 @@ export function stairSegments(w, h, axis, dir, up = true) {
   return { treads, arrow };
 }
 
+// A RAMP: no treads, only the arrow up the slope (along `climb`), so it reads apart from stairs.
+export function rampSegments(w, h, axis, dir) {
+  return stairSegments(w, h, axis, dir, true).arrow;
+}
+
 // Resolve a stair's plan `climb` (stairClimb) into the caller's space, given the
 // rectangle's corners as mapped there — same contract as resolveApertureOrient, so
 // the Y-flipped print page keeps the arrow pointing the same real-world way.

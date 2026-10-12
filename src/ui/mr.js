@@ -22,7 +22,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
-import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight } from '../core/model.js';
+import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight, stairRises, isSplitLevel, floorBelow, floorAbove } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
 import { materialsFor, materialById, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
@@ -57,8 +57,8 @@ import { AIR_INLETS, nextAirInlet } from '../core/airInlets.js';
 import { runAirflow, AIRFLOW_SCENARIOS } from '../core/airflow.js';
 import { houseAirInput, solveHouse3d } from '../core/airflow3d.js';
 import { floorHeatLoss, houseHeatLoss, houseBalance, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
-import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, verticalBandFields } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
+import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, hasClimb, verticalBandFields } from '../core/zoneColors.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 
 const ACCENT = 0x4ea1ff;
@@ -2153,7 +2153,7 @@ export function setupMR(view, project, getFootprint) {
     const byKind = new Map();
     for (const r of floor.rectangles) {
       const k = zoneKind(r);
-      if ((!isAperture(k) && !isStairs(k)) || k === 'recess') continue; // a recess is its outline only
+      if ((!isAperture(k) && !hasClimb(k) && k !== 'gardenwall') || k === 'recess') continue; // a recess is its outline only
       (byKind.get(k) ?? byKind.set(k, []).get(k)).push(r);
     }
     for (const [k, rects] of byKind) {
@@ -2161,9 +2161,10 @@ export function setupMR(view, project, getFootprint) {
       for (const r of rects) {
         const b = r.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
         const { hingeEnd, perp } = resolveApertureOrient(r, b.x0, b.x1, b.y0, b.y1);
-        const stair = isStairs(k) && resolveStairOrient(r, b.x0, b.x1, b.y0, b.y1);
-        const segs = stair ? Object.values(stairSegments(bw, bh, stair.axis, stair.dir, k === 'stairs_up')).flat()
-          : k === 'door' ? doorSwingSegments(bw, bh, hingeEnd, { perp })
+        const stair = hasClimb(k) && resolveStairOrient(r, b.x0, b.x1, b.y0, b.y1);
+        const segs = k === 'ramp' ? rampSegments(bw, bh, stair.axis, stair.dir)
+          : stair ? Object.values(stairSegments(bw, bh, stair.axis, stair.dir, k === 'stairs_up')).flat()
+          : (k === 'door' || k === 'gate') ? doorSwingSegments(bw, bh, hingeEnd, { perp })
           : k === 'passage' ? passageSegments(bw, bh)
           : k === 'garage' ? garageDoorSegments(bw, bh, { depth: 2.10, side: 0.15, perp })
           : k === 'sliding' ? slidingDoorSegments(bw, bh, hingeEnd, { over: 0.10, perp })
@@ -3274,6 +3275,13 @@ export function setupMR(view, project, getFootprint) {
     // styling: floor→sill and floor→head as two side-by-side dims, offset along the
     // aperture's wall axis. A zero sill and an open top (head:null) are omitted.
     for (const r of project.activeFloor.rectangles || []) {
+      if (r.kind === 'gardenwall') { // a garden wall's top and its fence's top
+        const b = r.bounds, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+        const [dx, dy] = b.x1 - b.x0 >= b.y1 - b.y0 ? [0.04, 0] : [0, 0.04];
+        if (r.top > 1e-4) batch.add(cx - dx, cy - dy, 0, r.top, r.top, dimMat, '#79c0ff');
+        if (r.fence > 1e-4) batch.add(cx + dx, cy + dy, 0, r.fence, r.fence, dimMat, '#79c0ff');
+        continue;
+      }
       if (!isAperture(r.kind)) continue;
       const b = r.bounds;
       const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
@@ -3283,6 +3291,7 @@ export function setupMR(view, project, getFootprint) {
       const sill = r.sill || 0;
       if (sill > 1e-4) batch.add(cx - dx, cy - dy, 0, sill, sill, dimMat, '#79c0ff');
       if (r.head != null && r.head > 1e-4) batch.add(cx + dx, cy + dy, 0, r.head, r.head, dimMat, '#79c0ff');
+
     }
     batch.flush();
   }
@@ -4868,13 +4877,16 @@ export function setupMR(view, project, getFootprint) {
 
   // ---- Cross-floor authoring targets (risers + cross-floor wires) --------------
   // The floors immediately above and below the active one (its stack neighbors).
+  // The storeys around it, plus any split level in between (Basement ↔ Garden ↔ Ground).
   function adjacentFloors() {
-    const i = project.floors.findIndex((f) => f.id === project.activeFloorId);
-    if (i < 0) return [];
-    const out = [];
-    if (i > 0) out.push(project.floors[i - 1]);
-    if (i < project.floors.length - 1) out.push(project.floors[i + 1]);
-    return out;
+    const floor = project.activeFloor;
+    if (!floor) return [];
+    const out = new Set([
+      floorBelow(project, floor, { stacked: true }), floorAbove(project, floor, { stacked: true }),
+      floorBelow(project, floor), floorAbove(project, floor),
+    ]);
+    out.delete(null);
+    return [...out];
   }
 
   const adjacentTargetGeom = new THREE.SphereGeometry(0.026, 12, 12);
@@ -5288,13 +5300,10 @@ export function setupMR(view, project, getFootprint) {
     if (!arch3dOn) return;
     const floors = allFloorsView ? project.floors : [project.activeFloor];
     for (const floor of floors) {
-      const index = project.floors.indexOf(floor);
       const doorProducts = doorProductPlacements(floor, (id) => materialById(project, id));
       const windowProducts = windowProductPlacements(floor, (id) => materialById(project, id));
       const a = buildArchitecturalFloor(floor, {
-        downRise: index > 0
-          ? Math.max(0.2, (floor.elevation || 0) - (project.floors[index - 1].elevation || 0))
-          : (floor.height || 2.8),
+        ...stairRises(project, floor),
         productDoors: new Set(doorProducts.map((d) => d.rectId)),
         openDoors: true, // door leaves swung open, as in View 3D (owner, 2026-09-27)
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
@@ -5543,7 +5552,7 @@ export function setupMR(view, project, getFootprint) {
   let overwriteSlot = null; // occupied SAVE slot armed for a required second trigger
   let levelBuffer = '';     // LEVEL mode: typed storey-height digits (prefilled with the floor's current height)
   let levelPristine = false; // levelBuffer holds a prefilled value; first key replaces it
-  let levelField = 'height'; // LEVEL pad field: 'height' (storey, floor to floor) or 'slab' (SWAP toggles)
+  let levelField = 'height'; // LEVEL pad field: 'height' (storey, floor to floor), 'slab', or a split level's 'rise' (SWAP cycles)
 
   // World point -> plan (x, y). extrude.js maps plan (x, y) -> planGroup-local
   // (x, 0, -y), and planGroup adds anchorYaw + planYaw + planPos; worldToLocal inverts all
@@ -6280,16 +6289,31 @@ export function setupMR(view, project, getFootprint) {
     if (levelField === 'slab') {
       return `${f.name}  ${t('level.ceiling')} ${fmt(ceilingHeight(f))} ${unitLabel()}  ·  ${t('level.slab')}`;
     }
+    if (levelField === 'rise') {
+      const below = floorBelow(project, f, { stacked: true });
+      return `${f.name}  ${t('level.base')} ${fmt(f.elevation)} ${unitLabel()}  ·  ${t('level.rise')} ${below?.name || ''}`;
+    }
     return `${f.name}  ${t('level.base')} ${fmt(f.elevation)} ${unitLabel()}  ·  ${t('level.storeyHeight')}`;
   };
+  // SWAP cycles the fields: storey height → slab → (a split level only) its level above
+  // the storey below it (owner, 2026-10-12: the garden, between the basement and the ground).
+  const levelFields = () => (isSplitLevel(project.activeFloor) && floorBelow(project, project.activeFloor, { stacked: true })
+    ? ['height', 'slab', 'rise'] : ['height', 'slab']);
+  const nextLevelField = () => {
+    const fields = levelFields();
+    return fields[(fields.indexOf(levelField) + 1) % fields.length];
+  };
   const redrawLevelPad = () => numpad.draw(levelTitle(), levelBuffer, hoverKey,
-    t(levelField === 'slab' ? 'key.storey' : 'key.slab'));
+    t({ height: 'key.storey', slab: 'key.slab', rise: 'key.rise' }[nextLevelField()]));
 
   // Prefill the field with the active floor's current height or slab (without re-parking
   // the panel) — used on enter, after SWAP and after cycling to another floor.
   function refreshLevelPad() {
     const f = project.activeFloor;
-    levelBuffer = fmt(levelField === 'slab' ? (f.slab || 0) : f.height);
+    if (!levelFields().includes(levelField)) levelField = 'height';
+    const below = floorBelow(project, f, { stacked: true });
+    levelBuffer = fmt(levelField === 'slab' ? (f.slab || 0)
+      : levelField === 'rise' ? f.elevation - (below?.elevation || 0) : f.height);
     levelPristine = true;
     redrawLevelPad();
   }
@@ -6312,6 +6336,16 @@ export function setupMR(view, project, getFootprint) {
       refreshLevelPad();
       return;
     }
+    if (levelField === 'rise') {
+      // A split level sits this far above the storey below it; nothing else moves.
+      const f = project.activeFloor, below = floorBelow(project, f, { stacked: true });
+      if (!Number.isFinite(val) || val < 0 || !below) return;
+      if (!project.setFloorLevel(f.id, below.elevation + toMeters(val))) return;
+      rlog('floor level set', { floor: f.name, m: +f.elevation.toFixed(3) });
+      buildPlan(); applyPlanMatrix();
+      refreshLevelPad();
+      return;
+    }
     if (!Number.isFinite(val) || val <= 0) return; // a storey must have positive height
     project.setHeight(toMeters(val)); // sets the active floor's height, re-solves + re-stacks elevations
     rlog('floor height set', { floor: project.activeFloor.name, m: +toMeters(val).toFixed(3) });
@@ -6322,7 +6356,7 @@ export function setupMR(view, project, getFootprint) {
   function pressLevelKey(k) {
     if (allFloorsView) return;
     if (k === 'enter') { commitLevelHeight(); return; }
-    if (k === 'swap') { levelField = levelField === 'slab' ? 'height' : 'slab'; refreshLevelPad(); return; }
+    if (k === 'swap') { levelField = nextLevelField(); refreshLevelPad(); return; }
     if (k === 'del') return; // not used when entering a height
     if (levelPristine && k !== 'back') levelBuffer = '';
     levelPristine = false;
@@ -7617,9 +7651,17 @@ export function setupMR(view, project, getFootprint) {
 
   // Floors bottom→top and the index of the one holding the headset ("my storey"),
   // measured against the virtually shifted datum so a vertical teleport moves it.
+  // A split level (the garden) counts only while the headset stands over something
+  // drawn on it, so a basement room under the garden's level stays "my storey".
   function storeyAtHead() {
-    const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
     const viewer = currentFrame?.getViewerPose(localSpace);
+    const head = viewer ? worldToPlan(viewer.transform.position) : null;
+    const over = (f) => head && f.rectangles.some((r) => {
+      const b = r.bounds;
+      return head.px >= b.x0 && head.px <= b.x1 && head.py >= b.y0 && head.py <= b.y1;
+    });
+    const floors = project.floors.filter((f) => !isSplitLevel(f) || over(f))
+      .sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
     const headZ = viewer ? viewer.transform.position.y - groundY() : 0;
     let mine = 0;
     for (let i = 0; i < floors.length; i++) if ((floors[i].elevation || 0) <= headZ) mine = i;
@@ -7942,6 +7984,7 @@ export function setupMR(view, project, getFootprint) {
   const rectHasBand = (rect) => bandFields(rect).length > 0;
   // Field labels are namespaced by which band the field belongs to.
   const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambdaField')
+    : selectedRect?.kind === 'gardenwall' ? t(`gardenwall.${f}`)
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
   const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
@@ -8005,6 +8048,14 @@ export function setupMR(view, project, getFootprint) {
       return;
     }
     const val = parseFloat(bandBuffer);
+    if (bandField === 'fence' && (bandBuffer.trim() === '' || val === 0)) {
+      // 0 or an empty ENTER removes the fence from the half wall.
+      delete selectedRect.fence;
+      project.touch(); buildArch3d();
+      rlog('fence removed', { id: selectedRect.id });
+      refreshBandPad();
+      return;
+    }
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
     const m = toMeters(val);
     // A furniture zone carrying a product has the product's fixed height: either bound
@@ -8409,7 +8460,8 @@ export function setupMR(view, project, getFootprint) {
           let z = Math.max(0, pos.y - overlayY());
           if (allFloorsView) {
             const absoluteZ = Math.max(0, pos.y - groundY());
-            floor = project.floors.reduce((best, candidate) => {
+            // A split level overlaps a storey's band: a free point goes to the storey.
+            floor = project.floors.filter((f) => !isSplitLevel(f)).reduce((best, candidate) => {
               const lo = candidate.elevation || 0;
               const hi = lo + (candidate.height || 0);
               const distance = absoluteZ < lo ? lo - absoluteZ : absoluteZ > hi ? absoluteZ - hi : 0;
@@ -8599,7 +8651,8 @@ export function setupMR(view, project, getFootprint) {
           let z = Math.max(0, pos.y - overlayY());
           if (allFloorsView) {
             const absoluteZ = Math.max(0, pos.y - groundY());
-            floor = project.floors.reduce((best, candidate) => {
+            // A split level overlaps a storey's band: a free point goes to the storey.
+            floor = project.floors.filter((f) => !isSplitLevel(f)).reduce((best, candidate) => {
               const lo = candidate.elevation || 0, hi = lo + (candidate.height || 0);
               const distance = absoluteZ < lo ? lo - absoluteZ : absoluteZ > hi ? absoluteZ - hi : 0;
               return !best || distance < best.distance ? { floor: candidate, distance } : best;

@@ -55,8 +55,10 @@ const PLANE_TOL = 0.25;  // proximity to a storey's ceiling/floor plane
 // Storey bands in ABSOLUTE world Z, one per floor, sorted bottom→top. Used to classify
 // whole-house conduit runs: a run whose two ends fall in different storeys is a riser.
 // `ceil` is the storey's ceiling (below its slab), where a ceiling run sits.
+// A split level (the garden, model.js isSplitLevel) overlaps a storey's band, so it has none:
+// its runs classify against the storeys around it.
 export function storeyBands(project) {
-  return (project?.floors || [])
+  return (project?.floors || []).filter((f) => !Number.isFinite(f.level))
     .map((f) => ({ lo: f.elevation || 0, hi: (f.elevation || 0) + (Number(f.height) || 0),
       ceil: (f.elevation || 0) + ceilingHeight(f) }))
     .sort((a, b) => a.lo - b.lo);

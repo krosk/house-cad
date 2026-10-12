@@ -580,9 +580,12 @@ export function floorHeatLoss(project, floor, without = {}) {
     noReveals: !!without.reveals };
   const fh = without.atticIns ? { ...floorHeat(floor), ceilingR: 0 } : floorHeat(floor);
   if (!fh.heated || !(ceilingHeight(floor) > 0)) return [];
-  const i = project.floors.indexOf(floor);
-  const below = project.floors[i - 1] || null, above = project.floors[i + 1] || null;
-  const gi = project.floors.findIndex((f) => f.id === project.groundFloorId);
+  // The storeys around this one; a split level (a garden, model.js isSplitLevel) is outdoor
+  // ground between them, not a neighbour space.
+  const stack = project.floors.filter((f) => f === floor || !Number.isFinite(f.level));
+  const i = stack.indexOf(floor);
+  const below = stack[i - 1] || null, above = stack[i + 1] || null;
+  const gi = stack.findIndex((f) => f.id === project.groundFloorId);
   const onEarth = i <= (gi < 0 ? 0 : gi); // nothing below at or under ground level = earth
   const dT = s.tRoom - s.tOut;
   const b = (temp) => (s.tRoom - temp) / dT;

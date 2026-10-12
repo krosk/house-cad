@@ -20,10 +20,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-12 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `b7be815` (VMC network: room sleepers, envelope leakage, bedroom CO₂;
-before it `54d4d22` whole-house 3D air map and `1844a8c` window air inlets + AR AIR INLET: item 74, unparked
-2026-10-12, untried on the Quest), pushed, served (`version.json` b7be815) and in the headset precache
-(`update-app` 10-12, "installed b7be815 1012-0000Z"). Proven (`quest-storage read` after each write, byte-identical): the
+**Status:** Proven (git): the code head is `ac1c277` (View 3D overview keeps the plan's orientation on a portrait
+screen; before it `e6ef977` the pipe tools like the conduit tools and `42220b3` the batched pipe layer: item 75, all
+untried on the Quest; and `b7be815` / `54d4d22` / `1844a8c`, item 74's VMC airflow, untried too), pushed, served
+(`version.json` ac1c277 1012-1850Z; `e6ef977`'s own Pages deploy failed with a GitHub 500, `ac1c277` carries it)
+and in the headset precache (`update-app` 10-12, "installed ac1c277 1012-1850Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
 60 cm, drain option A, column r122; 2026-10-09), item 66 (the upper vent), item 67 (unit B hung under the laundry
 ceiling), item 68 (boxing r220 a half wall), item 71 (Lucia tiles on boxing r220) and item 73 (heating network,
@@ -365,6 +366,10 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 
 ## Findings / traps worth knowing
 
+- **A push can build but not publish** (2026-10-12, `e6ef977`: Pages "Failed to create deployment (status: 500)").
+  If `version.json` doesn't show the commit within ~10 min, read the run without `gh` (not installed):
+  `curl -s https://api.github.com/repos/krosk/house-cad/actions/runs?per_page=3`, then its `/jobs`. The owner
+  re-runs it from the Actions page, or the next push carries it.
 - **A shared view renumbers floor ids** `f1…` in list order (`loadView`): name a floor in a link by its
   list position, never by the sender's id (the owner's plan lists Basement `f2` first, so it loads as
   `f1`).
@@ -576,7 +581,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -821,10 +826,46 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     bedroom under ≈ 1 400. Hypothesis: the inputs (inlet curve, leak distribution, 15 L/h per sleeper, no wind).
     Not seen in a browser or on the Quest. Results and assumptions: `docs/plumbing-workflow.md` "Air paths computed",
     `docs/ar-survey.md` AIR INLET, QA in `docs/ar-qa-checklist.md`.
+75. **AR pipes: frame rate, conduit-style tools; View 3D orientation (2026-10-12, untried on a device):**
+    - `42220b3`: the owner saw the fps tank in ALL FLOORS with pipes shown. The pipe layer was one mesh + material
+      per pipe and per node (482 objects on the house, each drawn per eye); now batched like the conduit layer
+      (`emphasisePipes`, `stylePipeNode`; `docs/ar-survey.md` "Never add an AR overlay layer as one Mesh…").
+    - `e6ef977` (owner: "Make the same interaction as conduits"): PIPE splits a pipe into a T and B/Y undoes pen
+      steps; new PIPE DIMS (a pipe junction pinned to a wall: a `{node}` endpoint solved by `solveConduitNodes`)
+      and PIPE EDIT (select, height pad, grip-drag, B/Y delete with two-pipe re-join). PIPE no longer selects
+      pipes. Proven: build; Node on the 10-12 plan (split/rejoin/branch delete/move/height/pin follows its wall,
+      save/load and floor paste keep pin + `zDatum`); picking 0.10 ms/frame on the Deck. Details:
+      `docs/plumbing-workflow.md`, `docs/ar-survey.md` HEATING · PIPE / PIPE DIMS / PIPE EDIT.
+    - `ac1c277`: the owner's share link opened on a portrait phone turned 90° from the plan; owner: "Keep the
+      plan". The overview no longer turns a wide house on a portrait screen (`frameModel`, CLAUDE.md updated).
+76. **Garden split level, RAMP, PLATFORM, GATE, GARDEN WALL + fence (2026-10-12; code committed, NOT yet on the headset plan):**
+    - Owner: the garden is a floor between the basement and the ground; it has three levels: the main garden at
+      the earth level (HEAT LOSS `earth` −0.90 m), the garage side at the basement floor (the driveway is a slope),
+      the front entrance at the ground floor (stairs from the garden to a platform). Gates and the low walls are
+      outdoor fixtures, "different from the half wall indoors"; a fence sits on the garden walls.
+    - Code: a floor's optional `level` makes it a split level outside the stacking (`isSplitLevel`, `floorBelow`/
+      `floorAbove`/`floorRises`, `model.js`); RAMP, PLATFORM, GATE, GARDEN WALL (`top` + optional `fence`) zone
+      kinds. Mechanics: `docs/ar-survey.md` "Multi-floor"; decision: `docs/product-intent.md`.
+    - Prepared write (scratch `editGarden.mjs` on a 10-12 read, session-local): new floor `f4` Garden (level −0.90,
+      height 2.5, unheated) between Basement and Ground; Basement `r236 r237 r239–r244` move to it with their 26
+      dims (`c1498`/`c1499`, r239↔r238, dropped: the garden is then pinned to nothing); `r239` → RAMP climbing
+      `-x`; `r242`/`r243` → GATE; the low walls → GARDEN WALL (`r241` 3.01 from the basement floor → top 1.64).
+      Proven (Node, 35 checks): elevations hold, no rectangle moves, heat loss 6723 W and the air network
+      unchanged, ramp 0 → −1.37, save/load/share keep it. Hypothesis: the look; `r240` (1.15 m, on garden level)
+      floats over the low end of the ramp, as does the neighbour wall's foot.
+    - Open: which garden walls get a fence and its top; the owner draws the garden stairs (Garden, STAIRS UP)
+      and the entrance PLATFORM (Ground) in AR.
 
 ## Next step
 
 **Active:**
+- **Item 76, the garden:** after the publish + `update-app` (an older app would stack the Garden and lift Ground and
+  Upper), on the owner's yes with AR closed: a fresh read equal to the base, re-run the garden edit on it (rebuild it
+  from item 76 if the scratch script is gone), `write --base`, read back. Then the four garden QA items.
+- **Item 75 on the devices:** in AR, HEATING · PIPE in ALL FLOORS holds its frame rate (PERF `condt` a few
+  calls), then the three new pipe QA items in `docs/ar-qa-checklist.md`; on the phone, the owner's share link (not
+  stored; rebuild one from a fresh read with `encodeViewToHash`, Ground = floor 2) opens in the plan's orientation.
+  Item 69 in AR: the WC under the east window, shower drain east, radiator legs up at x 3.05 / 3.45.
 - **Item 74, VMC airflow (unparked 2026-10-12; the owner fears too little renewal)**: try AR HEATING · AIR INLET on
   the Quest (QA items in `docs/ar-qa-checklist.md`; time the 3D map), then on the owner's yes write the five EHB²
   (r80, r108, r109, r113, r115) and two sleepers in r51, r85, r88, and draw the kitchen vent at V2 (1.10, −4.60)
@@ -862,7 +903,7 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`b7be815`, 10-12; relaunch it); item 73 first: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`ac1c277`, 10-12; relaunch it); item 75 (Active) first, then item 73: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
   basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall

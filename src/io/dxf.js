@@ -8,7 +8,7 @@ import { computeFootprint, connectedRoomComponents } from '../core/geometry2d.js
 import { edgeCoord, isMarkerConstraint, ORIGIN_ID } from '../core/constraints.js';
 import { dimLabelCoord, edgeLineWorld } from '../core/dimline.js';
 import { zoneKind } from '../core/zoneColors.js';
-import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
+import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, furnitureNotchSegments, passageSegments } from '../core/apertureGlyph.js';
 import { electricalRoutePoints } from '../core/electrical.js';
 import { conduitNetworkSegments, wireRouteSegments, segmentsForFloor } from '../core/conduit.js';
 import { resolveOutputLayers } from './outputOptions.js';
@@ -175,13 +175,13 @@ function writeZoneSymbol(w, rect, kind) {
   // DXF model space runs the same way as plan (min = lo), so pass plan corners.
   const { hingeEnd, perp } = resolveApertureOrient(rect, b.x0, b.x1, b.y0, b.y1);
   const segs = (layer, list) => { for (const [ax, ay, bx, by] of list) w.line(layer, b.x0 + ax, b.y0 + ay, b.x0 + bx, b.y0 + by); };
-  if (kind === 'door') {
+  if (kind === 'door' || kind === 'gate') {
     segs('DOOR', doorSwingSegments(width, height, hingeEnd, { perp }));
   } else if (kind === 'passage') {
     segs('PASSAGE', passageSegments(width, height));
   } else if (kind === 'garage') {
     segs('GARAGE', garageDoorSegments(width, height, { depth: 2.10, side: 0.15, perp }));
-  } else if (kind === 'halfwall') {
+  } else if (kind === 'halfwall' || kind === 'gardenwall') {
     // Inverse of the door opening: uniform diagonal hatch reading as solid (low) wall.
     segs('HALFWALL', halfWallHatchSegments(width, height));
   } else if (kind === 'heater') {
@@ -207,6 +207,9 @@ function writeZoneSymbol(w, rect, kind) {
     const { axis, dir } = resolveStairOrient(rect, b.x0, b.x1, b.y0, b.y1);
     const { treads, arrow } = stairSegments(width, height, axis, dir, kind === 'stairs_up');
     segs('STAIRS', [...treads, ...arrow]);
+  } else if (kind === 'ramp') {
+    const { axis, dir } = resolveStairOrient(rect, b.x0, b.x1, b.y0, b.y1);
+    segs('STAIRS', rampSegments(width, height, axis, dir));
   } else if (kind === 'cabinet') {
     w.line('CABINET', b.x0, b.y0, b.x1, b.y1);
     w.line('CABINET', b.x0, b.y1, b.x1, b.y0);

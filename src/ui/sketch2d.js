@@ -883,9 +883,12 @@ export class Sketch2D {
   _ghostFloor() {
     const p = this.project;
     if (!p.floors) return null;
-    const i = p.floors.findIndex((f) => f.id === p.activeFloorId);
+    // A storey's underlay skips a split level (the garden) and shows the storey below it.
+    const active = p.floors.find((f) => f.id === p.activeFloorId);
+    const floors = p.floors.filter((f) => f === active || !Number.isFinite(f.level) || Number.isFinite(active?.level));
+    const i = floors.indexOf(active);
     if (i < 0) return null;
-    return p.floors[i - 1] || p.floors[i + 1] || null;
+    return floors[i - 1] || floors[i + 1] || null;
   }
 
   _drawGhost() {

@@ -978,6 +978,34 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
 - `afterFloorChange()` runs after `switchFloor` (vertical thumbstick): it rebuilds the selected
   single-floor or stacked overlay. It re-shows the LEVEL pad only for real floors (the
   `refreshFloorEditState` reset hides it first).
+- **Split level** (owner, 2026-10-12: the garden, between the basement and the ground floor). A
+  floor with an authored `level` (its elevation from the ground floor's floor, `isSplitLevel`,
+  `model.js`) is left out of the stacking: the storeys keep their elevations around it. The floor
+  list stays sorted by elevation, so LEVEL's thumbstick visits it between them. In LEVEL its SWAP
+  cycles storey height → slab → **⇄ LEVEL**, its height above the storey below (positive, no minus
+  key). On desktop, double-click a floor's elevation to set or clear a split level. Its stairs climb to
+  the next floor by elevation (0.90 m from the garden to the ground floor), a storey's stairs skip
+  it (`floorRises`); risers, the heat loss, the VMC air network and the storey bands ignore it
+  (outdoors). In ALL FLOORS it counts as "my storey" only while the headset is over something drawn
+  on it, so a basement room under the garden's level stays on the basement.
+- **RAMP and PLATFORM zones** (owner, 2026-10-12). A RAMP is a smooth STAIRS DOWN: it starts at its
+  floor's level at its `climb` end (A/X turns it like a stair) and slopes down to the nearest floor
+  below (the garden's driveway down to the garage door, 1.37 m). A PLATFORM is a solid block from its
+  floor's level down to the nearest floor below (the landing at the front door, drawn on Ground,
+  0.90 m down to the garden). Both are drawn with the stairs' material; a ramp's sheet/DXF/AR glyph
+  is the arrow up the slope, a platform's is its outline.
+- **GATE zone** (owner, 2026-10-12: "an outdoor fixture"). A door's leaf, hinge and swing (A/X cycles
+  them, the band pad edits its head) standing free: it cuts no wall and has no lintel, and View 3D/AR
+  draw its leaf closed up to its own head, not clipped by the floor's height. Heat loss, the VMC air
+  network, floor finishes and window swings ignore it (none of their kind lists name it). Plan symbol:
+  the door's leaf and swing.
+- **GARDEN WALL zone** (owner, 2026-10-12: the garden's low walls must be "different from the half
+  wall indoors"). Solid from the ground to its `top`, with an optional **fence** on it up to `fence`
+  (slats on the wall's centre line plus a rail, drawn with the doors; slat size is a generic picket
+  fence, Hypothesis). The band pad edits WALL TOP and, after SWAP, FENCE TOP (0 or an empty ENTER
+  removes the fence); AR shows both heights as blue dims. Unlike a HALF WALL it never opens a house
+  wall, is not capped by the floor's ceiling, takes no wall finish, and heat loss and ventilation
+  ignore it; a window leaf swinging over it still stops on it. Plan symbol: the half wall's hatch.
 - **Stacking gotcha**: a storey's elevation is driven by the floor *below*. To lift the Upper
   overlay, edit the **Ground** height; to drop the Basement, edit the **Basement's** height.
   Editing the topmost floor's own height moves nothing.

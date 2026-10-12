@@ -44,6 +44,10 @@ const STRINGS = {
   'mode.recess':   { en: 'RECESS', fr: 'EMBRASURE', zh: '窗洞' },
   'mode.stairs_up':   { en: 'STAIRS UP', fr: 'ESCALIER MONTANT', zh: '上行楼梯' },
   'mode.stairs_down': { en: 'STAIRS DOWN', fr: 'ESCALIER DESCENDANT', zh: '下行楼梯' },
+  'mode.gardenwall':  { en: 'GARDEN WALL', fr: 'MURET', zh: '院墙' },
+  'mode.gate':        { en: 'GATE', fr: 'PORTAIL', zh: '院门' },
+  'mode.ramp':        { en: 'RAMP', fr: 'RAMPE', zh: '坡道' },
+  'mode.platform':    { en: 'PLATFORM', fr: 'PALIER', zh: '平台' },
   'mode.cabinet':  { en: 'CABINET', fr: 'PLACARD', zh: '柜子' },
   'mode.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
   'mode.edge':     { en: 'EDGE',   fr: 'BORD',     zh: '边' },
@@ -365,6 +369,8 @@ const STRINGS = {
   // --- aperture sill/head editor (PLAN EDIT) ----------------------------------
   'aperture.sill': { en: 'sill', fr: 'seuil',   zh: '下沿' },
   'aperture.head': { en: 'head', fr: 'linteau', zh: '上沿' },
+  'gardenwall.top':   { en: 'wall top', fr: 'haut du muret', zh: '墙顶' },
+  'gardenwall.fence': { en: 'fence top', fr: 'haut de clôture', zh: '围栏顶' },
   // --- furniture band (PLAN EDIT placeholder) + foot elevation (FURNISH) -------
   'furniture.foot': { en: 'foot', fr: 'pied',    zh: '底' },
   'furniture.top':  { en: 'top',  fr: 'sommet',  zh: '顶' },
@@ -428,6 +434,8 @@ const STRINGS = {
   'level.ceiling':     { en: 'ceiling', fr: 'plafond', zh: '净高' },
   'key.slab':          { en: '⇄ SLAB', fr: '⇄ DALLE', zh: '⇄ 楼板' },
   'key.storey':        { en: '⇄ STOREY', fr: '⇄ ÉTAGE', zh: '⇄ 层高' },
+  'level.rise':        { en: 'height above', fr: 'hauteur au-dessus de', zh: '高于' },
+  'key.rise':          { en: '⇄ LEVEL', fr: '⇄ NIVEAU', zh: '⇄ 标高' },
 
   // --- LANG menu title --------------------------------------------------------
   'lang.title': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },

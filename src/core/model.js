@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, snapM } from './constraints.js';
-import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, STAIR_CLIMBS, isStairs, stairClimb } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, STAIR_CLIMBS, hasClimb, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
 import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
@@ -162,7 +162,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 export const SLEEPERS_MAX = 4;
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, fence, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -200,6 +200,11 @@ export class Rectangle {
       if (article != null && article !== '') this.article = String(article);
       if (Array.isArray(productMm) && productMm.length === 3 && productMm.every((v) => v > 0)) this.productMm = [...productMm];
       if (facing !== undefined && facing !== 0) this.facing = snapFacing(facing);
+    } else if (this.kind === 'gardenwall') {
+      // Its top, and the FENCE on it (zoneColors.js GARDEN_WALL_TOP): slats from the wall's
+      // top up to `fence`, m above the floor; absent = no fence.
+      this.top = Number.isFinite(top) && top >= 0 ? top : GARDEN_WALL_TOP;
+      if (Number.isFinite(fence) && fence > this.top) this.fence = fence;
     } else if (this.kind === 'insulation' || this.kind === 'wall') {
       // Thermal resistance R (m²K/W) from the product label or the wall's build-up, for
       // the heat-loss calculation (docs/heat-loss.md); or its material's conductivity λ
@@ -214,7 +219,7 @@ export class Rectangle {
       // How many people sleep in the room (owner, 2026-10-12, for the VMC air network's night
       // scenarios, core/airflow.js); absent = none.
       else if (Number.isInteger(sleepers) && sleepers > 0) this.sleepers = Math.min(SLEEPERS_MAX, sleepers);
-    } else if (isStairs(this.kind) && STAIR_CLIMBS.includes(climb)) {
+    } else if (hasClimb(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
       this.climb = climb;
@@ -231,11 +236,12 @@ export class Rectangle {
     if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     if (this.kind !== 'window') delete this.airInlet;
+    if (this.kind !== 'gardenwall') delete this.fence;
     if (this.kind !== 'room') { delete this.outdoor; delete this.sleepers; }
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
-    // UP↔DOWN retypes the same flight, so its climb survives; any other kind drops it.
-    if (!isStairs(this.kind)) delete this.climb;
+    // UP↔DOWN (or ↔ RAMP) retypes the same flight, so its climb survives; any other kind drops it.
+    if (!hasClimb(this.kind)) delete this.climb;
     if (this.kind !== 'furniture') { delete this.article; delete this.productMm; delete this.facing; }
     if (d) {
       this.sill = d.sill; this.head = d.head; this.hinge = d.hinge;
@@ -244,6 +250,7 @@ export class Rectangle {
     } else {
       delete this.sill; delete this.head; delete this.hinge; delete this.swing;
       if (this.kind === 'furniture') { this.foot = FURNITURE_BAND.foot; this.top = FURNITURE_BAND.top; }
+      else if (this.kind === 'gardenwall') { delete this.foot; this.top = GARDEN_WALL_TOP; }
       else { delete this.foot; delete this.top; }
     }
     return this;
@@ -254,7 +261,7 @@ export class Rectangle {
   // hinge left → right → both. Stairs turn their ascent 90° (4 states, clockwise).
   // Half walls / other zones have nothing to rotate.
   rotateAperture(dir = 1) {
-    if (isStairs(this.kind)) {
+    if (hasClimb(this.kind)) {
       const i = STAIR_CLIMBS.indexOf(stairClimb(this));
       this.climb = STAIR_CLIMBS[((i + dir) % 4 + 4) % 4];
       return true;
@@ -267,7 +274,7 @@ export class Rectangle {
     }
     // Doors and sliding doors share the 4-state hinge×swing cycle (for a slider,
     // hinge = slide direction and swing = which wall face the rail sits on).
-    if (this.kind === 'door' || this.kind === 'sliding') {
+    if (this.kind === 'door' || this.kind === 'sliding' || this.kind === 'gate') {
       const states = [['left', 'in'], ['right', 'in'], ['right', 'out'], ['left', 'out']];
       const i = states.findIndex(([h, s]) => h === this.hinge && s === this.swing);
       const [h, s] = states[(((i < 0 ? 0 : i) + dir) % 4 + 4) % 4];
@@ -313,7 +320,7 @@ export class Rectangle {
 // `elevation` (base Z, meters) is DERIVED by stacking heights off the ground
 // datum, not authored; Project._recomputeElevations() keeps it current.
 export class Floor {
-  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, slab = 0, elevation = 0, heat = null } = {}) {
+  constructor({ id = nextFloorId(), name = 'Floor', rectangles = [], constraints = [], markers = [], electricalLinks = [], finishes = [], height = 2.8, slab = 0, elevation = 0, heat = null, level } = {}) {
     this.id = id;
     this.name = name;
     this.rectangles = rectangles;
@@ -343,10 +350,69 @@ export class Floor {
     // (ceilingHeight). Owner, 2026-10-04: the house's 2.95 storeys are 2.70 rooms + 0.25 slab.
     this.slab = slab;
     this.elevation = elevation; // base Z (m), derived cache — see _recomputeElevations
+    // A SPLIT LEVEL (owner, 2026-10-12: the garden, between the basement and the ground
+    // floor) has an authored `level`: its elevation from the ground floor's floor (m, + up).
+    // It is left out of the stacking, so the floors around it keep their elevations;
+    // its own height only bounds its walls and stairs. Absent = a stacked storey.
+    if (Number.isFinite(level)) this.level = level;
     // Heat-loss settings of this storey (heated or not, added slab/attic insulation),
     // only the keys set; defaults in src/core/heatLoss.js FLOOR_HEAT_DEFAULTS.
     this.heat = heat || {};
   }
+}
+
+export const isSplitLevel = (floor) => Number.isFinite(floor?.level);
+
+// The floor directly below `floor`. `stacked` (the storey the stack sits on: the
+// stairs-down rise, the heat-loss neighbour) skips split levels; otherwise the nearest
+// floor below by elevation, which may be a split level (a platform fills down to it,
+// a ramp slopes down to it).
+export function floorBelow(project, floor, { stacked = false } = {}) {
+  const floors = project?.floors || [];
+  const z = floor?.elevation || 0;
+  let best = null;
+  for (const f of floors) {
+    if (f === floor || (stacked && isSplitLevel(f))) continue;
+    const fz = f.elevation || 0;
+    if (fz < z - 1e-6 && (!best || fz > best.elevation)) best = f;
+  }
+  return best;
+}
+
+// The floor directly above, by the same rule.
+export function floorAbove(project, floor, { stacked = false } = {}) {
+  const floors = project?.floors || [];
+  const z = floor?.elevation || 0;
+  let best = null;
+  for (const f of floors) {
+    if (f === floor || (stacked && isSplitLevel(f))) continue;
+    const fz = f.elevation || 0;
+    if (fz > z + 1e-6 && (!best || fz < best.elevation)) best = f;
+  }
+  return best;
+}
+
+// How far things on `floor` reach vertically. `up` / `down`: a stair's climb. A storey's
+// stairs join the storeys around it (a basement stair climbs to the ground floor, past
+// a garden split level); a split level's stairs join the nearest floors (a garden stair
+// climbs to the ground floor's level, not a full storey). `fill`: how far a ramp slopes
+// or a platform fills down, to the nearest floor below by elevation.
+export function floorRises(project, floor) {
+  const z = floor?.elevation || 0;
+  const stacked = !isSplitLevel(floor);
+  const above = floorAbove(project, floor, { stacked }), below = floorBelow(project, floor, { stacked });
+  const under = floorBelow(project, floor);
+  return {
+    up: above ? above.elevation - z : (floor?.height || 2.8),
+    down: below ? z - below.elevation : (floor?.height || 2.8),
+    fill: under ? z - under.elevation : 0,
+  };
+}
+
+// buildArchitecturalFloor's vertical options for `floor` (floorRises).
+export function stairRises(project, floor) {
+  const r = floorRises(project, floor);
+  return { downRise: Math.max(0.2, r.down), upRise: Math.max(0.2, r.up), fillDepth: r.fill };
 }
 
 export class Project {
@@ -425,17 +491,23 @@ export class Project {
   }
 
   // Re-derive each floor's base elevation by stacking heights off the ground
-  // datum: ground = 0, floors above accumulate, floors below go negative.
+  // datum: ground = 0, floors above accumulate, floors below go negative. A split
+  // level (isSplitLevel) sits at its authored `level` and is skipped by the stack.
   _recomputeElevations() {
-    let gi = this.floors.findIndex((f) => f.id === this.groundFloorId);
-    if (gi < 0) gi = 0;
-    this.floors[gi].elevation = 0;
-    for (let i = gi + 1; i < this.floors.length; i++) {
-      this.floors[i].elevation = snapM(this.floors[i - 1].elevation + this.floors[i - 1].height);
+    const ground = this.floors.find((f) => f.id === this.groundFloorId) || this.floors[0];
+    if (isSplitLevel(ground)) delete ground.level; // the datum is always a stacked storey
+    const stack = this.floors.filter((f) => !isSplitLevel(f));
+    const gi = Math.max(0, stack.indexOf(ground));
+    stack[gi].elevation = 0;
+    for (let i = gi + 1; i < stack.length; i++) {
+      stack[i].elevation = snapM(stack[i - 1].elevation + stack[i - 1].height);
     }
     for (let i = gi - 1; i >= 0; i--) {
-      this.floors[i].elevation = snapM(this.floors[i + 1].elevation - this.floors[i].height);
+      stack[i].elevation = snapM(stack[i + 1].elevation - stack[i].height);
     }
+    for (const f of this.floors) if (isSplitLevel(f)) f.elevation = snapM(f.level);
+    // Keep the list bottom → top: a split level sits among the storeys by its level.
+    this.floors.sort((a, b) => a.elevation - b.elevation || (isSplitLevel(a) ? 1 : 0) - (isSplitLevel(b) ? 1 : 0));
   }
 
   // Recompute elevations, resolve every floor's constraints, then notify
@@ -448,8 +520,8 @@ export class Project {
   _snapToGrid() {
     const snap = (o, keys) => { for (const k of keys) if (typeof o[k] === 'number') o[k] = snapM(o[k]); };
     for (const f of this.floors) {
-      snap(f, ['height', 'slab']);
-      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top']);
+      snap(f, ['height', 'slab', 'level']);
+      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'fence', 'foot', 'top']);
       for (const c of f.constraints) snap(c, ['value']);
       for (const m of f.markers || []) snap(m, ['x', 'y', 'z']);
     }
@@ -485,6 +557,18 @@ export class Project {
       this.groundFloorId = id;
       this._emit();
     }
+  }
+
+  // Make a floor a split level at `level` (m from the ground floor's floor), or a
+  // stacked storey again with null. The ground floor is always stacked.
+  setFloorLevel(id, level) {
+    const f = this.floorById(id);
+    if (!f) return false;
+    if (level == null) delete f.level;
+    else if (Number.isFinite(level) && id !== this.groundFloorId) f.level = level;
+    else return false;
+    this._emit();
+    return true;
   }
 
   renameFloor(id, name) {

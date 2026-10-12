@@ -60,7 +60,8 @@ function floorAirInput(floor, result, { hmax, doorsOpen }) {
 
 /** Plain-data input for the whole house (every floor) from a network result. */
 export function houseAirInput(project, result, { hmax = 0.2, D = 0.0005, doorsOpen = false } = {}) {
-  const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
+  // A split level (the garden, model.js isSplitLevel) is outdoors: not part of the air network.
+  const floors = project.floors.filter((f) => !Number.isFinite(f.level)).sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
   return { D, floors: floors.map((f) => floorAirInput(f, result, { hmax, doorsOpen })).filter((f) => f.fluid.length) };
 }
 

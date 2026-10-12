@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'halfwall', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'gate', 'halfwall', 'gardenwall', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'ramp', 'platform', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -15,6 +15,8 @@ export const ZONE_COLORS = {
   door:    0x4ade80, // green
   passage: 0xbef264, // pale lime — an open doorway (no leaf); door-family
   garage:  0x16a34a, // dark green — motorized sectional garage door
+  gate:    0x65a30d, // olive — an outdoor gate: a free-standing leaf, no wall around it
+  gardenwall: 0x78716c, // stone — an outdoor low wall (boundary), optionally with a fence on top
   halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
@@ -22,6 +24,8 @@ export const ZONE_COLORS = {
   recess:  0x67e8f9, // pale cyan — a window's reveal through a thick wall; window-family
   stairs_up:   0xfbbf24, // yellow — arrow follows the existing/legacy stair direction
   stairs_down: 0xf59e0b, // amber — inverse arrow
+  ramp:    0xd97706, // dark amber — a sloped stair (a driveway down to a garage door)
+  platform: 0x78716c, // stone — an outdoor landing: a solid block from its floor down to the level below
   cabinet: 0xa78bfa, // purple
   furniture: 0xfb923c, // orange
 };
@@ -46,6 +50,11 @@ export const APERTURE_DEFAULTS = {
   // and two materials meet at its middle. Nothing to rotate.
   passage:  { sill: 0,   head: 2.1,  hinge: null   },
   garage:   { sill: 0,   head: 2.1,  hinge: null,   swing: 'in' },
+  // A GATE (owner, 2026-10-12: "an outdoor fixture", the garden's driveway and pedestrian
+  // gates): a door's leaf, hinge and swing, standing free between garden walls. It cuts no
+  // wall and has no lintel, and heat loss, ventilation and floor finishes ignore it.
+  // Its head is the leaf's top.
+  gate:     { sill: 0,   head: 1.2,  hinge: 'left', swing: 'in' },
   window:   { sill: 0.9, head: 2.1,  hinge: 'left' },
   halfwall: { sill: 1.1, head: null, hinge: null   },
   // Wall-mounted heater (radiator): a BOUNDED solid object, NOT open to the ceiling
@@ -77,6 +86,13 @@ export const STAIR_CLIMBS = ['+x', '-y', '-x', '+y'];
 export function isStairs(kind) {
   return kind === 'stairs_up' || kind === 'stairs_down' || kind === 'stairs';
 }
+// A RAMP (owner, 2026-10-12: the driveway from the garden down to the garage door) is a
+// smooth STAIRS DOWN: it starts at its own floor's level and slopes down to the floor below
+// (floorBelow, model.js), rising along `climb` like a stair. Stairs and ramps share the
+// climb field and its A/X rotation.
+export function hasClimb(kind) {
+  return isStairs(kind) || kind === 'ramp';
+}
 export function stairClimb(rect) {
   if (STAIR_CLIMBS.includes(rect?.climb)) return rect.climb;
   const b = rect.bounds;
@@ -94,7 +110,7 @@ export function isAperture(kind) {
 export function apertureBounds(rect) {
   if (!rect || !isAperture(rect.kind)) return [];
   const fields = [];
-  if (!['door', 'passage', 'garage', 'sliding'].includes(rect.kind)) fields.push('sill');
+  if (!['door', 'passage', 'garage', 'sliding', 'gate'].includes(rect.kind)) fields.push('sill');
   if (rect.head !== null && rect.head !== undefined) fields.push('head');
   return fields;
 }
@@ -103,12 +119,19 @@ export function apertureBounds(rect) {
 // vertical band [foot, top] (open above and below), where the real GLB carries no
 // mesh — so both bounds are authored. Default: a floor-standing ~0.9 m box.
 export const FURNITURE_BAND = { foot: 0, top: 0.9 };
+// A GARDEN WALL (owner, 2026-10-12: the garden's boundary walls, "different from the half
+// wall indoors"): an outdoor low wall, solid from the ground to `top`, with an optional
+// fence on it up to `fence`. Unlike a half wall it never opens a house wall, is not capped
+// by the floor's ceiling, and heat loss, ventilation and finishes ignore it.
+export const GARDEN_WALL_TOP = 1.0;
 
 // The editable vertical bounds of any rect that carries a band, in pad order, as
 // property names on the rect: apertures → [sill?, head?]; a furniture placeholder →
 // [foot, top]; everything else → []. This is what the AR band pad iterates over.
 export function verticalBandFields(rect) {
   if (rect?.kind === 'furniture') return ['foot', 'top'];
+  // A garden wall's height, then the top of the fence on it (0 / empty = no fence).
+  if (rect?.kind === 'gardenwall') return ['top', 'fence'];
   return apertureBounds(rect);
 }
 

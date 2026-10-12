@@ -61,7 +61,8 @@ const orifice = (A) => CD * A * Math.sqrt(2 / RHO_IN) * 3600;   // m³/h per √
 /** The network of `project` for `scenario` (an AIRFLOW_SCENARIOS entry or its id), doors shut unless `doorsOpen`. */
 export function buildAirNetwork(project, scenario = 'normal', { doorsOpen = false } = {}) {
   const sc = typeof scenario === 'string' ? AIRFLOW_SCENARIOS.find((s) => s.id === scenario) : scenario;
-  const floors = [...project.floors].sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
+  // A split level (the garden, model.js isSplitLevel) is outdoors: not part of the air network.
+  const floors = project.floors.filter((f) => !Number.isFinite(f.level)).sort((a, b) => (a.elevation || 0) - (b.elevation || 0));
   const zones = [], links = [], inlets = [], vents = [];
   const zoneAt = (floor, x, y) => zones.find((z) => z.floor === floor && z.rects.some((r) => inBox(r.bounds, x, y)));
   for (const floor of floors) {
