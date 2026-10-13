@@ -20,12 +20,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-13 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `9375539` (irregular stone paving; heat loss ignores an opening beyond a
-wall) after `cfd3193` (gate products): item 77, untried on the Quest; served (`version.json` 9375539 1013-1552Z)
-and in the headset precache (`update-app` 10-13, "installed 9375539 1013-1552Z"). Before them `eed5dc1` /
-`23ac94a` (item 76, the garden), untried on the Quest. Proven (`quest-storage read` after each write,
-byte-identical): the headset plan now carries item 76's garden (2026-10-12, 276 970 chars) and item 77's veranda
-glass (2026-10-13, 279 209 chars). Before them `ac1c277` / `e6ef977` / `42220b3` (item 75) and `b7be815` / `54d4d22` / `1844a8c`
+**Status:** Proven (git): the code head is `b8e9f38` (paved ramps/platforms; stairs as steps on a sloped slab +
+stairwell walls) after `66ea099` (basement floor materials) and `f868bda` (room ceiling + floor level, door sills):
+item 78, untried on the Quest. Served (`version.json` b8e9f38 1013-1826Z) and in the headset precache
+(`update-app` 10-13, "installed b8e9f38 1013-1826Z"). Before them `cfd3193` / `9375539` (item 77) and `eed5dc1` /
+`23ac94a` (item 76), untried on the Quest. Proven (`quest-storage read` after each write, byte-identical): the
+headset plan carries item 76's garden (2026-10-12), item 77's veranda glass and item 78's edits (2026-10-13; last
+write: the veranda on the Garden, **282 119 chars**). Before them `ac1c277` / `e6ef977` / `42220b3` (item 75) and `b7be815` / `54d4d22` / `1844a8c`
 (item 74), all untried on the Quest. Pushed, served (`version.json` eed5dc1 1012-2007Z) and in the headset
 precache (`update-app` 10-12, "installed eed5dc1 1012-2007Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
@@ -372,6 +373,10 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 - **The headset plan has a split level (Garden, `level` −0.90) since 2026-10-12**: never load or write it with an
   app older than `23ac94a` (Hypothesis, from the code: it would stack the Garden as a storey and lift Ground and
   Upper by its 2.5 m height).
+- **The Garden's height is 3.10 since 2026-10-13** (was 2.50) so the veranda on it (floor level +0.90) reaches its
+  2.20 roof: a room `ceiling` only lowers its storey's. Lowering the Garden's height cuts the veranda's glass.
+- **Every stored height is from the storey's floor, also in a room with its own `floorZ`** (markers, sills, heads,
+  `ceiling`): a door into a raised room needs its SILL set by hand; a window's sill too.
 - **A headset edit script must take its next ids before removing anything** (2026-10-13: the veranda script took
   `max(id)` after moving rects off the floor and reused r245 and c1537–c1541). Check rect and dimension ids are
   unique across all floors before a write.
@@ -591,7 +596,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix · `f868bda` room ceiling + floor level, door sills · `66ea099` basement cement + dark red tile · `b8e9f38` paved ramps/platforms, stairs on a sloped slab + stairwell walls.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -872,45 +877,54 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     - Open: which garden walls get a fence and its top; the owner draws the garden stairs (Garden, STAIRS UP)
       and the entrance PLATFORM (Ground) in AR.
 
-77. **Garden gates, the veranda's glass, stone paving (2026-10-13; `cfd3193` + `9375539` published and installed; untried on a device):**
-    - Gate products (`cfd3193`, `/model-product`): `mount: 'gate'` door materials, only on GATE zones; **the zone is
-      the gate itself** (owner drew r242 3.010 m = the Bono's published width inside the 3.06 m opening). Cap's
-      JAX (Leroy Merlin 97503536, one leaf, for r243) and Bono (80118263, two leaves + cover strip, for r242);
-      `buildGate` + `GATE_PROFILES` in `src/ui/doorProducts.js`, sources embedded; `docs/materials.md` "Garden
-      gates". Proven: front renders within 2 px of the straight studio photos. **Not set on the plan yet**: the
-      owner sets them in MATERIAL · DOOR. Hypotheses: colour #5a636c, the Bono's lever on its +X leaf.
-    - Veranda r175 (Ground, OUTDOOR, 1.89 × 3.69): owner: glass walls and a glass door, so no plaster wall.
-      Written 2026-10-13 (AR closed, backup, `write --base`, read back identical, 279 209 chars): WINDOW zones
-      r245 (north, the door, 1.11), r246 (east, through both corners), r247 (south), sill 0, head 2.70, in the
-      12 cm wall line outside the room, tied by `c1536–c1547`. Proven (Node): View 3D's inferred plaster on those
-      sides is gone; heat loss 6723 W.
-    - Heat-loss fix (`9375539`, `docs/heat-loss.md` "Openings"): r247 began at the kitchen insulation's outer face
-      and counted 0.27 m² as kitchen window (+49 W); an opening now counts only where it overlaps the wall's layers.
-      Proven: the plan without the glass reads identical per room with and without the rule.
-    - Stone paving (`9375539`, `docs/materials.md` "Irregular stone paving"): owner: "irregular stone pavement of
-      light gray", no product; `stone_flagstone_light_grey`, pattern `flagstone`. **Not set on r175 yet** (it waits
-      for the ceiling decision below; the code is now deployed, so a write is safe).
-    - **Open decision, the veranda's 2.20 m ceiling** (owner: "a 2.2 high ceiling"; its floor is the ground floor's,
-      "it exits from the kitchen"). Ground's ceiling is 2.70 and a room has no ceiling of its own. Options laid out:
-      (B) a split level "Surroundings" at level 0, height 2.20 (prepared in scratch `editVerandaLevel.mjs`, Proven
-      in Node: 6723 W, nothing moves, save/load keeps it; it drops the 5 dims to the house walls, and the light m204
-      stays on Ground, pinned to window r111 and switched from m205) — owner then: "Arguably, this is why it could
-      belong to ground floor"; (A, recommended) **a per-room `ceiling`** (optional, lower than the floor's only),
-      used by the inferred walls, the ceiling mesh, window caps, ceiling lights, heat-loss volume and wall area,
-      airflow volume, wall finishes (~20 `ceilingHeight` call sites); floors keep stacking by height. The owner
-      asked "What if we started to introduce a ceiling height per room?" and then said "C p, handoff": **not yet
-      a go-ahead; ask.** If A: veranda ceiling 2.20, glass heads 2.20, m204 z 2.20, a PLATFORM on Ground under the
-      veranda + glass line (x 3.535–5.5448, y −5.0693…−1.14, tied to r171 right / r194 bottom) filling down to the
-      garden (on the veranda's own level a platform, a subtract zone, would cut its floor and finish), then the
-      stone paving on r175.
+77. **Garden gates, the veranda's glass, stone paving (2026-10-13; `cfd3193` + `9375539`; untried on a device):**
+    - Gate products (`/model-product`, `docs/materials.md` "Garden gates"): Cap's JAX (one leaf, for r243) and
+      Bono (two leaves, for r242); **not set on the plan**: the owner sets them in MATERIAL · DOOR. Hypotheses:
+      colour #5a636c, the Bono's lever on its +X leaf.
+    - Veranda glass r245 (north, the door), r246 (east), r247 (south) in the 12 cm line outside r175; the
+      heat-loss overlap rule (`docs/heat-loss.md` "Openings"); stone paving `stone_flagstone_light_grey`.
+    - ~~Open decision, the veranda's 2.20 m ceiling: per-room ceiling (A) or a "Surroundings" split level (B)~~:
+      the owner chose A ("proceed"), then moved the veranda to the Garden with a room floor level (item 78).
+
+78. **Room ceilings and floor levels, door sills, basement/ramp floors, solid stairs, the veranda on the Garden
+    (2026-10-13; `f868bda`, `66ea099`, `b8e9f38`; published and installed; untried on a device):**
+    - `f868bda` (`docs/product-intent.md` multi-floor): a ROOM's own `ceiling` (only lowers) and `floorZ` (± from
+      the storey's floor); every height stays measured from the storey's floor. 3D slabs per level, walls fitted,
+      a flight between two room levels climbs only their difference; heat loss / airflow use ceiling − floor level.
+      Desktop fields; AR PLAN · EDIT on a room opens FLOOR UP / FLOOR DOWN / CEILING (no minus key). DOOR / PASSAGE /
+      SLIDING get a SILL (owner: "just like the head for the door, I would have to set the sill").
+    - `66ea099` (`docs/materials.md` "Basement floors"): `cement_floor_grey` (untextured, m² only) and
+      `tile_200_dark_red` (20 × 20, estimates). `b8e9f38`: a floor material on a RAMP / PLATFORM draws it in that
+      colour (`pavedParts`) and the takeoff counts it along the slope; stairs are step blocks on a 12 cm sloped
+      slab, and a flight going down gets stairwell walls only when its floor is shown alone (`docs/ar-survey.md`
+      "Stairs in 3D"; owner rejected "full underneath" for "connected by a slab or slope").
+    - Headset writes 2026-10-13, each on the owner's yes with AR closed, backup, fresh read = base, `write --base`,
+      read back byte-identical (scratch scripts session-local):
+      1. veranda ceiling/glass/light 2.20 + stone floor; Upper **r95 floorZ +0.50** (owner's estimate) and door
+         **r138 sill 0.50**;
+      2. Basement: cement on r70 r71 r72 r232, dark red tiles on r66 r67 r68 r69 r74 r76 r227; laundry radiator
+         **r224 to the south-west corner** (x −4.53…−3.33), pipes rerouted (supply drops to the west leg, return to
+         the east one, so they never cross);
+      3. ramp r239 (Garden) cement;
+      4. **the veranda on the Garden** (owner: "makes the whole indoor/outdoor separate and consistent"): r175
+         `floorZ` 0.90 (its `ceiling` removed), glass r245–r247 sill 0.90 / head 3.10, stone floor with it, **Garden
+         height 2.50 → 3.10** (a room ceiling only lowers), PASSAGE r248–r250 open the shell against the house,
+         its four ties to Ground walls now origin distances (c1262 c1289 c1536 c1544), c1354 removed, c1548–c1559
+         new. The light m204 (switched from m205) and outlets m216 / m218 stay on Ground. Proven (Node): nothing
+         moves, no conflicts, elevations unchanged, heat loss 6719 W, stone 7.27 m².
+    - Open: r95's real raise (measure; set FLOOR UP and r138's SILL to it), the Basement rooms' levels (owner types
+      them in AR), the veranda look in ALL FLOORS where it meets the kitchen wall (Hypothesis), whether m204 /
+      m216 / m218 should move to the Garden (m204 would lose its switch link: links are per floor).
 
 ## Next step
 
 **Active:**
-- **Item 77 (next): ask whether to build the per-room ceiling** (option A, recommended) or use the Surroundings
-  split level (B). Then, on the owner's yes with AR closed: the veranda edit (fresh read; base = the 10-13 read,
-  279 209 chars; backup; `write --base`; read back), and the stone paving on r175. The owner sets the gate
-  products in AR; then the gate and veranda QA items (`docs/ar-qa-checklist.md`, 2026-10-12/13).
+- **Item 78 on the device (next):** relaunch the app (b8e9f38) and walk the 2026-10-13 QA items in
+  `docs/ar-qa-checklist.md`: the veranda on the Garden (floor at the ground floor's height, base wall under the
+  glass, open to the house, its 2.20 roof), r95 raised with r94's three risers, the basement floors and the moved
+  radiator, the cement ramp, stairs on a slope with stairwell walls (one floor alone; no doubling in ALL FLOORS),
+  the room pad in PLAN · EDIT (does it get in the way of moving rooms?). Then the owner measures r95 and the
+  Basement levels. The owner sets the gate products in AR (item 77).
 - **Item 76, the garden, on the device:** written 2026-10-12; the five garden QA items (`docs/ar-qa-checklist.md`,
   2026-10-12). The owner still draws the garden stairs and the entrance PLATFORM, and any FENCE.
 - **Item 75 on the devices:** in AR, HEATING · PIPE in ALL FLOORS holds its frame rate (PERF `condt` a few
@@ -954,9 +968,9 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`9375539`, 10-13; relaunch it); item 77 (Active), item 76's QA, then item 75 (Active), then item 73: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`b8e9f38`, 10-13; relaunch it); item 78 (Active), item 76's QA, then item 75 (Active), then item 73: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
-  basement radiators (laundry under window r146, r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
+  basement radiators (laundry r224 now in its south-west corner, item 78; r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall
   and north to r209; the WC riser stopping at 1.49 m (the valve) and the brown Ø100 vent up the south façade at the
   upper floor's corner to 3.40 m. The owner adjusts these to the real setup. Then items 68/71: boxing r220 a
