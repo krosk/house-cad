@@ -524,3 +524,87 @@ saturated at 6 °C: ≈ 54 % at 15 °C, ≈ 48 % at 17 °C.
 Owner, same day: **A kept** (kitchen + r74, shower alone). ~~B: r74 + shower, kitchen alone~~: evener loads (≈ 0.42 m/s
 at 5 K) but the shower room, the tightest room, would share with r74, first on the pair and slow to warm (buried
 masonry, ≈ 1400 W rated), so it would warm last on a cold start.
+
+## Bare heating pipes in the basement (owner question, 2026-10-13)
+
+The owner's heating pipes are 16×2 multilayer (PE-X/Al/PE-X) with no insulation. Run lengths in the
+basement's air, **Proven** (Node, the plan written 2026-10-13, 282 449 chars, counting each pipe's part
+between the basement floor and its ceiling at 2.07 m): **88 m supply + 87 m return**, of which 74 m in the big
+room r70 and 48 m in the workshop r72 (the nine pairs along its ceiling). The heat figures are **Hypothesis**
+(a textbook model, not measured): a horizontal pipe in still air, PE-X wall 0.4 W/m·K, natural convection
+plus radiation (emissivity 0.9), ≈ 28 W/m at 50 °C water in 9 °C air, ≈ 10 W/m with a 9 mm foam sleeve
+(λ 0.038), ≈ 8 W/m with 13 mm.
+
+| Case (water flow/return, basement) | Bare | 13 mm sleeve |
+|---|---|---|
+| 0 °C day (50/41 °C, basement held at 9 °C) | 4.2 kW | 1.25 kW |
+| the same, the basement warming from the pipes (one zone: 204 W/K to earth/outside, the app's model with the basement marked heated; 46 W/K up through the slab + 2 cm PIR) | 2.9 kW, basement ≈ 20 °C, ≈ 0.5 kW of it back up into Ground | 1.1 kW, ≈ 13.5 °C |
+| heating season (212 days, mean ≈ 7.6 °C out, 41.8/35.9 °C water, circulating all the time), warming included | ≈ 8 300 kWh/yr lost to earth/outside | ≈ 3 400 kWh/yr |
+
+The second row bounds the first: the heat warms the basement, which then loses it, so a bare system
+cannot keep the basement at 9 °C. The house itself needs ≈ 6.7 kW at −7 °C. What would prove it: the
+basement's air temperature in winter with the heating on, and a pipe's surface temperature (a contact
+or IR thermometer; matte tape on the pipe for an IR reading). The water reaching the radiators is
+also cooler than modelled (≈ 1–2 K over a 10 m bare branch at 138 L/h; Hypothesis).
+
+**What it does to the rooms (owner question, same day).** The app's whole-house balance (Node, the same plan,
+0 °C out, 22 °C target) with the basement at 9 °C and 45.5 °C mean water, against the two cases above
+taken as inputs (basement 20.4 °C and radiators fed ≈ 2.9 K cooler, bare; 13.5 °C and ≈ 1.1 K cooler, 13 mm
+sleeves; the supply's loss over the radiators' total 570 W/K, one figure for every branch, Hypothesis):
+the rooms over the basement lose less downward (living room 2 008 → 1 680 W bare), so they still reach
+22 °C; the kitchen (on earth, no gain from below) settles at 21.7 °C and the ground shower room at 21.5 °C
+bare (21.8 sleeved). The radiators need 44.2 °C mean water bare, 45.0 sleeved, against 45.5 today, so the heat
+pump must send ≈ 1.7 K warmer water bare (44.2 + 2.9) and ≈ 0.6 K warmer sleeved (45.0 + 1.1). Comfort barely
+changes; the cost is energy. The 20.9 °C in the Upper 1 m² space is the same in all three cases (it has no
+radiator).
+
+**At −7 °C (owner question, same day).** The same method (Node, the app's balance; basement 6 °C without the
+pipes; one-zone warm-up; supply drop over 660 W/K), at the plan's 55/45 °C water: the rooms settle as in
+the model except the kitchen (21.6 °C bare) and the ground shower room (21.3 bare, 21.8 in the model without
+pipes, 21.6 sleeved). At 50/41 °C instead every room is below 22 in all three cases (living room 20.9 → 20.5
+bare). **The heat source must also make the pipes' loss:** rooms 6.1 kW + pipes 3.5 kW ≈ **9.6 kW bare** (the
+basement at ≈ 20 °C), against 6.7 kW in the model without pipe loss; 6.5 + 1.4 ≈ **7.9 kW with 13 mm sleeves**. A
+heat pump sized on the rooms alone would fall short on the coldest days with bare pipes (Hypothesis: the
+installer's sizing decides).
+
+**With and without the planned basement-ceiling insulation (owner question, same day).** Every figure above
+assumes it (Ground · Floor ins. R 0.9, 2 cm PIR). Proven (Node, the app): the house loses 6 719 W at −7 °C and
+12 232 kWh/yr with it, 8 132 W and 14 807 kWh/yr on the bare slab (the slab passes 44 vs 145 W/K to the
+basement). Heat source totals with the pipes (the same one-zone method, Hypothesis; the heat rising from
+the warmed basement counts against the rooms' loss):
+
+| | −7 °C day | per year |
+|---|---|---|
+| PIR, bare pipes | ≈ 9.6 kW (basement ≈ 20 °C) | ≈ 20 600 kWh |
+| PIR, 13 mm sleeves | ≈ 7.8 kW | ≈ 15 600 kWh |
+| bare slab, bare pipes | ≈ 10.4 kW (basement ≈ 17 °C) | ≈ 21 400 kWh |
+| bare slab, 13 mm sleeves | ≈ 9.0 kW | ≈ 17 300 kWh |
+
+With bare pipes the PIR saves only ≈ 800 kWh/yr (the warm basement already shields the floor); sleeving
+saves ≈ 4 000–5 000 kWh/yr either way.
+
+**Insulating the basement's own walls instead (owner question, same day): little gain.** Hypothesis (the
+same one-zone method, the basement's loss to earth/outside halved from 204 to 100 W/K as a stand-in for
+wall insulation): with bare pipes it saves ≈ 2 600 kWh/yr (PIR kept); with 13 mm sleeves ≈ 800 kWh/yr. Sleeving
+(≈ 5 000 kWh/yr) and the PIR on the ceiling are the usual and larger steps; insulating buried walls pays
+mainly if the basement becomes living space, and an old basement's damp walls need a moisture-safe build.
+The standing decision (above: "Basement: unheated, will not be insulated") holds.
+
+**Why the basement radiators r224/r225 exist, and the choice now (owner, same day):** the owner added them
+believing the pipes would give off no heat. With bare pipes the whole basement would sit near 20 °C
+(Hypothesis, above), so they would hardly run; sleeved, it sits at 11–16 °C and the laundry and r74 (15 °C rule)
+still need them. Options, Hypothesis: (A) bare pipes, no basement radiators: all 61 m² warm, uncontrolled,
+≈ 8 300 kWh/yr; (B) sleeve everything, keep both radiators (≈ 620 + 550 W at −7 °C, about 1 500–1 900 kWh/yr):
+≈ 5 000–5 300 kWh/yr in all, warmth only where wanted, on valves; (C) as B but leave the ≈ 10 m in the laundry and
+≈ 16 m in r74 bare (≈ 250 W and ≈ 420 W into them at −7 °C), so the radiators only top up.
+
+**The pipe band under the ceiling boards (owner question, same day; all Hypothesis, a hand estimate).** The
+real install differs from the plan: the pairs run in one flat band, ≈ 1 cm apart (the plan draws 8 cm lanes).
+A 30 mm PU board (R 1.35) with a groove carved for the band: the pipes then sit between the slab and the board.
+Down into the basement through what is left under the groove (≈ 5–10 mm: clips hold the pipes a few mm off the
+slab) ≈ 60–90 W/m² of groove at 0 °C, bounded by the water's temperature, ≈ **1.5–2.5 W per metre of pipe**; most
+of the heat goes up into the ground floor. A first figure (≈ 240 W, ≈ 850 kWh/yr) was too generous: it assumed
+10 mm left and every basement metre in the band. Counting the parts that stay bare (the drops to the basement
+radiators, ≈ 7 m, which warm their rooms; the connections at the boiler) ≈ **0.4–0.7 kW at 0 °C, ≈ 1 500–2 500 kWh/yr**,
+still ≈ 70–80 % below bare. Battens with the full board under the band, or a 40 mm board carved, roughly halve
+the band's share; sleeve the bare leftovers separately; tape the groove's ends so basement air cannot run along it.

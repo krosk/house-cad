@@ -606,11 +606,24 @@ travel) and return (blue, left, 5 cm higher off the basement ceiling) never cros
 (the ceiling 2.05). West pairs go along the north wall, then south across r70 at x −2.40…−2.08 (east of the garage
 door's area), then west in r76/r77; r204 rises south of the door's area at (−4.50, 1.40) and runs the living-room
 skirting. Bedroom + laundry: tee under bedroom radiator r205's east end (unit B hangs under its west part), laundry
-radiator r224 (EASY 1200 × 600, 1930 W) under window r146, its pipes down beside the window. Kitchen + r74: tee in
-r74's ceiling, radiator r225 (EASY 900 × 600, 1448 W) on its south wall, branches dipping to 1.91 m under the
-shower pair. Kitchen and shower pairs up into the slab at r74's south edge and along the trench (≈ 10 cm down).
+radiator r224 (EASY 1200 × 600, 1930 W), first under window r146, **moved 2026-10-13 to the laundry's south-west
+corner** (x −4.53…−3.33; supply to its west leg, return to its east leg, never crossing). Kitchen + r74: tee in
+r74's ceiling, radiator r225 (EASY 900 × 600, 1448 W), branches dipping to 1.91 m under the
+shower pair. **Owner, 2026-10-13: r225 moved to r74's east wall** (x 3.966–4.098, y 0.26–1.16, 10 cm off the north
+wall so outlet m124 at y 0.06 stays clear, facing west); its branches run east at 1.91 m then north along the wall,
+the return (inner, x 3.89) to the south leg, the supply (x 3.93) to the north leg, never crossing; branch 5.8 → 10.8 m.
+Proven (Node on the written plan, read back identical, 282 449 chars): the same clash list as before the move, heat loss
+unchanged (6719 W). Kitchen and shower pairs up into the slab at r74's south edge and along the trench (≈ 10 cm down).
 Proven (scratch `clash.mjs` on the written plan): no pipe within its neighbours' radii + 6 mm insulation + 3 mm;
-≈ 103 m supply + 106 m return. **Upper pairs (owner, same day: "Do 1, I will adjust according to real setup";
+≈ 103 m supply + 106 m return.
+**As installed (owner, 2026-10-14): the west pairs run as one flat band**, ≈ 1 cm between pipes (26 mm centres),
+from the manifold (on the wall) west along the north wall, south along the west wall over the garage door, to the
+column r122; each pair leaves where it rises (r204's first, then the (−2.48, −0.13) and bedroom + laundry pairs east,
+the Upper pairs up the column). Redrawn so (written, read back identical, 282 507 chars): lanes x −4.40 + 0.026 i,
+20 cm off the west wall so the Upper risers clear the WC waste Ø100 (x −4.42) in the column; north lanes y 4.22 −
+0.026 i; the band keeps 1.97 m (its real height unconfirmed). No ids made, 53 nodes moved. Proven (`clash.mjs`):
+nothing new against other services; neighbouring band pipes and one pass in the Upper slab (2.4 cm centres) fall
+inside the check's 6 mm-insulation allowance, as installed. ≈ 113 m supply + 112 m return. **Upper pairs (owner, same day: "Do 1, I will adjust according to real setup";
 written, read back identical, 266 704 chars):** the upper slab at the old column had no room (the VMC duct fills the
 west-wall trench, lintel 1 is never crossed, the WC drain fills bay 1 inside it), so **column r122 grows 13 cm east
 and 7 cm north** (c227 36 → 49 cm, passage r56 1.275 → 1.145 m; c1443 90 → 83 cm): x −4.705…−4.20, y −0.37…−0.16.

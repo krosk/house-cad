@@ -19,14 +19,15 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/materials.md` | **Texture preparation in a worker** (plan view prepares nothing 3D, the View 3D loading wheel, phone memory), surface finishes, flooring/tile/mosaic/octagon (**diagonal**)/terrazzo/pinwheel/**stepped random (Monastère)**/**stone wall tile (Lucia)** products, **pattern start corner + 90° turn**, **grout weight**, the View 3D **detail layer**, reflections, door (**drawn open in both 3D views**; **rail-hung sliding door**), window (Héméra window + porte-fenêtre, **Néva sliding bay**), switch, outlet and Ethernet products, doorway kinds (incl. **PASSAGE**): owner decisions, continuity rule, takeoff method + limits, phases |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-13 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `b8e9f38` (paved ramps/platforms; stairs as steps on a sloped slab +
-stairwell walls) after `66ea099` (basement floor materials) and `f868bda` (room ceiling + floor level, door sills):
-item 78, untried on the Quest. Served (`version.json` b8e9f38 1013-1826Z) and in the headset precache
-(`update-app` 10-13, "installed b8e9f38 1013-1826Z"). Before them `cfd3193` / `9375539` (item 77) and `eed5dc1` /
+**Date:** 2026-10-14 (session 40, continued; the Quest reachable)
+**Status:** Proven (git): the code head is `72440f4` (View 3D POV stands on steps/ramps/platforms) after `92fffea`
+(share links carry a room's floor level + ceiling): item 79. Served (`version.json` 72440f4 1013-1918Z) and in the
+headset precache (`update-app` 10-13, "installed 72440f4 1013-1918Z"). Before them `b8e9f38` / `66ea099` / `f868bda`
+(item 78), untried on the Quest. Proven (`quest-storage read` after each write, byte-identical): **last headset
+write 2026-10-14, the west heating band, 282 507 chars** (item 79). Before them `cfd3193` / `9375539` (item 77) and `eed5dc1` /
 `23ac94a` (item 76), untried on the Quest. Proven (`quest-storage read` after each write, byte-identical): the
-headset plan carries item 76's garden (2026-10-12), item 77's veranda glass and item 78's edits (2026-10-13; last
-write: the veranda on the Garden, **282 119 chars**). Before them `ac1c277` / `e6ef977` / `42220b3` (item 75) and `b7be815` / `54d4d22` / `1844a8c`
+headset plan carries item 76's garden (2026-10-12), item 77's veranda glass, item 78's edits (2026-10-13) and
+item 79's r225 move and west heating band (2026-10-13/14). Before them `ac1c277` / `e6ef977` / `42220b3` (item 75) and `b7be815` / `54d4d22` / `1844a8c`
 (item 74), all untried on the Quest. Pushed, served (`version.json` eed5dc1 1012-2007Z) and in the headset
 precache (`update-app` 10-12, "installed eed5dc1 1012-2007Z"). Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries every session-40 edit (items 49, 53, 59, 60), item 63's unit-A swap, item 65 (upper WC at
@@ -370,6 +371,10 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 
 ## Findings / traps worth knowing
 
+- **The west heating pipes are one flat band at 26 mm centres since 2026-10-14** (as installed): scratch
+  `clash.mjs`-style checks flag every neighbouring band pipe (they assume 6 mm insulation each); that is the real
+  install, not a defect. The band stays ≥ 20 cm off the west wall because the Upper risers share column r122 with
+  the WC waste Ø100 at x −4.42.
 - **The headset plan has a split level (Garden, `level` −0.90) since 2026-10-12**: never load or write it with an
   app older than `23ac94a` (Hypothesis, from the code: it would stack the Garden as a storey and lift Ground and
   Upper by its 2.5 m height).
@@ -596,7 +601,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix · `f868bda` room ceiling + floor level, door sills · `66ea099` basement cement + dark red tile · `b8e9f38` paved ramps/platforms, stairs on a sloped slab + stairwell walls.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix · `f868bda` room ceiling + floor level, door sills · `66ea099` basement cement + dark red tile · `b8e9f38` paved ramps/platforms, stairs on a sloped slab + stairwell walls · `92fffea` links carry room floor level + ceiling · `72440f4` POV stands on steps/ramps/platforms.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -916,9 +921,40 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       them in AR), the veranda look in ALL FLOORS where it meets the kitchen wall (Hypothesis), whether m204 /
       m216 / m218 should move to the Garden (m204 would lose its switch link: links are per floor).
 
+79. **Share links keep room levels, POV on steps, basement heating pipes as installed (2026-10-13/14; `92fffea`,
+    `72440f4`; published and installed; untried on a device):**
+    - `92fffea` (`docs/share-view.md`): a link carries a room's `floorZ` and `ceiling` (the owner saw the raised
+      r95 flat behind its raised door in a link). Links still carry **no conduits, wires or pipes** (owner asked;
+      an opt-in layer is possible, unmeasured).
+    - `72440f4` (`CLAUDE.md` View 3D): a POV tap stands on a floor at any level or the top of a step, ramp or
+      platform (the Garden's ramp down to −1.37 was unreachable).
+    - Headset writes, same procedure as item 78: (1) **r225 to r74's east wall** (x 3.966–4.098, y 0.26–1.16, facing
+      west, 10 cm off the north wall to clear outlet m124), branches rerouted, new pn298 pn299 p266 p267
+      (`docs/plumbing-workflow.md`); (2) **the west pairs as one flat band** (owner: as installed, ≈ 1 cm apart,
+      manifold on the wall → north wall → west wall over the garage door → column r122, pairs leave where they rise),
+      53 nodes moved, no ids made, 20 cm off the west wall so the Upper risers clear the WC waste in the column,
+      kept at 1.97 m (**real height unconfirmed**). Base for the next write: **282 507 chars**.
+    - Heat analysis, all Hypothesis (`docs/heat-loss.md` "Bare heating pipes in the basement" and the paragraphs
+      after it): the bare 16×2 multilayer pipes (≈ 93 + 91 m in the basement air) give ≈ 3–4 kW on a cold day and
+      warm the basement toward ≈ 20 °C (15–22 °C range; the basement's loss coefficient is the big unknown), ≈ 8 300
+      kWh/yr lost; rooms barely change but the heat source must make ≈ 9.6 kW at −7 °C vs 6.7. Individual sleeves
+      do not fit the 1 cm gaps; options: wrap the band, or put it under the ceiling boards (a carved groove: ≈ 0.4–0.7
+      kW, ≈ 1 500–2 500 kWh/yr). Insulating under the slab (not on top) keeps the pipes on the warm side. Candidate
+      board (owner asked for a Leroy Merlin product; Proven from the page 2026-10-14): Recticel PU + alu 30 mm, R 1.35,
+      λ 0.022, ref 82034165, €16.90/m², ≈ 13 bundles for ≈ 54 m²; its fire class was not on the page. The plan's
+      Ground "Floor ins. R" is still 0.9 (R 1.35: 6 537 W, 11 902 kWh/yr; Proven, Node).
+    - Open (owner): the band's real height; ceiling boards vs wrapping, and the fire covering; the basement radiators
+      (option A no radiators and bare pipes, B sleeve + keep both, C keep the runs bare in the laundry and r74; the owner
+      added r224/r225 believing the pipes give no heat); a basement thermometer reading this winter would ground every
+      figure; the manifold-to-ceiling pipes (≈ 18 m) matter more than the manifold.
+
 ## Next step
 
 **Active:**
+- **Item 79 (owner decisions, no code):** the band's real height (then move the band, read-base-write as usual);
+  insulation plan (ceiling boards over the band vs wrapping; set Ground "Floor ins. R" to the chosen board); the
+  basement radiators A/B/C. Offered, not started: a share-link layer with pipes/conduits; a fresh share link (the
+  owner's last one predates r225 and the band; rebuild from a fresh read with `encodeViewToHash`, never store it).
 - **Item 78 on the device (next):** relaunch the app (b8e9f38) and walk the 2026-10-13 QA items in
   `docs/ar-qa-checklist.md`: the veranda on the Garden (floor at the ground floor's height, base wall under the
   glass, open to the house, its 2.20 roof), r95 raised with r94's three risers, the basement floors and the moved
