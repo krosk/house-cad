@@ -646,6 +646,22 @@ instead of Lambert, plus the environment map: both cost GPU on Quest, where perf
 get. Hypothesis: WebXR light estimation could supply a real-room reflection map on some headsets
 (unverified on the Quest browser). If wanted, make it a separate opt-in inside AR and watch PERF.
 
+## Irregular stone paving (`pattern: 'flagstone'`)
+
+Owner, 2026-10-13: the veranda floor is "some irregular stone pavement of light gray" (no product
+named). **Irregular stone paving, light grey** (`stone_flagstone_light_grey`): a look, not a product.
+`paintFlagstone` (`src/ui/finishTextures.js`) draws an "opus incertum": 8 × 8 stones in one 2.56 m
+square repeat, a Voronoi of jittered grid sites wrapped so the unit tiles, each cell shrunk by half
+the 15 mm joint, its outline wobbled inward and rounded; per stone a tone of the light grey, now and
+then warmer or lighter, soft clouds, specks and a worn rim; a bump map (stones high, pillowed edge,
+joints low) and the Monastère detail layer for close-ups. `m.w` (0.32 m) is the mean stone size. The
+takeoff gives m² and joint mortar only (no countable piece; mortar from joints like a hexagon tiling
+of 0.32 m stones, `1.861 / w` m per m²: Hypothesis). Every colour is an estimate. **Proven** (scratch
+render, 2026-10-13): top view and a low view of a 1.89 × 3.69 m floor: irregular stones with mortar
+joints, the repeat no longer obvious at 2.56 m (it was at 1.6 m); painting took 2.1–2.5 s in Chrome on
+the Deck (in the texture worker in the app: Hypothesis that it stays off the page). Not yet seen in
+View 3D or AR on the owner's plan.
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a free-placed furniture item),

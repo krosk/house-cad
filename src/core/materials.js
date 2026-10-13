@@ -162,6 +162,17 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Lucia ivory stone 30×90', fr: 'Lucia effet pierre ivoire 30×90', zh: 'Lucia 象牙白石纹 30×90' },
   },
   {
+    // Irregular light grey stone paving ("opus incertum"), laid in mortar: the owner's veranda
+    // floor (2026-10-13, no product named). A look, not a product: stones about 32 cm across,
+    // 15 mm joints; the takeoff gives m² and mortar only. Drawn by paintFlagstone
+    // (src/ui/finishTextures.js); every colour is an estimate.
+    id: 'stone_flagstone_light_grey', surface: 'floor', pattern: 'flagstone', design: 'flagstone',
+    w: 0.32, h: 0.32, joint: 0.015, thickness: 0.02, edgeWobble: 0.005,
+    color: 0xbdbcb7, accent: 0xb2aa9b, light: 0xdcdcd7, pit: 0x7d7d7a, grout: 0x9a968e,
+    roughness: 0.85, bumpScale: 3, pack: null,
+    name: { en: 'Irregular stone paving, light grey', fr: 'Dallage opus incertum, gris clair', zh: '浅灰色不规则石材铺地' },
+  },
+  {
     // Leroy Merlin Monastère beige, matte glazed porcelain, aged limestone look, irregular
     // edges, 9 mm, 5 mm joint advised (the showroom board says 3 mm), 24 face designs. Three
     // articles, each its own box (leroymerlin.fr/produits/carrelage-mur-interieur-sol-interieur-

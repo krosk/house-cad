@@ -41,7 +41,8 @@ const hasDesign = (m) => (m.pattern === 'stagger' && !!DESIGNS[m.design])
   || (m.pattern === 'grid' && !!GRID_DESIGNS[m.design])
   || (m.pattern === 'octagon' && !!OCT_DESIGNS[m.design])
   || (m.pattern === 'pinwheel' && !!PINWHEEL_DESIGNS[m.design])
-  || (m.pattern === 'stepped' && !!PINWHEEL_DESIGNS[m.design]);
+  || (m.pattern === 'stepped' && !!PINWHEEL_DESIGNS[m.design])
+  || m.pattern === 'flagstone';
 
 // Repeat unit (metres) of a pattern. A `diagonal` octagon draws its straight unit turned
 // 45°: that repeats along plan x and y every √2 × the straight unit.
@@ -54,6 +55,7 @@ export function patternUnit(m) {
 }
 function straightUnit(m) {
   const px = m.w + (m.joint || 0), py = m.h + (m.joint || 0);
+  if (m.pattern === 'flagstone') return [FLAG_CELLS * m.w, FLAG_CELLS * m.w];
   if (m.pattern === 'stagger' && DESIGNS[m.design]) return [DESIGN_PER_ROW * m.w, DESIGN_ROWS * py];
   if (m.pattern === 'brick' && BRICK_DESIGNS[m.design]) return [BRICK_COLS * px, BRICK_ROWS * py];
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return [gridSheets(m)[0] * px, gridSheets(m)[1] * py];
@@ -849,6 +851,121 @@ function agedStone(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.restore();
 }
 
+// Irregular stone paving ("opus incertum", `pattern: 'flagstone'`; owner, 2026-10-13: the
+// veranda's light grey irregular stone pavement, no product named). FLAG_CELLS × FLAG_CELLS
+// stones of about `m.w` each in one square unit: a Voronoi of jittered grid sites, wrapped
+// so the unit tiles, each cell shrunk by half the joint (`m.joint`) on every side, its
+// outline walked in ~8 mm steps with a slow inward wobble and drawn through the midpoints
+// (rounded corners). Per stone: a tone of `m.color`, sometimes toward `m.accent` (warmer)
+// or `m.light`, soft clouds, specks and pits, a darker worn rim; the joints are `m.grout`.
+// Bump: stones high with a pillowed edge, joints low. A look, not a product: the takeoff
+// gives m² only (flooring.js countPieces).
+const FLAG_CELLS = 8;
+function clipHalf(poly, nx, ny, c) { // keep points with nx·x + ny·y ≤ c (Sutherland–Hodgman)
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const da = nx * a[0] + ny * a[1] - c, db = nx * b[0] + ny * b[1] - c;
+    if (da <= 0) out.push(a);
+    if ((da < 0) !== (db < 0) && da !== db) {
+      const t = da / (da - db);
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return out;
+}
+function paintFlagstone(ctx, m, W, H, ppm, bump) {
+  const r = rng(m.seed ?? 83), n = FLAG_CELLS, cw = W / n, ch = H / n, jp = (m.joint || 0) * ppm;
+  const mm = ppm / 1000;
+  ctx.fillStyle = bump ? '#5a5a5a' : css(m.grout ?? GROUT);
+  ctx.fillRect(0, 0, W, H);
+  // Joint sand: faint specks over the mortar.
+  for (let k = 0; k < (W / mm) * (H / mm) * 0.002; k++) {
+    ctx.globalAlpha = 0.15 + r() * 0.2;
+    ctx.fillStyle = r() < 0.5 ? (bump ? '#4a4a4a' : shade(m.grout ?? GROUT, 0.85)) : (bump ? '#6a6a6a' : shade(m.grout ?? GROUT, 1.12));
+    ctx.fillRect(r() * W, r() * H, (0.6 + r()) * mm, (0.6 + r()) * mm);
+  }
+  ctx.globalAlpha = 1;
+  const sites = [];
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) sites.push([(i + 0.5 + (r() - 0.5) * 0.8) * cw, (j + 0.5 + (r() - 0.5) * 0.8) * ch, Math.floor(r() * 1e9)]);
+  }
+  const copies = [];
+  for (const [x, y] of sites) for (const ox of [-W, 0, W]) for (const oy of [-H, 0, H]) copies.push([x + ox, y + oy]);
+  for (const [sx, sy, seed] of sites) {
+    let poly = [[sx - 2 * cw, sy - 2 * ch], [sx + 2 * cw, sy - 2 * ch], [sx + 2 * cw, sy + 2 * ch], [sx - 2 * cw, sy + 2 * ch]];
+    for (const [qx, qy] of copies) {
+      const dx = qx - sx, dy = qy - sy, d = Math.hypot(dx, dy);
+      if (d < 1e-6 || d > 3 * Math.max(cw, ch)) continue;
+      // Points nearer this site than q, less half the joint: (p − s)·d ≤ |d|²/2 − |d|·jp/2.
+      poly = clipHalf(poly, dx / d, dy / d, (dx * sx + dy * sy) / d + d / 2 - jp / 2);
+      if (poly.length < 3) break;
+    }
+    if (poly.length < 3) continue;
+    const sr = rng(seed);
+    // Outline: each edge in ~8 mm steps, pushed inward by a slow wave (never outward, so
+    // the joint never closes), then smoothed through the midpoints.
+    const wob = (m.edgeWobble ?? 0.004) * ppm, pts = [];
+    const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const steps = Math.max(2, Math.round(len / (8 * mm))), ph = sr() * 6.28, f = 1 + sr() * 2.5;
+      for (let k = 0; k < steps; k++) {
+        const t = k / steps, px = a[0] + (b[0] - a[0]) * t, py = a[1] + (b[1] - a[1]) * t;
+        const e = wob * (0.5 + 0.5 * Math.sin(t * f * 6.28 + ph)) * Math.sin(Math.PI * t);
+        const ix = cx - px, iy = cy - py, il = Math.hypot(ix, iy) || 1;
+        pts.push([px + (ix / il) * e, py + (iy / il) * e]);
+      }
+    }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [px, py] of pts) { x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py); }
+    const tone = 0.9 + sr() * 0.16, tint = sr();
+    const face = new THREE.Color(m.color).multiplyScalar(tone)
+      .lerp(new THREE.Color(tint < 0.3 ? (m.accent ?? m.color) : tint > 0.8 ? (m.light ?? m.color) : m.color), 0.35 * sr());
+    const fieldSeed = Math.floor(sr() * 1e9), speckSeed = Math.floor(sr() * 1e9);
+    // The same stone at each wrapped position that reaches the canvas.
+    for (const ox of [-W, 0, W]) {
+      for (const oy of [-H, 0, H]) {
+        if (x1 + ox < 0 || x0 + ox > W || y1 + oy < 0 || y0 + oy > H) continue;
+        const outline = () => {
+          ctx.beginPath();
+          const L = pts.length, mid = (i) => [(pts[i][0] + pts[(i + 1) % L][0]) / 2 + ox, (pts[i][1] + pts[(i + 1) % L][1]) / 2 + oy];
+          const s0 = mid(L - 1);
+          ctx.moveTo(s0[0], s0[1]);
+          for (let i = 0; i < L; i++) { const q = mid(i); ctx.quadraticCurveTo(pts[i][0] + ox, pts[i][1] + oy, q[0], q[1]); }
+          ctx.closePath();
+        };
+        const bx = x0 + ox, by = y0 + oy, bw = x1 - x0, bh = y1 - y0;
+        ctx.save();
+        outline();
+        ctx.fillStyle = bump ? '#b4b4b4' : `#${face.getHexString()}`;
+        ctx.fill();
+        ctx.clip();
+        const fr = rng(fieldSeed), cloud = stoneField(fr, 2 + Math.floor(fr() * 3), (m.clouds ?? 0.5) - 0.5, bx, by, bw, bh);
+        drawStoneCloud(ctx, cloud, bx, by, bw, bh, bump ? 0x8a8a8a : (m.accent ?? m.color), bump ? 0xc8c8c8 : (m.light ?? 0xf0f0ee),
+          [0.5, 0.9, 0.16], [0.45, 0.2, 0.2]);
+        const kr = rng(speckSeed), nsp = Math.round((bw / mm) * (bh / mm) * 0.01);
+        for (let k = 0; k < nsp; k++) {
+          const px = bx + kr() * bw, py = by + kr() * bh, rad = (0.4 + kr() ** 2 * 2) * mm, dark = kr() < 0.55;
+          ctx.globalAlpha = 0.1 + kr() * 0.22;
+          ctx.fillStyle = bump ? (dark ? '#7a7a7a' : '#d8d8d8') : dark ? shade(m.pit ?? 0x7d7d7a, 0.9 + kr() * 0.2) : css(m.light ?? 0xf0f0ee);
+          ctx.fillRect(px - rad, py - rad, rad * 2, rad * 2 * (0.6 + kr() * 0.8));
+        }
+        ctx.globalAlpha = 1;
+        // Worn, pillowed rim: nested strokes of the outline, clipped to the stone.
+        outline();
+        ctx.strokeStyle = bump ? '#303030' : shade(m.grout ?? GROUT, 0.8);
+        for (const [wd, al] of bump ? [[26, 0.12], [16, 0.14], [9, 0.18], [4, 0.25]] : [[14, 0.08], [6, 0.14], [2, 0.22]]) {
+          ctx.lineWidth = wd * mm; ctx.globalAlpha = al; ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+  }
+  grainPass(ctx, Math.round(W), Math.round(H), rng((m.seed ?? 83) + 1), bump ? 0.14 : 0.06);
+}
+
 const PINWHEEL_DESIGNS = { 'aged-stone': agedStone };
 
 // Pinwheel modules (src/core/flooring.js PINWHEEL, the count's own layout) over the joint
@@ -932,6 +1049,7 @@ function paintUnit(ctx, m, W, H, ppm) {
   if (m.pattern === 'grid' && GRID_DESIGNS[m.design]) return paintGridDesign(ctx, m, W, H, ppm, false);
   if (m.pattern === 'octagon' && OCT_DESIGNS[m.design]) return paintOctDesign(ctx, m, W, H, ppm, false);
   if (m.pattern === 'pinwheel') return paintPinwheel(ctx, m, W, H, ppm, false);
+  if (m.pattern === 'flagstone') return paintFlagstone(ctx, m, W, H, ppm, false);
   const jp = Math.max(1.5, (m.joint || 0) * ppm); // joint in px, never invisible
   if (m.pattern === 'stagger') {
     const rowH = H / 3;
@@ -1052,6 +1170,7 @@ function bumpCanvas(m) {
     return unitCanvas(m, (ctx, W, H, ppm) => paintPinwheel(ctx, m, W, H, ppm, true));
   }
   if (m?.pattern === 'stepped' && PINWHEEL_DESIGNS[m.design]) return { canvas: steppedCanvas(m, true), stepped: true };
+  if (m?.pattern === 'flagstone') return unitCanvas(m, (ctx, W, H, ppm) => paintFlagstone(ctx, m, W, H, ppm, true));
   if (!m || m.pattern !== 'brick' || !BRICK_DESIGNS[m.design]) return null;
   return unitCanvas(m, (ctx, W, H, ppm) => paintBrickDesign(ctx, m, W, H, ppm, true));
 }
@@ -1195,6 +1314,8 @@ const DETAIL_DESIGNS = {
     },
   },
 };
+// Irregular stone paving: the same matte pitted stone skin.
+DETAIL_DESIGNS.flagstone = DETAIL_DESIGNS['aged-stone'];
 
 const detailCache = new Map();
 const detailKey = (m) => `${m.design}:${m.seed ?? 0}`;

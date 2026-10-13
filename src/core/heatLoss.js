@@ -369,9 +369,15 @@ function wallLoss(floor, comp, s, fh, dT, nb) {
             }
             return rWith.get(key);
           };
+          // An opening in this wall overlaps its layers in depth; one that only starts at their
+          // outer face stands beyond the wall (owner's plan, 2026-10-13: the veranda's south
+          // glass begins where the kitchen's insulation ends, 0.40 m out, and was counted as a
+          // window in the kitchen's wall, +0.27 m², +49 W). With no layers, any opening on the probe.
+          const layerOut = cuts.length ? Math.max(...cuts.map((c) => c.hi)) : Infinity;
+          const inWall = (b) => Math.min(nx ? (b.x0 - mx) * nx : (b.y0 - my) * ny, nx ? (b.x1 - mx) * nx : (b.y1 - my) * ny) < layerOut - 0.005;
           let openH = 0, openU = 0, openSill = 0, openO = null;
           for (const o of openings) {
-            if (!hitsSegment(o.bounds, mx - nx * 0.3, my - ny * 0.3, px, py)) continue;
+            if (!hitsSegment(o.bounds, mx - nx * 0.3, my - ny * 0.3, px, py) || !inWall(o.bounds)) continue;
             const kind = zoneKind(o);
             const sill = Math.max(0, o.sill ?? 0), head = Math.min(H, o.head ?? H);
             if (head - sill > openH) {

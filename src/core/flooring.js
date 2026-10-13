@@ -381,6 +381,11 @@ export function jointLengthPerM2(material) {
     const side = w / (1 + Math.SQRT2);
     return (6 * side) / (w * w);
   }
+  if (pattern === 'flagstone') {
+    // Irregular stones of about w × w: joints like a hexagon tiling of that area,
+    // (perimeter / 2) / area = 1.861 / √area (Hypothesis: a Voronoi of jittered sites is near).
+    return 1.861 / w;
+  }
   if (pattern === 'grid' || pattern === 'brick') {
     // A mosaic sheet is sticks: its joints are the sticks' (the sheet's own edges included).
     const [cols, rows] = material.mosaic || [1, 1];
@@ -401,6 +406,8 @@ export function countPieces(material, boxes, { alongX } = {}) {
   const area = boxesArea(boxes);
   if (!material || !boxes.length) return { area, pieces: 0 };
   if (material.pattern === 'paint' || !(material.w > 0 && material.h > 0)) return { area, pieces: 0 };
+  // Irregular stone paving has no countable piece: m² and joint mortar only.
+  if (material.pattern === 'flagstone') return { area, pieces: 0, grout: groutKg(material, area) };
   const counted = material.pattern === 'stagger' ? staggerCount(material, boxes, alongX ?? plankAlongX(boxes))
     : material.pattern === 'pinwheel' ? pinwheelCount(material, boxes)
       : material.pattern === 'stepped' ? steppedCount(boxes) : latticeCount(material, boxes);

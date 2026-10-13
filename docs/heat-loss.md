@@ -46,6 +46,10 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   has no figure of its own, and a heated room's edge on it is exterior (b = 1), with the WALL /
   INSULATION zones there as its layers. It never merges with an indoor room it touches
   (`roomRectsConnect`), so its area is its own. Across a slab it counts as nothing (not a space).
+  Its glazing is WINDOW zones in the wall line outside its edges (owner, 2026-10-13: the veranda has
+  glass walls and a glass door; Ground r245 north = the door, r246 east, r247 south, sill 0, head
+  2.70 = its light m204's height, tied to r175's edges by dimensions): they replace the plaster wall
+  View 3D infers there, and they cost no heat (outside on both sides).
   That overstates the shared wall's share: **Hypothesis:** a glazed veranda is nearer b ≈ 0.6–0.9 at
   night; accepted, as it errs on the safe side for sizing.
   **Proven** (Node, made-up plan, 2026-10-05): a 4 × 4 m kitchen loses 4685 W with no veranda; with a
@@ -72,6 +76,13 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
   2026-10-01: each window carries its own, typed from its label's Uw / Ud in HEATING · R / U), else the
   project's Window U (window, sliding) or Door U (door, garage). Window products carry no Uw yet. A
   HALF WALL is plain wall; PASSAGE and HEATER are ignored (interior / not an opening).
+  An opening counts in a wall only where it **overlaps that wall's layers in depth** (the layers
+  found within `PROBE_M` of the edge); one that merely starts at their outer face stands beyond the
+  wall (a wall with no layers takes any opening on the probe, as before). Why (2026-10-13): the
+  veranda's south glass r247 begins exactly where the kitchen's insulation r197 ends, 0.40 m out from
+  the kitchen's east edge, and was counted as 0.27 m² of window in the kitchen's wall (+49 W).
+  **Proven** (Node, the owner's plan of 2026-10-13): before the glass, the house and every room
+  read the same with and without the rule (6723 W); with the glass, 6772 W without it, 6723 W with it.
 - **Floor and ceiling are split by overlap** with the floors below and above (rooms' plan union):
   heated room → no loss; unheated floor → `b`; nothing below → ground; nothing above → roof/attic.
 
