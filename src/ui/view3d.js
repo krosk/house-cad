@@ -1116,8 +1116,9 @@ export class View3D {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.viewNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.viewRaycaster.setFromCamera(this.viewNdc, this.camera);
-    const floors = this.house.children.filter((mesh) => mesh.visible && mesh.userData.architecturalRole === 'floor');
-    const hit = this.viewRaycaster.intersectObjects(floors, false)[0];
+    const floors = this.house.children.filter((mesh) => mesh.visible
+      && (mesh.userData.architecturalRole === 'floor' || mesh.userData.architecturalRole === 'stairs'));
+    const hit = this.viewRaycaster.intersectObjects(floors, false).find((h) => this._standable(h));
     if (!hit) return;
     this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(), distance: this.overviewDistance };
     const endPosition = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
@@ -1130,6 +1131,14 @@ export class View3D {
     this._startTransition(endPosition, endQuaternion, 'pov');
   }
 
+  // Somewhere to stand: a floor (at any room level, above or below its storey's floor), or
+  // the top of a step, a ramp or a platform (role 'stairs', facing up). Not their sides.
+  _standable(hit) {
+    const role = hit.object.userData.architecturalRole;
+    if (role === 'floor') return true;
+    return role === 'stairs' && !!hit.face && hit.face.normal.y > 0.5;
+  }
+
   // POV tap: walk to the tapped floor spot (through a doorway into the next room too),
   // facing the way you walked. Walls in front block the tap; it does nothing then.
   _walkToPointer(clientX, clientY) {
@@ -1140,7 +1149,7 @@ export class View3D {
     const targets = this.house.children.filter((mesh) => mesh.visible && mesh.isMesh
       && mesh.userData.architecturalRole !== 'doors');
     const hit = this.viewRaycaster.intersectObjects(targets, false)[0];
-    if (!hit || hit.object.userData.architecturalRole !== 'floor') return;
+    if (!hit || !this._standable(hit)) return;
     const end = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
     const travel = end.clone().sub(this.camera.position);
     travel.y = 0;

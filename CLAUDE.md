@@ -76,7 +76,7 @@ Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is lock
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a
-floor walks there (door leaves, drawn swung open in View 3D, don't block, so a tap through a doorway enters the next room), and the
+floor, or the top of a step, ramp or platform (at any level, below the storey's floor too), walks there (door leaves, drawn swung open in View 3D, don't block, so a tap through a doorway enters the next room), and the
 Overview button returns to the saved overview. The overview also has a **📏 Ruler** (owner, 2026-10-08;
 `src/ui/ruler3d.js`, shared links too): while on, a tap measures instead of entering POV. Each tap
 snaps to the vertical face planes within ~22 px (walls, half walls, stairs, furniture sides; a tap
