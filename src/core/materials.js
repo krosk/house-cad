@@ -162,6 +162,23 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Lucia ivory stone 30×90', fr: 'Lucia effet pierre ivoire 30×90', zh: 'Lucia 象牙白石纹 30×90' },
   },
   {
+    // Bare cement floor (owner, 2026-10-13: the basement's big room r70 and the workshop r72;
+    // no product named). A look, not a product: one smooth mid grey with no joints, drawn
+    // untextured like paint; the takeoff gives m² only. Colour and roughness are estimates.
+    id: 'cement_floor_grey', surface: 'floor', pattern: 'paint', w: 0, h: 0, joint: 0,
+    color: 0x9b9a95, accent: 0x7f7e79, roughness: 0.75, pack: null,
+    name: { en: 'Cement floor, grey', fr: 'Sol ciment gris', zh: '灰色水泥地面' },
+  },
+  {
+    // Dark red square floor tiles (owner, 2026-10-13: the other basement rooms; no product
+    // named, chosen over painted concrete and hexagonal tomettes). A look, not a product:
+    // 20 × 20 terracotta-like tiles, 3 mm grey joints; size, joint, colours and the pack
+    // (25 tiles = 1 m²) are estimates.
+    id: 'tile_200_dark_red', surface: 'floor', pattern: 'grid', w: 0.2, h: 0.2, joint: 0.003, thickness: 0.01,
+    color: 0x7a2c24, accent: 0x6e6862, roughness: 0.7, pack: { pieces: 25 },
+    name: { en: 'Dark red tile 20×20', fr: 'Carrelage rouge foncé 20×20', zh: '深红色地砖 20×20' },
+  },
+  {
     // Irregular light grey stone paving ("opus incertum"), laid in mortar: the owner's veranda
     // floor (2026-10-13, no product named). A look, not a product: stones about 32 cm across,
     // 15 mm joints; the takeoff gives m² and mortar only. Drawn by paintFlagstone

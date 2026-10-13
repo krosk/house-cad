@@ -662,6 +662,20 @@ joints, the repeat no longer obvious at 2.56 m (it was at 1.6 m); painting took 
 the Deck (in the texture worker in the app: Hypothesis that it stays off the page). Not yet seen in
 View 3D or AR on the owner's plan.
 
+## Basement floors: cement and dark red tiles (owner, 2026-10-13)
+
+Owner: the basement's big room and the workshop connected to it in cement, the rest in a dark red
+floor, chosen as square tiles (over painted concrete and hexagonal tomettes). No product named:
+two looks, every value an estimate.
+- `cement_floor_grey`: `pattern: 'paint'`, so one smooth mid grey drawn untextured, no joints;
+  the takeoff gives m² only. On r70 (the big room, garage door), r72 (the workshop), the strip
+  r71 between them and the 20 cm nook r232 against r72.
+- `tile_200_dark_red`: a plain `grid` of 20 × 20 dark red tiles, 3 mm grey joints (`accent`),
+  25 tiles = 1 m² per pack. On every other basement room (r66 laundry, r67, r68, r69, r74, r76, r227).
+
+Proven (Node, the owner's 10-13 plan with these finishes): cement 34.9 m²; dark red 25.1 m²,
+737 tiles, 30 packs, about 12 kg of grout (`groutKg`).
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a free-placed furniture item),
