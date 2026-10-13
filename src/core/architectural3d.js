@@ -471,7 +471,8 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
 // Keeping treads as thin slabs (rather than a solid stepped mass) makes both the
 // direction and the opening below readable while staying cheap on mobile GPUs.
 export const STAIR_RISER = 0.18; // m, fixed (owner)
-export const STAIR_GOING = 0.25; // m per tread in plan (a common going; Hypothesis)
+export const STAIR_GOING = 0.25; 
+export const STAIR_WAIST = 0.12; // m, the sloped slab under a flight's steps (Hypothesis: a common concrete waist) // m per tread in plan (a common going; Hypothesis)
 // A flight between two room levels of its own floor (storey.js roomFloorZ; owner, 2026-10-13:
 // the Upper small room up a few steps): the room just past its top (`climb`) end stands higher
 // than the one just past its other end. Returns { zLo, zHi } (m above the storey's floor), else
@@ -490,7 +491,60 @@ export function innerStairSpan(floor, rect) {
   return zHi - zLo > EPS ? { zLo, zHi } : null;
 }
 
-function stairsGeometry(floor, { downRise = floor?.height || 2.8, upRise = floor?.height || 2.8, fillDepth = 0 } = {}) {
+// The stairwell under a flight going down (owner, 2026-10-13: "stairs that go down don't have
+// walls either"), for a view of this floor alone: the floor below draws its own walls around
+// the staircase, so in a view of every floor this would double them. A lining
+// (`wallThickness`) on the flight's two sides and its top end, from the floor below up to this
+// floor; the bottom end stays open (the way off the stairs). A flight between two room levels
+// (innerStairSpan) has none. Returns { walls } (or null); the viewers show it only with one floor.
+function stairwellGeometries(floor, { downRise = floor?.height || 2.8, wallThickness = ARCH_WALL_THICKNESS } = {}) {
+  const walls = [];
+  const box = (x0, x1, y0, y1, z0, z1) => {
+    const g = new THREE.BoxGeometry(x1 - x0, z1 - z0, y1 - y0);
+    g.translate((x0 + x1) / 2, (z0 + z1) / 2, -(y0 + y1) / 2);
+    return g;
+  };
+  for (const rect of floor?.rectangles || []) {
+    if (zoneKind(rect) !== 'stairs_down' || !validBounds(rect.bounds) || innerStairSpan(floor, rect)) continue;
+    const b = rect.bounds, climb = stairClimb(rect);
+    const alongX = climb[1] === 'x', forward = climb[0] === '+';
+    const drop = Math.max(STAIR_RISER, downRise);
+    const T = wallThickness;
+    if (alongX) {
+      walls.push(box(b.x0, b.x1, b.y0 - T, b.y0, -drop, 0), box(b.x0, b.x1, b.y1, b.y1 + T, -drop, 0));
+      walls.push(forward ? box(b.x1, b.x1 + T, b.y0 - T, b.y1 + T, -drop, 0) : box(b.x0 - T, b.x0, b.y0 - T, b.y1 + T, -drop, 0));
+    } else {
+      walls.push(box(b.x0 - T, b.x0, b.y0, b.y1, -drop, 0), box(b.x1, b.x1 + T, b.y0, b.y1, -drop, 0));
+      walls.push(forward ? box(b.x0 - T, b.x1 + T, b.y1, b.y1 + T, -drop, 0) : box(b.x0 - T, b.x1 + T, b.y0 - T, b.y0, -drop, 0));
+    }
+  }
+  return { walls: walls.length ? (walls.length === 1 ? walls[0] : mergeGeometries(walls)) : null };
+}
+
+// A RAMP or PLATFORM zone's own floor material (owner, 2026-10-13: the garden driveway ramp in
+// cement): a `{rect}` finish with a floor material; drawn in its colour, untextured.
+function pavedDef(rect, materialOf) {
+  const def = materialOf?.(rect) || null;
+  return def && (def.surface === 'floor' || def.surface === 'both') ? def : null;
+}
+// The paved ramps and platforms of the floor, grouped by colour: [{ color, roughness, geometry }].
+function pavedParts(floor, fillDepth, materialOf) {
+  const byColor = new Map();
+  for (const rect of floor?.rectangles || []) {
+    const def = pavedDef(rect, materialOf);
+    if (!def) continue;
+    const g = rampPlatformGeometries(floor, fillDepth, (r) => r === rect);
+    if (!g.length) continue;
+    const key = `${def.color}|${def.roughness ?? 0.75}`;
+    (byColor.get(key) ?? byColor.set(key, { color: def.color, roughness: def.roughness ?? 0.75, geos: [] }).get(key)).geos.push(...g);
+  }
+  return [...byColor.values()].map(({ color, roughness, geos }) => ({
+    color, roughness, geometry: geos.length === 1 ? geos[0] : mergeGeometries(geos),
+  }));
+}
+
+function stairsGeometry(floor, opts = {}) {
+  const { downRise = floor?.height || 2.8, upRise = floor?.height || 2.8, fillDepth = 0 } = opts;
   const geometries = [];
   for (const rect of floor?.rectangles || []) {
     const kind = zoneKind(rect);
@@ -514,23 +568,43 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8, upRise = floor
     const riser = span ? (span.zHi - span.zLo) / risers : STAIR_RISER;
     const treadRun = run / Math.max(1, count);
     const slab = Math.min(0.05, STAIR_RISER * 0.3);
+    const stepRise = span ? riser : STAIR_RISER;
+    let zFirst = 0, zLast = 0;
     for (let i = 0; i < count; i++) {
       // i-th tread from the bottom of the flight, walking the climb direction. Up: the
       // first tread is one riser above the floor. Down: the top tread, next to the
       // floor edge, is one riser below it. Between room levels: from the lower one up.
       const level = span ? span.zLo + (i + 1) * riser
         : kind === 'stairs_up' ? (i + 1) * STAIR_RISER : -(count - i) * STAIR_RISER;
+      // Each step is a full block (one riser high) under its tread, and the flight's steps
+      // stand on a sloped slab (owner, 2026-10-13: "stairs are floating", then "maybe stairs
+      // should not be full below it, but at least the steps are connected by a slab or slope").
+      const h = Math.max(slab, stepRise);
       const geometry = alongX
-        ? new THREE.BoxGeometry(treadRun, slab, cross)
-        : new THREE.BoxGeometry(cross, slab, treadRun);
+        ? new THREE.BoxGeometry(treadRun, h, cross)
+        : new THREE.BoxGeometry(cross, h, treadRun);
       const s = forward ? treadRun * (i + 0.5) : run - treadRun * (i + 0.5);
       const planX = alongX ? b.x0 + s : (b.x0 + b.x1) / 2;
       const planY = alongX ? (b.y0 + b.y1) / 2 : b.y0 + s;
-      geometry.translate(planX, level - slab / 2, -planY);
+      geometry.translate(planX, level - h / 2, -planY);
       geometries.push(geometry);
+      if (i === 0) zFirst = level - stepRise;
+      zLast = level;
+    }
+    // The slab: its top runs through every step's front bottom edge, from the foot of the
+    // flight (its low end) up to the top tread at its climb end; STAIR_WAIST thick.
+    if (count > 0 && zLast > zFirst) {
+      const rise = zLast - zFirst, len = Math.hypot(run, rise), angle = Math.atan2(rise, run);
+      const g = alongX ? new THREE.BoxGeometry(len, STAIR_WAIST, cross) : new THREE.BoxGeometry(cross, STAIR_WAIST, len);
+      g.translate(0, -STAIR_WAIST / 2, 0);
+      if (alongX) g.rotateZ(forward ? angle : -angle); // as a ramp: the top rises toward the climb end
+      else g.rotateX(forward ? angle : -angle);
+      g.translate((b.x0 + b.x1) / 2, (zFirst + zLast) / 2, -(b.y0 + b.y1) / 2);
+      geometries.push(g);
     }
   }
-  geometries.push(...rampPlatformGeometries(floor, fillDepth));
+  // A ramp or platform with its own floor material is drawn apart (pavedParts).
+  geometries.push(...rampPlatformGeometries(floor, fillDepth, (r) => !pavedDef(r, opts.fenceMaterial)));
   if (!geometries.length) return null;
   const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries);
   if (geometries.length > 1) geometries.forEach((geometry) => geometry.dispose());
@@ -587,11 +661,12 @@ export function wallMarkerPlacements(floor, wallBoxes = architecturalWallBoxes(f
 // the nearest floor below (floorRises(...).fill, model.js). A ramp is a thin slab sloping from
 // this floor's level at its `climb` end down to the floor below at the other end; a platform
 // is a solid block from this floor's level down to it. Plain boxes, drawn with the stairs.
-export function rampPlatformBoxes(floor, fillDepth = 0) {
+export function rampPlatformBoxes(floor, fillDepth = 0, only = null) {
   const out = [];
   for (const rect of floor?.rectangles || []) {
     const kind = zoneKind(rect);
     if ((kind !== 'ramp' && kind !== 'platform') || !validBounds(rect.bounds)) continue;
+    if (only && !only(rect)) continue;
     const b = rect.bounds;
     if (kind === 'platform') {
       out.push({ kind, x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1, z0: -Math.max(RAMP_SLAB, fillDepth), z1: 0 });
@@ -603,8 +678,8 @@ export function rampPlatformBoxes(floor, fillDepth = 0) {
   return out;
 }
 const RAMP_SLAB = 0.05;
-function rampPlatformGeometries(floor, fillDepth) {
-  return rampPlatformBoxes(floor, fillDepth).map((box) => {
+function rampPlatformGeometries(floor, fillDepth, only = null) {
+  return rampPlatformBoxes(floor, fillDepth, only).map((box) => {
     const w = box.x1 - box.x0, d = box.y1 - box.y0;
     if (box.kind === 'platform') {
       const h = box.z1 - box.z0;
@@ -791,7 +866,9 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const stairGeometry = stairsGeometry(floor, opts);
   return {
     floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
-    outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial), markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
+    outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial),
+    pavedParts: pavedParts(floor, opts.fillDepth ?? 0, opts.fenceMaterial),
+    stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
   };
 }
 

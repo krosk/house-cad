@@ -673,7 +673,15 @@ two looks, every value an estimate.
 - `tile_200_dark_red`: a plain `grid` of 20 × 20 dark red tiles, 3 mm grey joints (`accent`),
   25 tiles = 1 m² per pack. On every other basement room (r66 laundry, r67, r68, r69, r74, r76, r227).
 
-Proven (Node, the owner's 10-13 plan with these finishes): cement 34.9 m²; dark red 25.1 m²,
+**A ramp or platform can take a floor material** (owner, same day: "the garden driveway slope, make it
+cement"): a `{rect}` finish on a RAMP or PLATFORM zone with a floor material draws that piece in the
+material's colour and roughness, untextured, instead of the stairs' material (`pavedParts` in
+`src/core/architectural3d.js`, desktop and AR), and the takeoff counts its top, a ramp's along its
+slope (`pavedRegions` in `src/core/flooring.js`). Set by the headset write only; AR MATERIAL · FLOOR
+picks rooms, not ramps (not yet). The driveway ramp r239 (Garden) is cement: 17.8 m² on its slope
+(17.3 m² in plan, 1.37 m drop over 5.66 m).
+
+Proven (Node, the owner's 10-13 plan with these finishes): cement 34.9 m² (52.7 m² with the ramp); dark red 25.1 m²,
 737 tiles, 30 packs, about 12 kg of grout (`groutKg`).
 
 ## Doors (door products)

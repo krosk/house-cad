@@ -5328,6 +5328,7 @@ export function setupMR(view, project, getFootprint) {
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
       });
       a.floorGeometry?.dispose(); // real floor stays visible; the ceiling is drawn (painted white)
+      if (allFloorsView) a.stairwell.walls?.dispose(); // the floor below draws its own
       const y = (floor.elevation || 0) - displayElevation();
       // Parts by PERF layer (`arch3dLayer`, PERF_LAYERS_3D), each merged into one mesh per
       // material: products are many small meshes, drawn once per eye.
@@ -5336,7 +5337,11 @@ export function setupMR(view, project, getFootprint) {
           [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
           [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
           [a.ceilingGeometry, arch3dMats.ceiling],
+          // The stairwell walls around a flight going down: only with this floor alone (the floor
+          // below draws it in ALL FLOORS).
+          ...(allFloorsView ? [] : [[a.stairwell.walls, arch3dMats.walls]]),
           ...a.fenceParts.map((p) => [p.geometry, fenceLambert(p.color)]),
+          ...a.pavedParts.map((p) => [p.geometry, fenceLambert(p.color)]), // a paved ramp/platform: its colour
         ],
         finish: finishGeometries(finishSurfaces(project, floor))
           .map((g) => [g.geometry, arch3dFinishMaterial(materialById(project, g.material))]),

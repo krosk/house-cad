@@ -376,11 +376,14 @@ export class View3D {
           [windowGeometry, this.windowMaterial, 'windows'],
           [stairGeometry, this.stairMaterial, 'stairs'],
           [ceilingGeometry, this.ceilingMaterial, 'ceiling'],
+          // The stairwell walls around a flight going down, only with this floor alone (_meshVisible).
+          [entry.stairwell?.walls, this.wallMaterial, 'walls', false, true],
         ];
-      for (const [partGeometry, material, role, halfWall] of parts) {
+      for (const [partGeometry, material, role, halfWall, stairwell] of parts) {
         if (!partGeometry) continue;
         const mesh = new THREE.Mesh(partGeometry, halfWall && this.halfWallsSeeThrough ? this.halfWallGlassMaterial : material);
         if (halfWall) mesh.userData.halfWall = true;
+        if (stairwell) mesh.userData.stairwell = true;
         mesh.castShadow = role !== 'floor' && role !== 'windows'; // glass lets the sun through
         if (halfWall && this.halfWallsSeeThrough) mesh.castShadow = false;
         mesh.receiveShadow = true;
@@ -400,6 +403,18 @@ export class View3D {
         mesh.userData.floorId = floorId || null;
         mesh.userData.floorName = name || '';
         mesh.userData.architecturalRole = 'doors';
+        mesh.visible = this._meshVisible(mesh);
+        this.house.add(mesh);
+      }
+      // Ramps and platforms with their own floor material (pavedParts): its colour, plain.
+      for (const part of entry.pavedParts || []) {
+        const mesh = new THREE.Mesh(part.geometry, this._pavedMaterial(part.color, part.roughness));
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.position.y = elevation || 0;
+        mesh.userData.floorId = floorId || null;
+        mesh.userData.floorName = name || '';
+        mesh.userData.architecturalRole = 'stairs';
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
@@ -896,6 +911,17 @@ export class View3D {
   // finish's flat colour until they arrive; main.js holds the 3D view until every
   // background texture job is done (owner, 2026-10-03).
   // A fence's colour (its fence material, materials.js); cached, never disposed.
+  _pavedMaterial(color, roughness) {
+    this.pavedMaterials ??= new Map();
+    const key = `${color}|${roughness}`;
+    let material = this.pavedMaterials.get(key);
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
+      this.pavedMaterials.set(key, material);
+    }
+    return material;
+  }
+
   _fenceMaterial(color) {
     this.fenceMaterials ??= new Map();
     let material = this.fenceMaterials.get(color);
@@ -975,6 +1001,8 @@ export class View3D {
     const role = mesh.userData.architecturalRole;
     if (role === 'outlines' && (this.lightingEnabled || this.realisticEnabled)) return false;
     if (mesh.userData.halfWallFinish && this.halfWallsSeeThrough) return false;
+    // A floor's stairwell under its flights going down: the floor below draws it otherwise.
+    if (mesh.userData.stairwell && this.floorFilter == null) return false;
     return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');
   }
 

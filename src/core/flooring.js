@@ -19,7 +19,7 @@
 // are rounded once per product for the whole house.
 
 import { connectedRoomComponents } from './geometry2d.js';
-import { zoneKind } from './zoneColors.js';
+import { zoneKind, stairClimb } from './zoneColors.js';
 import { materialById } from './materials.js';
 import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
 
@@ -779,12 +779,41 @@ export function finishSurfaces(project, floor) {
   return { floors, walls };
 }
 
+// A RAMP or PLATFORM zone's own floor material (owner, 2026-10-13: the garden driveway ramp in
+// cement; architectural3d.js pavedParts): its top, a ramp's along its slope down to the floor
+// below (as rampPlatformBoxes: from this floor's level to the nearest floor under it).
+function pavedRegions(project, floor) {
+  const z = floor.elevation || 0;
+  const under = Math.max(-Infinity, ...(project.floors || []).map((f) => f.elevation || 0).filter((e) => e < z - EPS));
+  const drop = Number.isFinite(under) ? z - under : 0;
+  const out = [];
+  for (const f of floor.finishes || []) {
+    if (f.target?.edge) continue;
+    const rect = floor.rectangles.find((r) => r.id === f.target?.rect);
+    const kind = rect && zoneKind(rect);
+    if (kind !== 'ramp' && kind !== 'platform') continue;
+    const material = materialById(project, f.material);
+    if (!material || (material.surface !== 'floor' && material.surface !== 'both')) continue;
+    const b = rect.bounds;
+    let boxes = [b];
+    if (kind === 'ramp') { // the slope stretches the ramp along its climb axis
+      const alongX = stairClimb(rect)[1] === 'x';
+      const run = alongX ? b.x1 - b.x0 : b.y1 - b.y0, len = Math.hypot(run, drop);
+      boxes = [alongX ? { ...b, x1: b.x0 + len } : { ...b, y1: b.y0 + len }];
+    }
+    out.push({ floorId: floor.id, material: f.material, rectIds: new Set([rect.id]), rects: [rect], boxes,
+      count: countPieces(material, boxes) });
+  }
+  return out;
+}
+
 // ---- whole-house takeoff ---------------------------------------------------------
 export function materialTakeoff(project) {
   const regions = [], walls = [];
   for (const floor of project.floors || []) {
     const roomIds = wallTargetIds(floor);
     regions.push(...floorRegions(project, floor));
+    regions.push(...pavedRegions(project, floor));
     for (const f of floor.finishes || []) {
       if (!f.target?.edge || !roomIds.has(f.target.rect)) continue;
       const material = materialById(project, f.material);

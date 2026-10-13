@@ -990,6 +990,18 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   it (`floorRises`); risers, the heat loss, the VMC air network and the storey bands ignore it
   (outdoors). In ALL FLOORS it counts as "my storey" only while the headset is over something drawn
   on it, so a basement room under the garden's level stays on the basement.
+- **Stairs in 3D are connected steps on a sloped slab** (owner, 2026-10-13: "stairs are floating, I would
+  rather they be full underneath", then "stairs that go down don't have walls either", "but that will maybe
+  conflict with the all levels 3d view", and "maybe stairs should not be full below it, but at least the
+  steps are connected by a slab or slope"). Every flight, up or down: each step is a full block one riser
+  high under its tread, standing on a 12 cm sloped slab (`STAIR_WAIST`, Hypothesis: a common concrete waist)
+  whose top runs through every step's front bottom edge from the foot of the flight to its top tread; open
+  underneath. A flight going down also gets **stairwell walls** (a 12 cm lining on its two sides and its top
+  end, from the floor below up to this floor, the bottom end open) drawn **only when that floor is shown
+  alone**: with ALL FLOORS the floor below draws its own walls there, so nothing doubles
+  (`stairwellGeometries` in `src/core/architectural3d.js`; View 3D `userData.stairwell` in `_meshVisible`, AR
+  skips it in ALL FLOORS). The slab's square-cut ends stick out ≈ 7 cm past the flight's ends, under the
+  floor at the foot and under the top tread at the top (Hypothesis: not noticeable).
 - **RAMP and PLATFORM zones** (owner, 2026-10-12). A RAMP is a smooth STAIRS DOWN: it starts at its
   floor's level at its `climb` end (A/X turns it like a stair) and slopes down to the nearest floor
   below (the garden's driveway down to the garage door, 1.37 m). A PLATFORM is a solid block from its
