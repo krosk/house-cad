@@ -38,7 +38,11 @@ only a product needs the slot), so links made before products still decode. **Su
 turn]` (trailing defaults dropped), indexes into that floor's rects and a top-level `m` id list; the
 owner's own products used by a finish ride in `cm`. Added 2026-10-03 after the owner's link showed no
 Héméra windows (Proven in Node on the owner's file: 28 finishes round-trip identical, 8 windows and 6
-doors restored, link 1 835 → 2 205 chars without markers); older links decode with none. Not
+doors restored, link 1 835 → 2 205 chars without markers); older links decode with none. **A room's own floor level and ceiling** (`floorZ`, `ceiling`, `docs/product-intent.md`
+multi-floor) ride after the furniture article slot of a compact rect (added 2026-10-13: the owner's link
+showed the raised Upper small room flat while its door kept its 50 cm sill; Proven in Node on the owner's
+plan: the room's floor top is 0.50 in the link after the fix, 0 before). Older links decode with every room on
+its storey's floor, and an older viewer ignores the extra slots. Not
 carried: constraints, the conduit/wire network, control links, circuits. To see exactly what a given house loses,
 run `node tools/check-share-link.mjs <house.json>` (Node only: it builds the link with the app's code,
 decodes it, and lists every differing field plus the link length with and without markers). Any of these could be

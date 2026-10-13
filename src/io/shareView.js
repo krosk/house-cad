@@ -31,6 +31,9 @@ const mm = (v) => (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(3)
 // into `a`.
 const APERTURE_KEYS = ['sill', 'head', 'hinge', 'swing', 'foot', 'top', 'climb', 'facing'];
 const ARTICLE_SLOT = 6 + APERTURE_KEYS.length;
+// A room's own floor level and ceiling (storey.js) follow the article slot, so older links,
+// which stop earlier, still decode (as rooms on the storey's floor, under its ceiling).
+const LEVEL_KEYS = ['floorZ', 'ceiling'];
 // Surface finishes (floors, walls, door and window products: docs/materials.md) ride in
 // floor slot 5 as [rectIndex, materialIndex, edge, anchorRectIndex, corner, turn], trailing
 // defaults dropped; indexes are into that floor's rects and the top-level `m` id list.
@@ -77,6 +80,7 @@ export function serializeView(project, { markers = false, furniture = true } = {
         const rc = [mm(r.x), mm(r.y), mm(r.w), mm(r.h), r.op === 'subtract' ? 1 : 0, kinds.indexOf(r.kind || 'room')];
         for (const key of APERTURE_KEYS) rc.push(r[key] == null ? null : mm(r[key]));
         rc.push(furniture && r.article ? furnitureArticles.indexOf(r.article) : null);
+        for (const key of LEVEL_KEYS) rc.push(r[key] == null ? null : mm(r[key]));
         while (rc.length > 6 && rc.at(-1) == null) rc.pop();
         return rc;
       });
@@ -129,6 +133,7 @@ export function loadView(project, view) {
       kind: view.k?.[r[5]] || 'room',
       ...Object.fromEntries(APERTURE_KEYS.flatMap((key, index) => r[index + 6] == null ? [] : [[key, r[index + 6]]])),
       ...(typeof view.a?.[r[ARTICLE_SLOT]] === 'string' ? { article: view.a[r[ARTICLE_SLOT]] } : {}),
+      ...Object.fromEntries(LEVEL_KEYS.flatMap((key, index) => r[ARTICLE_SLOT + 1 + index] == null ? [] : [[key, r[ARTICLE_SLOT + 1 + index]]])),
     })),
     markers: (f[3] || []).map((m) => ({
       t: view.t?.[m[0]] || 'outlet', x: m[1], y: m[2], z: m[3], ...(m[4] ? { d: 1 } : {}),
@@ -158,7 +163,7 @@ export function loadView(project, view) {
         id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
         op: rc.op || 'add', kind: rc.kind || 'room',
         sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
-        article: rc.article, facing: rc.facing,
+        article: rc.article, facing: rc.facing, floorZ: rc.floorZ, ceiling: rc.ceiling,
       })),
       constraints: [], // a view carries no parametric relationships (solver is a no-op)
       markers: (f.markers || []).map((m) => ({
