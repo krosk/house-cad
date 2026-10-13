@@ -22,7 +22,7 @@ import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { buildDeviceProduct } from './deviceProducts.js';
-import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight, stairRises, isSplitLevel, floorBelow, floorAbove } from '../core/model.js';
+import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight, ceilingAt, roomCeiling, roomFloorZ, stairRises, isSplitLevel, floorBelow, floorAbove } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
 import { materialsFor, materialById, zoneMaterial, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
@@ -7993,7 +7993,7 @@ export function setupMR(view, project, getFootprint) {
   // Selecting a rect that carries a vertical band opens the reused DIMS numpad to type
   // its bounds; the SWAP cell becomes a field toggle. Two kinds of band share this pad:
   //   • apertures — opening band [sill, head] (which bounds are editable is per-kind:
-  //     window/heater = SILL+HEAD, door/garage/sliding = HEAD only, half wall = SILL only);
+  //     window/heater/door/passage/sliding = SILL+HEAD, garage/gate = HEAD only, half wall = SILL only);
   //   • furniture placeholders — solid body band [foot, top] (both bounds).
   // Bounds are always [lower, upper] in field order; the commit keeps them ordered.
   // Aperture hinge/swing stay on A/X rotate; B/Y deletes the whole zone.
@@ -8001,10 +8001,18 @@ export function setupMR(view, project, getFootprint) {
   // (docs/heat-loss.md), plain numbers, not lengths; setting one clears the other, an
   // empty ENTER clears it (back to depth / the project λ).
   const THERMAL_FIELDS = new Set(['rValue', 'lambda']);
-  const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue', 'lambda'] : verticalBandFields(rect));
+  // A ROOM's own levels (core/storey.js; owner, 2026-10-13), from the storey's floor: its floor
+  // level above it (floorUp) or below it (floorDown; the pad has no minus key), and its own
+  // lower ceiling. An empty ENTER clears the field (back to the storey's).
+  const ROOM_FIELDS = new Set(['floorUp', 'floorDown', 'ceiling']);
+  const bandFields = (rect) => (rect?.kind === 'insulation' ? ['rValue', 'lambda']
+    : rect?.kind === 'room' ? ['floorUp', 'floorDown', 'ceiling'] : verticalBandFields(rect));
+  const roomFieldValue = (rect, f) => (f === 'ceiling' ? (rect.ceiling != null ? fmt(roomCeiling(project.activeFloor, rect)) : '')
+    : f === 'floorUp' ? (rect.floorZ > 0 ? fmt(rect.floorZ) : '') : (rect.floorZ < 0 ? fmt(-rect.floorZ) : ''));
   const rectHasBand = (rect) => bandFields(rect).length > 0;
   // Field labels are namespaced by which band the field belongs to.
   const bandFieldLabel = (f) => f === 'rValue' ? t('heat.rValue') : f === 'lambda' ? t('heat.lambdaField')
+    : ROOM_FIELDS.has(f) ? t(`room.${f}`)
     : selectedRect?.kind === 'gardenwall' ? t(`gardenwall.${f}`)
     : selectedRect?.kind === 'fence' ? t(`fence.${f}`)
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
@@ -8025,6 +8033,7 @@ export function setupMR(view, project, getFootprint) {
     if (!fs.includes(bandField)) bandField = fs[0]; // clamp after a retype
     bandBuffer = !selectedRect ? ''
       : THERMAL_FIELDS.has(bandField) ? (selectedRect[bandField] != null ? String(selectedRect[bandField]) : '')
+      : ROOM_FIELDS.has(bandField) ? roomFieldValue(selectedRect, bandField)
       : selectedRect.kind === 'fence' && bandField === 'foot' ? fmt(fenceFoot(project.activeFloor, selectedRect))
       : fmt(selectedRect[bandField] ?? 0);
     bandPristine = true;
@@ -8033,7 +8042,10 @@ export function setupMR(view, project, getFootprint) {
 
   function activateBandPad() {
     bandField = selectedRect?.kind === 'insulation' && selectedRect.rValue == null && selectedRect.lambda != null
-      ? 'lambda' : bandFields(selectedRect)[0] || 'sill'; // door/garage/sliding open on HEAD
+      ? 'lambda' : selectedRect?.kind === 'room' && selectedRect.floorZ < 0 ? 'floorDown'
+      // A door, passage or sliding door opens on HEAD (its sill is usually the floor's).
+      : ['door', 'passage', 'sliding'].includes(selectedRect?.kind) ? 'head'
+      : bandFields(selectedRect)[0] || 'sill'; // garage/gate: HEAD only
     placePanel(numpad.group);
     numpad.group.visible = true;
     refreshBandPad();
@@ -8070,6 +8082,7 @@ export function setupMR(view, project, getFootprint) {
       refreshBandPad();
       return;
     }
+    if (ROOM_FIELDS.has(bandField)) { commitRoomField(); return; }
     const val = parseFloat(bandBuffer);
     if (selectedRect.kind === 'fence' && bandField === 'foot' && bandBuffer.trim() === '') {
       // An empty ENTER puts the fence back on the garden wall under it (fenceFoot).
@@ -8114,6 +8127,30 @@ export function setupMR(view, project, getFootprint) {
     buildArch3d();
     rlog('band edit', { id: selectedRect.id, field: bandField, m: +m.toFixed(3) });
     refreshBandPad(); // stay open so the other bound can be typed next
+  }
+
+  function commitRoomField() {
+    const r = selectedRect, floor = project.activeFloor, H = ceilingHeight(floor);
+    const empty = bandBuffer.trim() === '', val = parseFloat(bandBuffer);
+    if (!empty && !(Number.isFinite(val) && val >= 0)) return;
+    const m = empty ? 0 : toMeters(val);
+    if (bandField === 'ceiling') {
+      // Only lower than the storey's: empty, or the storey's ceiling or more, clears it.
+      if (empty || m >= H) delete r.ceiling;
+      else if (m > roomFloorZ(r) + 0.5) r.ceiling = m;
+      else { rlog('room ceiling rejected (too low)', { id: r.id, m }); return; }
+    } else {
+      const z = bandField === 'floorDown' ? -m : m;
+      // A floor level above the storey's in one field clears one below it in the other.
+      if (m === 0) { if (bandField === 'floorDown' ? r.floorZ < 0 : r.floorZ > 0) delete r.floorZ; }
+      else if (z < roomCeiling(floor, r) - 0.5 && z > -2) r.floorZ = z;
+      else { rlog('room floor level rejected', { id: r.id, z }); return; }
+    }
+    project.touch();
+    if (!allFloorsView) buildZDims();
+    buildArch3d();
+    rlog('room level', { id: r.id, floorZ: r.floorZ ?? 0, ceiling: r.ceiling ?? null });
+    refreshBandPad();
   }
 
   function pressBandKey(k) {
@@ -8373,7 +8410,7 @@ export function setupMR(view, project, getFootprint) {
         }
         if (!hoverStack.length) return;
         selectedRect = hoverStack[0];
-        syncBandPad(); // a band-carrying rect opens its pad; a plain room tears it down
+        syncBandPad(); // a band-carrying rect (and a room: its levels) opens its pad; anything else tears it down
         updateRoomAreaHud();
         setModeInfo();
         rlog('edit select', {
@@ -8416,8 +8453,8 @@ export function setupMR(view, project, getFootprint) {
         // can be dropped, avoiding accidental duplicates while operating the pad.
         const { px, py } = worldToPlan(pos);
         // Lights live on the ceiling (unreachable to tip-capture), so default their z to
-        // the storey height; other fixtures capture z from the controller tip height.
-        const z = currentMarkerType === 'light' ? ceilingHeight(project.activeFloor) : Math.max(0, pos.y - overlayY());
+        // the ceiling there (a room's own lower one); other fixtures capture z from the tip height.
+        const z = currentMarkerType === 'light' ? ceilingAt(project.activeFloor, px, py) : Math.max(0, pos.y - overlayY());
         const m = project.addMarker({ type: currentMarkerType, x: px, y: py, z });
         buildPlan(); applyPlanMatrix();
         rlog('marker drop', { id: m.id, type: m.type, px: +px.toFixed(3), py: +py.toFixed(3), z: +z.toFixed(3) });

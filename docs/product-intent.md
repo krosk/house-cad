@@ -103,6 +103,38 @@ ray; the editor is **not** rebuilt as a separate 3D system.
   a 2.27 storey (slab 0.22). Before the slab existed, the owner typed 2.95 as Ground's height to make
   the floors stack, and everything drew and counted to 2.95. Exports (STL/OBJ/GLB massing) still use
   the storey height.
+- **A room can have its own lower ceiling and its own floor level** (owner, 2026-10-13). The ceiling:
+  the veranda is on the ground floor's level, "it exits from the kitchen", under a 2.2 m roof in a
+  2.70 m storey (a split level was the alternative, rejected because its floor is the ground floor's).
+  The floor level: the Upper small room r95 is up a few steps (≈ 0.50 m, owner's estimate), and the
+  Basement's rooms are "flat at different heights". Two optional ROOM fields, both in m from the
+  **storey's floor**, like every other height (markers, sills, heads), so nothing stored moves:
+  - `ceiling` only lowers (`roomCeiling` in `src/core/storey.js`; none, or one at or above the
+    storey's, is the storey's);
+  - `floorZ` is above (+) or below (−) the storey's floor (`roomFloorZ`); none = 0.
+  A room's height is its ceiling − its floor level. The floors still stack on `height`. Used by:
+  - View 3D / AR 3D: one floor slab per level, each reaching down under the lowest one so a step shows
+    a solid face; one ceiling piece per ceiling; the walls (a wall piece whose every room or stair within
+    the wall thickness + 1 cm is lower stops at the highest of their ceilings, a wall shared with a
+    full-height room keeps the storey's; a wall from the floor goes down to the lowest neighbour's level);
+    floor and wall finishes at their room's level; POV walks on the raised slab.
+  - A flight between two room levels of its floor (`innerStairSpan` in `src/core/architectural3d.js`:
+    the room just past its top end stands higher than the one past its other end): it climbs only
+    their difference, in equal risers near 0.18 m, the last one up onto the higher floor, and it is
+    floor, not a hole in the slab. Any other flight still climbs to the next floor.
+  - Heat loss: a space's walls and volume take its highest room ceiling − its lowest floor level; a
+    partition between two spaces the lower height. The 3D airflow box likewise.
+  - A new AR light defaults to the ceiling over its point (`ceilingAt`).
+
+  Editing: desktop room panel **Ceiling** and **Floor level** (empty = the storey's). AR PLAN · EDIT:
+  a selected room opens the numpad with FLOOR UP, FLOOR DOWN (the pad has no minus key) and CEILING
+  (SWAP cycles; an empty ENTER clears). Not yet: the AR flat plan and the plan sheets don't show levels,
+  marker heights still read from the storey's floor, the airflow network's leak heights, the switch→light
+  ceiling routes; a door's or window's sill and head are not moved to a room's level or clipped to its
+  ceiling: type them (owner: "just like the head for the door, I would have to set the sill"; a DOOR,
+  PASSAGE or SLIDING door now has a SILL on the band pad and the desktop takes it from the file: its
+  opening, leaf and product start there, and the wall under it is the step's face). Hypothesis until seen in View 3D: two rooms of different ceilings touching
+  with no wall between them leave a gap.
 - **A split level** (owner, 2026-10-12): the garden is a floor at its own elevation, the earth level
   (−0.90 m, the HEAT LOSS earth setting), between the basement and the ground floor, and it does not
   stack. The garden has three levels: the main garden on that floor, the garage-door side at the

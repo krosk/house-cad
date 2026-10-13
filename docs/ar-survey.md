@@ -879,9 +879,11 @@ live in `APERTURE_DEFAULTS` (`zoneColors.js`); `setKind` resets them on retype.
   View 3D shares the geometry (`architectural3d.js`).
 - **Band pad** — selecting a band-carrying rect in PLAN EDIT opens the reused DIMS numpad as a band
   editor (`activateBandPad`/`syncBandPad`/`commitBandField`). `verticalBandFields(rect)` is the
-  authoritative per-kind field list: apertures → `apertureBounds` (door/garage/sliding = HEAD only since sill
-  is structurally 0; halfwall = SILL only since head is null; window/heater = both); furniture zone →
-  `[foot,top]`; else `[]`. The **SWAP cell cycles the field** (only when ≥2 fields; label names the
+  authoritative per-kind field list: apertures → `apertureBounds` (garage/gate = HEAD only; door/passage/
+  sliding = SILL + HEAD, opening on HEAD: the sill is 0 unless the door opens onto a room on its own
+  floor level, owner 2026-10-13; halfwall = SILL only since head is null; window/heater = both);
+  furniture zone → `[foot,top]`; a ROOM → FLOOR UP / FLOOR DOWN / CEILING (`docs/product-intent.md`
+  multi-floor); else `[]`. The **SWAP cell cycles the field** (only when ≥2 fields; label names the
   field it switches to, namespaced `aperture.*` vs `furniture.*`); ENTER writes `rect[field]` with a
   band-ordering guard (lower < upper); **DEL deletes the whole zone** (unlike the height pads' DEL).
   The pad stays open after a commit so the other bound can be typed next.

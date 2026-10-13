@@ -21,7 +21,7 @@
 import { connectedRoomComponents } from './geometry2d.js';
 import { zoneKind } from './zoneColors.js';
 import { materialById } from './materials.js';
-import { ceilingHeight } from './storey.js';
+import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
 
 const EPS = 1e-6;
 // Door-family zones a floor runs through (full-height openings).
@@ -710,8 +710,10 @@ export function wallFaceBoxes(floor, rect, edge) {
     return { face, boxes: face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: s.z0 || 0, y1: top, inset: 0 })) };
   }
   const face = edgeFace(floor, rect, edge);
-  const H = ceilingHeight(floor, 2.8); // up to the ceiling, not the storey height
-  const include = face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: 0, y1: H }));
+  // Up to the ceiling, not the storey height; a room's face up to its own lower ceiling.
+  const H = zoneKind(rect) === 'room' ? roomCeiling(floor, rect, 2.8) : ceilingHeight(floor, 2.8);
+  const z0 = zoneKind(rect) === 'room' ? roomFloorZ(rect) : 0; // a room's face starts at its floor level
+  const include = face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: z0, y1: H }));
   const exclude = [];
   // A half wall standing inside a room is a free-standing low wall, not a gap in the
   // wall mass: it opens no face (as in architecturalWallBoxes).
@@ -754,11 +756,20 @@ const wallTargetIds = (floor) => new Set([
   ...(floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id),
   ...inRoomHalfWalls(floor).map((r) => r.id),
 ]);
+// A floor finish box's level (storey.js roomFloorZ): the room of its region it lies in, else
+// (a doorway's half) the room it touches.
+function boxFloorZ(rects, b) {
+  const inside = rects.filter((r) => zoneKind(r) === 'room' && Math.min(b.x1, r.bounds.x1) - Math.max(b.x0, r.bounds.x0) > EPS
+    && Math.min(b.y1, r.bounds.y1) - Math.max(b.y0, r.bounds.y0) > EPS);
+  const touch = inside.length ? inside : rects.filter((r) => zoneKind(r) === 'room'
+    && Math.max(0, r.bounds.x0 - b.x1, b.x0 - r.bounds.x1, r.bounds.y0 - b.y1, b.y0 - r.bounds.y1) < 0.02);
+  return touch.length ? Math.max(...touch.map(roomFloorZ)) : 0;
+}
 export function finishSurfaces(project, floor) {
   const roomIds = wallTargetIds(floor);
   const floors = floorRegions(project, floor, { count: false })
-    .map((r) => ({ material: r.material, boxes: r.boxes, anchor: r.anchor, alongX: r.alongX, patternTurn: r.patternTurn,
-      frameOffset: r.frameOffset }));
+    .map((r) => ({ material: r.material, boxes: r.boxes.map((b) => ({ ...b, z: boxFloorZ(r.rects, b) })), anchor: r.anchor,
+      alongX: r.alongX, patternTurn: r.patternTurn, frameOffset: r.frameOffset }));
   const walls = [];
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;

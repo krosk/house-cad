@@ -10,7 +10,7 @@ import { computeFootprint } from './geometry2d.js';
 import { extrudeFootprint } from './extrude.js';
 import { zoneKind, stairClimb } from './zoneColors.js';
 import { resolveApertureOrient } from './apertureGlyph.js';
-import { ceilingHeight } from './storey.js';
+import { ceilingHeight, roomCeiling, roomFloorZ, floorZAt, hasRoomLevels } from './storey.js';
 
 export const ARCH_WALL_THICKNESS = 0.12;
 export const ARCH_SLAB_THICKNESS = 0.06;
@@ -32,8 +32,11 @@ const PIERCE_MAX = 0.6;
 
 function openingBand(rect, storeyHeight) {
   const kind = zoneKind(rect);
-  if (kind === 'door' || kind === 'passage' || kind === 'garage' || kind === 'sliding') {
-    return [0, clipped(rect.head ?? 2.1, 0, storeyHeight)];
+  if (kind === 'garage') return [0, clipped(rect.head ?? 2.1, 0, storeyHeight)];
+  if (kind === 'door' || kind === 'passage' || kind === 'sliding') {
+    // A door's sill: 0, or a room's own floor level it opens onto (storey.js roomFloorZ).
+    const head = clipped(rect.head ?? 2.1, 0, storeyHeight);
+    return [clipped(rect.sill ?? 0, 0, head), head];
   }
   if (kind === 'window' || kind === 'recess') {
     return [
@@ -294,7 +297,34 @@ export function architecturalWallBoxes(floor, { wallThickness = ARCH_WALL_THICKN
     }
     return pieces.map((b) => ({ rect, bounds: b, z0: band[0], z1: band[1] }));
   });
-  return sources.flatMap((source) => splitWallByOpenings(source, height, openings));
+  const boxes = sources.flatMap((source) => splitWallByOpenings(source, height, openings));
+  return fitWallsToRooms(floor, boxes, [...rooms, ...stairs], height, wallThickness + 0.01);
+}
+
+// Rooms with their own ceiling or floor level (storey.js). A room with a lower ceiling (the
+// veranda's 2.20 m roof in a 2.70 m storey): a wall piece whose every neighbouring room or
+// stair within `reach` (plan gap) is lower stops at the highest of their ceilings; a wall
+// shared with a full-height room keeps the storey's height. A room standing below the
+// storey's floor (a Basement room a step down): a wall piece reaching down from the floor
+// goes down to the lowest neighbour's level. A piece near no room (a thick wall's core) is unchanged.
+function fitWallsToRooms(floor, boxes, spaces, height, reach) {
+  const low = spaces.some((r) => roomCeiling(floor, r) < height - EPS);
+  const sunk = spaces.some((r) => roomFloorZ(r) < -EPS);
+  if (!low && !sunk) return boxes;
+  const gap = (b, r) => Math.max(0, r.x0 - b.x1, b.x0 - r.x1, r.y0 - b.y1, b.y0 - r.y1);
+  return boxes.flatMap((box) => {
+    let top = -Infinity, bottom = Infinity;
+    for (const s of spaces) {
+      if (gap(box, s.bounds) > reach) continue;
+      top = Math.max(top, roomCeiling(floor, s));
+      bottom = Math.min(bottom, roomFloorZ(s));
+    }
+    if (top === -Infinity) return [box];
+    const z0 = box.z0 <= EPS && bottom < -EPS ? bottom : box.z0;
+    const z1 = top < box.z1 - EPS ? top : box.z1;
+    if (z1 <= box.z0 + EPS) return [];
+    return z0 === box.z0 && z1 === box.z1 ? [box] : [{ ...box, z0, z1 }];
+  });
 }
 
 function boxesGeometry(boxes) {
@@ -409,12 +439,13 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
   for (const rect of floor?.rectangles || []) {
     if (!validBounds(rect.bounds) || skip?.has(rect.id)) continue;
     const kind = zoneKind(rect);
+    const sill = kind === 'door' || kind === 'sliding' ? Math.max(0, rect.sill ?? 0) : 0;
     if (kind === 'door' && openDoors) {
       const head = clipped(rect.head ?? 2.1, 0, height);
-      if (head > EPS) doors.push(...openDoorLeafBoxes(rect, 0.015, Math.max(0.015, head - 0.015)));
+      if (head - sill > EPS) doors.push(...openDoorLeafBoxes(rect, sill + 0.015, Math.max(sill + 0.015, head - 0.015)));
     } else if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
-      if (head > EPS) doors.push(apertureInsertBox(rect, 0.015, Math.max(0.015, head - 0.015)));
+      if (head - sill > EPS) doors.push(apertureInsertBox(rect, sill + 0.015, Math.max(sill + 0.015, head - 0.015)));
     } else if (kind === 'gate') {
       // Free-standing and outdoors: the leaf, closed, up to its own head (no ceiling clip).
       const head = Math.max(0, rect.head ?? 1.2);
@@ -441,6 +472,24 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
 // direction and the opening below readable while staying cheap on mobile GPUs.
 export const STAIR_RISER = 0.18; // m, fixed (owner)
 export const STAIR_GOING = 0.25; // m per tread in plan (a common going; Hypothesis)
+// A flight between two room levels of its own floor (storey.js roomFloorZ; owner, 2026-10-13:
+// the Upper small room up a few steps): the room just past its top (`climb`) end stands higher
+// than the one just past its other end. Returns { zLo, zHi } (m above the storey's floor), else
+// null: the flight climbs to the next floor (or down to the one below) as before. Such a flight
+// is floor, not a hole in the slab.
+export function innerStairSpan(floor, rect) {
+  const kind = zoneKind(rect);
+  if ((kind !== 'stairs_up' && kind !== 'stairs_down') || !hasRoomLevels(floor) || !validBounds(rect.bounds)) return null;
+  const b = rect.bounds, climb = stairClimb(rect), d = 0.05;
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  const past = (sign) => (climb[1] === 'x'
+    ? floorZAt(floor, (sign > 0 ? b.x1 + d : b.x0 - d), cy)
+    : floorZAt(floor, cx, (sign > 0 ? b.y1 + d : b.y0 - d)));
+  const up = climb[0] === '+' ? 1 : -1;
+  const zHi = past(up), zLo = past(-up);
+  return zHi - zLo > EPS ? { zLo, zHi } : null;
+}
+
 function stairsGeometry(floor, { downRise = floor?.height || 2.8, upRise = floor?.height || 2.8, fillDepth = 0 } = {}) {
   const geometries = [];
   for (const rect of floor?.rectangles || []) {
@@ -453,15 +502,24 @@ function stairsGeometry(floor, { downRise = floor?.height || 2.8, upRise = floor
     const forward = climb[0] === '+';
     const run = alongX ? width : depth;
     const cross = alongX ? depth : width;
+    const span = innerStairSpan(floor, rect);
     const maxRise = Math.max(STAIR_RISER, kind === 'stairs_down' ? downRise : upRise);
-    const count = Math.max(1, Math.min(Math.round(run / STAIR_GOING), Math.floor(maxRise / STAIR_RISER + 1e-6)));
-    const treadRun = run / count;
+    // A flight between two room levels of this floor climbs their difference in equal risers
+    // as close to STAIR_RISER as fit, the last one up onto the higher room's floor (so one
+    // tread fewer than risers in the zone); any other flight climbs to the next floor in STAIR_RISERs.
+    const risers = span ? Math.max(1, Math.min(Math.round((span.zHi - span.zLo) / STAIR_RISER) || 1,
+      Math.max(1, Math.round(run / STAIR_GOING)) + 1)) : 0;
+    const count = span ? risers - 1
+      : Math.max(1, Math.min(Math.round(run / STAIR_GOING), Math.floor(maxRise / STAIR_RISER + 1e-6)));
+    const riser = span ? (span.zHi - span.zLo) / risers : STAIR_RISER;
+    const treadRun = run / Math.max(1, count);
     const slab = Math.min(0.05, STAIR_RISER * 0.3);
     for (let i = 0; i < count; i++) {
       // i-th tread from the bottom of the flight, walking the climb direction. Up: the
       // first tread is one riser above the floor. Down: the top tread, next to the
-      // floor edge, is one riser below it.
-      const level = kind === 'stairs_up' ? (i + 1) * STAIR_RISER : -(count - i) * STAIR_RISER;
+      // floor edge, is one riser below it. Between room levels: from the lower one up.
+      const level = span ? span.zLo + (i + 1) * riser
+        : kind === 'stairs_up' ? (i + 1) * STAIR_RISER : -(count - i) * STAIR_RISER;
       const geometry = alongX
         ? new THREE.BoxGeometry(treadRun, slab, cross)
         : new THREE.BoxGeometry(cross, slab, treadRun);
@@ -642,13 +700,56 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // walls/doors/windows sit on the floor, while a staircase needs a real opening.
   const roomFootprint = computeFootprint([...rooms, ...stairs]);
   const slabThickness = opts.slabThickness ?? ARCH_SLAB_THICKNESS;
-  const floorGeometry = extrudeFootprint(roomFootprint, slabThickness);
-  if (floorGeometry) floorGeometry.translate(0, -slabThickness, 0); // finished floor remains at local Y=0
+  let floorGeometry;
+  if (!hasRoomLevels(floor)) {
+    floorGeometry = extrudeFootprint(roomFootprint, slabThickness);
+    if (floorGeometry) floorGeometry.translate(0, -slabThickness, 0); // finished floor remains at local Y=0
+  } else {
+    // Rooms on their own levels (storey.js roomFloorZ): one slab per level, each reaching down
+    // to under the lowest level so a step between two rooms shows a solid face. A flight
+    // between two levels (innerStairSpan) is floor at its lower level, not a hole.
+    const inner = stairs.filter((st) => innerStairSpan(floor, st));
+    const holes = stairs.filter((st) => !inner.includes(st));
+    const levels = new Map();
+    const at = (z) => levels.get(z) ?? levels.set(z, []).get(z);
+    for (const r of rooms) at(roomFloorZ(r)).push(r);
+    for (const st of inner) at(innerStairSpan(floor, st).zLo).push({ bounds: st.bounds, op: 'add', kind: 'room' });
+    const bottom = Math.min(0, ...levels.keys()) - slabThickness;
+    const pieces = [];
+    for (const [z, group] of levels) {
+      const g = extrudeFootprint(computeFootprint([...group, ...holes]), z - bottom);
+      if (g) { g.translate(0, bottom, 0); pieces.push(g); }
+    }
+    floorGeometry = pieces.length > 1 ? mergeGeometries(pieces) : pieces[0] || null;
+  }
   // Reuse the exact room footprint for an overhead slab. Its underside is at
   // the ceiling (storey height − slab, ceilingHeight); View3D only reveals it in first-person mode so
   // the exterior orbit remains an unobstructed architectural overview.
-  const ceilingGeometry = floorGeometry?.clone() || null;
-  if (ceilingGeometry) ceilingGeometry.translate(0, ceilingHeight(floor) + slabThickness, 0);
+  // A room with its own lower ceiling (roomCeiling) gets its own piece at that height.
+  const H = ceilingHeight(floor);
+  const lowRooms = rooms.filter((r) => roomCeiling(floor, r) < H - EPS);
+  let ceilingGeometry = null;
+  if (!lowRooms.length && !hasRoomLevels(floor)) {
+    ceilingGeometry = floorGeometry?.clone() || null;
+    if (ceilingGeometry) ceilingGeometry.translate(0, H + slabThickness, 0);
+  } else {
+    // A flight between two room levels (innerStairSpan) has the ceiling over it, not a hole.
+    const inner = stairs.filter((st) => innerStairSpan(floor, st));
+    const holes = stairs.filter((st) => !inner.includes(st));
+    const groups = new Map([[H, [...rooms.filter((r) => !lowRooms.includes(r)),
+      ...inner.map((st) => ({ bounds: st.bounds, op: 'add', kind: 'room' }))]]]);
+    for (const r of lowRooms) {
+      const c = roomCeiling(floor, r);
+      (groups.get(c) ?? groups.set(c, []).get(c)).push(r);
+    }
+    const pieces = [];
+    for (const [c, group] of groups) {
+      if (!group.length) continue;
+      const g = extrudeFootprint(computeFootprint([...group, ...holes]), slabThickness);
+      if (g) { g.translate(0, c, 0); pieces.push(g); }
+    }
+    ceilingGeometry = pieces.length > 1 ? mergeGeometries(pieces) : pieces[0] || null;
+  }
   const wallBoxes = architecturalWallBoxes(floor, opts);
   // `splitHalfWalls` (View 3D, owner 2026-10-10: half walls can be shown see-through):
   // the boxes standing on an in-room half wall's footprint go to `halfWallGeometry`.
@@ -721,8 +822,10 @@ export function doorProductPlacements(floor, materialOf) {
       cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
       width: alongX ? b.x1 - b.x0 : b.y1 - b.y0,
       depth: alongX ? b.y1 - b.y0 : b.x1 - b.x0, // the wall thickness at the zone
-      // A gate is outdoors: its own head, no ceiling clip (as apertureInsertGeometries).
-      head: kind === 'gate' ? Math.max(0, rect.head ?? 1.2) : clipped(rect.head ?? 2.1, 0, height),
+      // A gate is outdoors: its own head, no ceiling clip (as apertureInsertGeometries). A door's
+      // product stands on its sill (`sill`, buildDoorProduct lifts it); `head` is its height above it.
+      sill: kind === 'gate' ? 0 : Math.max(0, rect.sill ?? 0),
+      head: kind === 'gate' ? Math.max(0, rect.head ?? 1.2) : clipped(rect.head ?? 2.1, 0, height) - Math.max(0, rect.sill ?? 0),
       hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
       swingZ: alongX ? -perp : perp,
       leafDepth: def.leafDepth || 0.07,
@@ -808,7 +911,7 @@ export function finishGeometries(surfaces) {
     };
     for (const r of region.boxes) {
       const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
-      quad(b, pts.map(([x, y]) => [x, FINISH_LIFT, -y]), pts.map(([x, y]) => uvOf(x, y)), [0, 1, 0]);
+      quad(b, pts.map(([x, y]) => [x, (r.z || 0) + FINISH_LIFT, -y]), pts.map(([x, y]) => uvOf(x, y)), [0, 1, 0]); // at its room's level
     }
   }
   for (const wall of surfaces?.walls || []) {

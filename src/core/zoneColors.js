@@ -111,7 +111,10 @@ export function isAperture(kind) {
 export function apertureBounds(rect) {
   if (!rect || !isAperture(rect.kind)) return [];
   const fields = [];
-  if (!['door', 'passage', 'garage', 'sliding', 'gate'].includes(rect.kind)) fields.push('sill');
+  // A door, passage or sliding door has a sill too (owner, 2026-10-13: "just like the head for the
+  // door, I would have to set the sill"), for a door into a room on its own floor level; 0 = the
+  // floor. A garage door and a gate stand on the ground.
+  if (!['garage', 'gate'].includes(rect.kind)) fields.push('sill');
   if (rect.head !== null && rect.head !== undefined) fields.push('head');
   return fields;
 }

@@ -377,6 +377,9 @@ const STRINGS = {
   'aperture.sill': { en: 'sill', fr: 'seuil',   zh: '下沿' },
   'aperture.head': { en: 'head', fr: 'linteau', zh: '上沿' },
   'gardenwall.top':   { en: 'wall top', fr: 'haut du muret', zh: '墙顶' },
+  'room.floorUp':      { en: 'floor up', fr: 'sol plus haut', zh: '地面抬高' },
+  'room.floorDown':    { en: 'floor down', fr: 'sol plus bas', zh: '地面降低' },
+  'room.ceiling':      { en: 'ceiling', fr: 'plafond', zh: '天花板' },
   'fence.foot':       { en: 'fence bottom', fr: 'bas de clôture', zh: '围栏底' },
   'fence.top':        { en: 'fence top', fr: 'haut de clôture', zh: '围栏顶' },
   // --- furniture band (PLAN EDIT placeholder) + foot elevation (FURNISH) -------

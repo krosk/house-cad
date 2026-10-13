@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, Rectangle, furnitureProductPlacements, ceilingHeight, stairRises, isSplitLevel } from './core/model.js';
+import { Project, Rectangle, furnitureProductPlacements, ceilingHeight, roomCeiling, stairRises, isSplitLevel } from './core/model.js';
 import { loadFurnitureCatalog } from './ui/furnitureCatalog.js';
 import { computeFootprint } from './core/geometry2d.js';
 import { extrudeFootprint, mergeFloorGeometries } from './core/extrude.js';
@@ -609,6 +609,9 @@ const pRot = document.getElementById('p-rot');
 const pOutdoorRow = document.getElementById('p-outdoor-row');
 const pOutdoor = document.getElementById('p-outdoor');
 const pApertureRow = document.getElementById('p-aperture-row');
+const pCeilingRow = document.getElementById('p-ceiling-row');
+const pCeiling = document.getElementById('p-ceiling');
+const pFloorZ = document.getElementById('p-floorz');
 let selectedRect = null;
 
 function updateProps() {
@@ -649,6 +652,16 @@ function updateProps() {
   // A room is indoor or OUTDOOR (a veranda: outside for heat loss, docs/heat-loss.md).
   pOutdoorRow.hidden = r.kind !== 'room';
   pOutdoor.textContent = r.outdoor ? '☀ Outdoor room' : '⌂ Indoor room';
+  // Its own lower ceiling (core/storey.js roomCeiling); empty = the floor's, shown as the hint.
+  pCeilingRow.hidden = r.kind !== 'room';
+  if (r.kind === 'room') {
+    pCeiling.step = String(unitInfo().snap * unitInfo().perMeter);
+    pCeiling.placeholder = fmt(ceilingHeight(project.activeFloor));
+    if (document.activeElement !== pCeiling) pCeiling.value = r.ceiling != null ? fmt(roomCeiling(project.activeFloor, r)) : '';
+    pFloorZ.step = pCeiling.step;
+    pFloorZ.placeholder = fmt(0);
+    if (document.activeElement !== pFloorZ) pFloorZ.value = r.floorZ != null ? fmt(r.floorZ) : '';
+  }
 }
 
 sketch.onSelect = (rect) => {
@@ -673,6 +686,23 @@ pRot.addEventListener('click', () => {
 pOutdoor.addEventListener('click', () => {
   if (selectedRect?.kind !== 'room') return;
   if (selectedRect.outdoor) delete selectedRect.outdoor; else selectedRect.outdoor = true;
+  project.touch();
+});
+pCeiling.addEventListener('change', () => {
+  if (selectedRect?.kind !== 'room') return;
+  const v = parseFloat(pCeiling.value), H = ceilingHeight(project.activeFloor);
+  // Only lower than the floor's: empty, or the floor's ceiling or more, clears it.
+  if (Number.isNaN(v) || !(toMeters(v) > 0) || toMeters(v) >= H) delete selectedRect.ceiling;
+  else selectedRect.ceiling = toMeters(v);
+  project.touch();
+});
+pFloorZ.addEventListener('change', () => {
+  if (selectedRect?.kind !== 'room') return;
+  const v = parseFloat(pFloorZ.value);
+  // Measured from the floor's level (negative: below it); empty or 0 clears it. It must stay
+  // under the room's ceiling.
+  if (Number.isNaN(v) || toMeters(v) === 0) delete selectedRect.floorZ;
+  else if (toMeters(v) < roomCeiling(project.activeFloor, selectedRect) - 0.5) selectedRect.floorZ = toMeters(v);
   project.touch();
 });
 pDel.addEventListener('click', () => sketch.deleteSelected());

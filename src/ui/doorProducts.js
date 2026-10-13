@@ -147,7 +147,13 @@ function materialsFor(def, lambert) {
 // Build the door for one placement. `lambert` selects the cheap AR materials.
 // `open`: the leaf (with its handles and roses) swung 90° to the swing face about the
 // hinge line (View 3D and the AR 3D view both show doors open).
-export function buildDoorProduct(p, { lambert = false, open = false } = {}) {
+export function buildDoorProduct(p, opts = {}) {
+  const meshes = buildDoorProductAtFloor(p, opts);
+  // A door on a sill (a door into a room on its own floor level): the whole product stands on it.
+  if (p.sill > 0) for (const mesh of meshes) mesh.geometry?.translate(0, p.sill, 0);
+  return meshes;
+}
+function buildDoorProductAtFloor(p, { lambert = false, open = false } = {}) {
   if (p.def.mount === 'rail') return buildRailDoor(p, { lambert, open });
   if (p.def.mount === 'gate') return buildGate(p, { lambert });
   const m = materialsFor(p.def, lambert);

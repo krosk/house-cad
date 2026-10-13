@@ -48,6 +48,8 @@ function serializeRect(r) {
   if (r.airInlet !== undefined) out.airInlet = r.airInlet; // a window's air inlet (core/airInlets.js)
   if (r.outdoor) out.outdoor = true; // an OUTDOOR room (docs/heat-loss.md)
   if (r.sleepers) out.sleepers = r.sleepers; // people sleeping in a room (core/airflow.js)
+  if (r.ceiling !== undefined) out.ceiling = r.ceiling; // a room's own lower ceiling (core/storey.js)
+  if (r.floorZ !== undefined) out.floorZ = r.floorZ; // a room's own floor level (core/storey.js)
   return out;
 }
 // Every stored Rectangle field (the constructor validates), for load and paste.
@@ -55,7 +57,7 @@ const rectFields = (r) => ({
   x: r.x, y: r.y, w: r.w, h: r.h, op: r.op || 'add', kind: r.kind, sill: r.sill, head: r.head,
   hinge: r.hinge, swing: r.swing, foot: r.foot, top: r.top, climb: r.climb,
   article: r.article, productMm: r.productMm, facing: r.facing, rValue: r.rValue, lambda: r.lambda, uValue: r.uValue,
-  outdoor: r.outdoor, airInlet: r.airInlet, sleepers: r.sleepers,
+  outdoor: r.outdoor, airInlet: r.airInlet, sleepers: r.sleepers, ceiling: r.ceiling, floorZ: r.floorZ,
 });
 function serializeConstraint(c) {
   return {

@@ -17,7 +17,20 @@
 import polygonClipping from 'polygon-clipping';
 import { computeFootprint, connectedRoomComponents, multiPolygonArea, roomRectsConnect } from './geometry2d.js';
 import { zoneKind } from './zoneColors.js';
-import { ceilingHeight } from './storey.js';
+import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
+
+// A space's ceiling: its highest room's own ceiling (storey.js roomCeiling), else the storey's.
+const compCeiling = (floor, comp) => {
+  const rooms = comp.rectangles.filter((r) => zoneKind(r) === 'room');
+  return rooms.length ? Math.max(...rooms.map((r) => roomCeiling(floor, r))) : ceilingHeight(floor);
+};
+// A space's floor level: its lowest room's own (storey.js roomFloorZ), else the storey's (0).
+const compFloorZ = (comp) => {
+  const rooms = comp.rectangles.filter((r) => zoneKind(r) === 'room');
+  return rooms.length ? Math.min(...rooms.map(roomFloorZ)) : 0;
+};
+// Its room height, floor level to ceiling.
+const compHeight = (floor, comp) => Math.max(0, compCeiling(floor, comp) - compFloorZ(comp));
 
 // Project settings (`project.heat`), each overridable. Defaults for the owner's house
 // (docs/heat-loss.md, owner answers 2026-10-01):
@@ -294,10 +307,11 @@ function wallLoss(floor, comp, s, fh, dT, nb) {
   const revealITE = s.noReveals ? RETURNED_REVEAL_PSI : s.revealPsi;
   const openingPsi = (cls) => (cls === 'ITE' ? revealITE : PSI_OPENING[cls]);
   const revealDone = new Set(); // openings already counted (an opening spans one edge)
-  const H = ceilingHeight(floor); // the room's walls, below the slab
+  // The room's walls, from its floor level up below the slab (or its own ceiling).
+  const H = compHeight(floor, comp);
   // Below the earth: the part of each wall under it loses to the ground at the annual
   // mean temperature (EN 12831's fg1 · fg2 · ΔT, as for a slab on earth).
-  const z = s.earth - (floor.elevation || 0), buriedH = Math.min(H, Math.max(0, z));
+  const z = s.earth - (floor.elevation || 0) - compFloorZ(comp), buriedH = Math.min(H, Math.max(0, z));
   const dt = s.wallDepth + LAMBDA_GROUND * (0.17 + s.slabR + 0.04); // floorR: not on earth
   const groundDT = FG1 * (s.tRoom - s.tMean);
   const others = floor.rectangles.filter((r) => isSpace(r) && !comp.ids.has(r.id))
@@ -630,7 +644,7 @@ export function floorHeatLoss(project, floor, without = {}) {
       if (what === 'unheated') return { poly, what, u: uCeilingUnheated, wm2: uCeilingUnheated * dT * b(up.temp ?? s.tOut) };
       return { poly, what: 'attic', u: uCeiling, wm2: uCeiling * dT };
     });
-    const volume = airVolume(comp, floor.rectangles, ceilingHeight(floor));
+    const volume = airVolume(comp, floor.rectangles, compHeight(floor, comp));
     const air = 0.34 * s.ach * volume * dT;
     const parts = { wall: w.wall, opening: w.opening, bridge: w.bridge, floor: floorW, ceiling: ceilingW, air };
     return {
@@ -700,7 +714,7 @@ const PROBE_STEP_M = 0.01;
 // STEP_M of a space's outline probes outward; the first other space within PROBE_M is across a
 // partition as thick as the gap. U = 1 / (Rsi + gap/λ + Rsi), λ = plaster under heavyWallMin,
 // else the wall λ (masonry). Each side samples the wall once: halved.
-function partitionLinks(rooms, H, s) {
+function partitionLinks(rooms, Hs, s) { // Hs: each room's height; a partition is the lower one high
   const K = new Map();
   const add = (i, j, v) => { const k = i < j ? `${i}|${j}` : `${j}|${i}`; K.set(k, (K.get(k) || 0) + v / 2); };
   const boxes = rooms.map((r) => r.rectangles.map((q) => q.bounds));
@@ -721,7 +735,7 @@ function partitionLinks(rooms, H, s) {
             if (j < 0) continue;
             const gap = d - PROBE_STEP_M / 2;
             const u = 1 / (2 * 0.13 + gap / (gap < s.heavyWallMin ? s.plasterLambda : s.wallLambda));
-            add(i, j, u * step * H);
+            add(i, j, u * step * Math.min(Hs[i], Hs[j]));
             break;
           }
         }
@@ -767,7 +781,7 @@ export function houseBalance(project, powerOf, without = {}) {
   const K = new Map();
   const addK = (i, j, v) => { if (i === j || !(v > 0)) return; const k = i < j ? `${i}|${j}` : `${j}|${i}`; K.set(k, (K.get(k) || 0) + v); };
   perFloor.forEach(({ floor, rooms, first }, fi) => {
-    for (const [k, v] of partitionLinks(rooms, ceilingHeight(floor), s)) { const [a, b] = k.split('|').map(Number); addK(first + a, first + b, v); }
+    for (const [k, v] of partitionLinks(rooms, rooms.map((r) => compHeight(floor, r)), s)) { const [a, b] = k.split('|').map(Number); addK(first + a, first + b, v); }
     const next = perFloor[fi + 1];
     if (!next || !rooms.length || !next.rooms.length) return;
     const uMid = 1 / (RS_CEILING + s.slabR + (floorHeat(next.floor).heavy ? 0 : WOOD_FLOOR_R));

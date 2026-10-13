@@ -14,7 +14,7 @@ import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, FENCE_T
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
 import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
-export { ceilingHeight } from './storey.js';
+export { ceilingHeight, roomCeiling, ceilingAt, roomFloorZ, floorZAt } from './storey.js';
 
 let _id = 0;
 const nextId = () => `r${++_id}`;
@@ -162,7 +162,7 @@ function applyProduct(rect, key, entry, { seedFoot }) {
 export const SLEEPERS_MAX = 4;
 
 export class Rectangle {
-  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers } = {}) {
+  constructor({ x, y, w, h, op = 'add', kind, id = nextId(), sill, head, hinge, swing, foot, top, climb, article, productMm, facing, rValue, lambda, uValue, outdoor, airInlet, sleepers, ceiling, floorZ } = {}) {
     this.id = id;
     this.x = x; // left edge (min x)
     this.y = y; // bottom edge (min y)
@@ -222,6 +222,11 @@ export class Rectangle {
       // How many people sleep in the room (owner, 2026-10-12, for the VMC air network's night
       // scenarios, core/airflow.js); absent = none.
       else if (Number.isInteger(sleepers) && sleepers > 0) this.sleepers = Math.min(SLEEPERS_MAX, sleepers);
+      // Its own lower ceiling, m above its floor (storey.js roomCeiling; owner, 2026-10-13, the
+      // veranda's 2.20 m roof in a 2.70 m storey); absent = the storey's ceiling.
+      if (Number.isFinite(ceiling) && ceiling > 0) this.ceiling = ceiling;
+      // Its own floor level, m above (negative: below) the storey's floor (storey.js roomFloorZ).
+      if (Number.isFinite(floorZ) && floorZ !== 0) this.floorZ = floorZ;
     } else if (hasClimb(this.kind) && STAIR_CLIMBS.includes(climb)) {
       // Stairs keep an authored ascent direction once rotated; absent = legacy
       // long-axis reading (see stairClimb in zoneColors.js).
@@ -239,7 +244,7 @@ export class Rectangle {
     if (this.kind !== 'insulation' && this.kind !== 'wall') { delete this.rValue; delete this.lambda; }
     if (!OPENING_KINDS.has(this.kind)) delete this.uValue;
     if (this.kind !== 'window') delete this.airInlet;
-    if (this.kind !== 'room') { delete this.outdoor; delete this.sleepers; }
+    if (this.kind !== 'room') { delete this.outdoor; delete this.sleepers; delete this.ceiling; delete this.floorZ; }
     this.op = this.kind === 'room' ? 'add' : 'subtract';
     const d = APERTURE_DEFAULTS[this.kind];
     // UP↔DOWN (or ↔ RAMP) retypes the same flight, so its climb survives; any other kind drops it.
@@ -524,7 +529,7 @@ export class Project {
     const snap = (o, keys) => { for (const k of keys) if (typeof o[k] === 'number') o[k] = snapM(o[k]); };
     for (const f of this.floors) {
       snap(f, ['height', 'slab', 'level']);
-      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top']);
+      for (const r of f.rectangles) snap(r, ['x', 'y', 'w', 'h', 'sill', 'head', 'foot', 'top', 'ceiling', 'floorZ']);
       for (const c of f.constraints) snap(c, ['value']);
       for (const m of f.markers || []) snap(m, ['x', 'y', 'z']);
     }

@@ -26,7 +26,9 @@ floor (heat down) Rsi 0.17; toward an attic or basement Rse = Rsi of that space 
 - **Walls:** a room edge with no other room of the same floor within 0.6 m beyond it is exterior.
   Edges shared with a room, or separated from one by an interior WALL zone, are heated on both sides
   and ignored. Wall height = the room height, storey height − slab (`ceilingHeight`; `docs/product-intent.md`
-  multi-floor); the room volume uses it too.
+  multi-floor), or the space's highest room's own lower `ceiling` (`roomCeiling`), less its lowest room's own
+  floor level (`roomFloorZ`); the room volume uses it too, and a partition between two spaces takes the
+  lower height. A raised room's earth line moves with its floor level.
 - **Air volume** (owner, 2026-10-06: "the area does not mark the actual air volume"): the room's
   floor area × the room height, minus what each zone inside the room really fills (`airVolume`).
   Walls, insulation and cabinets fill the full height; a half wall (incl. a plinth under a shower

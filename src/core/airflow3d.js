@@ -10,7 +10,7 @@
 // mixing D. The walls' leaks enter or leave spread over their rooms. No heat (no plumes), no people: Hypothesis. Pure functions: houseAirInput runs on the page,
 // solveHouse3d in a worker.
 import { zoneKind } from './zoneColors.js';
-import { ceilingHeight } from './storey.js';
+import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
 
 const UNDERCUT = 0.01;
 const box = (b, z0, z1) => [b.x0, b.x1, b.y0, b.y1, z0, z1];
@@ -22,9 +22,10 @@ function floorAirInput(floor, result, { hmax, doorsOpen }) {
   for (const r of floor.rectangles) {
     const k = zoneKind(r), b = r.bounds;
     const sill = Number.isFinite(r.sill) ? r.sill : 0, head = Number.isFinite(r.head) ? r.head : 2.1;
-    if ((k === 'room' && !r.outdoor) || k === 'stairs_up' || k === 'stairs_down') fluid.push(box(b, 0, H));
+    if (k === 'room' && !r.outdoor) fluid.push(box(b, Math.max(0, roomFloorZ(r)), roomCeiling(floor, r, 2.5))); // its own floor level and ceiling
+    else if (k === 'stairs_up' || k === 'stairs_down') fluid.push(box(b, 0, H));
     else if (k === 'passage') { fluid.push(box(b, sill, Math.min(head, H))); cutsZ.push(sill, head); }
-    else if (k === 'door' || k === 'sliding' || k === 'garage') { fluid.push(box(b, 0, doorsOpen ? Math.min(head, H) : UNDERCUT)); if (doorsOpen) cutsZ.push(head); }
+    else if (k === 'door' || k === 'sliding' || k === 'garage') { fluid.push(box(b, sill, doorsOpen ? Math.min(head, H) : sill + UNDERCUT)); if (sill > 0) cutsZ.push(sill, sill + UNDERCUT); if (doorsOpen) cutsZ.push(head); }
     else if (k === 'wall' || k === 'insulation') solid.push(box(b, 0, H));
     else if (k === 'halfwall') solid.push(box(b, 0, Math.max(0, sill)));
     else if (k === 'heater') solid.push(box(b, Math.max(0, sill), Math.min(H, head)));
