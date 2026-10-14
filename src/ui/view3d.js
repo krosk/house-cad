@@ -744,8 +744,9 @@ export class View3D {
   }
 
   // PLAN mode on/off (owner, 2026-10-14: switching keeps the view). On starts the orbit from the
-  // overview camera as it is, aimed at the plan point at the screen's centre; off puts back the
-  // overview exactly as it was, unless the floor changed meanwhile (then it frames that floor).
+  // camera as it is (the overview, or a POV), aimed at the plan point at the screen's centre; off
+  // puts back that overview or POV exactly as it was, unless the floor changed meanwhile (then it
+  // frames that floor's overview).
   // `frame`: View 3D opening on the plan (owner, 2026-10-14: the model is built only when asked
   // for), so there is no overview to keep: frame the plan, and ◈ Model frames the model.
   setPlanMode(on, project = this.planProject, { frame = false } = {}) {
@@ -753,8 +754,9 @@ export class View3D {
     this.cameraTransition = null;
     this.ruler?.clear();
     if (on) {
+      const mode = this.navigationMode.endsWith('pov') ? 'pov' : 'overview'; // ▤ Plan from POV too (owner)
       this.modelPose = frame ? null : { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
-        up: this.camera.up.clone(), fov: this.camera.fov, distance: this.overviewDistance, floor: this.floorFilter };
+        up: this.camera.up.clone(), fov: this.camera.fov, distance: this.overviewDistance, floor: this.floorFilter, mode };
       this.planProject = project;
       this.navigationMode = 'plan';
       this.planFramedFor = this.floorFilter;
@@ -762,7 +764,7 @@ export class View3D {
       this.controls.enabled = true;
       this.controls.enableDamping = true;
       this.controls.screenSpacePanning = true;
-      if (frame) { this.camera.up.set(0, 1, 0); this._framePlan(); } else this._aimPlanFromCamera();
+      if (frame) { this.camera.up.set(0, 1, 0); this._framePlan(); } else this._aimPlanFromCamera(mode === 'pov' ? 2 : null);
       this._applyModelVisibility();
       this._updateLightShadows();
       this.onNavigationChange?.('plan');
@@ -781,20 +783,23 @@ export class View3D {
       this.camera.updateProjectionMatrix();
       this.camera.updateMatrixWorld();
       this.overviewDistance = pose.distance;
+      if (pose.mode === 'pov') { this._finishTransition('pov'); return; } // back where the walk stood
       for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
       this._updateLightShadows();
       this.onNavigationChange?.('overview');
     }
   }
 
-  // The orbit starts where the camera is: its target is the plan point at the screen's centre, and a
-  // top-down camera is nudged a hair south so the orbit's +Y up keeps plan north up the screen.
-  _aimPlanFromCamera() {
+  // The orbit starts where the camera is: its target is the plan point at the screen's centre (from
+  // POV, `ahead` metres in front of the eye), and a top-down camera is nudged a hair south so the
+  // orbit's +Y up keeps plan north up the screen.
+  _aimPlanFromCamera(ahead = null) {
     const forward = new THREE.Vector3();
     this.camera.getWorldDirection(forward);
     const ray = new THREE.Ray(this.camera.position.clone(), forward);
-    const target = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.overviewPlaneY), new THREE.Vector3())
-      || this.camera.position.clone().addScaledVector(forward, this.overviewDistance);
+    const target = (ahead == null
+      && ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.overviewPlaneY), new THREE.Vector3()))
+      || this.camera.position.clone().addScaledVector(forward, ahead ?? this.overviewDistance);
     const distance = this.camera.position.distanceTo(target);
     if (Math.abs(forward.y) > 0.9999) this.camera.position.set(target.x, this.camera.position.y, target.z + distance * 1e-3);
     this.camera.up.set(0, 1, 0);
@@ -875,6 +880,9 @@ export class View3D {
       return;
     }
     this._rebuildPlanLayers();
+    // A model rebuild on the same floor (an edit, ▯ Windows open) keeps the overview or POV as it is
+    // (owner, 2026-10-14); choosing another floor frames it.
+    if (this.modelFramedFor === floorId && this.overviewPose) return;
     this.frameModel();
   }
 
@@ -1446,6 +1454,7 @@ export class View3D {
     this.overviewDistance = distance;
     this.overviewFitDistance = distance;
     this.overviewPlaneY = box.max.y;
+    this.modelFramedFor = this.floorFilter;
     this.navigationMode = 'overview';
     this.cameraTransition = null;
     this.camera.up.set(0, 0, -1);

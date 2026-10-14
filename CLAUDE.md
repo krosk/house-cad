@@ -79,8 +79,8 @@ floor's zones lie tinted and outlined at its elevation, the architectural model 
 and the whole-house conduit network and the pipes (coloured by service, a legend under the buttons) each show
 behind a per-device toggle; a run touching the chosen floor shows, so risers appear on both storeys. Rebuilt with
 the model and the floor picker; choosing another floor reframes, a model edit keeps the orbit; ▤ Plan / ◈ Model
-switch without moving the view (owner, 2026-10-14: the orbit starts from the overview camera, and ◈ Model puts the
-overview back as it was unless the floor changed), and AR hides it. The 💧 Pipes toggle also shows the pipes in the
+switch without moving the view (owner, 2026-10-14: the orbit starts from the overview or POV camera, also offered
+in POV, and ◈ Model puts that overview or POV back as it was unless the floor changed), and AR hides it. The 💧 Pipes toggle also shows the pipes in the
 Model view (overview and POV) in neutral grey, without the legend (owner, 2026-10-14). A share link carries the network (opt-in `network`, `docs/share-view.md`); without one, the toggles hide. OVERVIEW is locked top-down: a
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
@@ -94,7 +94,8 @@ parallel planes read the gap between them, picking the pair that faces each othe
 two walls: a thin wall's room-side face, a window's wall face rather than its reveal); otherwise
 point to point with plan X / Y legs. Session-only: nothing is stored; a rebuild, a floor change,
 POV or the button clears it. POV keeps at least 65° horizontal FOV on narrow screens
-(vertical capped at 100°); the overview stays at 50°. Camera state is session-only and must not
+(vertical capped at 100°); the overview stays at 50°. A model rebuild on the same floor (an edit, ▯ Windows open) keeps the camera, overview or POV (owner,
+2026-10-14); only choosing another floor reframes. Camera state is session-only and must not
 mutate project or shared-view data. The viewer initially isolates the
 project's active floor; POV reveals that floor's ceiling, which stays hidden in overview.
 Floor slabs use a lightweight procedural wood-plank material; walls and POV ceilings use neutral

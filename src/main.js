@@ -279,7 +279,7 @@ view.onNavigationChange = (mode) => {
   document.getElementById('view3d-floor-ctl').classList.toggle('plan-mode', plan);
   view3dOverview.hidden = !pov;
   view3dTilt.hidden = !pov || !tiltSupported;
-  view3dPlan.hidden = pov;
+  view3dPlan.hidden = false; // POV too (owner, 2026-10-14)
   view3dPlan.setAttribute('aria-pressed', String(plan));
   view3dPlan.textContent = plan ? '◈ Model' : '▤ Plan';
   view3dPlan.title = plan ? 'Back to the 3D model' : view3dPlanTitle;
