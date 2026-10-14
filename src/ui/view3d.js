@@ -23,7 +23,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
 import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 import { Ruler3D } from './ruler3d.js';
-import { buildPlanLayers, disposePlanLayer } from './planLayers3d.js';
+import { buildPlanLayers, disposePlanLayer, MODEL_PIPE_COLOR } from './planLayers3d.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -734,45 +734,79 @@ export class View3D {
   }
 
   // The architectural model hides in PLAN mode (its markers stay) and while MR shows the flat plan.
+  // planGroup also holds the Model view's grey pipes, so it shows in every mode.
   _applyModelVisibility() {
     const plan = this.navigationMode === 'plan';
     this.house.visible = !this.hideMesh && !plan;
     this.markerLights.visible = !this.hideMesh;
     this.furnitureModels.visible = !this.hideMesh && !plan;
-    this.planGroup.visible = !this.hideMesh && plan;
+    this.planGroup.visible = !this.hideMesh;
   }
 
-  // PLAN mode on/off. Off returns to the top-down overview.
+  // PLAN mode on/off (owner, 2026-10-14: switching keeps the view). On starts the orbit from the
+  // overview camera as it is, aimed at the plan point at the screen's centre; off puts back the
+  // overview exactly as it was, unless the floor changed meanwhile (then it frames that floor).
   setPlanMode(on, project = this.planProject) {
     if (!!on === (this.navigationMode === 'plan')) return;
     this.cameraTransition = null;
     this.ruler?.clear();
     if (on) {
+      this.modelPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
+        up: this.camera.up.clone(), fov: this.camera.fov, distance: this.overviewDistance, floor: this.floorFilter };
       this.planProject = project;
       this.navigationMode = 'plan';
-      this.planFramedFor = undefined;
+      this.planFramedFor = this.floorFilter;
       this._rebuildPlanLayers();
       this.controls.enabled = true;
       this.controls.enableDamping = true;
       this.controls.screenSpacePanning = true;
-      this.camera.up.set(0, 1, 0);
-      this._framePlan();
+      this._aimPlanFromCamera();
       this._applyModelVisibility();
       this._updateLightShadows();
       this.onNavigationChange?.('plan');
     } else {
       this.controls.enabled = false;
       this.navigationMode = 'overview';
-      this._clearPlanLayers();
+      this._rebuildPlanLayers();
       this._applyModelVisibility();
-      this.frameModel();
+      const pose = this.modelPose;
+      this.modelPose = null;
+      if (!pose || pose.floor !== this.floorFilter) { this.frameModel(); return; }
+      this.camera.up.copy(pose.up);
+      this.camera.position.copy(pose.position);
+      this.camera.quaternion.copy(pose.quaternion);
+      this.camera.fov = pose.fov;
+      this.camera.updateProjectionMatrix();
+      this.camera.updateMatrixWorld();
+      this.overviewDistance = pose.distance;
+      for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+      this._updateLightShadows();
+      this.onNavigationChange?.('overview');
     }
   }
 
-  // Show or hide one PLAN layer ('conduits' | 'pipes'); view-only.
+  // The orbit starts where the camera is: its target is the plan point at the screen's centre, and a
+  // top-down camera is nudged a hair south so the orbit's +Y up keeps plan north up the screen.
+  _aimPlanFromCamera() {
+    const forward = new THREE.Vector3();
+    this.camera.getWorldDirection(forward);
+    const ray = new THREE.Ray(this.camera.position.clone(), forward);
+    const target = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.overviewPlaneY), new THREE.Vector3())
+      || this.camera.position.clone().addScaledVector(forward, this.overviewDistance);
+    const distance = this.camera.position.distanceTo(target);
+    if (Math.abs(forward.y) > 0.9999) this.camera.position.set(target.x, this.camera.position.y, target.z + distance * 1e-3);
+    this.camera.up.set(0, 1, 0);
+    this.controls.target.copy(target);
+    this.camera.lookAt(target);
+    this.controls.update();
+  }
+
+  // Show or hide one PLAN layer ('conduits' | 'pipes'); view-only. The pipes also show in the Model
+  // view (grey), built only once asked for.
   setPlanLayerVisible(name, on) {
     this.planShow[name] = !!on;
     if (this.planLayers?.[name]) this.planLayers[name].visible = !!on;
+    else if (on) this._rebuildPlanLayers();
   }
 
   _clearPlanLayers() {
@@ -783,12 +817,16 @@ export class View3D {
     this.planLayers = null;
   }
 
-  // Rebuilt on every model change and floor choice while PLAN is on (cheap: a few draw calls).
+  // Rebuilt on every model change and floor choice (cheap: a few draw calls). PLAN: the zones, the
+  // conduits and the pipes by service. Model view (owner, 2026-10-14): only the pipes, neutral grey,
+  // and only while their toggle is on.
   _rebuildPlanLayers() {
     this._clearPlanLayers();
-    if (this.navigationMode !== 'plan' || !this.planProject) return;
-    this.planLayers = buildPlanLayers(this.planProject, this.floorFilter);
-    for (const name of ['zones', 'conduits', 'pipes']) {
+    if (!this.planProject) return;
+    const plan = this.navigationMode === 'plan';
+    if (!plan && !this.planShow.pipes) return;
+    this.planLayers = buildPlanLayers(this.planProject, this.floorFilter, plan ? {} : { pipeColor: MODEL_PIPE_COLOR });
+    for (const name of plan ? ['zones', 'conduits', 'pipes'] : ['pipes']) {
       const layer = this.planLayers[name];
       if (name !== 'zones') layer.visible = this.planShow[name];
       this.planGroup.add(layer);
@@ -834,6 +872,7 @@ export class View3D {
       if (this.planFramedFor !== floorId) this._framePlan();
       return;
     }
+    this._rebuildPlanLayers();
     this.frameModel();
   }
 

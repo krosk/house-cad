@@ -222,7 +222,8 @@ view3dTilt.addEventListener('click', async () => {
 });
 // PLAN mode (owner, 2026-10-14): the AR-style plan in 3D on an orbit camera, with the conduit
 // network and the pipes each behind its own toggle (src/ui/planLayers3d.js). View-only; the
-// layer toggles are remembered per device. A shared link carries no network, so its toggles hide.
+// layer toggles are remembered per device. A shared link without the network hides its toggles.
+// The pipes toggle also shows them in the Model view (overview and POV), neutral grey, no legend.
 const view3dPlan = document.getElementById('view3d-plan');
 const view3dConduits = document.getElementById('view3d-conduits');
 const view3dPipes = document.getElementById('view3d-pipes');
@@ -262,6 +263,7 @@ for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'
     renderPipeLegend();
   });
 }
+view.planProject = project; // the Model view's grey pipes are built from it too
 view3dPlan.addEventListener('click', () => view.setPlanMode(view.navigationMode !== 'plan', project));
 view.onNavigationChange = (mode) => {
   const pov = mode === 'pov';
@@ -276,7 +278,7 @@ view.onNavigationChange = (mode) => {
   view3dPlan.textContent = plan ? '◈ Model' : '▤ Plan';
   view3dPlan.title = plan ? 'Back to the 3D model' : view3dPlanTitle;
   view3dConduits.hidden = !plan || !project.conduitSegments?.length;
-  view3dPipes.hidden = !plan || !project.pipes?.length;
+  view3dPipes.hidden = !project.pipes?.length; // Model view too, in grey (owner, 2026-10-14)
   renderPipeLegend();
   if ((pov || plan) && view.ruler.enabled) setRuler(false);
 };

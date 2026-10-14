@@ -17,6 +17,7 @@ import { roomFloorZ } from '../core/storey.js';
 
 // Shared with AR (mr.js) so a run reads the same colour in both.
 export const CONDUIT_COLOR = 0xa78bfa;
+export const MODEL_PIPE_COLOR = 0x9a9a9a; // the pipes in View 3D's Model view (owner, 2026-10-14)
 export const PIPE_SERVICE_COLOR = {
   cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1, waste: 0xa16207,
 };
@@ -158,8 +159,9 @@ function pipeNodePos(project, node) {
 }
 
 // The plan layers for one floor (floorId) or the whole house (null). A run shows when either
-// end is on the shown floor, so a riser appears on both storeys it joins (as AR).
-export function buildPlanLayers(project, floorId = null) {
+// end is on the shown floor, so a riser appears on both storeys it joins (as AR). `pipeColor`
+// draws every pipe and its beads in one colour (the Model view's neutral grey) instead of by service.
+export function buildPlanLayers(project, floorId = null, { pipeColor = null } = {}) {
   const shown = (id) => floorId == null || id === floorId;
   const zones = new THREE.Group();
   for (const floor of project.floors) {
@@ -185,12 +187,12 @@ export function buildPlanLayers(project, floorId = null) {
     if (!a || !b || !(shown(project.pipeNodeFloorId(a)) || shown(project.pipeNodeFloorId(b)))) continue;
     const radius = (pipe.diameter || 0.016) / 2;
     pipeRuns.push({ a: pipeNodePos(project, a), b: pipeNodePos(project, b), service: pipe.service,
-      color: PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold, radius });
+      color: pipeColor ?? (PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold), radius });
     for (const id of [pipe.a, pipe.b]) nodeRadius.set(id, Math.max(nodeRadius.get(id) || 0, radius));
   }
   const pipeBeads = (project.pipeNodes || [])
     .filter((n) => shown(project.pipeNodeFloorId(n)))
-    .map((n) => ({ p: pipeNodePos(project, n), color: 0xffffff, radius: (nodeRadius.get(n.id) || 0.008) * PIPE_NODE_SCALE }));
+    .map((n) => ({ p: pipeNodePos(project, n), color: pipeColor ?? 0xffffff, radius: (nodeRadius.get(n.id) || 0.008) * PIPE_NODE_SCALE }));
 
   return {
     zones,

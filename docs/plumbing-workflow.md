@@ -119,6 +119,29 @@ side and height. Window opening against the units: docs/materials.md "Window swi
 
 ## VMC: two Sauter Agalina units (2026-10-07, draft)
 
+**Unit B turned, radiator to the north wall (owner, 2026-10-14, evening). Supersedes the basement routes of the
+blocks below.**
+- **Laundry radiator r224 on the laundry's north wall** (x −4.33…−3.13, 1 cm off the wall): its flow and return tee off
+  the pair where it enters the laundry (y −2.33 / −2.37; the pair that also feeds ground radiator r205), so no heating
+  pipe crosses the south half of the laundry ceiling any more. 20 cm east of its old x so the flow drop clears the waste
+  stack in the north-west corner (−4.5, −2.3) by 5 cm; east end 19 cm from the switch stack at x −2.93. Its branch is
+  ≈ 5.3 m of pipe instead of ≈ 9.6 m.
+- **Unit B turned 90° clockwise** (`facing` 270: OUT Ø160 and the laundry Ø80 west, kitchen Ø125 + bath Ø80 east, the
+  side Ø80s north, the lug south), centre (−4.25, −4.475). Spigot ends Proven with the builder at facing 270.
+  OUT runs **straight west through the west wall** (y −4.56). The owner chose the west wall (outside assumed above
+  ground at 1.95 m: to check) and asked for it as far south as possible: the limit is the kitchen duct, which needs
+  ≈ 18 cm between its chute's bottom elbow and its turn west (Ø125 elbows, Hypothesis).
+- **Kitchen and bath ducts flat at spigot height (1.955 m)**, straight west into B's east face (kitchen lane y −4.575,
+  bath y −4.38): the chutes drop 31.5 cm (the nicks are unchanged: they depend on the slab and the duct size only).
+  The bath dip under the heating and both ducts' last turns are gone. Upper duct: down the west wall, then two 45s
+  into the north face's west Ø80. Laundry vent: the 8 cm stub, now off the west face.
+- **Open (owner checking): the laundry window r146** (single leaf 1.26 m, opens inward, head 1.98 m, ceiling 2.05 m).
+  The ducts' undersides are at ≈ 1.89 m (kitchen, 32 cm from the wall) and 1.905 m (bath, 52 cm): the leaf's top edge
+  must be below ≈ 1.88 m to open under them. If not, the ducts keep lanes north of the leaf's sweep past the window and
+  jog south with 45s (the kitchen gets its turn back).
+- Loss at boost (Hypothesis, the model below): kitchen 8.88 m ≈ 23.1 Pa (was 25.9), bath 13.50 m ≈ 10.4 Pa (was 12.7),
+  upper 10.56 m ≈ 23.8 Pa (was 24.6); OUT unchanged (straight, 35 cm). Clash check: no new clash.
+
 **One unit, optimised (owner, 2026-10-14, later the same day; written to the headset, read back identical, 284 543
 chars). Supersedes the routes in the block below where they differ.**
 - **Unit B 0.82 m further south**: its south face 12 mm north of the laundry radiator supply (y −4.72, 2.05 m, above
@@ -490,6 +513,14 @@ is the contractor's). Drafted on the owner's plan (session scripts `editBoxing.m
   2 cm over wall cabinet r162 (top 2.48); the kitchen vent sits on the box's underside (2.50);
 - bedroom r51 south wall x −0.935–0, 41.5 cm deep, foot 2.50, continuing the kitchen's line through the thick wall;
 - alcove r133: a half wall to the ceiling (x −0.935…−0.53) round the two drops.
+**45° chutes through the ground slab (owner, 2026-10-14: "a 45 degree chute", "nicking the top of the wall is ok", "Nicks
+deeper"; written with the kitchen vent, read back identical, 285 708 chars):** each alcove drop is vertical down to the alcove
+floor (kitchen y −5.0725, bath y −5.06: 2 cm and 3.5 cm behind the alcove box's face, for its board), bends 45° there and
+crosses the 20 cm slab heading north, levelling out in the laundry at y −4.66 (kitchen, 1.86 m) and −4.78 (bath, 1.99 m).
+It replaces the pocket in the wall top and the bore through the basement wall. **Nicks in the wall's top inside edge
+(Proven geometry, 5 mm clearance included):** kitchen Ø125 at x −0.85: **6.6 cm** into the laundry face × 6.6 cm down from
+the slab, 13.5 cm wide; bath Ø100 at x −0.65: **3.6 × 3.6 cm**, 11 cm wide; ≈ 9 cm of wall between them. Each needs an oval
+hole through the slab next to its bearing on the wall (Hypothesis, structural: the builder's call).
 **Kitchen vent (owner, 2026-10-14):** the kit's C21 (`aldes-bahia-curve-l-ceiling`, `docs/furniture.md`), face down on
 the south box's underside at (0.98, −4.80), its 230 mm along y; centre 56.5 / 35 / 22.5 / 20.5 cm from the west wall, the
 south wall, the box's edge and its step (Aldes: ≥ 20). The Ø125 climbs to 2.60 and jogs 14 cm north to its run (y −4.66).
