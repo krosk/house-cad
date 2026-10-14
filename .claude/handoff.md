@@ -20,11 +20,13 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
 **Date:** 2026-10-14 (session 40, continued; the Quest reachable)
-**Status:** Proven (git): the code head is `61e3493` (kitchen vent C21) after `f9a4340` (ceiling boxing `soffit`),
-`481ad14` (PNG pipe sheet), `ad651fa`, `f9a93f1`: item 80. Served (`version.json` 61e3493 1014-1420Z) and in the headset
-precache (`update-app` 10-14, "installed 61e3493 1014-1420Z"); none seen in a browser or on a device. Proven (`quest-storage
-read` after each write, byte-identical): **last headset write 2026-10-14: ceiling boxes, 45° slab chutes and the kitchen
-vent, 285 708 chars** (item 80).
+**Status:** Proven (git): the code head is `ce570b9` (View 3D ORBIT) after `969e599`, `bfd0c83`, `3dacf2b` (View 3D:
+grey pipes in Model, opens on the plan, Plan/Model keep the camera) and `61e3493`, `f9a4340`, `481ad14`, `ad651fa`,
+`f9a93f1`: item 80. Served (`version.json` ce570b9) and in the headset precache (`update-app` 10-14, "installed ce570b9
+1014-1833Z"); none seen in a browser or on a device. Proven (`quest-storage read` after the write, byte-identical):
+**last headset write 2026-10-14 evening: VMC unit B turned (facing 270), laundry radiator r224 on the north wall, flat
+basement ducts, 284 914 chars = the base for the next write** (item 80). **A draft waits for the owner's W**: window
+r146 two-leaf + unit B moved north so the leaves open fully (item 80, Next step).
 Before them `72440f4` / `92fffea` (item 79) and `b8e9f38` / `66ea099` / `f868bda` (item 78), untried on the Quest. Before them `cfd3193` / `9375539` (item 77) and `eed5dc1` /
 `23ac94a` (item 76), untried on the Quest. Proven (`quest-storage read` after each write, byte-identical): the
 headset plan carries item 76's garden (2026-10-12), item 77's veranda glass, item 78's edits (2026-10-13) and
@@ -372,6 +374,13 @@ legend overlap seen) · 45 the owner's heating plan (`docs/heat-loss.md` "Heatin
 
 ## Findings / traps worth knowing
 
+- **Window r146 was drawn as one 1.26 m leaf; the owner says two leaves** (2026-10-14). Until the draft is written the
+  headset plan still has the single leaf. Check a window's leaves before routing anything at its head height: the
+  sweep comes from `windowSwings` (`src/core/windowSwing.js`), not from the rectangle.
+- **A GitHub Pages deploy can fail at `deploy-pages` while the build passes** (2026-10-14, `3dacf2b`): `version.json`
+  never moves. The run's jobs are readable without login (`api.github.com/repos/krosk/house-cad/actions/runs`); the
+  next push redeployed (Hypothesis: transient). Don't poll `version.json` blindly for 10 minutes: check the run.
+
 - **A plan holding a new zone kind or catalog article is written only after the app that knows it is installed and
   relaunched** (Hypothesis from `Rectangle`'s constructor: an unknown kind reads as a WALL and the autosave keeps it;
   an unknown article keeps its data but draws nothing). `soffit` needs ≥ `f9a4340`, the C21 ≥ `61e3493`.
@@ -606,7 +615,7 @@ All pushed, all with descriptive bodies. Doc-only commits are omitted.
   `ce85140` real air volume + whole-house balance · `4da7198` shutter outlets take outlet products ·
   `74e4bff` window swing (AR overlay, View 3D windows open) · `a913657` refrigerant pipe service ·
   `b1cd35d` TOOL menu (right-thumbstick tap) · `52583bc` VMC pipe service + Sauter Agalina furniture
-  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix · `f868bda` room ceiling + floor level, door sills · `66ea099` basement cement + dark red tile · `b8e9f38` paved ramps/platforms, stairs on a sloped slab + stairwell walls · `92fffea` links carry room floor level + ceiling · `72440f4` POV stands on steps/ramps/platforms · `f9a93f1` View 3D Plan mode (conduits/pipes toggles) · `ad651fa` links carry conduits + pipes · `481ad14` PNG pipe sheet · `f9a4340` ceiling boxing (`soffit`) · `61e3493` kitchen vent C21.
+  (flat and `-wall`) · `2f3771a` WASTE pipe service · `d7538ff` View 3D ruler + links that open in 3D · `c29de11` Aldes EasyHOME furniture · `26aaad7` Duofix, see-through half walls · `1844a8c` window `airInlet`, AR AIR INLET, airflow network + 3D map · `54d4d22` the 3D map for the whole house · `b7be815` sleepers, leakage, bedroom CO₂ · `42220b3` AR pipes batched · `e6ef977` PIPE DIMS / PIPE EDIT / T-split · `ac1c277` View 3D keeps the plan's orientation · `23ac94a` garden split level, RAMP, PLATFORM, GATE, GARDEN WALL · `eed5dc1` FENCE zone + fence materials · `cfd3193` JAX + Bono gate products · `9375539` irregular stone paving + opening-beyond-a-wall heat fix · `f868bda` room ceiling + floor level, door sills · `66ea099` basement cement + dark red tile · `b8e9f38` paved ramps/platforms, stairs on a sloped slab + stairwell walls · `92fffea` links carry room floor level + ceiling · `72440f4` POV stands on steps/ramps/platforms · `f9a93f1` View 3D Plan mode (conduits/pipes toggles) · `ad651fa` links carry conduits + pipes · `481ad14` PNG pipe sheet · `f9a4340` ceiling boxing (`soffit`) · `61e3493` kitchen vent C21 · `3dacf2b` grey pipes in View 3D Model · `bfd0c83` View 3D opens on the plan · `969e599` Plan from POV, rebuilds keep the camera · `ce570b9` View 3D ORBIT.
 - **Session 39:** `d2831ed` thermal bridges (DPE ψ) + AR junction view · `9ebba86` per-floor heavy,
   partition thickness · `4ebe481` floors that don't line up · `9615e2a` floor R only over the basement ·
   `bb28c35` own-gap fix + 1 K ΔT step · `d6ff2f7` open stairs + furniture-only dims.
@@ -796,7 +805,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
     - Tiles on half walls: `halfWallFace` (`src/core/flooring.js`) now shows a half wall's side above a lower
       neighbouring half wall (segment `z0`), so a boxing on a half wall can be tiled above it. Proven in Node:
       r220's east face gives 1.15–2.70 m. The tiles themselves were written as item 71.
-    - View 3D button "🧱 Half walls" (overview and POV, shared links too): in-room half walls turn faint
+    - View 3D button "🧱 Half walls" (overview and POV, shared links too; ceiling boxings too since 2026-10-14, "🧱 Half walls + boxing"): in-room half walls turn faint
       (`halfWallGlassMaterial`) and their finishes hide, to see a frame inside. Built split by
       `buildArchitecturalFloor(…, { splitHalfWalls })`; AR (`mr.js`) does not pass it and is unchanged. Proven in
       a local browser on the scratch link: the button toggles and the frame shows through in the overview.
@@ -952,8 +961,9 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       (option A no radiators and bare pipes, B sleeve + keep both, C keep the runs bare in the laundry and r74; the owner
       added r224/r225 believing the pipes give no heat); a basement thermometer reading this winter would ground every
       figure; the manifold-to-ceiling pipes (≈ 18 m) matter more than the manifold.
-80. **View 3D Plan mode, links with pipes, one VMC unit, PNG pipe sheet, ceiling boxing, kitchen vent (2026-10-14;
-    `f9a93f1`, `ad651fa`, `481ad14`, `f9a4340`, `61e3493`; published and installed; untried in a browser or on a device):**
+80. **View 3D Plan mode, links with pipes, one VMC unit, PNG pipe sheet, ceiling boxing, kitchen vent, unit B turned,
+    View 3D plan-first + ORBIT (2026-10-14; `f9a93f1`, `ad651fa`, `481ad14`, `f9a4340`, `61e3493`, `3dacf2b`, `bfd0c83`,
+    `969e599`, `ce570b9`; published and installed; untried in a browser or on a device):**
     - `f9a93f1` (`CLAUDE.md` View 3D, `src/ui/planLayers3d.js`): ▤ Plan in View 3D shows AR's flat plan per floor
       on an orbit camera, with ⚡ Conduits and 💧 Pipes toggles (per device) and a pipe legend; follows the floor
       picker. Proven only in Node (the layers build on the owner's plan: 312 conduit runs, 229 pipes on All floors).
@@ -982,21 +992,47 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       boost (≈ 34–37 Pa, vent under 80 Pa), yes at ≤ 30 m³/h (Hypothesis).
     - **Kitchen vent** (`61e3493`, `docs/furniture.md`): the kit's C21 (Bahia Curve L, Ø125, 15–55 / 135 m³/h, 70 Pa at
       boost), `aldes-bahia-curve-l(-ceiling)`, face down at (0.98, −4.80) on the south box; written with the chutes:
-      **base for the next write 285 708 chars**.
+      written 285 708 chars (superseded as the base, below).
     - **Heating (owner decision, no plan change):** kitchen + ground shower room + workshop r74 on ONE pair, lockshields
       on all three, r74 kept low (`docs/heat-loss.md`); the plan still draws the shower's own pair.
+    - **Unit B turned + laundry radiator moved (written 284 914 chars; `docs/plumbing-workflow.md` "Unit B turned"):**
+      owner: the bath duct's dip near B came from the laundry radiator's pair crossing the lanes, so r224 went to the
+      laundry's north wall (teeing off where the pair enters), B turned 90° clockwise with OUT straight out the west
+      wall, both ducts flat at spigot height into B's east face, the upper duct with two 45s. One bend fewer on each of
+      the kitchen and bath ducts (≈ −2.4 Pa, Hypothesis). Owner reasoning recorded there: a bend on the shared OUT costs
+      every branch (the fan's rise is shared by both sides), so OUT goes west only if that wall allows it (to check).
+    - **Window r146 (owner, after the write): two leaves**, and "move the unit so the pipes don't block the window,
+      still oriented the way it is": the draft is in the plumbing doc (r146 `hinge` 'both', B centre (−4.25, −4.06), every
+      node position given); both leaves open fully in Node (176°/180°); **not written**. The plan as written blocks
+      the single 1.26 m leaf it draws at 21°.
+    - **View 3D (owner): `3dacf2b`** 💧 Pipes also in the Model view, neutral grey (`MODEL_PIPE_COLOR`, no legend);
+      **`bfd0c83`** View 3D opens on ▤ Plan, the model and its textures are built only on ◈ Model (wheel, ✕ Cancel), Plan
+      hides lighting/reflections/Realistic/windows and skips the Realistic pass; **`969e599`** ▤ Plan offered in POV, a
+      model rebuild on the same floor keeps the camera (▯/◫ Windows no longer throws POV out); **`ce570b9`** Plan → Model
+      keeps the plan camera: a fourth camera state ORBIT (the model on the free orbit; a tap walks into POV, whose
+      ▦ Overview returns to the orbit; ▦ Overview in ORBIT goes top-down); unmoved in Plan, the previous view comes back.
+      `CLAUDE.md` View 3D paragraph; QA items. Build only.
 
 
 ## Next step
 
 **Active:**
-- **Item 80:** (1) redraw the heating so the ground shower room tees off the kitchen + r74 pair (remove its own pair;
-  take new ids before removing; read-base-write on the owner's W). (2) On the device (relaunch the app, 61e3493): the
-  ceiling boxes in View 3D/AR and the band pad's FOOT, the C21 under the kitchen box, a PNG download (desktop + AR) vs
-  the Node render, View 3D ▤ Plan, a link with pipes (QA items in `docs/ar-qa-checklist.md`). Open (owner/builder):
-  the slab holes next to the wall's bearing, the vent above the shower (Aldes), a hood over the hob, access hatches,
-  the upper waste's exit to the collector.
-- **Item 79 (owner decisions, no code):** (the base for any write is now 285 708 chars, item 80) the band's real height (then move the band, read-base-write as usual);
+- **Item 80:** (0′) **hood + alcove draft** (2026-10-14, `docs/plumbing-workflow.md` "Hood and alcove draft"): the
+  session script applied it on top of the window draft; it needs the commit with `falmec-lumina` installed and
+  relaunched before any write. Then write window + hood + recess together on the owner's W (new ids r258/r259,
+  c1560–c1565, checked free on the 284 914 base). (0) **the window draft, on the owner's W**: from a fresh read equal to the 284 914-char base, set r146
+  `hinge` 'both' and move unit B's rect and nodes to centre (−4.25, −4.06) exactly as listed in
+  `docs/plumbing-workflow.md` "Unit B turned" (no new ids, nothing removed: r219 y, pn78/79, pn320/321/325, pn316/317,
+  pn306/307/pn75, pn319/pn329/pn76); re-run the leaf sweep (`windowSwings` + `leafDirection`, 3.5 cm sash half-thickness)
+  and the clash check before writing; then `write --base`, read back. (1) Redraw the heating so the ground shower room
+  tees off the kitchen + r74 pair (remove its own pair; take new ids before removing; read-base-write on the owner's W).
+  (2) On the device (relaunch the app, ce570b9): View 3D opening on ▤ Plan, ◈ Model (wheel, ORBIT keeps the camera, a
+  tap walks), ▤ Plan from POV, grey pipes in Model, ▯/◫ Windows keeping the POV; the ceiling boxes and the band pad's
+  FOOT, the C21 under the kitchen box, a PNG download vs the Node render, a link with pipes (QA items in
+  `docs/ar-qa-checklist.md`). Open (owner/builder): the outside of the laundry's west wall at 1.95 m (B's OUT), the slab
+  holes next to the wall's bearing, the vent above the shower (Aldes), a hood over the hob, access hatches, the upper
+  waste's exit to the collector.
+- **Item 79 (owner decisions, no code):** (the base for any write is now 284 914 chars, item 80) the band's real height (then move the band, read-base-write as usual);
   insulation plan (ceiling boards over the band vs wrapping; set Ground "Floor ins. R" to the chosen board); the
   basement radiators A/B/C. A fresh share link: rebuild from a fresh read with `encodeViewToHash(p, { markers: true,
   network: true })`, never store it; send it as a file (owner, 2026-10-14: token efficiency).
@@ -1049,7 +1085,7 @@ skip `update-app` and say so.
 - **First, on the phone (no Quest needed):** open a 🔗 Share view link copied in View 3D: it opens in 3D
   on that floor; in the overview, 📏 Ruler by touch: two walls give the clear gap, taps near windows
   and on thin partitions read the room-side wall face (`docs/ar-qa-checklist.md` "Desktop / phone").
-- **First, with the Quest:** the app is updated (`61e3493`, 10-14; relaunch it); item 78 (Active), item 76's QA, then item 75 (Active), then item 73: HEATING · PIPE shows
+- **First, with the Quest:** the app is updated (`ce570b9`, 10-14; relaunch it); item 80 (Active), item 78, item 76's QA, then item 75 (Active), then item 73: HEATING · PIPE shows
   the red/blue pairs from the manifold beside the boiler (basement north wall) along the basement ceiling, the two
   basement radiators (laundry r224 now in its south-west corner, item 78; r74 on its south wall), column r122 now 13 cm wider and 7 cm deeper
   with four pipes rising in it (≈ 6 mm clearances: compare with the real setup), the upper pairs along the west wall

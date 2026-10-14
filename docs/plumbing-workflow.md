@@ -119,8 +119,8 @@ side and height. Window opening against the units: docs/materials.md "Window swi
 
 ## VMC: two Sauter Agalina units (2026-10-07, draft)
 
-**Unit B turned, radiator to the north wall (owner, 2026-10-14, evening). Supersedes the basement routes of the
-blocks below.**
+**Unit B turned, radiator to the north wall (owner, 2026-10-14, evening; written to the headset, read back identical,
+284 914 chars). Supersedes the basement routes of the blocks below.**
 - **Laundry radiator r224 on the laundry's north wall** (x −4.33…−3.13, 1 cm off the wall): its flow and return tee off
   the pair where it enters the laundry (y −2.33 / −2.37; the pair that also feeds ground radiator r205), so no heating
   pipe crosses the south half of the laundry ceiling any more. 20 cm east of its old x so the flow drop clears the waste
@@ -135,12 +135,19 @@ blocks below.**
   bath y −4.38): the chutes drop 31.5 cm (the nicks are unchanged: they depend on the slab and the duct size only).
   The bath dip under the heating and both ducts' last turns are gone. Upper duct: down the west wall, then two 45s
   into the north face's west Ø80. Laundry vent: the 8 cm stub, now off the west face.
-- **Open (owner checking): the laundry window r146** (single leaf 1.26 m, opens inward, head 1.98 m, ceiling 2.05 m).
-  The ducts' undersides are at ≈ 1.89 m (kitchen, 32 cm from the wall) and 1.905 m (bath, 52 cm): the leaf's top edge
-  must be below ≈ 1.88 m to open under them. If not, the ducts keep lanes north of the leaf's sweep past the window and
-  jog south with 45s (the kitchen gets its turn back).
-- Loss at boost (Hypothesis, the model below): kitchen 8.88 m ≈ 23.1 Pa (was 25.9), bath 13.50 m ≈ 10.4 Pa (was 12.7),
-  upper 10.56 m ≈ 23.8 Pa (was 24.6); OUT unchanged (straight, 35 cm). Clash check: no new clash.
+- ~~**Open (owner checking): the laundry window r146** (single leaf 1.26 m …): the ducts block it at 21°.~~ **The
+  owner (same evening): r146 has two leaves**, and the pipes must not block it: **draft, not written (waits for the
+  owner's W)**: r146 `hinge` 'both' (two 0.611 m leaves, hinges at x −3.091 and −1.869, y −4.882, Proven with
+  `windowSwings`), unit B **kept at facing 270, centre moved to (−4.25, −4.06)** (rect y −4.24…−3.88): the kitchen lane
+  at y −4.16 (1 cm past the leaves' sweep with a 3.5 cm sash half-thickness), bath −3.965, OUT at y −4.145, the laundry
+  vent stub and the upper duct's two 45s follow (down the wall to y −3.4125, the 45s to (−4.347, −3.6805), into the spigot at y −3.8305). Proven in
+  Node on the draft: both leaves open fully (176° / 180°), no new clash, footprint as intended; losses ≈ kitchen 9.30 m
+  23.6 Pa, bath 13.92 m 10.7 Pa, upper 10.15 m 23.1 Pa (Hypothesis). Geometry used by both edits: B's spigot ends at
+  facing 270 from its centre (cx, cy): OUT (cx − 0.2295, cy − 0.085, 1.95), laundry Ø80 (cx − 0.2295, cy + 0.095),
+  kitchen (cx + 0.2295, cy − 0.100), bath (cx + 0.2295, cy + 0.095), north Ø80s (cx + 0.094 / cx − 0.097,
+  cy + 0.2295), all at 1.955 m (Proven with `buildProceduralFurniture`); the lug to cy − 0.228 (Aldes: 10 cm free).
+- Loss at boost as written (Hypothesis, the model below): kitchen 8.88 m ≈ 23.1 Pa (was 25.9), bath 13.50 m ≈ 10.4 Pa
+  (was 12.7), upper 10.56 m ≈ 23.8 Pa (was 24.6); OUT unchanged (straight, 35 cm). Clash check: no new clash.
 
 **One unit, optimised (owner, 2026-10-14, later the same day; written to the headset, read back identical, 284 543
 chars). Supersedes the routes in the block below where they differ.**
@@ -526,8 +533,29 @@ the south box's underside at (0.98, −4.80), its 230 mm along y; centre 56.5 / 
 south wall, the box's edge and its step (Aldes: ≥ 20). The Ø125 climbs to 2.60 and jogs 14 cm north to its run (y −4.66).
 Kitchen duct (drafted with the 45° chutes): 9.5 m, ≈ 25.9 Pa at 135 m³/h (Hypothesis, same model), so ≈ 76–86 Pa at the
 vent with B's assumed ≥ 122 Pa: over the C21's 70 Pa boost floor. The 135 m³/h boost assumed before is the C21's.
-Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open: a hood over the cooktop under the
-south box (none drawn); access hatches at the duct joints (Hypothesis: usual practice).
+Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open: access hatches at the duct joints
+(Hypothesis: usual practice).
+**Hood and alcove draft (owner, 2026-10-14; not written).**
+
+The hood: a Falmec Lumina NRS 90 (`falmec-lumina-nrs-90-black`, `docs/furniture.md`), as furniture zone r258.
+- It sits on the south wall, centred over cooktop unit r154 (x 1.548…2.448; dimension c1560: the hood's left edge
+  15 cm left of r154's). Owner, 2026-10-14: "Center it over the cooktop"; a first draft centred it 90 cm from the
+  tall oven unit, 30 cm off the hob. The canopy is at 1.44 m and the chimney rises to the box underside at 2.50.
+- Proven clashes, from a Node check on the draft:
+  - conduit cs418, drawn at 2.40 m 2–15 cm off the wall, passes 13 mm into the chimney (x 1.82–2.18, 30 cm deep);
+  - the chimney stands 1.5 cm proud of box r253's face.
+- Outlet m80 at (2.025, 1.80 m) now sits behind the chimney, where a hood socket usually goes (Hypothesis: it is
+  meant for the hood).
+
+The bedroom alcove r133: a recess up to 2.50 m only (owner).
+- Wall r185 deepens to the bedroom face (41 cm, like r186; c1314 now ties it to r133's top edge).
+- RECESS r259 (sill 0, head 2.50) cuts it over r133 west of the duct box r256 (x −1.55…−0.935). r256 stays a
+  full-height box round the drops.
+- Proven in Node: wall above 2.50 over the recess, solid r256, no conflicts.
+- The bedroom area falls 13.83 → 13.72 m², because the wall now covers the recess floor.
+- The kitchen Ø125 and bath Ø100 cross from box r255 into r256 at 2.60 and 2.62 m, inside the 20 cm of wall above the
+  recess (8 and 7 cm in from the bedroom face). Before, that was open alcove; now the wall needs a notch or bore
+  there. This is the owner's or builder's call.
 
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
