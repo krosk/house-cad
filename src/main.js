@@ -684,7 +684,7 @@ function updateProps() {
   set(pX, b.x0);
   set(pY, b.y0);
   const kindLabel = {
-    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', ramp: '◢ Ramp', platform: '▬ Platform', gate: '⛩ Gate', gardenwall: '🧱 Garden wall', fence: '▥ Fence', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
+    room: '➕ Room', wall: '➖ Wall', insulation: '▧ Insulation', door: '🚪 Door', passage: '⇆ Passage', garage: '▤ Garage door', halfwall: '🧱 Half wall', soffit: '⬓ Ceiling boxing', heater: '♨ Heater', sliding: '↔ Sliding door', window: '🪟 Window', recess: '▭ Recess', stairs_up: '🪜 Stairs up', stairs_down: '🪜 Stairs down', ramp: '◢ Ramp', platform: '▬ Platform', gate: '⛩ Gate', gardenwall: '🧱 Garden wall', fence: '▥ Fence', cabinet: '🗄 Cabinet', furniture: '🛋 Furniture',
   };
   pOp.textContent = kindLabel[r.kind] ?? (r.op === 'add' ? kindLabel.room : kindLabel.wall);
   pOp.className = `op-toggle ${r.op}`;

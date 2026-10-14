@@ -95,7 +95,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', ramp: 'Ramp', platform: 'Platform', gate: 'Gate', gardenwall: 'Garden wall', fence: 'Fence', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', soffit: 'Ceiling boxing', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', ramp: 'Ramp', platform: 'Platform', gate: 'Gate', gardenwall: 'Garden wall', fence: 'Fence', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -422,6 +422,15 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
   // Draw a shared box-space segment list at the glyph's page origin.
   const segs = (list, width) => { for (const [ax, ay, bx, by] of list) line(x + ax, y + ay, x + bx, y + by, width); };
 
+  // A ceiling boxing is overhead: the drafting convention's dashed outline with dashed diagonals, no fill, so the
+  // floor (and what stands on it) still reads through.
+  if (kind === 'soffit') {
+    const dash = { stroke: C_ZONE, width: 0.18, dash: [1.2, 0.8] };
+    for (const [ax, ay, bx, by] of [[x, y, x1, y], [x1, y, x1, y1], [x1, y1, x, y1], [x, y1, x, y], [x, y, x1, y1], [x, y1, x1, y]]) {
+      be.line(ax, ay, bx, by, dash);
+    }
+    return;
+  }
   // A passage is open: no outline along the wall faces, only its jambs (below).
   be.rect(x, y, w, h, { fill: '#fff', stroke: kind === 'passage' ? 'none' : C_ZONE, width: 0.25 });
 

@@ -6,7 +6,7 @@
 // Values are numeric hex (Three.js material colors). Use the helpers below for
 // canvas/CSS ('#rrggbb') and rgba() consumers.
 
-export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'gate', 'halfwall', 'gardenwall', 'fence', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'ramp', 'platform', 'cabinet', 'furniture'];
+export const ZONE_KINDS = ['room', 'wall', 'insulation', 'door', 'passage', 'garage', 'gate', 'halfwall', 'soffit', 'gardenwall', 'fence', 'heater', 'sliding', 'window', 'recess', 'stairs_up', 'stairs_down', 'ramp', 'platform', 'cabinet', 'furniture'];
 
 export const ZONE_COLORS = {
   room:    0x4a9eff, // blue
@@ -18,6 +18,7 @@ export const ZONE_COLORS = {
   gate:    0x65a30d, // olive — an outdoor gate: a free-standing leaf, no wall around it
   gardenwall: 0x78716c, // stone — an outdoor low wall (boundary)
   fence:   0xa16207, // brown — an outdoor fence: its own piece, often on a garden wall
+  soffit:  0x5eead4, // teal — a ceiling boxing (soffit) hung over ducts; drawn dashed on sheets (overhead)
   halfwall: 0x94a3b8, // slate — a low wall; wall-family but distinct from the red full wall
   heater:  0xf59e0b, // amber — a wall-mounted heater; behaves like a half wall (low, solid band)
   sliding: 0x14b8a6, // teal — a sliding door; door-family but distinct from the green swing door
@@ -133,6 +134,12 @@ export const GARDEN_WALL_TOP = 1.0;
 // [foot, top], foot absent = standing on the garden wall under it (fenceFoot,
 // architectural3d.js). Outdoors like a garden wall.
 export const FENCE_TOP = 1.8;
+// A CEILING BOXING (soffit; owner, 2026-10-14: "work on boxing those conduits", the VMC ducts along the kitchen and
+// bedroom ceilings): the dual of a half wall, hung from the ceiling. Solid from `foot` (its underside, m above the
+// floor) up to the ceiling; it takes no floor area (the room, its area, heat loss and floor finishes run under it).
+export const SOFFIT_FOOT = 2.45;
+// Zones that sit in a room without cutting its floor: they never carve the footprint or the room area.
+export const takesNoFloor = (rect) => rect?.kind === 'furniture' || rect?.kind === 'soffit';
 
 // The editable vertical bounds of any rect that carries a band, in pad order, as
 // property names on the rect: apertures → [sill?, head?]; a furniture placeholder →
@@ -141,6 +148,7 @@ export function verticalBandFields(rect) {
   if (rect?.kind === 'furniture') return ['foot', 'top'];
   if (rect?.kind === 'gardenwall') return ['top'];
   if (rect?.kind === 'fence') return ['foot', 'top'];
+  if (rect?.kind === 'soffit') return ['foot'];
   return apertureBounds(rect);
 }
 

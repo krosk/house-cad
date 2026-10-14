@@ -857,8 +857,12 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // Garden walls: solid from the ground to their own top, outside the house's wall logic.
   const gardenWalls = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'gardenwall' && validBounds(r.bounds) && (r.top ?? 0) > EPS)
     .map((r) => ({ ...r.bounds, z0: 0, z1: r.top, source: 'garden' }));
-  const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls]);
-  const outlineGeometry = boxesOutlineGeometry(wallBoxes);
+  // Ceiling boxings (soffits, zoneColors.js): plaster solids from their foot up to the ceiling, over the room.
+  const soffits = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'soffit' && validBounds(r.bounds))
+    .map((r) => ({ ...r.bounds, z0: Math.min(Math.max(0, r.foot ?? H), H), z1: H, source: 'soffit' }))
+    .filter((b) => b.z1 - b.z0 > EPS);
+  const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls, ...soffits]);
+  const outlineGeometry = boxesOutlineGeometry([...wallBoxes, ...soffits]);
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
   const skip = new Set([...(opts.productDoors || []), ...(opts.productWindows || [])]);

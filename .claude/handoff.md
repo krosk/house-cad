@@ -970,6 +970,11 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       and AR EXPORT PNG; monochrome. Proven in Node + rsvg on the owner's plan (3 floors); not seen from the app.
       ~~Colour vs monochrome for conduit/heating layers~~: superseded by the owner's narrower ask (waste + VMC only).
 
+- **Ceiling boxing (`soffit`, uncommitted code + a drafted plan `editBoxing.mjs`, 2026-10-14):** new zone kind; the
+  ground kitchen/bedroom boxes are drafted, not written. **Trap: write a plan holding a `soffit` only after the app
+  that knows the kind is installed and relaunched on the Quest**: an older app reads an unknown kind as a WALL and
+  its autosave would keep it that way (Hypothesis from `Rectangle`'s constructor: unknown kind → inferred 'wall').
+
 ## Next step
 
 **Active:**

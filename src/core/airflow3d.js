@@ -30,8 +30,9 @@ function floorAirInput(floor, result, { hmax, doorsOpen }) {
     else if (k === 'halfwall') solid.push(box(b, 0, Math.max(0, sill)));
     else if (k === 'heater') solid.push(box(b, Math.max(0, sill), Math.min(H, head)));
     else if (k === 'furniture') solid.push(box(b, r.foot ?? 0, r.top ?? 0));
+    else if (k === 'soffit') solid.push(box(b, Math.min(H, r.foot ?? H), H));
     else continue;
-    if (k !== 'furniture' && k !== 'heater') { cutsX.push(b.x0, b.x1); cutsY.push(b.y0, b.y1); }
+    if (k !== 'furniture' && k !== 'heater' && k !== 'soffit') { cutsX.push(b.x0, b.x1); cutsY.push(b.y0, b.y1); }
   }
   // Boundary flows (m³/s): + in, − out. A point source sits in the nearest air cell; a stairwell
   // spreads over its overlap box, tagged with its link so the two floors' ends can be paired.

@@ -477,6 +477,22 @@ the same day (read back identical). A taller half wall standing on a lower one i
 band above its top skips the taller one's footprint (`src/core/architectural3d.js`, 2026-10-10; before that fix
 r210's band cut r220 away above 1.15 m, so the boxing looked missing).
 
+**Ceiling boxings (owner, 2026-10-14: "work on boxing those conduits", the ground floor's kitchen and bedroom
+ducts; "new ceiling box kind").** A duct along a ceiling is boxed by a **`soffit` zone** (CEILING BOXING): solid from
+its `foot` (the box's underside, m above the floor; AR's band pad edits it) up to the ceiling, plaster in View 3D,
+a dashed outline with dashed diagonals on sheets (overhead), and it takes no floor area (footprint, room area, heat
+loss and floor finishes run under it, as for furniture). A riser from floor to ceiling stays a half wall (above). Each
+box clears its ducts by 1 cm plus a 12.5 mm board (Hypothesis: a typical plasterboard on rails; the real build-up
+is the contractor's). Drafted on the owner's plan (session scripts `editBoxing.mjs`):
+- kitchen east wall x 2.99–3.275, foot 2.47 (the bath duct leans down to 2.55 at the partition; the box also covers the
+  two conduits climbing that wall; window r111's head 2.27 is 20 cm under it);
+- kitchen south wall: x 1.185–2.99 (bath duct only), 29 cm deep, and x 0.415–1.185 (both ducts) 57.5 cm deep, foot 2.50,
+  2 cm over wall cabinet r162 (top 2.48); the kitchen vent sits on the box's underside (2.50);
+- bedroom r51 south wall x −0.935–0, 41.5 cm deep, foot 2.50, continuing the kitchen's line through the thick wall;
+- alcove r133: a half wall to the ceiling (x −0.935…−0.53) round the two drops.
+Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open: a hood over the cooktop under the
+south box (none drawn); access hatches at the duct joints (Hypothesis: usual practice).
+
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
 of boxing r220**, facing south, centre at 2.35 m and **17 cm from the bare west wall** (owner: "The guide says

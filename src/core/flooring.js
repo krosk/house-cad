@@ -19,7 +19,7 @@
 // are rounded once per product for the whole house.
 
 import { connectedRoomComponents } from './geometry2d.js';
-import { zoneKind, stairClimb } from './zoneColors.js';
+import { zoneKind, stairClimb, takesNoFloor } from './zoneColors.js';
 import { materialById } from './materials.js';
 import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
 
@@ -520,7 +520,7 @@ export function floorRegions(project, floor, { count = true } = {}) {
       for (const i of withMat) adds[i].push(doorwayHalf(door, components[i]));
     }
   }
-  const excludes = rects.filter((r) => r.op === 'subtract' && zoneKind(r) !== 'furniture').map((r) => r.bounds);
+  const excludes = rects.filter((r) => r.op === 'subtract' && !takesNoFloor(r)).map((r) => r.bounds);
   const groups = new Map();
   components.forEach((c, i) => {
     if (!mats[i]) return;

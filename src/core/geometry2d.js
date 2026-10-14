@@ -8,7 +8,7 @@
 // directly onto Three.js Shape + holes for extrusion.
 
 import polygonClipping from 'polygon-clipping';
-import { zoneKind } from './zoneColors.js';
+import { zoneKind, takesNoFloor } from './zoneColors.js';
 
 // Constraint solving and JSON round-trips can leave mathematically coincident
 // edges a few floating-point ulps apart (for example 1.7e-16 m). Polygon boolean
@@ -43,7 +43,7 @@ export function computeFootprint(rectangles) {
     // Its plan symbol is drawn separately; here it is simply ignored, so the room
     // outline (and its bold extremity line) encloses the furniture rather than
     // notching around it.
-    if (zoneKind(rect) === 'furniture') continue;
+    if (takesNoFloor(rect)) continue; // and a ceiling boxing hangs over the floor
     const b = rect.bounds;
     if (b.x1 - b.x0 <= 0 || b.y1 - b.y0 <= 0) continue; // skip degenerate
 
@@ -76,7 +76,7 @@ export function recalibrationCorners(rectangles, epsilon = 1e-6) {
   const horizontal = [];
   const vertical = [];
   for (const rect of rectangles || []) {
-    if (zoneKind(rect) === 'furniture') continue;
+    if (takesNoFloor(rect)) continue;
     const bounds = rect?.bounds;
     if (!bounds) continue;
     const x0 = Math.min(bounds.x0, bounds.x1), x1 = Math.max(bounds.x0, bounds.x1);
@@ -171,7 +171,7 @@ export function connectedRoomComponents(rectangles, epsilon = 1e-6) {
     // a subtract zone for editing/visualization, but movable furniture does not
     // reduce the room's reported floor area.
     const subtracts = (rectangles || []).filter((r) =>
-      r?.op === 'subtract' && zoneKind(r) !== 'furniture');
+      r?.op === 'subtract' && !takesNoFloor(r));
     components.push({
       rectangles: connected,
       ids,

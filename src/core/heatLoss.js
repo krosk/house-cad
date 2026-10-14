@@ -16,7 +16,7 @@
 
 import polygonClipping from 'polygon-clipping';
 import { computeFootprint, connectedRoomComponents, multiPolygonArea, roomRectsConnect } from './geometry2d.js';
-import { zoneKind } from './zoneColors.js';
+import { zoneKind, takesNoFloor } from './zoneColors.js';
 import { ceilingHeight, roomCeiling, roomFloorZ } from './storey.js';
 
 // A space's ceiling: its highest room's own ceiling (storey.js roomCeiling), else the storey's.
@@ -546,7 +546,7 @@ export function heatComponents(floor) {
     if (!cs.length) continue;
     if (!sts.length) { out.push(cs[0].comp); continue; }
     const rectangles = [...cs.flatMap((n) => n.comp.rectangles), ...sts.map(proxy)];
-    const subtracts = rects.filter((r) => r.op === 'subtract' && zoneKind(r) !== 'furniture' && !sts.includes(r));
+    const subtracts = rects.filter((r) => r.op === 'subtract' && !takesNoFloor(r) && !sts.includes(r));
     out.push({ rectangles, ids: new Set(rectangles.map((r) => r.id)),
       area: multiPolygonArea(computeFootprint([...rectangles, ...subtracts])) });
   }
@@ -575,7 +575,7 @@ function airVolume(comp, rects, H) {
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   for (const z of rects) {
     const kind = zoneKind(z);
-    if (z.op !== 'subtract' || kind === 'furniture' || comp.ids.has(z.id)) continue;
+    if (z.op !== 'subtract' || takesNoFloor(z) || comp.ids.has(z.id)) continue;
     const solid = solidHeight(z, kind, H);
     const b = z.bounds;
     if (solid >= H || b.x1 <= x0 || b.x0 >= x1 || b.y1 <= y0 || b.y0 >= y1) continue;

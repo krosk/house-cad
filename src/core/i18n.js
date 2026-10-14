@@ -38,6 +38,7 @@ const STRINGS = {
   'mode.passage':  { en: 'PASSAGE', fr: 'PASSAGE', zh: '通道' },
   'mode.garage':   { en: 'GARAGE DOOR', fr: 'PORTE GARAGE', zh: '车库门' },
   'mode.halfwall': { en: 'HALF WALL', fr: 'DEMI-MUR', zh: '矮墙' },
+  'mode.soffit': { en: 'CEILING BOXING', fr: 'COFFRAGE PLAFOND', zh: '吊顶包管' },
   'mode.heater': { en: 'HEATER', fr: 'RADIATEUR', zh: '暖气' },
   'mode.sliding':  { en: 'SLIDING', fr: 'COULISSANT', zh: '推拉门' },
   'mode.window':   { en: 'WINDOW', fr: 'FENÊTRE',  zh: '窗' },
