@@ -551,15 +551,21 @@ The hood: a Falmec Lumina NRS 90 (`falmec-lumina-nrs-90-black`, `docs/furniture.
 - Outlet m80 at (2.025, 1.80 m) now sits behind the chimney, where a hood socket usually goes (Hypothesis: it is
   meant for the hood).
 
-The bedroom alcove r133: a recess up to 2.50 m only (owner).
-- Wall r185 deepens to the bedroom face (41 cm, like r186; c1314 now ties it to r133's top edge).
-- RECESS r259 (sill 0, head 2.50) cuts it over r133 west of the duct box r256 (x −1.55…−0.935). r256 stays a
-  full-height box round the drops.
-- Proven in Node: wall above 2.50 over the recess, solid r256, no conflicts.
-- The bedroom area falls 13.83 → 13.72 m², because the wall now covers the recess floor.
-- The kitchen Ø125 and bath Ø100 cross from box r255 into r256 at 2.60 and 2.62 m, inside the 20 cm of wall above the
-  recess (8 and 7 cm in from the bedroom face). Before, that was open alcove; now the wall needs a notch or bore
-  there. This is the owner's or builder's call.
+The bedroom alcove r133: a recess up to 2.50 m only (owner), floored like the bedroom (owner: "In the recessed,
+apply a flooring").
+- r133 stays a room, so the bedroom's oak, its slab and its area (13.83 m²) run into it.
+- The wall above 2.50 over its open part (x −1.55…−0.935, west of the duct box r256) is CEILING BOXING r259
+  (foot 2.50): a solid from 2.50 to the ceiling that takes no floor.
+- A first draft deepened wall r185 and cut a RECESS zone instead. The wall then covered the recess floor: no
+  flooring, and the area fell to 13.72.
+- Proven in Node: oak and slab in the recess, area 13.83, no conflicts.
+- r256 stays a full-height box round the drops. The real recess also stops at 2.50 over r256's part, so the kitchen
+  Ø125 and bath Ø100, crossing from box r255 into r256 at 2.60 and 2.62 m, pass through the wall's top there (8 and
+  7 cm in from the bedroom face). It needs a notch or bore: the owner's or builder's call. The model draws that
+  part as r256's box, not as wall.
+The kitchen's south boxes r253 and r254 take the south wall's tile_vernisse_white on every exposed side and underneath
+(owner, 2026-10-14; 10 finish entries, only the exposed faces draw: `docs/materials.md` "a ceiling boxing takes wall
+finishes too").
 
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face

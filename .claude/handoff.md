@@ -1020,7 +1020,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
 - **Item 80:** (0′) **hood + alcove draft** (2026-10-14, `docs/plumbing-workflow.md` "Hood and alcove draft"): the
   session script applied it on top of the window draft; it needs the commit with `falmec-lumina` installed and
   relaunched before any write. Then write window + hood + recess together on the owner's W (new ids r258/r259/r260,
-  c1560–c1567, checked free on the 284 914 base; r260 = a generic induction hob, catalog `generic-induction-hob-60`). (0) **the window draft, on the owner's W**: from a fresh read equal to the 284 914-char base, set r146
+  c1560–c1567, checked free on the 284 914 base; r260 = a generic induction hob, catalog `generic-induction-hob-60`; r259 is now a CEILING BOXING over the alcove's
+  open part, r133 keeps its floor; plus 10 tile finishes on boxes r253/r254, which need the soffit-finish code). (0) **the window draft, on the owner's W**: from a fresh read equal to the 284 914-char base, set r146
   `hinge` 'both' and move unit B's rect and nodes to centre (−4.25, −4.06) exactly as listed in
   `docs/plumbing-workflow.md` "Unit B turned" (no new ids, nothing removed: r219 y, pn78/79, pn320/321/325, pn316/317,
   pn306/307/pn75, pn319/pn329/pn76); re-run the leaf sweep (`windowSwings` + `leafDirection`, 3.5 cm sash half-thickness)
