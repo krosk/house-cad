@@ -123,7 +123,7 @@ export class View3D {
       if (event.alpha == null) return;
       this._deviceOrientation = { alpha: event.alpha, beta: event.beta, gamma: event.gamma };
     };
-    // Called with the new mode ('overview' | 'pov') when a camera transition ends.
+    // Called with the new mode ('overview' | 'pov' | 'orbit' | 'plan') when it changes.
     this.onNavigationChange = null;
 
     // Lighting.
@@ -743,39 +743,51 @@ export class View3D {
     this.planGroup.visible = !this.hideMesh;
   }
 
-  // PLAN mode on/off (owner, 2026-10-14: switching keeps the view). On starts the orbit from the
-  // camera as it is (the overview, or a POV), aimed at the plan point at the screen's centre; off
-  // puts back that overview or POV exactly as it was, unless the floor changed meanwhile (then it
-  // frames that floor's overview).
-  // `frame`: View 3D opening on the plan (owner, 2026-10-14: the model is built only when asked
-  // for), so there is no overview to keep: frame the plan, and ◈ Model frames the model.
+  // PLAN mode on/off (owner, 2026-10-14: switching keeps the view, both ways). On starts the orbit
+  // from the camera as it is (the overview, a POV or the model's orbit). Off keeps the camera too:
+  // if it was not moved in the plan, the overview, POV or orbit it came from comes back as it was;
+  // otherwise the model shows from exactly where the plan camera is, on the same orbit (ORBIT).
+  // `frame`: View 3D opening on the plan (the model is built only when asked for): frame the plan.
   setPlanMode(on, project = this.planProject, { frame = false } = {}) {
     if (!!on === (this.navigationMode === 'plan')) return;
     this.cameraTransition = null;
     this.ruler?.clear();
     if (on) {
-      const mode = this.navigationMode.endsWith('pov') ? 'pov' : 'overview'; // ▤ Plan from POV too (owner)
+      const from = this.navigationMode;
+      const mode = from.endsWith('pov') ? 'pov' : from === 'orbit' ? 'orbit' : 'overview';
       this.modelPose = frame ? null : { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
         up: this.camera.up.clone(), fov: this.camera.fov, distance: this.overviewDistance, floor: this.floorFilter, mode };
       this.planProject = project;
       this.navigationMode = 'plan';
       this.planFramedFor = this.floorFilter;
       this._rebuildPlanLayers();
-      this.controls.enabled = true;
-      this.controls.enableDamping = true;
-      this.controls.screenSpacePanning = true;
-      if (frame) { this.camera.up.set(0, 1, 0); this._framePlan(); } else this._aimPlanFromCamera(mode === 'pov' ? 2 : null);
+      this._enableOrbit();
+      if (frame) { this.camera.up.set(0, 1, 0); this._framePlan(); }
+      else if (mode !== 'orbit') this._aimPlanFromCamera(mode === 'pov' ? 2 : null); // ORBIT keeps its target
+      this.planEntry = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone() };
       this._applyModelVisibility();
       this._updateLightShadows();
       this.onNavigationChange?.('plan');
     } else {
+      const pose = this.modelPose, entry = this.planEntry;
+      this.modelPose = this.planEntry = null;
+      const moved = !entry || entry.position.distanceTo(this.camera.position) > 1e-4
+        || entry.quaternion.angleTo(this.camera.quaternion) > 1e-4;
+      if (moved || !pose || pose.floor !== this.floorFilter) {
+        // The model from the plan camera, on the same orbit.
+        this.navigationMode = 'orbit';
+        this.modelFramedFor = this.floorFilter; // a rebuild on this floor keeps the orbit
+        this._rebuildPlanLayers();
+        this._applyModelVisibility();
+        for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
+        this._updateLightShadows();
+        this.onNavigationChange?.('orbit');
+        return;
+      }
       this.controls.enabled = false;
       this.navigationMode = 'overview';
       this._rebuildPlanLayers();
       this._applyModelVisibility();
-      const pose = this.modelPose;
-      this.modelPose = null;
-      if (!pose || pose.floor !== this.floorFilter) { this.frameModel(); return; }
       this.camera.up.copy(pose.up);
       this.camera.position.copy(pose.position);
       this.camera.quaternion.copy(pose.quaternion);
@@ -784,10 +796,18 @@ export class View3D {
       this.camera.updateMatrixWorld();
       this.overviewDistance = pose.distance;
       if (pose.mode === 'pov') { this._finishTransition('pov'); return; } // back where the walk stood
+      if (pose.mode === 'orbit') { this._enableOrbit(); this._finishTransition('orbit'); return; }
       for (const mesh of this.house.children) mesh.visible = this._meshVisible(mesh);
       this._updateLightShadows();
       this.onNavigationChange?.('overview');
     }
+  }
+
+  // The free orbit (OrbitControls) of PLAN and of the model's ORBIT view.
+  _enableOrbit() {
+    this.controls.enabled = true;
+    this.controls.enableDamping = true;
+    this.controls.screenSpacePanning = true;
   }
 
   // The orbit starts where the camera is: its target is the plan point at the screen's centre (from
@@ -882,7 +902,7 @@ export class View3D {
     this._rebuildPlanLayers();
     // A model rebuild on the same floor (an edit, ▯ Windows open) keeps the overview or POV as it is
     // (owner, 2026-10-14); choosing another floor frames it.
-    if (this.modelFramedFor === floorId && this.overviewPose) return;
+    if (this.modelFramedFor === floorId && (this.overviewPose || this.navigationMode === 'orbit')) return;
     this.frameModel();
   }
 
@@ -1212,7 +1232,7 @@ export class View3D {
     if (!p || p.id !== event.pointerId) return;
     if (!p.moved && !this.cameraTransition && event.type === 'pointerup') {
       if (this.navigationMode === 'overview' && this.ruler.enabled) this.ruler.pick(event.clientX, event.clientY);
-      else if (this.navigationMode === 'overview') this._enterPovFromPointer(event.clientX, event.clientY);
+      else if (this.navigationMode === 'overview' || this.navigationMode === 'orbit') this._enterPovFromPointer(event.clientX, event.clientY);
       else if (this.navigationMode === 'pov') this._walkToPointer(event.clientX, event.clientY);
     }
     this.viewPointer = null;
@@ -1266,7 +1286,10 @@ export class View3D {
       && (mesh.userData.architecturalRole === 'floor' || mesh.userData.architecturalRole === 'stairs'));
     const hit = this.viewRaycaster.intersectObjects(floors, false).find((h) => this._standable(h));
     if (!hit) return;
-    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(), distance: this.overviewDistance };
+    // The pose ▦ Overview returns to: the overview, or the ORBIT view with its target.
+    this.overviewPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(), distance: this.overviewDistance,
+      orbit: this.navigationMode === 'orbit' ? this.controls.target.clone() : null };
+    this.controls.enabled = false; // POV drags look around
     const endPosition = new THREE.Vector3(hit.point.x, hit.point.y + this.eyeHeight, hit.point.z);
     const box = this._visibleBox();
     const center = box?.getCenter(new THREE.Vector3()) || new THREE.Vector3(endPosition.x, endPosition.y, endPosition.z - 1);
@@ -1307,8 +1330,11 @@ export class View3D {
   }
 
   // Leave POV for the saved overview (the Overview button; no longer a stray tap).
+  // From ORBIT, ▦ Overview frames the top-down overview.
   exitPov() {
-    if (this.navigationMode !== 'pov' || this.cameraTransition) return;
+    if (this.cameraTransition) return;
+    if (this.navigationMode === 'orbit') { this.frameModel(); return; }
+    if (this.navigationMode !== 'pov') return;
     this._returnToOverview();
   }
 
@@ -1327,7 +1353,7 @@ export class View3D {
     for (const mesh of this.house.children) {
       if (mesh.userData.architecturalRole === 'ceiling') mesh.visible = false;
     }
-    this._startTransition(this.overviewPose.position, this.overviewPose.quaternion, 'overview');
+    this._startTransition(this.overviewPose.position, this.overviewPose.quaternion, this.overviewPose.orbit ? 'orbit' : 'overview');
   }
 
   _startTransition(position, quaternion, destination, duration = 700) {
@@ -1344,7 +1370,13 @@ export class View3D {
     this.navigationMode = destination;
     this.cameraTransition = null;
     this.tiltRecalibrate = true; // tilt resumes from the heading the transition ended on
-    this.camera.up.set(0, destination === 'pov' ? 1 : 0, destination === 'pov' ? 0 : -1);
+    this.camera.up.set(0, destination === 'overview' ? 0 : 1, destination === 'overview' ? -1 : 0);
+    if (destination === 'orbit') {
+      // Back on the model's orbit about its saved target (OrbitControls re-derives its angles).
+      if (this.overviewPose?.orbit) this.controls.target.copy(this.overviewPose.orbit);
+      this._enableOrbit();
+      this.controls.update();
+    }
     if (destination === 'pov') {
       const direction = this.camera.getWorldDirection(new THREE.Vector3());
       this.viewYaw = Math.atan2(-direction.x, -direction.z);
@@ -1456,6 +1488,7 @@ export class View3D {
     this.overviewPlaneY = box.max.y;
     this.modelFramedFor = this.floorFilter;
     this.navigationMode = 'overview';
+    this.controls.enabled = false;
     this.cameraTransition = null;
     this.camera.up.set(0, 0, -1);
     this.camera.position.set(center.x, box.max.y + distance, center.z);
@@ -1497,7 +1530,7 @@ export class View3D {
       if (a >= 1) this._finishTransition(this.cameraTransition.destination);
     } else if (!this.renderer.xr.isPresenting && this.tiltEnabled && this.navigationMode === 'pov') {
       this._applyTiltLook();
-    } else if (!this.renderer.xr.isPresenting && this.navigationMode === 'plan') {
+    } else if (!this.renderer.xr.isPresenting && (this.navigationMode === 'plan' || this.navigationMode === 'orbit')) {
       this.controls.update(); // orbit damping
     }
     if (frame && this.onXRFrame) {

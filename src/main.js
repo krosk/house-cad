@@ -272,12 +272,13 @@ view3dPlan.addEventListener('click', () => {
 view.onNavigationChange = (mode) => {
   const pov = mode === 'pov';
   const plan = mode === 'plan';
+  const orbit = mode === 'orbit'; // the model on the plan's free orbit (◈ Model after moving the plan)
   view3dNav.hidden = false;
-  view3dRuler.hidden = pov || plan;
+  view3dRuler.hidden = pov || plan || orbit;
   view3dHalfWalls.hidden = plan;
   // Plan shows no model: its lighting, reflections, Realistic and window options hide (owner, 2026-10-14).
   document.getElementById('view3d-floor-ctl').classList.toggle('plan-mode', plan);
-  view3dOverview.hidden = !pov;
+  view3dOverview.hidden = !(pov || orbit);
   view3dTilt.hidden = !pov || !tiltSupported;
   view3dPlan.hidden = false; // POV too (owner, 2026-10-14)
   view3dPlan.setAttribute('aria-pressed', String(plan));
@@ -286,7 +287,7 @@ view.onNavigationChange = (mode) => {
   view3dConduits.hidden = !plan || !project.conduitSegments?.length;
   view3dPipes.hidden = !project.pipes?.length; // Model view too, in grey (owner, 2026-10-14)
   renderPipeLegend();
-  if ((pov || plan) && view.ruler.enabled) setRuler(false);
+  if ((pov || plan || orbit) && view.ruler.enabled) setRuler(false);
 };
 
 function render3DFloorList() {

@@ -73,14 +73,16 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
 
-Desktop/mobile View 3D has three view-only camera states. PLAN (owner, 2026-10-14; `src/ui/planLayers3d.js`)
-is AR's flat plan in 3D on a free orbit camera (OrbitControls, the only place they are enabled): each shown
+Desktop/mobile View 3D has four view-only camera states (PLAN, OVERVIEW, POV, and ORBIT below). PLAN (owner, 2026-10-14; `src/ui/planLayers3d.js`)
+is AR's flat plan in 3D on a free orbit camera (OrbitControls, enabled only here and in ORBIT): each shown
 floor's zones lie tinted and outlined at its elevation, the architectural model and furniture hide (markers stay),
 and the whole-house conduit network and the pipes (coloured by service, a legend under the buttons) each show
 behind a per-device toggle; a run touching the chosen floor shows, so risers appear on both storeys. Rebuilt with
 the model and the floor picker; choosing another floor reframes, a model edit keeps the orbit; ▤ Plan / ◈ Model
-switch without moving the view (owner, 2026-10-14: the orbit starts from the overview or POV camera, also offered
-in POV, and ◈ Model puts that overview or POV back as it was unless the floor changed), and AR hides it. The 💧 Pipes toggle also shows the pipes in the
+switch without moving the view (owner, 2026-10-14: the orbit starts from the overview, POV or ORBIT camera, also
+offered in POV; ◈ Model puts that view back as it was when the plan camera did not move, and otherwise shows the model
+from exactly the plan camera in ORBIT: the model on the same free orbit, where a tap walks into POV, whose ▦ Overview
+returns to that orbit, and ▦ Overview in ORBIT frames the top-down overview), and AR hides it. The 💧 Pipes toggle also shows the pipes in the
 Model view (overview and POV) in neutral grey, without the legend (owner, 2026-10-14). A share link carries the network (opt-in `network`, `docs/share-view.md`); without one, the toggles hide. OVERVIEW is locked top-down: a
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
