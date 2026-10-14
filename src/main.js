@@ -264,13 +264,19 @@ for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'
   });
 }
 view.planProject = project; // the Model view's grey pipes are built from it too
-view3dPlan.addEventListener('click', () => view.setPlanMode(view.navigationMode !== 'plan', project));
+view3dPlan.addEventListener('click', () => {
+  if (openingModel) cancelModel();
+  else if (view.navigationMode === 'plan') showModel();
+  else view.setPlanMode(true, project);
+});
 view.onNavigationChange = (mode) => {
   const pov = mode === 'pov';
   const plan = mode === 'plan';
   view3dNav.hidden = false;
   view3dRuler.hidden = pov || plan;
   view3dHalfWalls.hidden = plan;
+  // Plan shows no model: its lighting, reflections, Realistic and window options hide (owner, 2026-10-14).
+  document.getElementById('view3d-floor-ctl').classList.toggle('plan-mode', plan);
   view3dOverview.hidden = !pov;
   view3dTilt.hidden = !pov || !tiltSupported;
   view3dPlan.hidden = pov;
@@ -356,16 +362,17 @@ function setDesktop3D(visible) {
 }
 // The 3D model and its textures are built only for the 3D view (owner, 2026-10-03:
 // texture loading disturbed the plan view): nothing 3D runs while the plan is shown.
-// ◈ View 3D builds the model, waits behind a loading wheel until every texture is
-// prepared (src/ui/textureWorker.js), then opens; pressing it again cancels.
+// ◈ View 3D opens on the 3D plan (owner, 2026-10-14), which needs no model; the model and
+// its textures are built only when ◈ Model is pressed, behind a loading wheel until every
+// texture is prepared (src/ui/textureWorker.js); pressing it again cancels.
 const view3dLoading = document.getElementById('view3d-loading');
 const view3dLoadingText = document.getElementById('view3d-loading-text');
-let opening3D = false;
+let openingModel = false;
 let textureProgress = { total: 0, done: 0, onPage: '' };
 let progressWaiter = null;
 onTextureProgress((p) => {
   textureProgress = p;
-  if (opening3D) showLoading();
+  if (openingModel) showLoading();
   if (p.done >= p.total) progressWaiter?.();
 });
 function showLoading() {
@@ -377,35 +384,41 @@ function showLoading() {
     : 'Preparing 3D…';
   view3dLoadingText.title = onPage ? `Textures prepared on the page: ${onPage}` : '';
 }
-async function open3D() {
-  opening3D = true;
-  view3dToggle.textContent = '✕ Cancel 3D';
-  view3dToggle.title = 'Stop opening the 3D view (textures keep loading)';
-  showLoading();
-  await allowWorkLightPaint(); // paint the wheel before the model build
-  if (!opening3D) return;
-  if (view3dDirty) {
-    try { rebuildView(); } catch (error) { console.error('3D build failed:', error); }
-  }
-  if (textureProgress.done < textureProgress.total) {
-    await new Promise((resolve) => { progressWaiter = resolve; });
-    progressWaiter = null;
-  }
-  if (!opening3D) return;
-  opening3D = false;
-  view3dLoading.hidden = true;
+function open3D() {
   setDesktop3D(true);
+  view.setPlanMode(true, project, { frame: true });
 }
-function cancel3D() {
-  opening3D = false;
+// ◈ Model: build the model if it is stale, wait for its textures, then leave the plan.
+async function showModel() {
+  openingModel = true;
+  view3dPlan.textContent = '✕ Cancel';
+  view3dPlan.title = 'Stop opening the model (textures keep loading)';
+  if (view3dDirty || textureProgress.done < textureProgress.total) {
+    showLoading();
+    await allowWorkLightPaint(); // paint the wheel before the model build
+    if (!openingModel) return;
+    if (view3dDirty) {
+      try { rebuildView(); } catch (error) { console.error('3D build failed:', error); }
+    }
+    if (textureProgress.done < textureProgress.total) {
+      await new Promise((resolve) => { progressWaiter = resolve; });
+      progressWaiter = null;
+    }
+    if (!openingModel) return;
+  }
+  openingModel = false;
+  view3dLoading.hidden = true;
+  view.setPlanMode(false);
+}
+function cancelModel() {
+  openingModel = false;
   progressWaiter?.();
   view3dLoading.hidden = true;
-  view3dToggle.textContent = '◈ View 3D';
-  view3dToggle.title = 'Open the interactive 3D model';
+  view.onNavigationChange?.(view.navigationMode); // the button's label back to ◈ Model
 }
 view3dToggle.addEventListener('click', () => {
-  if (opening3D) cancel3D();
-  else if (app.classList.contains('show-3d')) setDesktop3D(false);
+  if (openingModel) cancelModel();
+  if (app.classList.contains('show-3d')) setDesktop3D(false);
   else open3D();
 });
 
@@ -465,7 +478,7 @@ function rebuildView() {
   view.setFloorFilter(selected3DFloorId);
   render3DFloorList();
   if (firstBuild && floorGeos.some((g) => g.floorGeometry || g.wallGeometry)) {
-    view.frameModel();
+    if (view.navigationMode !== 'plan') view.frameModel(); // else ◈ Model frames it
     firstBuild = false;
   }
 }
@@ -481,10 +494,17 @@ function exportGeometry() {
   exportGeos.forEach(({ geometry }) => geometry?.dispose());
   return merged;
 }
-// While the 3D view is shown, a model change rebuilds it; otherwise it is only marked
-// stale and ◈ View 3D rebuilds it on opening.
+// While the 3D model is shown, a model change rebuilds it; otherwise it is only marked
+// stale and ◈ Model rebuilds it. In the 3D plan, the plan layers refresh at once (cheap).
 function scheduleRebuild() {
-  if (!app.classList.contains('show-3d')) { view3dDirty = true; return; }
+  if (!app.classList.contains('show-3d') || view.navigationMode === 'plan' || openingModel) {
+    view3dDirty = true;
+    if (app.classList.contains('show-3d') && view.navigationMode === 'plan' && !openingModel) {
+      view.setFloorFilter(selected3DFloorId);
+      render3DFloorList();
+    }
+    return;
+  }
   if (rebuildQueued) return;
   rebuildQueued = true;
   withWork('UPDATING MODEL', () => {

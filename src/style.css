@@ -274,6 +274,8 @@ body {
 #view3d-floor-ctl.collapsed { width: auto; max-width: 176px; }
 #view3d-floor-ctl.collapsed .view3d-floor-title { padding-bottom: 5px; }
 #view3d-floor-ctl.collapsed .cx-caret { transform: rotate(-90deg); }
+/* The 3D plan shows no model, so the model-only options hide (owner, 2026-10-14). */
+#view3d-floor-ctl.plan-mode :is(#view3d-lighting, #view3d-reflections, #view3d-realistic, #view3d-windows, #view3d-sun, #view3d-sky-status) { display: none; }
 #view3d-floor-ctl.collapsed #view3d-floor-current { display: inline; }
 #view3d-floor-ctl.collapsed > :not(.view3d-floor-title) { display: none; }
 #view3d-floor-list {

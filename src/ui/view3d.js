@@ -746,12 +746,14 @@ export class View3D {
   // PLAN mode on/off (owner, 2026-10-14: switching keeps the view). On starts the orbit from the
   // overview camera as it is, aimed at the plan point at the screen's centre; off puts back the
   // overview exactly as it was, unless the floor changed meanwhile (then it frames that floor).
-  setPlanMode(on, project = this.planProject) {
+  // `frame`: View 3D opening on the plan (owner, 2026-10-14: the model is built only when asked
+  // for), so there is no overview to keep: frame the plan, and ◈ Model frames the model.
+  setPlanMode(on, project = this.planProject, { frame = false } = {}) {
     if (!!on === (this.navigationMode === 'plan')) return;
     this.cameraTransition = null;
     this.ruler?.clear();
     if (on) {
-      this.modelPose = { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
+      this.modelPose = frame ? null : { position: this.camera.position.clone(), quaternion: this.camera.quaternion.clone(),
         up: this.camera.up.clone(), fov: this.camera.fov, distance: this.overviewDistance, floor: this.floorFilter };
       this.planProject = project;
       this.navigationMode = 'plan';
@@ -760,7 +762,7 @@ export class View3D {
       this.controls.enabled = true;
       this.controls.enableDamping = true;
       this.controls.screenSpacePanning = true;
-      this._aimPlanFromCamera();
+      if (frame) { this.camera.up.set(0, 1, 0); this._framePlan(); } else this._aimPlanFromCamera();
       this._applyModelVisibility();
       this._updateLightShadows();
       this.onNavigationChange?.('plan');
@@ -1502,7 +1504,7 @@ export class View3D {
       return;
     }
     this.ruler?.updateLabel();
-    if (this.realisticEnabled && this.composer && !this.renderer.xr.isPresenting) this.composer.render();
+    if (this.realisticEnabled && this.composer && !this.renderer.xr.isPresenting && this.navigationMode !== 'plan') this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }
 }
