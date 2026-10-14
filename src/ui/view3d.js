@@ -328,7 +328,7 @@ export class View3D {
     this.ruler.setEnabled(enabled);
   }
 
-  // Half walls see-through: their solid turns faint and their finishes hide. View-only.
+  // Half walls and ceiling boxings see-through: their solid turns faint and their finishes hide. View-only.
   setHalfWallsSeeThrough(on) {
     this.halfWallsSeeThrough = !!on;
     for (const mesh of this.house.children) {
@@ -373,7 +373,7 @@ export class View3D {
 
     for (const entry of list) {
       const {
-        geometry, floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry,
+        geometry, floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, ceilingGeometry,
         doorGeometry, windowGeometry, outlineGeometry, stairGeometry, elevation, floorId, name,
         markerPlacements, furniture,
       } = entry;
@@ -383,6 +383,7 @@ export class View3D {
           [floorGeometry, this.floorMaterial, 'floor'],
           [wallGeometry, this.wallMaterial, 'walls'],
           [halfWallGeometry, this.wallMaterial, 'walls', true],
+          [soffitGeometry, this.wallMaterial, 'walls', true], // ceiling boxing: see-through with the half walls
           [doorGeometry, this.doorMaterial, 'doors'],
           [windowGeometry, this.windowMaterial, 'windows'],
           [stairGeometry, this.stairMaterial, 'stairs'],

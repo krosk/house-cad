@@ -5331,7 +5331,7 @@ export function setupMR(view, project, getFootprint) {
       // material: products are many small meshes, drawn once per eye.
       const layers = {
         struct: [
-          [a.wallGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
+          [a.wallGeometry, arch3dMats.walls], [a.soffitGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
           [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
           [a.ceilingGeometry, arch3dMats.ceiling],
           // The stairwell walls around a flight going down: only with this floor alone (the floor

@@ -68,7 +68,7 @@ The desktop **View 3D** presentation no longer uses that legacy massing mesh dir
 `src/core/architectural3d.js` interpretation treats ROOM unions as thin floor slabs, derives an
 exterior wall shell from exposed room boundaries, renders explicit WALL and INSULATION (interior
 lining) zones as solids, CEILING BOXING (`soffit`, owner 2026-10-14: a box hung from the ceiling over ducts, solid from its
-`foot` to the ceiling; it takes no floor area, like furniture; dashed on sheets) as plaster solids, and cuts DOOR/PASSAGE/WINDOW/SLIDING/HALFWALL/RECESS vertical bands into overlapping wall segments (a RECESS cuts only its own footprint, never pierces). This module is
+`foot` to the ceiling; it takes no floor area, like furniture; dashed on sheets; its own `soffitGeometry`, so View 3D's 🧱 see-through toggle turns it faint with the half walls) as plaster solids, and cuts DOOR/PASSAGE/WINDOW/SLIDING/HALFWALL/RECESS vertical bands into overlapping wall segments (a RECESS cuts only its own footprint, never pierces). This module is
 deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains on the legacy
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.

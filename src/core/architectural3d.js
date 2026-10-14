@@ -861,7 +861,9 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const soffits = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'soffit' && validBounds(r.bounds))
     .map((r) => ({ ...r.bounds, z0: Math.min(Math.max(0, r.foot ?? H), H), z1: H, source: 'soffit' }))
     .filter((b) => b.z1 - b.z0 > EPS);
-  const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls, ...soffits]);
+  const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls]);
+  // Apart from the walls so View 3D's see-through toggle reaches them (owner, 2026-10-14).
+  const soffitGeometry = boxesGeometry(soffits);
   const outlineGeometry = boxesOutlineGeometry([...wallBoxes, ...soffits]);
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
@@ -869,7 +871,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip, { openDoors: !!opts.openDoors });
   const stairGeometry = stairsGeometry(floor, opts);
   return {
-    floorGeometry, wallGeometry, halfWallGeometry, ceilingGeometry, doorGeometry, windowGeometry,
+    floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, ceilingGeometry, doorGeometry, windowGeometry,
     outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial),
     pavedParts: pavedParts(floor, opts.fillDepth ?? 0, opts.fenceMaterial),
     stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),

@@ -774,7 +774,7 @@ export function finishSurfaces(project, floor) {
   for (const f of floor.finishes || []) {
     if (!f.target?.edge || !roomIds.has(f.target.rect) || !materialById(project, f.material)) continue;
     const rect = floor.rectangles.find((r) => r.id === f.target.rect);
-    walls.push({ material: f.material, halfWall: zoneKind(rect) === 'halfwall', ...wallFaceBoxes(floor, rect, f.target.edge) });
+    walls.push({ material: f.material, halfWall: zoneKind(rect) === 'halfwall' || zoneKind(rect) === 'soffit', ...wallFaceBoxes(floor, rect, f.target.edge) });
   }
   return { floors, walls };
 }
