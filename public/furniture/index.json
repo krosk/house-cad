@@ -756,5 +756,18 @@
     "procedural": "geberit-duofix",
     "source": "procedural: Geberit Duofix 111.333.00.6 WC frame, 112 cm, Sigma 12 cm cistern (no 3D model stored: code only); measured on Geberit's CAD views 111.333.00.6_A/_L/_G.dxf (cdn.data.geberit.com/cad), heights from the manual 972.363.00.0; the outlet bend reaches 24 mm behind the 120 mm footprint; feet and wall brackets left out",
     "registeredAt": "2026-10-10T00:00:00.000Z"
+  },
+  "falmec-lumina-nrs-90-black": {
+    "name": "falmec-lumina-nrs-90-black",
+    "article": "8034122348162",
+    "sizeMm": [
+      900,
+      1060,
+      480
+    ],
+    "mountZMm": 1440,
+    "procedural": "falmec-lumina",
+    "source": "procedural: Falmec Lumina NRS wall hood 90 cm, black glass (Boulanger 1060654, EAN 8034122348162; no manufacturer 3D model); outer sizes from Falmec's wall manual 110031219 p. 3 orthographic views, front details from Boulanger photos (sources in the builder falmecLumina). Height 1060 = chimney to a 2.50 m box with the canopy at 1.44 m (52 cm above a 92 cm worktop); the product allows 585-1095",
+    "registeredAt": "2026-10-14T00:00:00.000Z"
   }
 }

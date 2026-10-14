@@ -1656,11 +1656,105 @@ function geberitDuofix(entry) {
   return g;
 }
 
+// Falmec Lumina NRS wall hood, 90 cm, black glass (owner, 2026-10-14). A flat canopy with a
+// black glass front, and a two-part stainless chimney against the wall (−Z). `sizeMm` [w, h, d]:
+// h is the whole height, canopy bottom to chimney top, set per installation (585–1095).
+// Sources:
+//   - Product page https://www.boulanger.com/ref/1060654 ("Hotte décorative murale FALMEC LUMINA
+//     NRS MURAL 90 INOX/VERRE Noir", EAN 8034122348162), spec table: "Largeur produit : 90 cm",
+//     "Diamètre de la buse mini : 15 cm", "Type d'éclairage : néon", "Emplacement de l'éclairage :
+//     coté gauche et droit", "Nombre de filtre à graisse : 2". Its drawing (gallery image
+//     8034122348162_h_f_l_8, 900 × 585, chimney 387 × 310 centred in plan, 45 kg) is the island
+//     version, not this hood: not used.
+//   - Falmec spec sheet https://storage.onpage.it/cd451206c3e7f9bff4d6c9d835d000f314d2d189/8034122348162.pdf
+//     ("Wall - 90 cm - Black - 800 m3/h"): scotch-brite stainless AISI 304 + tempered glass with
+//     black finishing; net weight 36 kg; minimum hob distance 52 cm electric, 65 cm gas.
+//   - Falmec manual 110031219 "Lumen | Lumina | Plane Wall/Parete"
+//     https://storage.onpage.it/8672bb30af371550d49e32de500a0c4d3edcc866/110031219_Lumen-Lumina-Plane%20NRS_PLUS-parete_Web.pdf
+//     p. 3, "LUMINA 90 NRS / LUMINA 120 NRS", orthographic views, rasterised at 600 dpi: 2.01 px/mm
+//     (the lower chimney's 355 = 714 px, the 530 = 1067 px, the side view's 480 = 965 px; the front
+//     view's canopy is the 120's, 2410 px): canopy 900 × 55 × 480; lower chimney 355 wide × 300
+//     deep × 530 high; upper chimney 353 wide × 298 deep, up to 510 above it; the chimney's back
+//     flush with the canopy's back (the wall); the Ø150 outlet 118 mm from the wall, centred across
+//     (not modelled: inside the chimney); a vent grille of 4 × 8 slots on each side of the upper
+//     chimney, 84–220 mm from the wall and 35–115 mm below its top; front edge lines 8.5 and
+//     13.4 mm below the canopy top; six touch keys centred on the chimney, 17.6 mm apart, 31 mm
+//     below the canopy top. p. 5: duct top min 738 / max 1096 above the canopy bottom.
+//   - Photos (Boulanger gallery): 8034122348162_h_f_l_1 (straight-on close-up of the front edge,
+//     ≈ 4.4 px/mm against the 55 mm: from the top a 6.6 mm polished lip, a 4.8 mm dark gap, 35 mm
+//     of black glass, an 8 mm steel lower edge; the drawing's lines give 8.5 and 5, so the glass
+//     is 33.5; the keys are six white icons); _2 (the right end: a polished end cap wrapping the glass, the white
+//     "falmec" logo low near the right end, the grey filter panel recessed underneath with a dark
+//     slot round it); _0 and _3 (the brushed stainless chimney, no grille on its front).
+//   The lower edge band, the logo and the underside slot are photo estimates; every outer
+//   dimension is the drawing's.
+function falmecLumina(entry) {
+  const [W, H, D] = (entry.sizeMm || [900, 1095, 480]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v) => v / 1000;
+  // Low metalness: View 3D has no environment map outside Reflections/Realistic, where a 0.7 metal went black.
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc9cdd1, roughness: 0.42, metalness: 0.25 });
+  const polished = new THREE.MeshStandardMaterial({ color: 0xe6e8ea, roughness: 0.22, metalness: 0.35 });
+  const glass = new THREE.MeshStandardMaterial({ color: p.glassColor ?? 0x0a0b0d, roughness: 0.06, metalness: 0.1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.7 });
+  const filter = new THREE.MeshStandardMaterial({ color: 0x9a9ea2, roughness: 0.55, metalness: 0.15 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'falmec-lumina';
+  const T = mm(55), back = -D / 2, zf = D / 2;
+  const GLASS_T = mm(6), END = mm(6);                      // glass thickness, end cap (estimates)
+  const LIP = mm(8.5), GAP = mm(4.9), GLASS_H = mm(33.6);  // front bands from the top (drawing; 8 mm below: photo _1)
+  const gTop = T - LIP - GAP, gBot = gTop - GLASS_H;
+
+  // Canopy: the steel body behind the glass, then the front bands.
+  g.add(box([-W / 2, 0, back], [W / 2, T, zf - GLASS_T], steel));
+  g.add(box([-W / 2 + END, gBot, zf - GLASS_T], [W / 2 - END, gTop, zf], glass));
+  g.add(box([-W / 2, T - LIP, zf - GLASS_T], [W / 2, T, zf], polished));
+  g.add(box([-W / 2 + END, gTop, zf - GLASS_T], [W / 2 - END, T - LIP, zf - mm(1)], dark));
+  g.add(box([-W / 2, 0, zf - GLASS_T], [W / 2, gBot, zf], steel));
+  for (const s of [-1, 1]) g.add(box([s > 0 ? W / 2 - END : -W / 2, gBot, zf - GLASS_T], [s > 0 ? W / 2 : -W / 2 + END, T - LIP, zf], polished));
+  // Touch keys centred (drawing), and the logo near the right end (photo _2).
+  const keyY = T - mm(31);
+  for (let i = 0; i < 6; i++) {
+    const x = mm((i - 2.5) * 17.6);
+    g.add(box([x - mm(2.5), keyY - mm(2.5), zf], [x + mm(2.5), keyY + mm(2.5), zf + mm(0.5)], white));
+  }
+  g.add(box([W / 2 - mm(95), gBot + mm(8), zf], [W / 2 - mm(55), gBot + mm(14), zf + mm(0.5)], white));
+  // Underside: a dark suction slot round the recessed grey filter panel (perimeter extraction).
+  g.add(box([-W / 2 + mm(15), -mm(0.3), back + mm(15)], [W / 2 - mm(15), 0, zf - mm(15)], dark));
+  g.add(box([-W / 2 + mm(28), -mm(0.6), back + mm(28)], [W / 2 - mm(28), -mm(0.3), zf - mm(28)], filter));
+
+  // Chimney: the lower part 530 high, the upper one sliding inside it up to the set height.
+  const lowTop = Math.min(H, T + mm(530));
+  g.add(box([-mm(177.5), T, back], [mm(177.5), lowTop, back + mm(300)], steel));
+  if (H > lowTop + 1e-4) {
+    g.add(box([-mm(176.5), lowTop, back], [mm(176.5), H, back + mm(298)], steel));
+    // Vent grille on each side near the top: a dark plate crossed by steel bars (4 × 8 slots).
+    const z0 = back + mm(84), z1 = back + mm(220), y1 = H - mm(35), y0 = H - mm(115);
+    if (y0 > lowTop) for (const s of [-1, 1]) {
+      const x = s * mm(176.5), xo = x + s * mm(0.6);
+      const sx = (a, b) => (s > 0 ? [a, b] : [-b, -a]);
+      const [a0, a1] = sx(mm(176.5), mm(177));
+      g.add(box([a0, y0, z0], [a1, y1, z1], dark));
+      for (let i = 1; i < 4; i++) {
+        const z = z0 + (z1 - z0) * i / 4;
+        g.add(box([Math.min(x, xo), y0, z - mm(3)], [Math.max(x, xo), y1, z + mm(3)], steel));
+      }
+      for (let j = 1; j < 8; j++) {
+        const y = y0 + (y1 - y0) * j / 8;
+        g.add(box([Math.min(x, xo), y - mm(1.5), z0], [Math.max(x, xo), y + mm(1.5), z1], steel));
+      }
+    }
+  }
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
   'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'geberit-duofix': geberitDuofix,
+  'falmec-lumina': falmecLumina,
 };
 
 export function isProcedural(entry) {

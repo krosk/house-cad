@@ -228,6 +228,31 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   24 mm behind the footprint, and the wall brackets 182 mm (adjustable): real parts that stick out of the zone.
   Proven in a scratch browser preview (bounding box 590 × 1200 × 332 mm with brackets, legs and rods; front, side,
   top and 3D beside the CAD views). Not yet seen in View 3D, AR or on device; inside a half wall it is hidden.
+- `falmec-lumina-nrs-90-black` (owner, 2026-10-14): Falmec Lumina NRS wall hood, 90 cm, black glass (Boulanger
+  1060654, EAN 8034122348162). Builder `falmec-lumina`. It has:
+  - a flat 900 × 55 × 480 mm canopy, with a black glass front, a polished top lip and end caps, six centred touch
+    keys, the logo at the right, and a grey filter panel in a dark slot underneath;
+  - a stainless chimney against the wall (−Z): a lower part 355 × 300 × 530 mm and an upper part 353 × 298 mm
+    sliding in it, with a 4 × 8 vent grille on each side near its top.
+
+  Sources:
+  - Proven: every outer dimension comes from Falmec's wall manual 110031219 p. 3, rasterised at 600 dpi. Its scale
+    is 2.01 px/mm, and the canopy in that drawing is the 120 cm one.
+  - Estimates from Boulanger photos `_h_f_l_1` and `_h_f_l_2`: the lower edge band, the logo and the underside slot.
+  - Boulanger's own drawing (`_h_f_l_8`) is the island version, so it was not used.
+  - The builder's comment holds every value.
+
+  `sizeMm` height is the whole hood, canopy bottom to chimney top. The product allows 585–1095 mm.
+  - The entry uses 1060 mm with `mountZMm: 1440`. That puts the canopy 52 cm above the 92 cm worktop (Falmec's
+    electric minimum; gas needs 65) and the chimney top at 2.50 m, the underside of the kitchen's south ceiling
+    box.
+  - Hypothesis: the hob is electric (its outlet is the 32 A cooktop one). Another height needs another entry.
+  - Not modelled: the Ø150 outlet (118 mm from the wall, inside the chimney) and the lights.
+  - The steel's metalness is low (0.25). Outside Reflections/Realistic, View 3D has no environment map, and at
+    0.7 the hood rendered near-black. Proven in the scratch preview without an environment map; the owner did
+    not see the first version in the draft link.
+  - Proven in a scratch browser preview: the front and side render over the drawing sit on its lines, and the box
+    reads 900 × 1095.6 × 480.5 mm at 1095 (40 meshes, 480 triangles). Not yet seen in View 3D, AR or on device.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives
