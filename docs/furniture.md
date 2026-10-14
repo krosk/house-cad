@@ -243,9 +243,9 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   - The builder's comment holds every value.
 
   `sizeMm` height is the whole hood, canopy bottom to chimney top. The product allows 585–1095 mm.
-  - The entry uses 1060 mm with `mountZMm: 1440`. That puts the canopy 52 cm above the 92 cm worktop (Falmec's
-    electric minimum; gas needs 65) and the chimney top at 2.50 m, the underside of the kitchen's south ceiling
-    box.
+  - The entry uses 1054 mm with `mountZMm: 1446`. That puts the canopy 52 cm above the hob's glass (0.926 m: a
+    6 mm hob on the 92 cm worktop; Falmec's electric minimum, gas needs 65) and the chimney top at 2.50 m, the
+    underside of the kitchen's south ceiling box.
   - Hypothesis: the hob is electric (its outlet is the 32 A cooktop one). Another height needs another entry.
   - Not modelled: the Ø150 outlet (118 mm from the wall, inside the chimney) and the lights.
   - The steel's metalness is low (0.25). Outside Reflections/Realistic, View 3D has no environment map, and at
@@ -253,6 +253,11 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
     not see the first version in the draft link.
   - Proven in a scratch browser preview: the front and side render over the drawing sit on its lines, and the box
     reads 900 × 1095.6 × 480.5 mm at 1095 (40 meshes, 480 triangles). Not yet seen in View 3D, AR or on device.
+- `generic-induction-hob-60` (owner, 2026-10-14: "Go generic", no product chosen): builder `induction-hob`, only
+  the 6 mm black glass plate above the worktop (590 × 520 mm, a typical 60 cm hob). Its top is a painted texture
+  (`furnHob`): four zones (Ø180/Ø210 left, Ø210/Ø160 right, as `params.zonesMm`), a printed slider and keys at the
+  front. The body under the worktop and the worktop's cut-out are not drawn. `mountZMm: 920` = the worktop top.
+  Proven in a scratch preview (590 × 6 × 520 mm, 12 triangles); not yet seen in View 3D, AR or on device.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives

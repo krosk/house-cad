@@ -122,10 +122,29 @@ function paintGrille(ctx, size, _h, { W, color }) {
   ctx.fillRect(0, 0, 6, size); ctx.fillRect(size - 6, 0, 6, size);  // end caps
 }
 
+// A generic induction hob's glass top (millimetre layout, canvas top = the back edge): four
+// ring pairs, a printed control strip and slider at the front.
+function paintHob(ctx, cw, ch, { W, D, zones }) {
+  const k = cw / W;
+  ctx.fillStyle = '#0c0c0e'; ctx.fillRect(0, 0, cw, ch);
+  ctx.strokeStyle = '#5c6064';
+  for (const [x, y, d] of zones) {
+    for (const [r, lw] of [[d / 2, 2.2], [d / 2 - 12, 1.2]]) {
+      ctx.lineWidth = lw * k; ctx.beginPath(); ctx.arc(x * k, y * k, r * k, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  ctx.fillStyle = '#9a9ea2';
+  const y = (D - 32) * k;
+  ctx.fillRect((W / 2 - 95) * k, y - 1 * k, 190 * k, 2 * k);            // slider
+  for (const x of [60, 85, W - 85, W - 60]) ctx.fillRect((x - 5) * k, y - 5 * k, 10 * k, 10 * k);
+  ctx.strokeStyle = '#2a2c2f'; ctx.lineWidth = 3 * k; ctx.strokeRect(1.5 * k, 1.5 * k, cw - 3 * k, ch - 3 * k);
+}
+
 // Small textures by name, painted in the texture worker (paintedTexture.js, painters.js).
 export const FURNITURE_PAINTERS = {
   furnWood: paintWood, furnLeather: paintLeather, furnFabric: paintFabric, furnSlat: paintSlat,
   furnTrayTop: paintTrayTop, furnKeys: paintKeys, furnBadge: paintBadge, furnGrille: paintGrille,
+  furnHob: paintHob,
 };
 const woodTexture = (color) => paintedTexture('furnWood', { color }, 256, 256, { placeholder: color });
 const leatherTexture = (color, cols = 3, rows = 3) => paintedTexture('furnLeather', { color, cols, rows }, 256, 256, { placeholder: color });
@@ -1749,12 +1768,33 @@ function falmecLumina(entry) {
   return g;
 }
 
+// A generic built-in induction hob (owner, 2026-10-14: "Go generic"; no product chosen yet): the
+// 6 mm black glass plate that shows above the worktop. The body under the worktop, the cut-out and
+// any frame are not drawn. Default 590 × 6 × 520 mm, the usual 60 cm hob (Hypothesis: a typical
+// listing size, not a product); four zones, Ø180/Ø210 on the left, Ø210/Ø160 on the right.
+function inductionHob(entry) {
+  const [Wm, Hm, Dm] = entry.sizeMm || [590, 6, 520];
+  const [W, H, D] = [Wm, Hm, Dm].map((v) => v / 1000);
+  const p = entry.params || {};
+  const zones = p.zonesMm || [[150, 130, 180], [150, 330, 210], [440, 140, 210], [440, 345, 160]];
+  const map = paintedTexture('furnHob', { W: Wm, D: Dm, zones }, 512, Math.round(512 * Dm / Wm),
+    { wrap: THREE.ClampToEdgeWrapping, placeholder: 0x0c0c0e });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.08, metalness: 0.1 });
+  const top = new THREE.MeshStandardMaterial({ map, roughness: 0.08, metalness: 0.1 });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [glass, glass, top, glass, glass, glass]);
+  m.position.y = H / 2;
+  const g = new THREE.Group();
+  g.name = entry.name || 'induction-hob';
+  g.add(m);
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
   'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'geberit-duofix': geberitDuofix,
-  'falmec-lumina': falmecLumina,
+  'falmec-lumina': falmecLumina, 'induction-hob': inductionHob,
 };
 
 export function isProcedural(entry) {
