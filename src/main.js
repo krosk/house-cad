@@ -9,6 +9,7 @@ import { finishSurfaces } from './core/flooring.js';
 import { materialById, markerProductDraws, zoneMaterial } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
+import { PIPE_SERVICE_COLOR } from './ui/planLayers3d.js';
 import { setupMR } from './ui/mr.js';
 import { installRemoteLog } from './ui/remoteLog.js';
 
@@ -219,13 +220,65 @@ view3dTilt.addEventListener('click', async () => {
   // The permission request must run inside this tap (iOS).
   showTiltState(await view.setTiltEnabled(!view.tiltEnabled));
 });
+// PLAN mode (owner, 2026-10-14): the AR-style plan in 3D on an orbit camera, with the conduit
+// network and the pipes each behind its own toggle (src/ui/planLayers3d.js). View-only; the
+// layer toggles are remembered per device. A shared link carries no network, so its toggles hide.
+const view3dPlan = document.getElementById('view3d-plan');
+const view3dConduits = document.getElementById('view3d-conduits');
+const view3dPipes = document.getElementById('view3d-pipes');
+const view3dPipeLegend = document.getElementById('view3d-pipe-legend');
+const view3dPlanTitle = view3dPlan.title;
+const PLAN_LAYERS_KEY = 'house-cad:view3d-plan-layers:v1';
+let planServices = [];
+function savedPlanLayers() {
+  try { return JSON.parse(localStorage.getItem(PLAN_LAYERS_KEY)) || {}; } catch { return {}; }
+}
+function showPlanLayer(button, name, label, on) {
+  view.setPlanLayerVisible(name, on);
+  button.setAttribute('aria-pressed', String(on));
+  button.textContent = `${label}${on ? ' on' : ''}`;
+}
+{
+  const saved = savedPlanLayers();
+  showPlanLayer(view3dConduits, 'conduits', '⚡ Conduits', !!saved.conduits);
+  showPlanLayer(view3dPipes, 'pipes', '💧 Pipes', !!saved.pipes);
+}
+function renderPipeLegend() {
+  const plan = view.navigationMode === 'plan';
+  view3dPipeLegend.hidden = !plan || !view.planShow.pipes || !planServices.length;
+  view3dPipeLegend.replaceChildren(...planServices.map((service) => {
+    const item = document.createElement('span');
+    item.textContent = t(`pipe.service.${service}`);
+    item.style.setProperty('--swatch', `#${(PIPE_SERVICE_COLOR[service] ?? PIPE_SERVICE_COLOR.cold).toString(16).padStart(6, '0')}`);
+    return item;
+  }));
+}
+view.onPlanServices = (services) => { planServices = services; renderPipeLegend(); };
+for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'], [view3dPipes, 'pipes', '💧 Pipes']]) {
+  button.addEventListener('click', () => {
+    const on = !view.planShow[name];
+    showPlanLayer(button, name, label, on);
+    try { localStorage.setItem(PLAN_LAYERS_KEY, JSON.stringify(view.planShow)); } catch { /* private mode */ }
+    renderPipeLegend();
+  });
+}
+view3dPlan.addEventListener('click', () => view.setPlanMode(view.navigationMode !== 'plan', project));
 view.onNavigationChange = (mode) => {
   const pov = mode === 'pov';
+  const plan = mode === 'plan';
   view3dNav.hidden = false;
-  view3dRuler.hidden = pov;
+  view3dRuler.hidden = pov || plan;
+  view3dHalfWalls.hidden = plan;
   view3dOverview.hidden = !pov;
   view3dTilt.hidden = !pov || !tiltSupported;
-  if (pov && view.ruler.enabled) setRuler(false);
+  view3dPlan.hidden = pov;
+  view3dPlan.setAttribute('aria-pressed', String(plan));
+  view3dPlan.textContent = plan ? '◈ Model' : '▤ Plan';
+  view3dPlan.title = plan ? 'Back to the 3D model' : view3dPlanTitle;
+  view3dConduits.hidden = !plan || !project.conduitSegments?.length;
+  view3dPipes.hidden = !plan || !project.pipes?.length;
+  renderPipeLegend();
+  if ((pov || plan) && view.ruler.enabled) setRuler(false);
 };
 
 function render3DFloorList() {

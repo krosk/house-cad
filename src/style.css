@@ -401,6 +401,36 @@ body {
   backdrop-filter: blur(4px);
   touch-action: manipulation;
 }
+/* PLAN mode's pipe colours, above the nav. */
+.view3d-pipe-legend {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  max-width: calc(100% - 32px);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.view3d-pipe-legend[hidden] { display: none; }
+.view3d-pipe-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-radius: 2px;
+  background: var(--swatch);
+}
 #view3d-nav button[aria-pressed="true"] {
   color: #0b1220;
   background: #ffd166;

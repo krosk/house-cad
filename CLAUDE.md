@@ -72,7 +72,13 @@ deliberately reusable by a future opt-in AR 3D layer. STL/OBJ/GLB export remains
 `computeFootprint → extrudeFootprint` pipeline until the architectural interpretation is visually
 accepted; do not silently change exports when editing the viewer.
 
-Desktop/mobile View 3D has exactly two view-only camera states. OVERVIEW is locked top-down: a
+Desktop/mobile View 3D has three view-only camera states. PLAN (owner, 2026-10-14; `src/ui/planLayers3d.js`)
+is AR's flat plan in 3D on a free orbit camera (OrbitControls, the only place they are enabled): each shown
+floor's zones lie tinted and outlined at its elevation, the architectural model and furniture hide (markers stay),
+and the whole-house conduit network and the pipes (coloured by service, a legend under the buttons) each show
+behind a per-device toggle; a run touching the chosen floor shows, so risers appear on both storeys. Rebuilt with
+the model and the floor picker; choosing another floor reframes, a model edit keeps the orbit; ▤ Plan / ◈ Model
+switch, and AR hides it. A shared link carries no network, so its toggles hide. OVERVIEW is locked top-down: a
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a

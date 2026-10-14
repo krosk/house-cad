@@ -57,6 +57,7 @@ import { AIR_INLETS, nextAirInlet } from '../core/airInlets.js';
 import { runAirflow, AIRFLOW_SCENARIOS } from '../core/airflow.js';
 import { houseAirInput, solveHouse3d } from '../core/airflow3d.js';
 import { floorHeatLoss, houseHeatLoss, houseBalance, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
+import { CONDUIT_COLOR, PIPE_SERVICE_COLOR } from './planLayers3d.js'; // shared with View 3D's PLAN mode
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, hasClimb, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
@@ -3314,7 +3315,6 @@ export function setupMR(view, project, getFootprint) {
 
   // Keep the physical carrier visually separate from what it carries. Surface remains
   // inferred routing metadata, but does not recolor either layer in AR.
-  const CONDUIT_COLOR = 0xa78bfa;
   const CONDUIT_NODE_COLOR = 0xffffff;
   const CIRCUIT_CONNECTED_COLOR = 0x4ade80;
   const WIRE_TYPE_COLOR = { electrical: 0xf59e0b, ethernet: 0x38bdf8 };
@@ -3992,9 +3992,6 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // ---- Plumbing graph (nodes + service-bearing pipe segments) -----------------
-  const PIPE_SERVICE_COLOR = {
-    cold: 0x38bdf8, hot: 0xef4444, heating_supply: 0xf97316, heating_return: 0x8b5cf6, refrigerant: 0x34d399, vmc: 0xcbd5e1, waste: 0xa16207,
-  };
   const pipeColor = (pipe) => PIPE_SERVICE_COLOR[pipe?.service] || PIPE_SERVICE_COLOR.cold;
   // A `{node}` constraint endpoint: a conduit or a pipe junction (ids never collide).
   function netNodeById(id) {
@@ -9315,6 +9312,7 @@ export function setupMR(view, project, getFootprint) {
     saved.meshVisible = view.house?.visible;
     saved.markerLightsVisible = view.markerLights?.visible;
     saved.furnitureModelsVisible = view.furnitureModels?.visible;
+    saved.planLayersVisible = view.planGroup?.visible; // View 3D's PLAN mode layers
 
     scene.background = null; // reveal passthrough
     scene.environment = null; // View 3D reflections are desktop-only (Quest cost)
@@ -9323,6 +9321,7 @@ export function setupMR(view, project, getFootprint) {
     if (view.house) view.house.visible = false; // hide the extruded walls
     if (view.markerLights) view.markerLights.visible = false;
     if (view.furnitureModels) view.furnitureModels.visible = false;
+    if (view.planGroup) view.planGroup.visible = false;
     view.hideMesh = true; // keep them hidden even as survey edits rebuild the mesh
     view.controls.enabled = false;
 
@@ -9403,6 +9402,7 @@ export function setupMR(view, project, getFootprint) {
     if (view.house) view.house.visible = saved.meshVisible ?? true;
     if (view.markerLights) view.markerLights.visible = saved.markerLightsVisible ?? true;
     if (view.furnitureModels) view.furnitureModels.visible = saved.furnitureModelsVisible ?? true;
+    if (view.planGroup) view.planGroup.visible = saved.planLayersVisible ?? false;
     view.controls.enabled = saved.controls ?? true;
     view._resize(); // XR left the framebuffer at headset size
   });

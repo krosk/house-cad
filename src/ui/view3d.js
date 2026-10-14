@@ -23,6 +23,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
 import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 import { Ruler3D } from './ruler3d.js';
+import { buildPlanLayers, disposePlanLayer } from './planLayers3d.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -262,6 +263,16 @@ export class View3D {
     this.scene.add(this.markerLights);
     this.furnitureModels = new THREE.Group();
     this.scene.add(this.furnitureModels);
+    // PLAN mode (src/ui/planLayers3d.js): the AR-style flat plan with the conduits and the
+    // pipes, on a free orbit camera. Built from `planProject` only while the mode is on.
+    this.planGroup = new THREE.Group();
+    this.planGroup.visible = false;
+    this.scene.add(this.planGroup);
+    this.planProject = null;
+    this.planLayers = null;
+    this.planShow = { conduits: false, pipes: false };
+    this.planFramedFor = undefined; // the floor filter the plan camera was last framed for
+    this.onPlanServices = null; // (services[]) → main.js draws the pipe legend
     this.furnitureBuildToken = 0;
     this.furnitureSources = new Map();
     this.furniturePending = new Map();
@@ -501,9 +512,7 @@ export class View3D {
         this._addFurniture(item, entry, furnitureToken);
       }
     }
-    this.house.visible = !this.hideMesh; // stay hidden if MR is showing the flat plan
-    this.markerLights.visible = !this.hideMesh;
-    this.furnitureModels.visible = !this.hideMesh;
+    this._applyModelVisibility();
     this._updateLightShadows();
     if (this.realisticEnabled) this._applySun();
   }
@@ -724,6 +733,88 @@ export class View3D {
     return fixture;
   }
 
+  // The architectural model hides in PLAN mode (its markers stay) and while MR shows the flat plan.
+  _applyModelVisibility() {
+    const plan = this.navigationMode === 'plan';
+    this.house.visible = !this.hideMesh && !plan;
+    this.markerLights.visible = !this.hideMesh;
+    this.furnitureModels.visible = !this.hideMesh && !plan;
+    this.planGroup.visible = !this.hideMesh && plan;
+  }
+
+  // PLAN mode on/off. Off returns to the top-down overview.
+  setPlanMode(on, project = this.planProject) {
+    if (!!on === (this.navigationMode === 'plan')) return;
+    this.cameraTransition = null;
+    this.ruler?.clear();
+    if (on) {
+      this.planProject = project;
+      this.navigationMode = 'plan';
+      this.planFramedFor = undefined;
+      this._rebuildPlanLayers();
+      this.controls.enabled = true;
+      this.controls.enableDamping = true;
+      this.controls.screenSpacePanning = true;
+      this.camera.up.set(0, 1, 0);
+      this._framePlan();
+      this._applyModelVisibility();
+      this._updateLightShadows();
+      this.onNavigationChange?.('plan');
+    } else {
+      this.controls.enabled = false;
+      this.navigationMode = 'overview';
+      this._clearPlanLayers();
+      this._applyModelVisibility();
+      this.frameModel();
+    }
+  }
+
+  // Show or hide one PLAN layer ('conduits' | 'pipes'); view-only.
+  setPlanLayerVisible(name, on) {
+    this.planShow[name] = !!on;
+    if (this.planLayers?.[name]) this.planLayers[name].visible = !!on;
+  }
+
+  _clearPlanLayers() {
+    for (const child of [...this.planGroup.children]) {
+      this.planGroup.remove(child);
+      disposePlanLayer(child);
+    }
+    this.planLayers = null;
+  }
+
+  // Rebuilt on every model change and floor choice while PLAN is on (cheap: a few draw calls).
+  _rebuildPlanLayers() {
+    this._clearPlanLayers();
+    if (this.navigationMode !== 'plan' || !this.planProject) return;
+    this.planLayers = buildPlanLayers(this.planProject, this.floorFilter);
+    for (const name of ['zones', 'conduits', 'pipes']) {
+      const layer = this.planLayers[name];
+      if (name !== 'zones') layer.visible = this.planShow[name];
+      this.planGroup.add(layer);
+    }
+    this.onPlanServices?.(this.planLayers.services);
+  }
+
+  // Frame the shown plan from the south, looking down at ~40°, orbiting about its centre.
+  _framePlan() {
+    const box = new THREE.Box3();
+    for (const child of this.planGroup.children) box.expandByObject(child);
+    if (box.isEmpty()) return;
+    this.planFramedFor = this.floorFilter;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    this.camera.fov = OVERVIEW_FOV;
+    this.camera.updateProjectionMatrix();
+    const radius = Math.max(2, size.length() / 2);
+    const distance = radius / Math.sin(THREE.MathUtils.degToRad(OVERVIEW_FOV / 2)) * Math.max(1, 1 / this.camera.aspect) * 0.9;
+    const pitch = THREE.MathUtils.degToRad(40);
+    this.controls.target.copy(center);
+    this.camera.position.set(center.x, center.y + distance * Math.sin(pitch), center.z + distance * Math.cos(pitch));
+    this.camera.lookAt(center);
+    this.controls.update();
+  }
+
   setFloorFilter(floorId = null) {
     this.floorFilter = floorId;
     this.ruler?.clear();
@@ -737,6 +828,12 @@ export class View3D {
       object.visible = floorId == null || object.userData.floorId === floorId;
     }
     this._updateLightShadows();
+    if (this.navigationMode === 'plan') {
+      // A model change keeps the orbit; choosing another floor frames it.
+      this._rebuildPlanLayers();
+      if (this.planFramedFor !== floorId) this._framePlan();
+      return;
+    }
     this.frameModel();
   }
 
@@ -1289,6 +1386,7 @@ export class View3D {
   }
 
   frameModel() {
+    if (this.navigationMode === 'plan') { this._framePlan(); return; }
     const box = this._visibleBox();
     if (!box) return;
     const center = box.getCenter(new THREE.Vector3());
@@ -1349,6 +1447,8 @@ export class View3D {
       if (a >= 1) this._finishTransition(this.cameraTransition.destination);
     } else if (!this.renderer.xr.isPresenting && this.tiltEnabled && this.navigationMode === 'pov') {
       this._applyTiltLook();
+    } else if (!this.renderer.xr.isPresenting && this.navigationMode === 'plan') {
+      this.controls.update(); // orbit damping
     }
     if (frame && this.onXRFrame) {
       // CPU cost split for the AR debug HUD: frame logic vs. three's render submission.
