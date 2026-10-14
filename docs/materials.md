@@ -148,6 +148,18 @@ later `herringbone`. `pack` is pieces per box or m² per box.
       aimed inside its footprint (more than 5 cm from a side). Proven (Node, owner's Ground bathroom,
       Lucia): r107's back face 3.10 → 1.94 m², the side faces lose 0.22 m² each, the half wall adds
       1.155 m² (front) + 0.21 m² (top, 4 tiles); its back and ends have no exposed segment;
+    - **a ceiling boxing takes wall finishes too** (owner, 2026-10-14: "apply the same wall material as the
+      kitchen south wall" on the kitchen's south boxes). Its sides go from its foot to the ceiling, exposed
+      where 1 cm in front is room and not a wall, lining, in-room half wall or a boxing reaching as low. Its
+      underside is `edge: 'cap'`, drawn facing down at the foot. `flooring.js` `soffitFace` and
+      `wallFaceBoxes`.
+      - Like a half wall's finishes, they hide when View 3D's 🧱 see-through is on.
+      - AR WALL mode cannot pick a boxing's faces yet (Hypothesis: it only looks at rooms and half walls).
+        The owner's finishes on r253/r254 were written by script.
+      - Proven (Node, owner's Ground kitchen draft):
+        - r253: north face 0.36 m² (1.185…2.9875 × 2.50…2.70) and underside 0.51 m²;
+        - r254: north face 0.15 m², exposed east end 0.06 m², underside 0.44 m²;
+        - the sides against walls or the neighbour box get nothing.
   - a doorway belongs to a room within 5 cm, and an opening pierces a face when it sits within
     45 cm behind it.
 - Always show the naive `area ÷ piece + waste%` beside the laid-out count. Round packs up **once per

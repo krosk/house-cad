@@ -690,6 +690,37 @@ export function halfWallFace(floor, rect, edge) {
   return { vertical, at, inward, segments, halfWall: true };
 }
 
+// A side of a ceiling boxing (soffit, owner 2026-10-14: finished like the wall it runs along), from its foot to
+// the ceiling, in halfWallFace's shape. Exposed where just in front of it is room, not a wall, lining or another
+// boxing reaching as low or lower (a deeper neighbour box hides it; a higher one is drawn behind its own faces).
+export function soffitFace(floor, rect, edge) {
+  const b = rect.bounds;
+  const vertical = edge === 'left' || edge === 'right';
+  const at = edge === 'left' ? b.x0 : edge === 'right' ? b.x1 : edge === 'bottom' ? b.y0 : b.y1;
+  const inward = edge === 'left' || edge === 'bottom' ? -1 : 1;
+  const lo = vertical ? b.y0 : b.x0, hi = vertical ? b.y1 : b.x1;
+  const rooms = roomBoxesOf(floor);
+  const foot = rect.foot ?? 0;
+  const blockers = (floor.rectangles || []).filter((r) => r !== rect && (['wall', 'insulation'].includes(zoneKind(r))
+    || (zoneKind(r) === 'soffit' && (r.foot ?? 0) <= foot + EPS) || isInRoomHalfWall(floor, r))).map((r) => r.bounds);
+  const cuts = new Set([lo, hi]);
+  for (const q of [...rooms, ...blockers]) {
+    for (const v of vertical ? [q.y0, q.y1] : [q.x0, q.x1]) if (v > lo && v < hi) cuts.add(v);
+  }
+  const C = [...cuts].sort((p, q) => p - q);
+  const probe = at + inward * 0.01; // 1 cm in front of the side
+  const segments = [];
+  for (let i = 0; i < C.length - 1; i++) {
+    const m = (C[i] + C[i + 1]) / 2;
+    const px = vertical ? probe : m, py = vertical ? m : probe;
+    if (!rooms.some((q) => within(q, px, py)) || blockers.some((q) => within(q, px, py))) continue;
+    const last = segments[segments.length - 1];
+    if (last && Math.abs(last.b - C[i]) <= EPS) last.b = C[i + 1];
+    else segments.push({ a: C[i], b: C[i + 1], inset: 0 });
+  }
+  return { vertical, at, inward, segments, halfWall: true };
+}
+
 // The top of an in-room half wall: one box with u along its long side (so a tile's
 // width runs along it, as on a face) and v across; `alongX` says which plan axis u is.
 export function halfWallCap(floor, rect) {
@@ -704,6 +735,16 @@ export function halfWallCap(floor, rect) {
 // so is the part hidden behind an in-room half wall standing against it. A half wall's
 // own side runs from the floor to its top; its `cap` is halfWallCap.
 export function wallFaceBoxes(floor, rect, edge) {
+  if (zoneKind(rect) === 'soffit') { // a ceiling boxing: its sides from the foot up, its underside as CAP
+    const H = ceilingHeight(floor, 2.8), foot = Math.min(rect.foot ?? H, H);
+    if (edge === CAP) {
+      const b = rect.bounds, alongX = b.x1 - b.x0 >= b.y1 - b.y0;
+      const box = alongX ? { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 } : { x0: b.y0, x1: b.y1, y0: b.x0, y1: b.x1 };
+      return { face: { cap: true, down: true, alongX, z: foot }, boxes: [box] };
+    }
+    const face = soffitFace(floor, rect, edge);
+    return { face, boxes: foot < H - EPS ? face.segments.map((s) => ({ x0: s.a, x1: s.b, y0: foot, y1: H, inset: 0 })) : [] };
+  }
   if (zoneKind(rect) === 'halfwall') {
     if (edge === CAP) return halfWallCap(floor, rect);
     const face = halfWallFace(floor, rect, edge), top = halfWallTop(floor, rect);
@@ -751,9 +792,9 @@ export function wallFaceBoxes(floor, rect, edge) {
 
 // Geometry-only view of one floor's finishes for the 3D view: no piece counting
 // (that runs per model change on desktop; the texture does not need it).
-// A wall-finish target rect: a room, or a half wall standing inside one.
+// A wall-finish target rect: a room, a half wall standing inside one, or a ceiling boxing.
 const wallTargetIds = (floor) => new Set([
-  ...(floor.rectangles || []).filter((r) => zoneKind(r) === 'room').map((r) => r.id),
+  ...(floor.rectangles || []).filter((r) => zoneKind(r) === 'room' || zoneKind(r) === 'soffit').map((r) => r.id),
   ...inRoomHalfWalls(floor).map((r) => r.id),
 ]);
 // A floor finish box's level (storey.js roomFloorZ): the room of its region it lies in, else

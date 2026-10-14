@@ -1000,13 +1000,15 @@ export function finishGeometries(surfaces) {
   for (const wall of surfaces?.walls || []) {
     const b = bucket('walls', wall.material, !!wall.halfWall);
     const { face } = wall;
-    if (face.cap) { // a half wall's top: (u = along it, v = across) at its height
+    if (face.cap) { // a half wall's top (or a ceiling boxing's underside, `down`): (u = along it, v = across)
+      const z = face.down ? face.z - FINISH_LIFT : face.z + FINISH_LIFT;
       for (const r of wall.boxes) {
         const pts = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
-        const at = (u, v) => (face.alongX ? [u, face.z + FINISH_LIFT, -v] : [v, face.z + FINISH_LIFT, -u]);
+        const at = (u, v) => (face.alongX ? [u, z, -v] : [v, z, -u]);
         const corners = pts.map(([u, v]) => at(u, v));
-        // Wound to face up either way (u along y mirrors the quad).
-        quad(b, face.alongX ? corners : [...corners].reverse(), face.alongX ? pts : [...pts].reverse(), [0, 1, 0]);
+        // Wound to face up either way (u along y mirrors the quad); an underside the other way round.
+        const flip = face.alongX === !!face.down;
+        quad(b, flip ? [...corners].reverse() : corners, flip ? [...pts].reverse() : pts, [0, face.down ? -1 : 1, 0]);
       }
       continue;
     }
