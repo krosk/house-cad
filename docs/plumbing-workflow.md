@@ -119,6 +119,62 @@ side and height. Window opening against the units: docs/materials.md "Window swi
 
 ## VMC: two Sauter Agalina units (2026-10-07, draft)
 
+**One unit, optimised (owner, 2026-10-14, later the same day; written to the headset, read back identical, 284 543
+chars). Supersedes the routes in the block below where they differ.**
+- **Unit B 0.82 m further south**: its south face 12 mm north of the laundry radiator supply (y −4.72, 2.05 m, above
+  B's top 2.045), the closest it can hang. Outlet Ø160 ≈ 15 cm to the wall; the laundry vent is an 8 cm stub on B's
+  south port turning down (face to the floor), since 20 cm would hit the wall.
+- **Ground bathroom vent on the bathroom's south wall** (owner: "the bathroom outlet can be on the south wall"): the
+  partition with the kitchen, facing north, Bahia Curve S (zone r251), centre 2.55 m, 21.5 cm from the east wall
+  (Aldes's 20 cm guide). The Ø80 sleeve crosses the partition; the Ø100 runs south at x 3.06 in the kitchen (21 cm off
+  its east wall: two conduits climb that wall to the ceiling at (3.10, −2.08)), leaning 2.55 → 2.62 m over 2.7 m
+  (≈ 1.5°, no fitting), then west along the south wall at y −4.9375, dropping at x −0.65 in alcove r133.
+  Hypothesis: the vent is above the shower; check Aldes's instructions allow it there.
+- **Kitchen duct** vent and run at y −4.66 (5 mm north of the conduit riser at (0, −4.74)), dropping at x −0.85,
+  west of the bath's. So in the basement the kitchen (west) turns into its lane first: **no crossing** (owner's idea).
+- **Basement lanes by the unit** (owner: "optimize a bit the placement and the length"): kitchen y −4.06, bath y −3.92,
+  both straight west from the wall holes; the dips under the heating pair stay.
+- **Tight spot (Proven from the plan):** along the bedroom's south face the bath duct is 2.5 mm off the wall and
+  passes the conduit riser on the thick wall's bedroom face (it runs up to 2.60 m at y −4.873) above its bend; at
+  2.55 m it would be 3 mm from it, hence the lean.
+- Lengths and loss at boost (Hypothesis, same model as below): bath 14.7 m ≈ 12.9 Pa at 45 m³/h; kitchen 9.7 m
+  ≈ 24.2 Pa at 135 m³/h; upper 11.0 m (≈ +1 Pa for the unit move). Clash check: only same-pipe fittings flagged.
+
+**One unit for the whole house (owner, 2026-10-14; written to the headset the same day, read back identical, 284 347
+chars). Supersedes the two-unit layout below: unit A (r218), its roof outlet and its ground-floor ducts are gone.**
+Unit B (r219, the hung Aldes) serves the kitchen, the ground bathroom, the upper bathroom and the laundry.
+- **Unit B moved 0.93 m south**, centre (−3.99, −3.70) (owner: "move the VMC unit closer to the south wall"). Why:
+  basement door r120 opens into the laundry (0.83 m leaf, top 1.94 m; Proven from its swing in the plan) and no Ø125
+  fits over it under the 2.07 ceiling, so the ducts reach B along lanes south of the leaf's sweep (y −3.10 / −3.24).
+  Its OUT Ø160 to the south wall is now ≈ 1.0 m.
+- **Ground bathroom duct: Ø100, Ø80 only at the vent and the port** (owner chose it: at Ø80 the boost loss put the
+  vent under its 80 Pa floor). Vent (2.70, −1.125) → west over passage r117 at the kitchen ceiling (2.62) → south down
+  the kitchen's west wall (x 0.48, above the wall cupboards) → through the 41.5 cm wall into bedroom r51 at y −4.47 →
+  south into alcove r133 → straight down through the slab into the top of the basement wall (under the alcove: the
+  laundry's south face is y −4.90) → north through a hole drilled in that wall (1.99 m) and straight across the laundry
+  (owner: "go straight north") → west at y −3.10 → under the heating pair → into B's back Ø80. 16.1 m.
+- **Kitchen duct Ø125**, vent at V2 (1.10, −4.60): west at y −4.60 through the same wall → alcove → down beside the
+  bath duct → wall hole at 1.86 m → north → west at y −3.24 → B's kitchen port. It stays at 1.86 in the basement, so it
+  passes under the bath duct (the one place they must cross: the kitchen vent is east of the bath's run on the ground
+  floor but its port is east of the bath's at B) and under the heating pair. 10.6 m.
+- The thick wall is crossed **north of the two conduit risers on its bedroom face** (y −4.74 and −4.88, Proven from
+  the plan's conduits); the basement lanes stay clear of the ethernet panel's conduit rising at x −0.20.
+- **Upper bathroom duct**: straight down the laundry's west wall (x −4.615, 1.97) into B's west Ø80 (the diagonal is
+  gone), 10.2 m. **Laundry vent**: a 20 cm stub on B's south Ø80.
+- **Upper WC waste beside the upper duct** (owner: "one single hole"): from the stack's foot south at x −4.50,
+  1.93 → 1.91 m, through the same holes in the r76/r67 and r67/r66 walls; inside the laundry it drops to ≈ 1.0 m and
+  runs low along the west wall (13 cm off it, behind the machines), stopping short of the radiator riser. Its exit
+  through the south wall to the collector is still open.
+- **Laundry radiator supply raised to 2.05 m** along the south wall (owner's option 2): it crossed B's outlet (a clash
+  already on the headset before this change, from the radiator move of 2026-10-13); now 6 mm over the outlet's top.
+- Pressure at boost (Hypothesis: smooth pipe, Blasius, each 90° as two 45° = 0.3 × dynamic pressure; turns counted on
+  the drawing): bath 45 m³/h ≈ 14 Pa (the vent sees ≈ 88–98 Pa with B's assumed ≥ 122 Pa and 10–20 Pa of room
+  depression); kitchen ≈ 15 Pa at 105 m³/h, ≈ 25 Pa at 135 (its vent's required pressure is not known); upper ≈ +1.5 Pa
+  for the extra 0.93 m. All four boosting at once would exceed B's one published point (144 m³/h at 122 Pa).
+- Open: the kitchen vent's real flows; the wall holes' heights against the slab (contractor); the waste's height
+  against the washing-machine sockets (1.09 m) and the collector (its height is unknown); insulation R ≥ 0.6 on the
+  basement ducts; B's lid hatch.
+
 **Model changed (owner, 2026-10-08): Aldes EasyHOME Hygro Compact Classic** (Leroy Merlin kit 82201371,
 Aldes 11033404, with 3 Bdh vents; furniture `aldes-easyhome-hygro-compact`, `docs/furniture.md`). Unit **A
 (r218) is the Aldes on the headset** (written 2026-10-09, read back identical: flat, facing 0, OUT south,

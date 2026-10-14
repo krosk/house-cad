@@ -21,7 +21,7 @@ import {
 import { buildShareUrl, decodeViewFromHash, loadView } from './io/shareView.js';
 import { onTextureProgress } from './ui/textureWorker.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
-import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
+import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions, pipeSheetOptions } from './io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
@@ -1222,7 +1222,8 @@ function printSheets(svgs) {
           sketch.onStatus?.(`Downloaded ${name}${changeMap ? ' — with change map' : ''}`);
         } else if (b.dataset.print === 'png') {
           const f = project.activeFloor;
-          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap };
+          // PNG only, for now (owner, 2026-10-14): the plan with the waste and VMC pipes.
+          const sheetOpts = pipeSheetOptions({ ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap });
           const blob = await floorToPngBlob(f, sheetOpts);
           const name = sheetDownloadName(f, 'png');
           download(name, blob, 'image/png');

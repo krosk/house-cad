@@ -41,7 +41,7 @@ import {
   AUTOSAVE_KEY, FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
-import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
+import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions, pipeSheetOptions } from '../io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from '../io/dxf.js';
 import { buildShareUrl } from '../io/shareView.js';
 import { qrToPngBlob } from '../io/qr.js';
@@ -7186,7 +7186,7 @@ export function setupMR(view, project, getFootprint) {
         changeMap: exportChangeMap(), // revision clouds when a baseline slot is chosen
       });
       if (extension === 'png') {
-        data = await floorToPngBlob(f, sheetOpts);
+        data = await floorToPngBlob(f, pipeSheetOptions(sheetOpts));
         mime = 'image/png';
       } else {
         data = floorToSvg(f, sheetOpts);

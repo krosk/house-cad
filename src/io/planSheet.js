@@ -1277,6 +1277,92 @@ function drawElectricalLinks(be, L, floor) {
 // One conventional floor-area chip per semantic ROOM component. Use the center
 // of its largest source rectangle as a stable point inside the union; this avoids
 // polygon-centroid labels falling outside an L-shaped room.
+// Pipes (owner, 2026-10-14: waste and VMC on the PNG sheet, nothing else for now). Opt-in
+// through opts.pipeServices (service names), so no other output changes. Drawn to scale at
+// each pipe's diameter in plan projection, monochrome like the rest of the sheet: waste a
+// solid grey band, VMC an outlined (hollow) duct. A run shows when either end is on this
+// floor; a run through the slab marks its plan point with a crossed circle (a riser).
+const PIPE_SHEET_STYLE = {
+  waste: { fill: '#8a8a8a', outline: null },
+  vmc: { fill: '#ffffff', outline: '#111' },
+};
+// The services the PNG sheet shows (desktop and AR), for now.
+export const SHEET_PNG_PIPES = ['waste', 'vmc'];
+// The PNG sheet's options, for now (owner, 2026-10-14): the plan and those pipes only, so
+// dimensions and fixtures are off. Applied over shared-scale options, so the page, scale and
+// origin still match every other sheet of the set.
+export function pipeSheetOptions(opts = {}) {
+  return {
+    ...opts,
+    pipeServices: SHEET_PNG_PIPES,
+    layers: { ...resolveOutputLayers(opts), planDims: false, markerDims: false, markerIcons: false, furnitureDims: false },
+  };
+}
+const PIPE_SHEET_LABELS = { waste: 'Waste', vmc: 'VMC' };
+const PIPE_OUTLINE_MM = 0.25;
+
+function sheetPipeNodePos(project, node) {
+  if (node?.markerId) {
+    const found = project.findMarker?.(node.markerId);
+    if (found) return { x: found.marker.x, y: found.marker.y };
+  }
+  return { x: node?.x || 0, y: node?.y || 0 };
+}
+
+// The pipes of the chosen services that touch this floor: [{ a, b, service, diameter, riser }].
+// Whether a run's absolute height span overlaps this storey's (elevation .. + height).
+function passesThrough(project, a, b, floor) {
+  const z = (n) => {
+    const found = n.markerId ? project.findMarker?.(n.markerId) : null;
+    if (found) return (found.floor.elevation || 0) + (found.marker.z || 0);
+    return (project.floorById(n.floorId)?.elevation || 0) + (n.z || 0);
+  };
+  const lo = Math.min(z(a), z(b)), hi = Math.max(z(a), z(b));
+  const bottom = floor.elevation || 0;
+  return lo < bottom + floor.height - 1e-6 && hi > bottom + 1e-6;
+}
+
+function sheetPipeRuns(project, floor, services) {
+  if (!project || !services?.length) return [];
+  const nodes = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
+  const runs = [];
+  for (const pipe of project.pipes || []) {
+    if (!services.includes(pipe.service)) continue;
+    const a = nodes.get(pipe.a), b = nodes.get(pipe.b);
+    if (!a || !b) continue;
+    const fa = project.pipeNodeFloorId(a), fb = project.pipeNodeFloorId(b);
+    // A run from the Upper floor straight to the Basement crosses the whole Ground storey
+    // (its shaft), so it shows there too. Split levels (the garden) never take a pass-through.
+    if (fa !== floor.id && fb !== floor.id && !(fa !== fb && !Number.isFinite(floor.level)
+      && passesThrough(project, a, b, floor))) continue;
+    runs.push({ a: sheetPipeNodePos(project, a), b: sheetPipeNodePos(project, b),
+      service: pipe.service, diameter: pipe.diameter || 0.016, riser: fa !== fb });
+  }
+  return runs;
+}
+
+function drawPipes(be, L, runs) {
+  const band = (run, width, stroke) => be.line(L.X(run.a.x), L.Y(run.a.y), L.X(run.b.x), L.Y(run.b.y),
+    { stroke, width, cap: 'round' });
+  // Outlines first, then every fill over them, so a duct's joints read as one hollow run.
+  for (const run of runs) {
+    const st = PIPE_SHEET_STYLE[run.service];
+    if (st?.outline) band(run, run.diameter * L.mmPerM + 2 * PIPE_OUTLINE_MM, st.outline);
+  }
+  for (const run of runs) band(run, run.diameter * L.mmPerM, PIPE_SHEET_STYLE[run.service]?.fill || '#8a8a8a');
+  for (const run of runs) {
+    if (!run.riser) continue;
+    // Plan point of the slab crossing: the end that stays put in plan (a vertical riser has both).
+    const p = run.a.x === run.b.x && run.a.y === run.b.y ? run.a : null;
+    if (!p) continue;
+    const cx = L.X(p.x), cy = L.Y(p.y), r = Math.max(1, run.diameter * L.mmPerM / 2 + 0.6);
+    be.circle(cx, cy, r, { stroke: '#111', width: 0.25 });
+    const d = r * Math.SQRT1_2;
+    be.line(cx - d, cy - d, cx + d, cy + d, { stroke: '#111', width: 0.2 });
+    be.line(cx - d, cy + d, cx + d, cy - d, { stroke: '#111', width: 0.2 });
+  }
+}
+
 function drawRoomAreas(be, L, floor) {
   for (const component of connectedRoomComponents(floor.rectangles)) {
     const anchor = component.rectangles.reduce((largest, r) => {
@@ -1360,7 +1446,25 @@ function drawStrip(be, L, floor, opts) {
       label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : markerNote(t) ? ` · ${markerNote(t)}` : ''}`,
     })), (entry) => 4.4 + be.measure(entry.label, 2.4) + 3);
 
+  const pipeRuns = sheetPipeRuns(opts.project, floor, opts.pipeServices);
+  const pipeRows = wrapRows((opts.pipeServices || []).filter((sv) => pipeRuns.some((r) => r.service === sv)).map((sv) => {
+    const sizes = [...new Set(pipeRuns.filter((r) => r.service === sv).map((r) => Math.round(r.diameter * 1000)))]
+      .sort((a, b) => b - a);
+    return { sv, label: `${(opts.pipeLabel || ((t) => PIPE_SHEET_LABELS[t] || t))(sv)} Ø${sizes.join('/')} mm` };
+  }), (entry) => 7.4 + be.measure(entry.label, 2.2) + 2.2);
+
   let legendRow = 0;
+  for (const row of pipeRows) {
+    let x = page.w - MARGIN - row.width;
+    const y = yBase + 4 + legendRow++ * 6;
+    for (const entry of row.entries) {
+      const st = PIPE_SHEET_STYLE[entry.sv];
+      if (st?.outline) be.line(x, y, x + 6, y, { stroke: st.outline, width: 1.6 + 2 * PIPE_OUTLINE_MM });
+      be.line(x, y, x + 6, y, { stroke: st?.fill || '#8a8a8a', width: 1.6 });
+      be.text(entry.label, x + 7.4, y, { fill: '#000', size: 2.2, align: 'left', baseline: 'middle' });
+      x += entry.width;
+    }
+  }
   for (const row of zoneRows) {
     let x = page.w - MARGIN - row.width;
     const y = yBase + 4 + legendRow++ * 6;
@@ -1608,6 +1712,7 @@ function renderFloor(be, floor, opts = {}) {
   if (layers.markerIcons) {
     drawElectricalLinks(be, L, floor); // logical switch→light control legs; conduit topology is never printed
   }
+  drawPipes(be, L, sheetPipeRuns(opts.project, floor, opts.pipeServices)); // opt-in, over the zones
   if (layers.planDims || furnitureDimsOnly(layers)) drawDimensions(be, L, floor, layers);
   if (layers.markerDims) drawMarkerPins(be, L, floor, layers); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);
