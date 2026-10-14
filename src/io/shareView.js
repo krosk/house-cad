@@ -40,12 +40,61 @@ const LEVEL_KEYS = ['floorZ', 'ceiling'];
 // Links made before finishes stop at slot 3/4 and decode with none.
 const EDGES = ['left', 'right', 'bottom', 'top', 'cap']; // 'cap': a half wall's top (appended: old indices hold)
 const CORNERS = ['bl', 'br', 'tl', 'tr'];
+// The conduit network and the pipes (opt-in `network`, owner 2026-10-14: a link to look at them in
+// View 3D's Plan mode) ride in top-level `n`: c = conduit nodes and pn = pipe nodes, each
+// [floorIndex, x, y, z] floor-relative; s = conduit segments [a, b] and pp = pipes
+// [a, b, serviceIndex, diameter], indexes into those node lists; ps = the service names.
+// A device-bound node travels as a bare node where its device stands (a view never edits).
+// Links without `n` decode with no network.
+
+// A conduit/pipe node → [floorIndex, x, y, z], floor-relative, wherever its device stands.
+function viewNode(project, node) {
+  const found = node.markerId ? project.findMarker(node.markerId) : null;
+  const floorId = found ? found.floor.id : node.floorId;
+  const at = found ? found.marker : node;
+  return [Math.max(0, project.floors.findIndex((f) => f.id === floorId)), mm(at.x || 0), mm(at.y || 0), mm(at.z || 0)];
+}
+
+function serializeNetwork(project) {
+  const conduitIndex = new Map((project.conduitNodes || []).map((n, i) => [n.id, i]));
+  const pipeIndex = new Map((project.pipeNodes || []).map((n, i) => [n.id, i]));
+  const services = [...new Set((project.pipes || []).map((p) => p.service))];
+  return {
+    c: (project.conduitNodes || []).map((n) => viewNode(project, n)),
+    s: (project.conduitSegments || []).filter((g) => conduitIndex.has(g.a) && conduitIndex.has(g.b))
+      .map((g) => [conduitIndex.get(g.a), conduitIndex.get(g.b)]),
+    pn: (project.pipeNodes || []).map((n) => viewNode(project, n)),
+    pp: (project.pipes || []).filter((p) => pipeIndex.has(p.a) && pipeIndex.has(p.b))
+      .map((p) => [pipeIndex.get(p.a), pipeIndex.get(p.b), services.indexOf(p.service), mm(p.diameter || 0.016)]),
+    ps: services,
+  };
+}
+
+// `n` → the deserialize schema's whole-house arrays, with fresh ids and the decoded floor ids.
+function loadNetwork(n, floors) {
+  const floorId = (i) => floors[Number.isInteger(i) && i < floors.length ? i : 0].id;
+  const nodes = (list, prefix) => (Array.isArray(list) ? list : []).map((v, i) => ({
+    id: `${prefix}${i + 1}`, x: v[1], y: v[2], z: v[3], floorId: floorId(v[0]), markerId: null,
+  }));
+  const conduitNodes = nodes(n?.c, 'cn');
+  const pipeNodes = nodes(n?.pn, 'pn').map((node) => ({ ...node, role: null }));
+  const valid = (list, i) => Number.isInteger(i) && i >= 0 && i < list.length;
+  return {
+    conduitNodes,
+    conduitSegments: (n?.s || []).filter((g) => valid(conduitNodes, g[0]) && valid(conduitNodes, g[1]))
+      .map((g, i) => ({ id: `cs${i + 1}`, a: conduitNodes[g[0]].id, b: conduitNodes[g[1]].id })),
+    pipeNodes,
+    pipes: (n?.pp || []).filter((p) => valid(pipeNodes, p[0]) && valid(pipeNodes, p[1]))
+      .map((p, i) => ({ id: `p${i + 1}`, a: pipeNodes[p[0]].id, b: pipeNodes[p[1]].id,
+        service: n.ps?.[p[2]] || 'cold', diameter: p[3] || 0.016 })),
+  };
+}
 
 // Project → compact view object. Furniture products are compact enough to include by
 // default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
 // Links made before the furniture merge carried placed items in floor slot 4; they still
 // decode (and migrate to zones in deserializeInto). New links leave that slot empty.
-export function serializeView(project, { markers = false, furniture = true } = {}) {
+export function serializeView(project, { markers = false, furniture = true, network = false } = {}) {
   const kinds = [...new Set(project.floors.flatMap((f) => f.rectangles.map((r) => r.kind || 'room')))];
   const markerTypes = markers
     ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.type || 'outlet')))]
@@ -73,6 +122,8 @@ export function serializeView(project, { markers = false, furniture = true } = {
     a: furnitureArticles,
     ...(finishMaterials.length ? { m: finishMaterials } : {}),
     ...(customMaterials.length ? { cm: customMaterials.map((m) => ({ ...m })) } : {}),
+    ...(network && ((project.conduitNodes || []).length || (project.pipeNodes || []).length)
+      ? { n: serializeNetwork(project) } : {}),
     // Positional arrays keep a large marker set within QR version 40 after deflate.
     // version 40 even after deflate. Trailing defaults are removed before encoding.
     f: project.floors.map((f) => {
@@ -192,7 +243,7 @@ export function loadView(project, view) {
   deserializeInto(project, {
     app: 'house-cad', version: FILE_VERSION,
     groundFloorId: floors[gi].id, activeFloorId: floors[ai].id,
-    floors, conduitNodes: [], conduitSegments: [], wires: [],
+    floors, wires: [], ...loadNetwork(view.n, floors),
     materials: Array.isArray(view.cm) ? view.cm : [],
   });
 }

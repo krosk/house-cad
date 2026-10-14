@@ -6976,7 +6976,7 @@ export function setupMR(view, project, getFootprint) {
   let shareUrlTimer = null;
   async function refreshShareUrl(generation) {
     try {
-      const url = await buildShareUrl(project, { markers: true, furniture: true });
+      const url = await buildShareUrl(project, { markers: true, furniture: true, network: true });
       if (generation === shareUrlGeneration) { shareUrlCache = { url }; shareUrlError = ''; }
     } catch (error) {
       if (generation === shareUrlGeneration) {

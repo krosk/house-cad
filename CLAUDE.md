@@ -78,7 +78,7 @@ floor's zones lie tinted and outlined at its elevation, the architectural model 
 and the whole-house conduit network and the pipes (coloured by service, a legend under the buttons) each show
 behind a per-device toggle; a run touching the chosen floor shows, so risers appear on both storeys. Rebuilt with
 the model and the floor picker; choosing another floor reframes, a model edit keeps the orbit; ▤ Plan / ◈ Model
-switch, and AR hides it. A shared link carries no network, so its toggles hide. OVERVIEW is locked top-down: a
+switch, and AR hides it. A share link carries the network (opt-in `network`, `docs/share-view.md`); without one, the toggles hide. OVERVIEW is locked top-down: a
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a

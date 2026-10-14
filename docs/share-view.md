@@ -42,8 +42,14 @@ doors restored, link 1 835 → 2 205 chars without markers); older links decode 
 multi-floor) ride after the furniture article slot of a compact rect (added 2026-10-13: the owner's link
 showed the raised Upper small room flat while its door kept its 50 cm sill; Proven in Node on the owner's
 plan: the room's floor top is 0.50 in the link after the fix, 0 before). Older links decode with every room on
-its storey's floor, and an older viewer ignores the extra slots. Not
-carried: constraints, the conduit/wire network, control links, circuits. To see exactly what a given house loses,
+its storey's floor, and an older viewer ignores the extra slots. **The conduit network and the pipes**
+(opt-in `network`, on for 🔗 Share view and AR `link`, off for the QR; owner, 2026-10-14, to look at them in
+View 3D's ▤ Plan) ride in top-level `n`: nodes as `[floorIndex, x, y, z]` floor-relative, segments and pipes
+as indexes into them, pipes with a service index and a diameter. A device-bound node travels as a bare node
+where its device stands. Proven in Node on the owner's plan: 312 conduit segments and 229 pipes decode at the
+same world endpoints, pipes exactly and conduits within the links' 1 mm rounding; the link grew to about
+12.9k chars with markers. Older links decode with no network, and an older viewer ignores `n`. Not
+carried: constraints, wires, control links, circuits. To see exactly what a given house loses,
 run `node tools/check-share-link.mjs <house.json>` (Node only: it builds the link with the app's code,
 decodes it, and lists every differing field plus the link length with and without markers). Any of these could be
 added as an opt-in layer.
