@@ -243,9 +243,9 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   - The builder's comment holds every value.
 
   `sizeMm` height is the whole hood, canopy bottom to chimney top. The product allows 585–1095 mm.
-  - The entry uses 1054 mm with `mountZMm: 1446`. That puts the canopy 52 cm above the hob's glass (0.926 m: a
-    6 mm hob on the 92 cm worktop; Falmec's electric minimum, gas needs 65) and the chimney top at 2.50 m, the
-    underside of the kitchen's south ceiling box.
+  - The entry uses 924 mm with `mountZMm: 1576`. That puts the canopy 65 cm above the hob's glass (0.926 m: a
+    6 mm hob on the 92 cm worktop) and the chimney top at 2.50 m, the underside of the kitchen's south ceiling
+    box. The owner chose 65 cm on 2026-10-14: the usual 65–75 cm, over Falmec's minimum of 52 cm electric, 65 gas.
   - Hypothesis: the hob is electric (its outlet is the 32 A cooktop one). Another height needs another entry.
   - Not modelled: the Ø150 outlet (118 mm from the wall, inside the chimney) and the lights.
   - The steel's metalness is low (0.25). Outside Reflections/Realistic, View 3D has no environment map, and at

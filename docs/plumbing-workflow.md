@@ -540,9 +540,10 @@ Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open:
 The hood: a Falmec Lumina NRS 90 (`falmec-lumina-nrs-90-black`, `docs/furniture.md`), as furniture zone r258.
 - It sits on the south wall, centred over cooktop unit r154 (x 1.548…2.448; dimension c1560: the hood's left edge
   15 cm left of r154's). Owner, 2026-10-14: "Center it over the cooktop"; a first draft centred it 90 cm from the
-  tall oven unit, 30 cm off the hob. The canopy is at 1.446 m and the chimney rises to the box underside at 2.50.
+  tall oven unit, 30 cm off the hob. The canopy is at 1.576 m, 65 cm over the hob (owner: "Go with 65"; Falmec's minimum is 52), and the chimney
+  rises to the box underside at 2.50.
 - A generic induction hob, r260 (`generic-induction-hob-60`; owner: "Go generic"), lies on worktop B centred on
-  r154 (x 1.703…2.293), 5 cm back from the worktop's front (c1566, c1567). Its glass top at 0.926 m is 52 cm under
+  r154 (x 1.703…2.293), 5 cm back from the worktop's front (c1566, c1567). Its glass top at 0.926 m is 65 cm under
   the canopy.
 - Proven clashes, from a Node check on the draft:
   - conduit cs418, drawn at 2.40 m 2–15 cm off the wall, passes 13 mm into the chimney (x 1.82–2.18, 30 cm deep);

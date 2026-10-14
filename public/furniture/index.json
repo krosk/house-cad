@@ -762,12 +762,12 @@
     "article": "8034122348162",
     "sizeMm": [
       900,
-      1054,
+      924,
       480
     ],
-    "mountZMm": 1446,
+    "mountZMm": 1576,
     "procedural": "falmec-lumina",
-    "source": "procedural: Falmec Lumina NRS wall hood 90 cm, black glass (Boulanger 1060654, EAN 8034122348162; no manufacturer 3D model); outer sizes from Falmec's wall manual 110031219 p. 3 orthographic views, front details from Boulanger photos (sources in the builder falmecLumina). Height 1054 = chimney to a 2.50 m box with the canopy at 1.446 m (52 cm above the hob's glass on a 92 cm worktop); the product allows 585-1095",
+    "source": "procedural: Falmec Lumina NRS wall hood 90 cm, black glass (Boulanger 1060654, EAN 8034122348162; no manufacturer 3D model); outer sizes from Falmec's wall manual 110031219 p. 3 orthographic views, front details from Boulanger photos (sources in the builder falmecLumina). Height 924 = chimney to a 2.50 m box with the canopy at 1.576 m (65 cm above the hob's glass on a 92 cm worktop; owner, 2026-10-14); the product allows 585-1095",
     "registeredAt": "2026-10-14T00:00:00.000Z"
   },
   "generic-induction-hob-60": {
