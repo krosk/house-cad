@@ -714,6 +714,37 @@
     "source": "procedural: Aldes Bahia Curve S hygro extract vent BW21 Ø80 (Aldes 11015144; no manufacturer 3D model); face and depth profile from the product sheet's orthographic drawing (p. 2) + Aldes store photo 3516 (sources in the builder vmcVentBahia); on a ceiling, face down",
     "registeredAt": "2026-10-09T00:00:00.000Z"
   },
+  "aldes-bahia-curve-l": {
+    "name": "aldes-bahia-curve-l",
+    "article": "aldes-bahia-curve-l",
+    "sizeMm": [
+      163,
+      230,
+      48.8
+    ],
+    "procedural": "vmc-vent-bahia",
+    "params": {
+      "large": true
+    },
+    "source": "procedural: Aldes Bahia Curve L hygro kitchen extract vent C21 Ø125 push 9V (Aldes 11015068; the kit's kitchen vent per notice 3963727 p. 16; no manufacturer 3D model); size and front features from Aldes's Bahia Curve technical document p. 20 drawing (sources in the builder vmcVentBahia, params.large); on a wall, face toward the room",
+    "registeredAt": "2026-10-14T00:00:00.000Z"
+  },
+  "aldes-bahia-curve-l-ceiling": {
+    "name": "aldes-bahia-curve-l-ceiling",
+    "article": "aldes-bahia-curve-l-ceiling",
+    "sizeMm": [
+      163,
+      48.8,
+      230
+    ],
+    "procedural": "vmc-vent-bahia",
+    "params": {
+      "large": true,
+      "ceiling": true
+    },
+    "source": "procedural: Aldes Bahia Curve L hygro kitchen extract vent C21 Ø125 push 9V (Aldes 11015068; the kit's kitchen vent per notice 3963727 p. 16; no manufacturer 3D model); size and front features from Aldes's Bahia Curve technical document p. 20 drawing (sources in the builder vmcVentBahia, params.large); on a ceiling, face down",
+    "registeredAt": "2026-10-14T00:00:00.000Z"
+  },
   "geberit-duofix-111333": {
     "name": "geberit-duofix-111333",
     "article": "111.333.00.6",

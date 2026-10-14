@@ -521,9 +521,17 @@ corrections (Hypothesis) **laundry ≈ 800 W, r74 ≈ 690 W**; the house water i
 ≈ **1600 W** and ≈ **1400 W** rated. Pairs at 5 K (heat pump): bedroom + laundry ≈ 1.64 kW, ≈ 280 l/h, ≈ 0.69 m/s (over the
 ≈ 0.6 m/s noise limit); kitchen + r74 ≈ 1.36 kW, ≈ 0.58 m/s. Fine on the boiler (10 K). Relative humidity of air
 saturated at 6 °C: ≈ 54 % at 15 °C, ≈ 48 % at 17 °C.
-Owner, same day: **A kept** (kitchen + r74, shower alone). ~~B: r74 + shower, kitchen alone~~: evener loads (≈ 0.42 m/s
+~~Owner, same day: **A kept** (kitchen + r74, shower alone).~~ Superseded 2026-10-14 (below). ~~B: r74 + shower, kitchen alone~~: evener loads (≈ 0.42 m/s
 at 5 K) but the shower room, the tightest room, would share with r74, first on the pair and slow to warm (buried
 masonry, ≈ 1400 W rated), so it would warm last on a cold start.
+**Owner, 2026-10-14: one pair for the kitchen, the ground shower room and r74 (the workshop)** ("Shower having its own
+pair seems wasteful though? And workshop will not be opened most of the time"). Why it holds (Hypothesis, the loads above
+at −7 °C): kitchen ≈ 0.65 kW + shower ≈ 0.3 kW + r74 ≈ 0.3 kW on frost/low (8–10 °C) = ≈ 1.25 kW: ≈ 110 l/h at 10 K,
+≈ 215 l/h (≈ 0.53 m/s) at 5 K, fine on the boiler and a heat pump. r74 at 15 °C gives ≈ 1.5 kW (≈ 0.64 m/s at 5 K, the
+noise limit), at 17 °C ≈ 1.7 kW (≈ 0.7 m/s): heat the workshop on mild days only once a heat pump is fitted. Conditions:
+a thermostatic valve **and a lockshield** on each of the three radiators, so the shower (last on the pair) is balanced
+to its full flow; r74's valve kept low. Saves one pair (≈ 20 m of 16×2, Hypothesis), two manifold outlets and half the
+slab trench (2 pipes instead of 4). The water temperature still follows the shower's towel radiator. Plan not redrawn yet.
 
 ## Bare heating pipes in the basement (owner question, 2026-10-13)
 

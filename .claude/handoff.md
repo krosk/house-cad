@@ -970,8 +970,8 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
       and AR EXPORT PNG; monochrome. Proven in Node + rsvg on the owner's plan (3 floors); not seen from the app.
       ~~Colour vs monochrome for conduit/heating layers~~: superseded by the owner's narrower ask (waste + VMC only).
 
-- **Ceiling boxing (`soffit`, uncommitted code + a drafted plan `editBoxing.mjs`, 2026-10-14):** new zone kind; the
-  ground kitchen/bedroom boxes are drafted, not written. **Trap: write a plan holding a `soffit` only after the app
+- **Ceiling boxing (`soffit`, `f9a4340`, installed on the Quest 2026-10-14):** new zone kind; the ground kitchen/bedroom
+  boxes (`editBoxing.mjs`) written 2026-10-14, read back identical: **base for the next write 285 057 chars**. **Trap: write a plan holding a `soffit` only after the app
   that knows the kind is installed and relaunched on the Quest**: an older app reads an unknown kind as a WALL and
   its autosave would keep it that way (Hypothesis from `Rectangle`'s constructor: unknown kind → inferred 'wall').
 
@@ -982,7 +982,7 @@ and Bubblewrap's JDK/SDK exist; see `packaging/quest-apk.md` and don't re-init.
   heights on the sheet only if the owner asks. On a
   device: View 3D ▤ Plan and a link with pipes (QA item in `docs/ar-qa-checklist.md`). VMC open points are listed
   in the plumbing doc (kitchen vent flows, wall-hole heights, the waste's exit to the collector).
-- **Item 79 (owner decisions, no code):** (the base for any write is now 284 543 chars, item 80) the band's real height (then move the band, read-base-write as usual);
+- **Item 79 (owner decisions, no code):** (the base for any write is now 285 057 chars, item 80) the band's real height (then move the band, read-base-write as usual);
   insulation plan (ceiling boards over the band vs wrapping; set Ground "Floor ins. R" to the chosen board); the
   basement radiators A/B/C. A fresh share link: rebuild from a fresh read with `encodeViewToHash(p, { markers: true,
   network: true })`, never store it; send it as a file (owner, 2026-10-14: token efficiency).

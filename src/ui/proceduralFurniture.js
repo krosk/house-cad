@@ -1457,10 +1457,24 @@ function loft(upper, lower) {
 //   the recess bottoms at ≈ 26 mm (its second inner line). Dish shape, the side edges' roll-over,
 //   corner rounding and the window, logo and icon tones are estimates.
 // `params.ceiling`: the same vent on a ceiling, face down; `sizeMm` is then 155 W × 44 H × 155 D.
+// `params.large`: the Bahia Curve L, the kitchen vent (owner, 2026-10-14; the kit's kitchen vent is the C21, Aldes
+// notice 3963727 p. 16 "Hygro B", F3 and up). Sources:
+//   - Aldes C21 sheet 11015068 (https://assets.aldes.fr/assets/productRefDocs/fr/FR-France-Aldes-C21-BAHIA-CURVE-L-
+//     15-55-135-m-h-O-125-mm-push-9V-Blanc-11015068.pdf): Ø125, 15–55 / 135 m³/h, 80–160 Pa (70–160 at the boost),
+//     push 9V; ≥ 1.80 m up, centre ≥ 20 cm from adjacent walls, wall or ceiling.
+//   - Aldes "Documentation technico-commerciale Bahia Curve" p. 20 ENCOMBREMENTS
+//     (https://assets.aldes.fr/assets/docsFR/bahia-curve-documentation-technique.pdf): 163 wide × 230 high, face 48.8
+//     deep, 90.8 with the Ø125 barrel. Front view rasterised at 600 dpi (4.02 px/mm: 230 = 924 px, 163 = 655 px):
+//     recess −47.9…48.4 across, 112.7–185.6 up; sensor window −36.0…36.8, 128.6–182.3 (its dark upper part from
+//     146.6); logo −15.5…16.0, 96.3–100.7; the push button Ø13.4 at 77.9 up; signal icon 58.3–70.0 across,
+//     156.7–175.4 up. The L's side profile is not used: the S's, stretched to 230 × 48.8 (estimate; the drawing's
+//     L side view has the same shape).
+// The features below are in the S's frame (155 × 155 × 44); the L's measured millimetres are divided by its
+// stretch (163/155 across, 230/155 up) so one mesh code serves both.
 function vmcVentBahia(entry) {
   const p = entry.params || {};
   if (p.ceiling) {
-    const [W, H, D] = (entry.sizeMm || [155, 44, 155]).map((v) => v / 1000);
+    const [W, H, D] = (entry.sizeMm || (p.large ? [163, 48.8, 230] : [155, 44, 155])).map((v) => v / 1000);
     const wall = vmcVentBahia({ ...entry, sizeMm: [W * 1000, D * 1000, H * 1000], params: { ...p, ceiling: false } });
     wall.rotation.x = Math.PI / 2; // wall front (+Z) → down (−Y), wall up (+Y) → +Z
     wall.position.set(0, H / 2, -D / 2);
@@ -1469,7 +1483,7 @@ function vmcVentBahia(entry) {
     g.add(wall);
     return g;
   }
-  const [W, H, D] = (entry.sizeMm || [155, 155, 44]).map((v) => v / 1000);
+  const [W, H, D] = (entry.sizeMm || (p.large ? [163, 230, 48.8] : [155, 155, 44])).map((v) => v / 1000);
   const white = new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.45 });
   const frame = new THREE.MeshStandardMaterial({ color: 0xe2e3e1, roughness: 0.5 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x8e9195, roughness: 0.8 });
@@ -1480,7 +1494,10 @@ function vmcVentBahia(entry) {
     [134, 38], [140, 35], [145, 30], [150, 24], [153, 19], [155, 12]];
   const DISH = 9, RECESS = 26;          // mm: the face dishes 9 below the rim (side view's inner line at
   //                                       ≈ 35 mid-height); the recess bottom at 26 (inner line at ≈ 26)
-  const OUT = [-36.5, 37.5, 73, 127], IN = [-24, 24, 81, 120]; // recess, sensor window (mm; x from centre)
+  const sx = 163 / 155, sz = 230 / 155; // the L's stretch: its measured mm → the S's frame
+  const L = (x0, x1, z0, z1) => [x0 / sx, x1 / sx, z0 / sz, z1 / sz];
+  const OUT = p.large ? L(-47.9, 48.4, 112.7, 185.6) : [-36.5, 37.5, 73, 127]; // recess (mm; x from centre)
+  const IN = p.large ? L(-36.0, 36.8, 128.6, 182.3) : [-24, 24, 81, 120];      // sensor window
   const N = 8, a = W / 2, b = H / 2, mx = (W * 1000) / 155, mz = (H * 1000) / 155, md = (D * 1000) / 44;
   const prof = (zmm) => {
     const z = Math.min(155, Math.max(0, zmm / mz));
@@ -1558,6 +1575,16 @@ function vmcVentBahia(entry) {
     g.add(m);
   };
   patch(ix0, ix1, iz0, iz1, frame, RECESS);         // sensor window, 54–102 across, 81–120 up
+  if (p.large) {
+    patch(...L(-35, 35, 146.6, 182.3), dark, RECESS + 0.5); // its opening (the dark upper part)
+    patch(...L(-15.5, 16.0, 96.3, 100.7), grey);           // logo
+    patch(...L(58.3, 70.0, 156.7, 175.4), grey);           // signal icon
+    // The push button: a Ø13.4 disc at 77.9 mm up, proud of the face by 1 mm.
+    const btn = new THREE.Mesh(new THREE.CircleGeometry(0.0067, 20), grey);
+    btn.position.set(...P(0, 77.9 / sz, depthMm(0, 77.9) / md + 1));
+    g.add(btn);
+    return g;
+  }
   patch(-17, 17, 86, 115, dark, RECESS + 0.5);      // its opening
   patch(-10, 10, 46.5, 49.5, grey);                 // logo
   patch(53, 58, 100, 110, grey);                    // icon

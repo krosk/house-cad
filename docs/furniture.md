@@ -360,6 +360,14 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   within 4 mm. Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
   scale, sit on the drawing's lines (overlay); bounding box 457.5 × 187.6 × 459.0 mm against the
   drawing's 459 × 187 × 460; 3 028 triangles. Not yet seen in AR, View 3D or on device.
+- `aldes-bahia-curve-l` (wall) and `-ceiling` (face down): Aldes Bahia Curve L **C21**, the kit's kitchen vent (owner,
+  2026-10-14: "Look for it"). Which vent: the kit pages (Leroy Merlin 82201371, Tecnomat) say three Bahia Curve vents, the
+  kitchen one PUSH 9V, no code; Aldes notice 3963727 p. 16 (Hygro B) gives C21 for F3 and up (C36 only for an F2). Sheet
+  11015068: Ø125, 15–55 / 135 m³/h, 80–160 Pa (70–160 at the boost), ≥ 1.80 m, centre ≥ 20 cm from adjacent walls.
+  Size 163 × 230 × 48.8 mm (Aldes Bahia Curve technical document p. 20); front features measured on that drawing at
+  600 dpi (4.02 px/mm), listed in the builder `vmc-vent-bahia` (`params.large`); the side profile is the S's stretched
+  (estimate). Proven in Node: bounding box 163.0 × 230.0 × 48.0 mm; an orthographic front render under the drawing
+  (scratch) puts the outline, recess, window, logo, button and icon on its lines. Not yet seen in View 3D, AR or on device.
 - `aldes-bahia-curve-s`: Aldes Bahia Curve S humidity-controlled extract vent, Ø80 (BW21, Aldes
   11015144: the bathroom-with-WC model; the kit lists "3x Bouches Bdh" without a model name, so which
   vent the kit holds is a Hypothesis), builder `vmc-vent-bahia`. On a wall, face toward the room:

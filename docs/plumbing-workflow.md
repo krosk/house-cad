@@ -490,6 +490,11 @@ is the contractor's). Drafted on the owner's plan (session scripts `editBoxing.m
   2 cm over wall cabinet r162 (top 2.48); the kitchen vent sits on the box's underside (2.50);
 - bedroom r51 south wall x −0.935–0, 41.5 cm deep, foot 2.50, continuing the kitchen's line through the thick wall;
 - alcove r133: a half wall to the ceiling (x −0.935…−0.53) round the two drops.
+**Kitchen vent (owner, 2026-10-14):** the kit's C21 (`aldes-bahia-curve-l-ceiling`, `docs/furniture.md`), face down on
+the south box's underside at (0.98, −4.80), its 230 mm along y; centre 56.5 / 35 / 22.5 / 20.5 cm from the west wall, the
+south wall, the box's edge and its step (Aldes: ≥ 20). The Ø125 climbs to 2.60 and jogs 14 cm north to its run (y −4.66).
+Kitchen duct (drafted with the 45° chutes): 9.5 m, ≈ 25.9 Pa at 135 m³/h (Hypothesis, same model), so ≈ 76–86 Pa at the
+vent with B's assumed ≥ 122 Pa: over the C21's 70 Pa boost floor. The 135 m³/h boost assumed before is the C21's.
 Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open: a hood over the cooktop under the
 south box (none drawn); access hatches at the duct joints (Hypothesis: usual practice).
 
@@ -717,8 +722,8 @@ the pipes are **composite (multilayer)**. Owner decisions:
   - (owner, 2026-10-10: the kitchen's pair also feeds the east basement room r74, teed in r74's ceiling; the ground
     bedroom's pair also feeds the laundry r66, teed in the laundry ceiling; both basement rooms at 15 °C,
     `docs/heat-loss.md` "Laundry heater"; not drawn yet)
-  - the **kitchen and ground shower-room radiators on their own lines too** (owner chose them over
-    one shared pair split on the basement ceiling). There is no basement under them: both pairs go up
+  - ~~the **kitchen and ground shower-room radiators on their own lines too**~~ **superseded 2026-10-14: the kitchen,
+    the ground shower room and r74 (the workshop) share one pair**, lockshields on all three (`docs/heat-loss.md`); There is no basement under them: both pairs go up
     into the slab together at the south edge of the east basement room; one short trench (≈ 1.3 m,
     4 pipes on its first 0.6 m);
   - the **upper floor on TWO pairs**, both up the column `r122` beside the VMC duct and the WC stack,
