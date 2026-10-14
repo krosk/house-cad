@@ -136,8 +136,8 @@ side and height. Window opening against the units: docs/materials.md "Window swi
   The bath dip under the heating and both ducts' last turns are gone. Upper duct: down the west wall, then two 45s
   into the north face's west Ø80. Laundry vent: the 8 cm stub, now off the west face.
 - ~~**Open (owner checking): the laundry window r146** (single leaf 1.26 m …): the ducts block it at 21°.~~ **The
-  owner (same evening): r146 has two leaves**, and the pipes must not block it: **draft, not written (waits for the
-  owner's W)**: r146 `hinge` 'both' (two 0.611 m leaves, hinges at x −3.091 and −1.869, y −4.882, Proven with
+  owner (same evening): r146 has two leaves**, and the pipes must not block it: **written to the headset 2026-10-14 night
+  with the hood and alcove draft below (287 333 chars, read back identical)**: r146 `hinge` 'both' (two 0.611 m leaves, hinges at x −3.091 and −1.869, y −4.882, Proven with
   `windowSwings`), unit B **kept at facing 270, centre moved to (−4.25, −4.06)** (rect y −4.24…−3.88): the kitchen lane
   at y −4.16 (1 cm past the leaves' sweep with a 3.5 cm sash half-thickness), bath −3.965, OUT at y −4.145, the laundry
   vent stub and the upper duct's two 45s follow (down the wall to y −3.4125, the 45s to (−4.347, −3.6805), into the spigot at y −3.8305). Proven in
@@ -535,7 +535,7 @@ Kitchen duct (drafted with the 45° chutes): 9.5 m, ≈ 25.9 Pa at 135 m³/h (Hy
 vent with B's assumed ≥ 122 Pa: over the C21's 70 Pa boost floor. The 135 m³/h boost assumed before is the C21's.
 Room areas: only the alcove box takes floor (bedroom 13.90 → 13.83 m²). Open: access hatches at the duct joints
 (Hypothesis: usual practice).
-**Hood and alcove draft (owner, 2026-10-14; not written).**
+**Hood and alcove (owner, 2026-10-14; written with the window draft, 287 333 chars, read back identical).**
 
 The hood: a Falmec Lumina NRS 90 (`falmec-lumina-nrs-90-black`, `docs/furniture.md`), as furniture zone r258.
 - It sits on the south wall, centred over cooktop unit r154 (x 1.548…2.448; dimension c1560: the hood's left edge
@@ -546,7 +546,9 @@ The hood: a Falmec Lumina NRS 90 (`falmec-lumina-nrs-90-black`, `docs/furniture.
   r154 (x 1.703…2.293), 5 cm back from the worktop's front (c1566, c1567). Its glass top at 0.926 m is 65 cm under
   the canopy.
 - Proven clashes, from a Node check on the draft:
-  - conduit cs418, drawn at 2.40 m 2–15 cm off the wall, passes 13 mm into the chimney (x 1.82–2.18, 30 cm deep);
+  - conduit cs418, drawn at 2.40 m 2–15 cm off the wall, passed 13 mm into the chimney (x 1.82–2.18, 30 cm deep).
+    The owner's conduits are drawn on the wall but buried, so its junctions cn320/cn321 were snapped onto the face
+    (y −5.15; written, 287 329 chars, read back identical). It now only touches the chimney's back;
   - the chimney stands 1.5 cm proud of box r253's face.
 - Outlet m80 at (2.025, 1.80 m) now sits behind the chimney, where a hood socket usually goes (Hypothesis: it is
   meant for the hood).
@@ -561,8 +563,8 @@ apply a flooring").
 - Proven in Node: oak and slab in the recess, area 13.83, no conflicts.
 - r256 stays a full-height box round the drops. The real recess also stops at 2.50 over r256's part, so the kitchen
   Ø125 and bath Ø100, crossing from box r255 into r256 at 2.60 and 2.62 m, pass through the wall's top there (8 and
-  7 cm in from the bedroom face). It needs a notch or bore: the owner's or builder's call. The model draws that
-  part as r256's box, not as wall.
+  7 cm in from the bedroom face). Owner, 2026-10-14: "the pipes can cross the wall top, no problem", so the wall
+  top is notched or bored there; the route stays as drawn. The model draws that part as r256's box, not as wall.
 The kitchen's south boxes r253 and r254 take the south wall's tile_vernisse_white on every exposed side and underneath
 (owner, 2026-10-14; 10 finish entries, only the exposed faces draw: `docs/materials.md` "a ceiling boxing takes wall
 finishes too").
