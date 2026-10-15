@@ -569,6 +569,81 @@ The kitchen's south boxes r253 and r254 take the south wall's tile_vernisse_whit
 (owner, 2026-10-14; 10 finish entries, only the exposed faces draw: `docs/materials.md` "a ceiling boxing takes wall
 finishes too").
 
+**Kitchen vent out of the cabinet door, ducts against the wall (owner, 2026-10-15; option 1c, written to the headset
+2026-10-15, 286 571 chars, read back identical).** Proven (Node on the 287 329-char plan): the face-down C21 r257 (underside 2.451) sat inside wall cabinet
+r162's door swing (hinge (0.818, −5.067), 60 cm door, top 2.48); the door's top edge met it at about 12°. Options weighed
+and set aside:
+- Raising the box to clear the door left a ≈ 15 cm box. A Ø125 vertical-to-horizontal turn needs ≈ 22 cm (vent spigot
+  43.8 mm, Aldes technical document; Nicoll PVC 87°30 F/F Ø125: socket 61, Z 96), and even the 20 cm box was ≈ 2 cm
+  short (the model draws the turn as a sharp corner).
+- A sideways vent on a box face: the C21 sheet asks ≥ 20 cm from the vent's centre to adjacent surfaces, and the
+  technical document shows only ±20° of turn in its sleeve. A 20 cm face is too small for it.
+- Stacking the two ducts through the kitchen–bedroom wall: 4–6 cm short over the wall cabinets (tops 2.48).
+- Centred on the hood in front of its chimney (1b): a 70 cm box, if the chimney counts as an adjacent surface.
+
+The owner allowed drilling into the bedroom's south-wall top (the 16 cm by which it stands proud of the kitchen's
+line, x −0.53…0). Draft 1c, scratch `editVent1c.mjs`:
+- bath Ø100 against the wall at y −5.06 straight into its drop (its 12 cm jog removed: p272 and pn303 go), inside a
+  channel ≈ 13 × 12.5 cm in that wall top;
+- kitchen Ø125 at y −4.935 (1.25 cm off the bath drop at x −0.65), ending right over the vent (p296 and pn328 go);
+- one kitchen box r254 from the west wall to r252, 30 cm deep (front = the chimney's front, −4.85; r253 and its five
+  finishes removed); bedroom box r255 14 cm deep;
+- the vent turned 90° clockwise (facing 270, its 230 mm along the wall) at (1.60, −4.935), west of the chimney (22 cm),
+  out of r162's swing (6.9 cm), wholly under the 30 cm box (front edge 3.5 mm behind the box front). No bump: owner,
+  2026-10-15, "absence of surface should not count, it is not a wall". Aldes's 20 cm from the vent's centre applies to
+  surfaces hanging down beside it: the south wall (21.5 cm) and the chimney (22 cm), not to the box's front edge,
+  which goes up to the ceiling. The same reading would have made option 1b's box shallower than 70 cm;
+- buried conduit junction cn236 (cs299/cs305, climbing the partition) 7 cm north to y −4.80, beside the duct's hole.
+
+Proven in Node: no conflicts, no dimension deleted, the ducts 1.2–1.4 cm apart, Ø125 +0.205 m. Hypothesis: one bend
+fewer on each duct; the vent plugs into the run with a saddle or tee (part not chosen); whether the bearing wall's top
+may be cut (the builder's call). Untouched: r252 keeps its 2.47 underside (the bath duct is at 2.55 at its north end),
+so the corner keeps a 3 cm step, and r252 still sits 1 cm into the tall oven unit r156 and filler r157 (tops 2.48),
+an overlap that predates this draft.
+
+**The kitchen Ø125 with rigid parts (owner, 2026-10-15: "can it be realized with real parts?", then "Ok, draft it";
+draft 1d on the 286 571-char plan; written to the headset 2026-10-15, 287 752 chars, read back identical).** Proven (Aldes technical document: the vent's
+spigot 43.8 mm, outer Ø119, for a Ø125 duct; Nicoll sheet: PVC 87°30 F/F Ø125 sockets 61 mm, Z 96 mm; 45° Z 41 mm), two
+spots of 1c could not be built with them:
+- the vent's turn up into the run: spigot in a socket (61) + Z 96 puts the run's axis 15.7 cm above the box underside and
+  the socket's top 6.55 cm above that, ≈ 22 cm, in a 20 cm box (18.75 cm inside the board). An equal-size Ø125 saddle
+  or tee was assumed earlier; it is not a standard part (Hypothesis);
+- the double turn over the alcove (west → south 13.75 cm → down): two such elbows need 19.2 cm centre to centre.
+
+Draft 1d, scratch `editVent1d.mjs` (new ids r261, r262 taken first, nothing removed):
+- the kitchen run 7 cm north, y −4.865 (the double turn 20.75 cm), and at 2.62 all the way;
+- the kitchen box split: r254 x 0.415–1.43 and r262 x 1.82–2.9875 at 2.50, r261 x 1.43–1.82 dropped 4 cm to 2.46 (the
+  elbow's socket top 2.6855, 1.45 cm under the ceiling); all 37 cm deep (front −4.78), tiled; the bedroom box r255 21 cm;
+- r261's west edge at 1.43 clears wall cabinet r162's door at 90° (it reaches x 1.418 at its 2.48 top);
+- the vent r257 still turned at x 1.60, under the run (centre y −4.865), its top at 2.46;
+- buried conduit junction cn236 to y −4.73;
+- (owner: "2 is good") the flat turn in the laundry (north → west, pn316) as two 45° (Nicoll 45° F/F Ø125, Z 41): the
+  elbow centres 8.5 cm back on each leg, a 12 cm diagonal (new pn338, p306).
+
+Proven in Node: no conflicts, no dimension deleted, both ducts ≥ 3 cm from every other pipe and conduit (8 cm apart),
+the kitchen Ø125 9.60 m from the vent to unit B with three 87°30 (above the vent, ① and ② over the alcove) and four 45°
+(the slab chute, the laundry pair).
+
+Kitchen Ø125 loss, draft 1d (owner asked for an estimate; Hypothesis: smooth pipe, Blasius, ρ 1.2; 87°30 short elbow
+K 0.6–0.8, ① + ② close-coupled out of plane +20 %, each 45° pair 0.3–0.45):
+
+| C21 flow | PVC Ø125 (≈ 119 mm bore) | galvanised Ø125 (125 mm bore) |
+|---|---|---|
+| 135 m³/h (boost) | ≈ 32–38 Pa (friction 13.6, fittings 18–25) | ≈ 26–31 Pa (friction 10.8, fittings 15–20) |
+| 55 m³/h | ≈ 6–7 Pa | ≈ 5–6 Pa |
+| 15 m³/h | ≈ 0.5 Pa | ≈ 0.5 Pa |
+
+At boost the vent then sees ≈ 122 − (10–20) − loss: ≈ 64–80 Pa in PVC, ≈ 71–86 Pa in galvanised, against the C21's
+70 Pa boost floor (122 Pa: B's one published point; its Classic curve is not published). Below boost there is ample
+margin. A short flexible end at the unit adds ≈ 2–2.5 Pa at boost. The tight turns (above the vent, ① and ②) have
+no room for gentler bends; the bore is the remaining lever. **Owner, 2026-10-15: "I for sure will keep pvc".** Below
+70 Pa the boost is not lost: at boost the vent acts as a fixed opening, so its flow goes roughly with √Δp (≈ 130 instead
+of 135 m³/h at 64 Pa; Hypothesis). Small PVC-side gains: a thin-wall Ø125 (≈ 1.8 mm, ≈ 121 mm bore, ≈ 2–3 Pa), no or a
+short straight flexible end at the unit (≈ 2–2.5 Pa), generous kitchen window inlets (the room-depression term).
+Commissioning: read the kitchen vent's pressure during a boost. Hypothesis: r261's 4 cm lips are no "paroi" (its west lip is 17 cm from the vent's centre, the
+chimney 22 cm, the south wall 28.5 cm); the tile takeoff counts r261's sides whole, ≈ 0.15 m² of them inside the
+neighbouring boxes; r162's real door reach (leaf width and hinge offset; 1.2 cm margin).
+
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
 of boxing r220**, facing south, centre at 2.35 m and **17 cm from the bare west wall** (owner: "The guide says

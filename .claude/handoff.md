@@ -18,14 +18,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-14 (session 40, continued; the Quest reachable)
+**Date:** 2026-10-15 (session 40, continued; the Quest reachable)
 
 **Status:**
-- Proven (git): the code head is `faa9d43`, pushed. It is served (`version.json`) and in the headset precache
-  (`update-app` 10-14: "installed faa9d43 1014-2001Z").
-- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-14 night,
-  287 329 chars. That is the base for the next write.** Backup `quest-backup-1014-2202` (scratchpad,
-  session-local). No save slot holds a pre-edit copy, so undo = reverse the edit.
+- Proven (git): the code head is `d36c0fe`, pushed. It is served (`version.json`) and in the headset precache
+  (`update-app` 10-14: "installed d36c0fe 1014-2045Z").
+- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-15,
+  287 752 chars (item 80's kitchen vent, option 1d: buildable with rigid PVC). That is the base for the next write.**
+  Backup `quest-backup-1015-0128` (scratchpad, session-local). No save slot holds a pre-edit copy, so undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
@@ -131,9 +131,13 @@ plan.
   - Falmec hood at 65 cm, generic hob;
   - see-through + finished boxings;
   - bedroom recess floored with a boxing above 2.50;
-  - conduit cs418 snapped to the wall.
+  - conduit cs418 snapped to the wall;
+  - (10-15) the kitchen vent out of r162's door swing, options 1c then 1d: both ducts against the south wall through
+    the drilled bedroom wall top, the kitchen Ø125 laid out for standard PVC elbows (box 37 cm, dropped to 2.46 round
+    the vent, bedroom box 21 cm, a 45° pair in the laundry), the vent turned at x 1.60; the owner keeps PVC (≈ 64–80 Pa
+    at the vent at boost, Hypothesis).
 
-  All written (287 329). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
+  All written (287 752). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
   "Ceiling boxings", "Kitchen vent", "Hood and alcove".
 
 Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are still cited in `docs/ar-qa-checklist.md`.
@@ -158,7 +162,9 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   worker job). The plan view prepares nothing 3D.
 - **Owner preferences:**
   - keep product advice **generic** (a brand's datasheet only gives typical sizes);
-  - plots are elevations "west wall facing me" (north on the right), sometimes in Chinese.
+  - plots are elevations "west wall facing me" (north on the right), sometimes in Chinese;
+  - a "face view" is drawn as seen standing in the room facing that wall (facing south: east left, west right).
+    Earlier session-40 "elevations facing the south wall" were mirrored.
 
 **Owner design decisions in force**
 - **Heating:**
@@ -170,7 +176,13 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 - **VMC:**
   - ONE Aldes EasyHOME unit B in the laundry, a Classic (not HP);
   - efficiency, not compliance: no inspector, so DTU 68.3 is only guidance;
-  - few bends, pipes against the wall, shallow trenches.
+  - few bends, pipes against the wall, shallow trenches;
+  - **PVC ducts, also the kitchen Ø125** (owner, 10-15: "I for sure will keep pvc"); short PVC elbows where room is
+    tight, a 45° pair wherever there is room;
+  - Aldes's "≥ 20 cm from the vent's centre to adjacent surfaces" counts only surfaces hanging down beside the vent
+    (walls, a hood chimney), never a box edge that goes up (owner, 10-15: "absence of surface should not count, it is
+    not a wall");
+  - the bedroom's south-wall top (x −0.53…0) may be drilled/channelled for the ducts (owner, 10-15; builder's call).
 - **Waste:**
   - no roof vent; a Ø100 façade vent at the upper floor's south-east corner;
   - a Ø100 air valve on the upper riser.
@@ -266,6 +278,14 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 - **The basement's west face is x −4.55, 15 cm inside the ground floor's** (a survey error the owner will
   correct; the ducts are drawn that way on purpose).
 - **Data oddities:** cameras m174/m183 have `z = 0`; doors r77/r120 are drawn wider than their opening.
+- **The model draws pipe turns as sharp corners.** Before sizing a box round a duct, stack the real fittings (Proven
+  from the sheets: Nicoll PVC Ø125 F/F 87°30 socket 61 mm, Z 96; 45° Z 41; Aldes vent spigot 43.8 mm, outer Ø119):
+  a face-down Ø125 vent turning into a run needs ≈ 22 cm above the box underside; two 87°30 in a row need ≥ 19.2 cm
+  centre to centre. The kitchen layout (draft 1d) was redone for that on 10-15.
+- **A wall cabinet's door sweeps at its top edge:** r162's 60 cm door (hinge x 0.818, y −5.067) reaches x 1.418 at
+  2.48 when fully open. Anything lower than 2.48 near there (a vent, a dropped box) must stay outside that sweep.
+- **Box r252 sits 1 cm into the tall oven unit r156 and filler r157** (2.47 vs tops 2.48), from before 10-15; not
+  fixed (r252 must stay ≤ 2.47 north of y ≈ −3.1, where the bath duct runs at 2.55).
 
 **View 3D, textures and products**
 - **Metal renders near-black in basic View 3D** (no environment map outside Reflections/Realistic). Keep steel at
@@ -316,6 +336,10 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   - `addWire` returns `{ ok, wire }`;
   - `wireSegmentPath` returns ids.
 - **Wall faces follow the finished surface** (`edgeFace`): linings inset the face, stairwell edges are open.
+- **A furniture zone's `facing` turns counter-clockwise** in 90° steps (seen from above); a 90° clockwise turn is
+  `facing: 270`. With a product, the solver swaps the footprint.
+- **A soffit's side is hidden only by a neighbour as low or lower** (`soffitFace`): a lower box beside a higher one
+  draws (and counts) its whole side, part of it inside the neighbour.
 - **Thick walls between rooms are hollow in 3D** (a 12 cm skin per face).
 - **Mixed-hunk commits:** build the staged blob with `git hash-object -w` + `update-index --cacheinfo`; never
   `apply --unidiff-zero` or `stash --keep-index`.
@@ -333,7 +357,7 @@ ramps, sloped stairs · `92fffea` links keep room levels · `72440f4` POV on ste
 `ad651fa` links carry the network · `481ad14` PNG pipe sheet · `f9a4340` `soffit` · `61e3493` C21 vent ·
 `3dacf2b` grey pipes in Model · `bfd0c83` opens on Plan · `969e599` Plan from POV · `ce570b9` ORBIT ·
 `106f527` Falmec hood · `d476b07` see-through boxings · `007e2ca` generic hob · `7ef82c4` hood at 65 cm ·
-`d6b710f` boxing finishes.
+`d6b710f` boxing finishes · `07a5ce5` the Plan/Model button no longer shows pressed.
 
 ## Resuming from a clean checkout
 
@@ -368,12 +392,12 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 
 **Active (item 80):**
 1. **Redraw the heating so the ground shower room tees off the kitchen + r74 pair.** Remove its own pair, taking
-   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 329).
-2. **Device QA** (app `faa9d43`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
+   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 752).
+2. **Device QA** (app `d36c0fe`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
    - the hood, the hob, the box tiles, the alcove floor;
    - View 3D on ▤ Plan, then ◈ Model (wheel, ORBIT keeps the camera, a tap walks), ▤ Plan from POV;
    - grey pipes in Model; ▯/◫ Windows keep the POV;
-   - the ceiling boxes; the C21 under the kitchen box;
+   - the ceiling boxes; the C21 turned at x 1.60 under the box's 2.46 section, clear of r162's door (also fully open); the 37 cm kitchen and 21 cm bedroom boxes;
    - a PNG download vs the Node render; a link with pipes.
 
    Then, in order: item 78 (veranda, r95 raised, basement floors, sloped stairs), item 76 (garden), item 75 (PIPE
@@ -386,7 +410,13 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   - the slab holes beside the wall's bearing;
   - the vent above the shower;
   - access hatches; the upper waste's exit to the collector;
-  - the real hob model (a generic one is drawn).
+  - the real hob model (a generic one is drawn);
+  - the kitchen Ø125 (draft 1d, written): a flexible end at unit B or rigid to the end (undecided; ≈ 2–2.5 Pa);
+    elbow ① is ≈ 0.7 cm from r255/r256's board (offered: both alcove drops 2–3 cm east, not answered); the wall-top
+    opening over the alcove (≈ 40 × 18 × 20 cm, elbows ② ③) and the 13 × 12.5 cm channel in the bedroom wall top
+    (builder);
+  - the r252 / oven-unit 1 cm overlap: offered (run the south box to the east wall, start r252 further north),
+    not answered; re-check against the 37 cm box before drafting.
 - **Item 79:**
   - the band's real height (drawn at 1.97 m);
   - ceiling boards over the band vs wrapping, and the fire covering;
@@ -451,6 +481,8 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   ground the bare-pipe figures.
 - **VMC:**
   - the slab build-up over the ducts; fitting sizes; boost pressures (Hypothesis, Colebrook);
+  - the kitchen C21 at boost in PVC: ≈ 64–80 Pa at the vent against its 70 Pa floor (B's curve unpublished; read it at
+    commissioning); whether r261's 4 cm lips count as surfaces (west lip 17 cm from the vent's centre);
   - the EHB² humidity curve; wind;
   - the kitchen vent's real minimum flow.
 - **Technical unknowns:**
