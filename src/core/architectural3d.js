@@ -29,6 +29,7 @@ const clipped = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const snap = (v) => Math.round(v * 1e6) / 1e6;
 // Furthest an opening may be extended through wall layers beyond its own footprint.
 const PIERCE_MAX = 0.6;
+const DOORWAY_KINDS = new Set(['door', 'passage', 'sliding', 'garage']);
 
 function openingBand(rect, storeyHeight) {
   const kind = zoneKind(rect);
@@ -803,15 +804,19 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // A room with its own lower ceiling (roomCeiling) gets its own piece at that height.
   const H = ceilingHeight(floor);
   const lowRooms = rooms.filter((r) => roomCeiling(floor, r) < H - EPS);
+  // An opening whose head reaches the ceiling (a passage at full height) has no wall above it, and no room
+  // covers its strip: the ceiling closes over it (owner, 2026-10-15: the passage into the kitchen had none).
+  const openTop = (floor?.rectangles || []).filter((r) => DOORWAY_KINDS.has(zoneKind(r))
+    && (openingBand(r, H)?.[1] ?? 0) >= H - EPS).map((r) => ({ bounds: r.bounds, op: 'add', kind: 'room' }));
   let ceilingGeometry = null;
-  if (!lowRooms.length && !hasRoomLevels(floor)) {
+  if (!lowRooms.length && !hasRoomLevels(floor) && !openTop.length) {
     ceilingGeometry = floorGeometry?.clone() || null;
     if (ceilingGeometry) ceilingGeometry.translate(0, H + slabThickness, 0);
   } else {
     // A flight between two room levels (innerStairSpan) has the ceiling over it, not a hole.
     const inner = stairs.filter((st) => innerStairSpan(floor, st));
     const holes = stairs.filter((st) => !inner.includes(st));
-    const groups = new Map([[H, [...rooms.filter((r) => !lowRooms.includes(r)),
+    const groups = new Map([[H, [...rooms.filter((r) => !lowRooms.includes(r)), ...openTop,
       ...inner.map((st) => ({ bounds: st.bounds, op: 'add', kind: 'room' }))]]]);
     for (const r of lowRooms) {
       const c = roomCeiling(floor, r);
