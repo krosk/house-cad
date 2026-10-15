@@ -274,8 +274,6 @@ body {
 #view3d-floor-ctl.collapsed { width: auto; max-width: 176px; }
 #view3d-floor-ctl.collapsed .view3d-floor-title { padding-bottom: 5px; }
 #view3d-floor-ctl.collapsed .cx-caret { transform: rotate(-90deg); }
-/* The 3D plan shows no model, so the model-only options hide (owner, 2026-10-14). */
-#view3d-floor-ctl.plan-mode :is(#view3d-lighting, #view3d-reflections, #view3d-realistic, #view3d-windows, #view3d-sun, #view3d-sky-status) { display: none; }
 #view3d-floor-ctl.collapsed #view3d-floor-current { display: inline; }
 #view3d-floor-ctl.collapsed > :not(.view3d-floor-title) { display: none; }
 #view3d-floor-list {
@@ -297,10 +295,34 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-#view3d-lighting,
-#view3d-reflections,
-#view3d-realistic,
-#view3d-windows {
+/* 👁 Show (owner, 2026-10-16): the show/hide switches and the look options, above the nav. */
+.view3d-menu {
+  position: absolute;
+  right: 10px;
+  bottom: 72px;
+  z-index: 6;
+  width: 220px;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  padding: 6px;
+  color: var(--text);
+  background: rgba(30, 33, 39, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+}
+.view3d-menu[hidden], .view3d-menu button[hidden] { display: none; }
+.view3d-menu-title {
+  padding: 4px 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.view3d-menu-look { margin-top: 8px; }
+/* The 3D plan shows no model, so the model-only options hide (owner, 2026-10-14). */
+.view3d-menu.plan-mode .view3d-menu-look { display: none; }
+.view3d-menu button {
   width: 100%;
   margin-top: 5px;
   padding: 7px 8px;
@@ -313,10 +335,7 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-#view3d-lighting[aria-pressed="true"],
-#view3d-reflections[aria-pressed="true"],
-#view3d-realistic[aria-pressed="true"],
-#view3d-windows[aria-pressed="true"] {
+.view3d-menu button[aria-pressed="true"] {
   color: #0b1220;
   background: #ffd166;
   border-color: #ffd166;
@@ -377,7 +396,11 @@ body {
 
 @media (max-width: 640px) {
   #view3d-floor-ctl { width: 145px; }
+  /* Icons only in the nav; the full name stays in the title and aria-label. */
+  #view3d-nav .nav-lbl { display: none; }
+  #view3d-nav button { padding: 0 14px; font-size: 18px; }
 }
+#view3d-nav .nav-ico + .nav-lbl { margin-left: 6px; }
 
 /* POV controls, bottom centre (clear of the floor panel on a narrow screen). */
 #view3d-nav {
@@ -404,25 +427,39 @@ body {
   touch-action: manipulation;
 }
 /* PLAN mode's pipe colours, above the nav. */
+/* The pipe legend: a chip at the top right; open, its items below it (owner, 2026-10-16). */
 .view3d-pipe-legend {
   position: absolute;
-  left: 50%;
-  bottom: 72px;
-  transform: translateX(-50%);
+  top: 34px;
+  right: 10px;
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 12px;
-  max-width: calc(100% - 32px);
-  padding: 6px 12px;
+  max-width: min(260px, calc(100% - 180px));
+  padding: 2px;
   font-size: 12px;
   color: var(--text);
   background: rgba(30, 33, 39, 0.92);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
-.view3d-pipe-legend[hidden] { display: none; }
+.view3d-pipe-legend[hidden], #view3d-legend-items[hidden] { display: none; }
+#view3d-legend-chip {
+  width: 100%;
+  padding: 5px 9px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+#view3d-legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 9px 7px;
+}
 .view3d-pipe-legend span::before {
   content: '';
   display: inline-block;
@@ -433,7 +470,8 @@ body {
   border-radius: 2px;
   background: var(--swatch);
 }
-#view3d-nav button[aria-pressed="true"] {
+#view3d-nav button[aria-pressed="true"],
+#view3d-nav button[aria-expanded="true"] {
   color: #0b1220;
   background: #ffd166;
   border-color: #ffd166;

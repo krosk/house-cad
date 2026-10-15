@@ -204,6 +204,12 @@ export class View3D {
       transparent: true, opacity: 0.18, depthWrite: false,
     });
     this.floorsSeeThrough = false;
+    // Ceiling see-through (owner, 2026-10-16: to see the ducts above it in POV): the ceiling faint, its finishes hidden.
+    this.ceilingGlassMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf4f4f4, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.18, depthWrite: false,
+    });
+    this.ceilingsSeeThrough = false;
     this.doorMaterial = new THREE.MeshStandardMaterial({
       color: 0xa9794f,
       roughness: 0.7,
@@ -278,7 +284,7 @@ export class View3D {
     this.planLayers = null;
     this.planShow = { conduits: false, pipes: false };
     this.planFramedFor = undefined; // the floor filter the plan camera was last framed for
-    this.onPlanServices = null; // (services[], fittingIssues) → main.js draws the pipe legend
+    this.onPlanServices = null; // (services[], fittingIssues, insulateM) → main.js draws the pipe legend
     this.furnitureBuildToken = 0;
     this.furnitureSources = new Map();
     this.furniturePending = new Map();
@@ -355,6 +361,18 @@ export class View3D {
     }
   }
 
+  // Ceiling see-through: the ceilings turn faint and their finishes hide. View-only.
+  setCeilingsSeeThrough(on) {
+    this.ceilingsSeeThrough = !!on;
+    for (const mesh of this.house.children) {
+      if (mesh.userData.ceilingSlab) {
+        mesh.material = this.ceilingsSeeThrough ? this.ceilingGlassMaterial : this.ceilingMaterial;
+        mesh.castShadow = !this.ceilingsSeeThrough;
+      }
+      if (mesh.userData.ceilingFinish) mesh.visible = this._meshVisible(mesh);
+    }
+  }
+
   // The renderer is shared with WebXR, but the desktop plan does not need its
   // parked 3D canvas to consume GPU continuously. Visible 3D and AR run it;
   // plan view stops it completely until either one is requested again.
@@ -409,13 +427,16 @@ export class View3D {
       for (const [partGeometry, material, role, halfWall, stairwell] of parts) {
         if (!partGeometry) continue;
         const glass = halfWall && this.halfWallsSeeThrough ? this.halfWallGlassMaterial
-          : role === 'floor' && this.floorsSeeThrough ? this.floorGlassMaterial : material;
+          : role === 'floor' && this.floorsSeeThrough ? this.floorGlassMaterial
+            : role === 'ceiling' && this.ceilingsSeeThrough ? this.ceilingGlassMaterial : material;
         const mesh = new THREE.Mesh(partGeometry, glass);
         if (halfWall) mesh.userData.halfWall = true;
         if (role === 'floor') mesh.userData.floorSlab = true;
+        if (role === 'ceiling') mesh.userData.ceilingSlab = true;
         if (stairwell) mesh.userData.stairwell = true;
         mesh.castShadow = role !== 'floor' && role !== 'windows'; // glass lets the sun through
         if (halfWall && this.halfWallsSeeThrough) mesh.castShadow = false;
+        if (role === 'ceiling' && this.ceilingsSeeThrough) mesh.castShadow = false;
         mesh.receiveShadow = true;
         mesh.position.y = elevation || 0;
         mesh.userData.floorId = floorId || null;
@@ -460,6 +481,7 @@ export class View3D {
         mesh.userData.architecturalRole = finish.role;
         if (finish.halfWall) mesh.userData.halfWallFinish = true;
         if (finish.role === 'floor') mesh.userData.floorFinish = true;
+        if (finish.role === 'ceiling') mesh.userData.ceilingFinish = true;
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
@@ -878,7 +900,7 @@ export class View3D {
       if (name !== 'zones') layer.visible = this.planShow[name];
       this.planGroup.add(layer);
     }
-    this.onPlanServices?.(this.planLayers.services, this.planLayers.fittingIssues);
+    this.onPlanServices?.(this.planLayers.services, this.planLayers.fittingIssues, this.planLayers.insulateM);
   }
 
   // Frame the shown plan from the south, looking down at ~40°, orbiting about its centre.
@@ -1188,6 +1210,7 @@ export class View3D {
     if (role === 'outlines' && (this.lightingEnabled || this.realisticEnabled)) return false;
     if (mesh.userData.halfWallFinish && this.halfWallsSeeThrough) return false;
     if (mesh.userData.floorFinish && this.floorsSeeThrough) return false;
+    if (mesh.userData.ceilingFinish && this.ceilingsSeeThrough) return false;
     // A floor's stairwell under its flights going down: the floor below draws it otherwise.
     if (mesh.userData.stairwell && this.floorFilter == null) return false;
     return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');

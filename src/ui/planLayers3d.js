@@ -17,6 +17,7 @@ import { ZONE_KINDS, zoneKind, zoneColorHex } from '../core/zoneColors.js';
 import { conduitNetworkSegments, conduitNodePos } from '../core/conduit.js';
 import { roomFloorZ } from '../core/storey.js';
 import { derivePipeFittings } from '../core/pipeFittings.js';
+import { ductInsulation, DUCT_INSULATION_M } from '../core/ductInsulation.js';
 
 // Shared with AR (mr.js) so a run reads the same colour in both.
 export const CONDUIT_COLOR = 0xa78bfa;
@@ -31,6 +32,9 @@ const PIPE_NODE_SCALE = 1.3;   // a pipe junction: a bead slightly fatter than i
 // Fittings (src/core/pipeFittings.js): PVC-white over the pipe's colour; a check that fails shows in its own colour.
 export const FITTING_FLAG_COLOR = { angle: 0xff3b30, short: 0xff9500, mf: 0xffd60a };
 const FITTING_TINT = 0.55; // toward white
+// A VMC duct outside the heated volume (src/core/ductInsulation.js): a translucent wool jacket over the cold stretch.
+export const INSULATION_COLOR = 0xfacc15;
+const insulationMaterial = new THREE.MeshLambertMaterial({ color: INSULATION_COLOR, transparent: true, opacity: 0.35, depthWrite: false });
 
 const tubeGeometry = new THREE.CylinderGeometry(1, 1, 1, 10, 1); // unit, along +Y
 const nodeGeometry = new THREE.SphereGeometry(1, 12, 8);
@@ -192,7 +196,7 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     const b = pipeNodes.get(pipe.b);
     if (!a || !b || !(shown(project.pipeNodeFloorId(a)) || shown(project.pipeNodeFloorId(b)))) continue;
     const radius = (pipe.diameter || 0.016) / 2;
-    pipeRuns.push({ a: pipeNodePos(project, a), b: pipeNodePos(project, b), service: pipe.service,
+    pipeRuns.push({ a: pipeNodePos(project, a), b: pipeNodePos(project, b), service: pipe.service, pipeId: pipe.id,
       color: pipeColor ?? (PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold), radius });
     for (const id of [pipe.a, pipe.b]) nodeRadius.set(id, Math.max(nodeRadius.get(id) || 0, radius));
   }
@@ -208,6 +212,19 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     ?? tint.setHex(pipeColor ?? PIPE_SERVICE_COLOR[f.service] ?? PIPE_SERVICE_COLOR.cold).lerp(new THREE.Color(0xffffff), FITTING_TINT).getHex());
   const fittingIssues = {};
   for (const f of fittings) if (f.flag) fittingIssues[f.flag] = (fittingIssues[f.flag] || 0) + 1;
+  // The ducts to insulate, in the plan's colours only (the Model view's grey pipes stay plain).
+  let insulateM = 0;
+  if (pipeColor == null) {
+    const cold = ductInsulation(project, (n) => pipeNodePos(project, n));
+    const jackets = [];
+    for (const run of pipeRuns) {
+      const c = cold.get(run.pipeId);
+      if (!c) continue;
+      insulateM += c.length;
+      for (const [t0, t1] of c.cold) jackets.push({ a: lerpPos(run.a, run.b, t0), b: lerpPos(run.a, run.b, t1), radius: run.radius + DUCT_INSULATION_M });
+    }
+    addJackets(pipes, jackets);
+  }
 
   return {
     zones,
@@ -216,7 +233,32 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     // The services present, for the legend, and the fitting checks that failed ({ angle, short, mf } counts).
     services: [...new Set(pipeRuns.map((run) => run.service))],
     fittingIssues,
+    insulateM, // metres of VMC duct to insulate on the shown floors (0 in the Model view)
   };
+}
+
+const lerpPos = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
+
+// The insulation jackets: [{ a, b, radius }], one translucent instanced cylinder each.
+function addJackets(group, jackets) {
+  if (!jackets.length) return;
+  const up = new THREE.Vector3(0, 1, 0);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const mesh = new THREE.InstancedMesh(tubeGeometry, insulationMaterial, jackets.length);
+  jackets.forEach((j, i) => {
+    const a = world(j.a), b = world(j.b);
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const length = dir.length();
+    quaternion.setFromUnitVectors(up, length > 1e-9 ? dir.clone().divideScalar(length) : up);
+    scale.set(j.radius, Math.max(length, 1e-4), j.radius);
+    matrix.compose(a.clone().add(b).multiplyScalar(0.5), quaternion, scale);
+    mesh.setMatrixAt(i, matrix);
+  });
+  mesh.computeBoundingSphere();
+  mesh.renderOrder = 1; // after the opaque pipes, so they show through
+  group.add(mesh);
 }
 
 // The fittings at the shown nodes, drawn into the pipe layer: each leg a socket-wide cylinder from the node to its

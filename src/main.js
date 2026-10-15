@@ -9,7 +9,7 @@ import { finishSurfaces } from './core/flooring.js';
 import { materialById, markerProductDraws, zoneMaterial } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
-import { PIPE_SERVICE_COLOR, FITTING_FLAG_COLOR } from './ui/planLayers3d.js';
+import { PIPE_SERVICE_COLOR, FITTING_FLAG_COLOR, INSULATION_COLOR } from './ui/planLayers3d.js';
 import { setupMR } from './ui/mr.js';
 import { installRemoteLog } from './ui/remoteLog.js';
 
@@ -192,15 +192,29 @@ view3dWindows.addEventListener('click', () => { setWindowsOpen(!windowsOpen); sc
 // has the ruler (src/ui/ruler3d.js; owner, 2026-10-08): while it is on, a tap measures
 // instead of entering POV. View-only, so shared links have it too.
 const view3dNav = document.getElementById('view3d-nav');
+// A nav button's label: its icon, then a text that hides on a narrow screen (style.css), the full name in its title.
+function navLabel(button, icon, text) {
+  const ico = document.createElement('span');
+  ico.className = 'nav-ico';
+  ico.textContent = icon;
+  const lbl = document.createElement('span');
+  lbl.className = 'nav-lbl';
+  lbl.textContent = text;
+  button.replaceChildren(ico, lbl);
+  button.setAttribute('aria-label', text);
+}
 const view3dTilt = document.getElementById('view3d-tilt');
 const view3dOverview = document.getElementById('view3d-overview');
 const view3dRuler = document.getElementById('view3d-ruler');
 view3dOverview.addEventListener('click', () => view.exitPov());
+navLabel(view3dOverview, '▦', 'Overview');
+navLabel(view3dRuler, '📏', 'Ruler');
+navLabel(view3dTilt, '◎', 'Tilt look');
 const tiltSupported = typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 function setRuler(on) {
   view.setRulerEnabled(on);
   view3dRuler.setAttribute('aria-pressed', String(!!on));
-  view3dRuler.textContent = on ? '📏 Ruler on' : '📏 Ruler';
+  navLabel(view3dRuler, '📏', on ? 'Ruler on' : 'Ruler');
 }
 view3dRuler.addEventListener('click', () => setRuler(!view.ruler.enabled));
 // Half walls see-through (owner, 2026-10-10): to look at a WC frame inside its half wall; ceiling
@@ -221,9 +235,38 @@ view3dFloors.addEventListener('click', () => {
   view3dFloors.setAttribute('aria-pressed', String(on));
   view3dFloors.textContent = on ? '▱ Floors: see-through' : '▱ Floors';
 });
+// Ceiling see-through (owner, 2026-10-16): to see the ducts and pipes above the ceiling in POV (the
+// overview never shows a ceiling). View-only, session-only.
+const view3dCeilings = document.getElementById('view3d-ceilings');
+view3dCeilings.addEventListener('click', () => {
+  const on = !view.ceilingsSeeThrough;
+  view.setCeilingsSeeThrough(on);
+  view3dCeilings.setAttribute('aria-pressed', String(on));
+  view3dCeilings.textContent = on ? '▭ Ceiling: see-through' : '▭ Ceiling';
+});
+// 👁 Show (owner, 2026-10-16: "too many buttons over the view"): the show/hide switches and the look
+// options live in one menu above the nav. It closes on a tap elsewhere or Escape; the button counts
+// the Show switches that are on, so a layer left on is not forgotten.
+const view3dShow = document.getElementById('view3d-show');
+const view3dShowMenu = document.getElementById('view3d-show-menu');
+function setShowMenu(open) {
+  view3dShowMenu.hidden = !open;
+  view3dShow.setAttribute('aria-expanded', String(open));
+}
+view3dShow.addEventListener('click', () => setShowMenu(view3dShowMenu.hidden));
+view3dHolder.addEventListener('pointerdown', (event) => {
+  if (!view3dShowMenu.hidden && !view3dShowMenu.contains(event.target) && !view3dShow.contains(event.target)) setShowMenu(false);
+});
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !view3dShowMenu.hidden) setShowMenu(false); });
+function renderShowCount() {
+  const on = [...view3dShowMenu.querySelectorAll(':scope > button[aria-pressed="true"]')].filter((b) => !b.hidden).length;
+  navLabel(view3dShow, '👁', on ? `Show · ${on}` : 'Show');
+}
+new MutationObserver(renderShowCount).observe(view3dShowMenu, { subtree: true, attributes: true, attributeFilter: ['aria-pressed', 'hidden'] });
+renderShowCount();
 function showTiltState(on) {
   view3dTilt.setAttribute('aria-pressed', String(on));
-  view3dTilt.textContent = on ? '◉ Tilt look' : '◎ Tilt look';
+  navLabel(view3dTilt, on ? '◉' : '◎', 'Tilt look');
 }
 view3dTilt.addEventListener('click', async () => {
   // The permission request must run inside this tap (iOS).
@@ -241,6 +284,7 @@ const view3dPlanTitle = view3dPlan.title;
 const PLAN_LAYERS_KEY = 'house-cad:view3d-plan-layers:v1';
 let planServices = [];
 let planFittingIssues = {}; // failed fitting checks, { angle, short, mf } counts
+let planInsulateM = 0; // metres of VMC duct to insulate (src/core/ductInsulation.js)
 function savedPlanLayers() {
   try { return JSON.parse(localStorage.getItem(PLAN_LAYERS_KEY)) || {}; } catch { return {}; }
 }
@@ -254,21 +298,41 @@ function showPlanLayer(button, name, label, on) {
   showPlanLayer(view3dConduits, 'conduits', '⚡ Conduits', !!saved.conduits);
   showPlanLayer(view3dPipes, 'pipes', '💧 Pipes', !!saved.pipes);
 }
+// The legend is a chip in the corner (owner, 2026-10-16): services, failed checks and the duct to insulate in
+// one line; a tap opens the full legend (remembered per device).
+const view3dLegendChip = document.getElementById('view3d-legend-chip');
+const view3dLegendItems = document.getElementById('view3d-legend-items');
+const LEGEND_OPEN_KEY = 'house-cad:view3d-legend-open:v1';
+let legendOpen = false;
+try { legendOpen = localStorage.getItem(LEGEND_OPEN_KEY) === '1'; } catch { /* private mode */ }
+view3dLegendChip.addEventListener('click', () => {
+  legendOpen = !legendOpen;
+  try { localStorage.setItem(LEGEND_OPEN_KEY, legendOpen ? '1' : '0'); } catch { /* private mode */ }
+  renderPipeLegend();
+});
 function renderPipeLegend() {
   const plan = view.navigationMode === 'plan';
   view3dPipeLegend.hidden = !plan || !view.planShow.pipes || !planServices.length;
+  const issues = Object.values(planFittingIssues).reduce((sum, n) => sum + n, 0);
+  view3dLegendChip.textContent = [`${legendOpen ? '▾' : '▸'} 💧 ${planServices.length}`,
+    ...(issues ? [`⚠ ${issues}`] : []), ...(planInsulateM > 0 ? [`▒ ${planInsulateM.toFixed(1)} m`] : [])].join(' · ');
+  view3dLegendChip.setAttribute('aria-expanded', String(legendOpen));
+  view3dLegendItems.hidden = !legendOpen;
   const item = (text, hex) => {
     const span = document.createElement('span');
     span.textContent = text;
     span.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
     return span;
   };
-  view3dPipeLegend.replaceChildren(
+  view3dLegendItems.replaceChildren(
     ...planServices.map((service) => item(t(`pipe.service.${service}`), PIPE_SERVICE_COLOR[service] ?? PIPE_SERVICE_COLOR.cold)),
     ...Object.entries(planFittingIssues).map(([flag, n]) => item(`${t(`pipe.fitting.${flag}`)} (${n})`, FITTING_FLAG_COLOR[flag])),
+    ...(planInsulateM > 0 ? [item(`${t('pipe.insulate')} (${planInsulateM.toFixed(1)} m)`, INSULATION_COLOR)] : []),
   );
 }
-view.onPlanServices = (services, fittingIssues = {}) => { planServices = services; planFittingIssues = fittingIssues; renderPipeLegend(); };
+view.onPlanServices = (services, fittingIssues = {}, insulateM = 0) => {
+  planServices = services; planFittingIssues = fittingIssues; planInsulateM = insulateM; renderPipeLegend();
+};
 for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'], [view3dPipes, 'pipes', '💧 Pipes']]) {
   button.addEventListener('click', () => {
     const on = !view.planShow[name];
@@ -291,12 +355,13 @@ view.onNavigationChange = (mode) => {
   view3dRuler.hidden = pov || plan || orbit;
   view3dHalfWalls.hidden = plan;
   view3dFloors.hidden = plan;
+  view3dCeilings.hidden = !pov; // only POV shows a ceiling
   // Plan shows no model: its lighting, reflections, Realistic and window options hide (owner, 2026-10-14).
-  document.getElementById('view3d-floor-ctl').classList.toggle('plan-mode', plan);
+  view3dShowMenu.classList.toggle('plan-mode', plan);
   view3dOverview.hidden = !(pov || orbit);
   view3dTilt.hidden = !pov || !tiltSupported;
   view3dPlan.hidden = false; // POV too (owner, 2026-10-14)
-  view3dPlan.textContent = plan ? '◈ Model' : '▤ Plan';
+  navLabel(view3dPlan, plan ? '◈' : '▤', plan ? 'Model' : 'Plan');
   view3dPlan.title = plan ? 'Back to the 3D model' : view3dPlanTitle;
   view3dConduits.hidden = !plan || !project.conduitSegments?.length;
   view3dPipes.hidden = !project.pipes?.length; // Model view too, in grey (owner, 2026-10-14)
@@ -349,7 +414,10 @@ const view3dFloorCurrent = document.getElementById('view3d-floor-current');
     panel.classList.toggle('collapsed', collapsed);
     toggle.setAttribute('aria-expanded', String(!collapsed));
   };
-  try { apply(localStorage.getItem(KEY) === '1'); } catch { /* private mode */ }
+  // No choice yet: collapsed on a phone-width screen (owner, 2026-10-16), open otherwise.
+  let saved = null;
+  try { saved = localStorage.getItem(KEY); } catch { /* private mode */ }
+  apply(saved == null ? matchMedia('(max-width: 640px)').matches : saved === '1');
   toggle.addEventListener('click', () => {
     const collapsed = !panel.classList.contains('collapsed');
     apply(collapsed);
@@ -406,7 +474,7 @@ function open3D() {
 // ◈ Model: build the model if it is stale, wait for its textures, then leave the plan.
 async function showModel() {
   openingModel = true;
-  view3dPlan.textContent = '✕ Cancel';
+  navLabel(view3dPlan, '✕', 'Cancel');
   view3dPlan.title = 'Stop opening the model (textures keep loading)';
   if (view3dDirty || textureProgress.done < textureProgress.total) {
     showLoading();

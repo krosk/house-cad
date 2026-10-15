@@ -18,23 +18,28 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-15 (session 40, continued; the Quest reachable)
+**Date:** 2026-10-16 (session 40 ended; the Quest reachable)
 
 **Status:**
-- Proven (git, Actions, `version.json`, `update-app` on 10-15): the code head is `1a40798`, pushed, served and
-  installed on the headset.
-- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-15,
-  287 526 chars (the ground bathroom and kitchen VMC ducts moved into the attic, the kitchen boxes removed:
-  `docs/plumbing-workflow.md` "Ground-floor ducts in the attic"). Before it, 287 926 (the upper WC drain as layout S + column r122 narrowed to 35.5 cm, replacing T1 at
+- Proven (git, Actions, `version.json`, `update-app` on 10-15): the code head is `6da6a2b` (View 3D pipe fittings),
+  pushed, served ("6da6a2b 1015-2127Z") and installed on the headset.
+- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-16,
+  287 829 chars (the bath duct's two flat corners as 45° pairs: `docs/plumbing-workflow.md` "The bath duct's two flat
+  corners"). Before it, 287 516 (2026-10-15: fix A at the alcove and the longer laundry 45° pair: `docs/plumbing-workflow.md` "Fittings to datasheet
+  sizes"). Before it, 287 526 (the ground bathroom and kitchen VMC ducts moved into the attic, the kitchen boxes removed:
+  "Ground-floor ducts in the attic"), and 287 926 (the upper WC drain as layout S + column r122 narrowed to 35.5 cm, replacing T1 at
   287 757; resolved with real Nicoll/Geberit parts:
-  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). That is the base for the
-  next write.** Backups `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
+  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). 287 829 is the base for the
+  next write.** Backups `quest-backup-1016-bath45` (pre-45° pairs), `quest-backup-1015-fixA` (pre-fix A), `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
 - Proven (owner, 10-03): their link's 3D view opens on their phone.
 - **Hypothesis:** everything else from sessions 30–40 works on the devices. It is verified only by build, Node or
-  a scratch/desktop browser, and nothing from items 47–80 has been seen on the Quest.
+  a scratch/desktop browser, and nothing from items 47–81 has been seen on the Quest. The View 3D fittings (`6da6a2b`)
+  were never seen in any browser: the Chrome tools here could not reach this machine's dev servers.
+- Uncommitted at the end of session 40: none expected beyond this handoff and `docs/plumbing-workflow.md` (the
+  287 516 write recorded, the bath duct loss recounted); commit them if `git status` still shows them.
 
 ## What the app is today
 
@@ -157,14 +162,18 @@ plan.
     same depth as T1, moves the vent to x −4.50 into the drawn VMC Ø80. With the stack at x −4.434 column r122
     narrows 50.5 → 35.5 cm and passage r56 widens with it. **Owner chose S + the narrower column: written
     (287 926)**, replacing T1; open: move the VMC Ø80 p39 west in r220 (2.6 cm overlap);
-  - **the ground bathroom and kitchen ducts into the attic** (owner: the ceiling boxes are ugly): written (287 526),
-    only a 40 × 37 cm corner box left in the kitchen; Ø80 all the way checked and rejected (≈ 69–81 Pa at the vent at
-    boost, Hypothesis). Next: a `hood` pipe service (owner OK) for the Ø150 hood exhaust through the south wall.
+  - **the ground bathroom and kitchen ducts into the attic** (owner: the ceiling boxes are ugly; the roof slopes down
+    to the east): written (287 526); the bath vent on the ceiling over the shower (2.45, −1.85), the C21 flush on the
+    ceiling, only a corner box left in the kitchen; Ø80 all the way checked and rejected (≈ 69–81 Pa at the vent at
+    boost, Hypothesis). Vent positions kept after an age-of-air comparison (owner, 10-15: "we keep those positions";
+    every candidate within ≈ 5 %, the model has no plumes);
   - **View 3D pipe fittings** (`src/core/pipeFittings.js`, every size from Nicoll's datasheets): elbows, tees,
     reducers drawn from the angles, with buildability flags; it found the kitchen turn over the alcove and the laundry
     45° pair too short (draft 1d had left out the sockets). Owner chose **fix A** (a CX8 M/F at ①, the kitchen run 4.75 cm
-    north, boxes +4.75 cm) and the longer laundry pair: `docs/plumbing-workflow.md` "Fittings to datasheet sizes".
+    north, boxes +4.75 cm) and the longer laundry pair, **written (287 516)**: `docs/plumbing-workflow.md` "Fittings to datasheet sizes".
     Not yet in AR; never seen in a browser (Hypothesis). Still flagged: the WC stack foot (pn62–pn63) and pn81.
+    Realistic drawings of both ducts (plan + looking north + looking west, distances, EN and ZH) were sent to the
+    owner as files; their scripts were scratch only.
 
 Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are still cited in `docs/ar-qa-checklist.md`.
 
@@ -188,7 +197,8 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   worker job). The plan view prepares nothing 3D.
 - **Owner preferences:**
   - keep product advice **generic** (a brand's datasheet only gives typical sizes);
-  - plots are elevations "west wall facing me" (north on the right), sometimes in Chinese;
+  - plots are elevations "west wall facing me" (north on the right), sometimes in Chinese; "realistic" drawings show
+    pipes and fittings to size, with distances outside the views;
   - a "face view" is drawn as seen standing in the room facing that wall (facing south: east left, west right).
     Earlier session-40 "elevations facing the south wall" were mirrored.
 
@@ -208,7 +218,13 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   - Aldes's "≥ 20 cm from the vent's centre to adjacent surfaces" counts only surfaces hanging down beside the vent
     (walls, a hood chimney), never a box edge that goes up (owner, 10-15: "absence of surface should not count, it is
     not a wall");
-  - the bedroom's south-wall top (x −0.53…0) may be drilled/channelled for the ducts (owner, 10-15; builder's call).
+  - the bedroom's south-wall top (x −0.53…0) may be drilled/channelled for the ducts (owner, 10-15; builder's call);
+  - **the ground bathroom and kitchen ducts run in the attic** (owner, 10-15), never in kitchen ceiling boxes; the
+    vents stay where they are (bath over the shower, C21 beside the hob); the bath duct stays Ø100;
+  - the alcove turn uses a Nicoll **CX8** M/F 87°30′ Ø125 (fix A); the owner wants product sizes from datasheets,
+    never guessed (10-15): `src/core/pipeFittings.js` holds Nicoll's values;
+  - the hood gets a real Ø150 exhaust through the south wall (owner); its chimney stays at 2.50 for now; it needs a
+    `hood` pipe service first (owner OK) so the VMC airflow model ignores it.
 - **Waste:**
   - no roof vent; a Ø100 façade vent at the upper floor's south-east corner;
   - a Ø100 air valve on the upper riser;
@@ -308,10 +324,11 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 - **The basement's west face is x −4.55, 15 cm inside the ground floor's** (a survey error the owner will
   correct; the ducts are drawn that way on purpose).
 - **Data oddities:** cameras m174/m183 have `z = 0`; doors r77/r120 are drawn wider than their opening.
-- **The model draws pipe turns as sharp corners.** Before sizing a box round a duct, stack the real fittings (Proven
-  from the sheets: Nicoll PVC Ø125 F/F 87°30 socket 61 mm, Z 96; 45° Z 41; Aldes vent spigot 43.8 mm, outer Ø119):
-  a face-down Ø125 vent turning into a run needs ≈ 22 cm above the box underside; two 87°30 in a row need ≥ 19.2 cm
-  centre to centre. The kitchen layout (draft 1d) was redone for that on 10-15.
+- **The model draws pipe turns as sharp corners; View 3D's fittings (`src/core/pipeFittings.js`) and their flags
+  show the real ones.** Nicoll's Z runs from the corner to the **socket bottom** (Proven: the M/F datasheet's drawing),
+  so two F/F fittings need (Z + L) + (Z + L) between corners (two Ø125 87°30′: 31.4 cm; draft 1d's 19.2 left out
+  the sockets), an M/F one h + the other's Z (CX8 + CX88: 25.3 cm). A face-down Ø125 vent turning into a run needs
+  ≈ 16 cm (spigot in the socket + Z 96). Any 45° that descends must start inside a column, never under a 20 cm box.
 - **A wall cabinet's door sweeps at its top edge:** r162's 60 cm door (hinge x 0.818, y −5.067) reaches x 1.418 at
   2.48 when fully open. Anything lower than 2.48 near there (a vent, a dropped box) must stay outside that sweep.
 - **Real fitting sizes, not the drawn corners, decide a layout:** Nicoll PVC Ø100 87°30 needs **13.4 cm** from the
@@ -324,8 +341,6 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   has two positions, the second 15 mm toward the wall (the 10–13 / 11.5–14.5 cm figures are the inlet's reach to the
   finished wall, not free play). Geberit also sells sideways "offset" bends (366.913.16.1 left / 366.914.16.1 right,
   Ø90): level outlet 10.3 cm below the WC axis (Proven from their CAD; not yet checked against this frame).
-- **Box r252 sits 1 cm into the tall oven unit r156 and filler r157** (2.47 vs tops 2.48), from before 10-15; not
-  fixed (r252 must stay ≤ 2.47 north of y ≈ −3.1, where the bath duct runs at 2.55).
 
 **View 3D, textures and products**
 - **Metal renders near-black in basic View 3D** (no environment map outside Reflections/Realistic). Keep steel at
@@ -346,6 +361,9 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   - inject a test house into `localStorage` a few seconds after the first load (the demo autosave overwrites an
     earlier write).
 - **The owner's house JSON never goes into a served folder or a browser;** use it in Node only.
+- **This session the Chrome tools could not load any page from this machine** (`chrome-error` for localhost, the LAN
+  IP over HTTP on 5173/5174/5191; the HTTPS dev server stops at the self-signed-certificate warning, which must not be
+  clicked through). Node checks only; ask the owner to look, or find out why before relying on a browser preview.
 - **Photo finishes:** never tile a photo; joints come from the texture. Check textures against the full-resolution
   photo.
 - **Retailer sites:**
@@ -398,14 +416,15 @@ ramps, sloped stairs · `92fffea` links keep room levels · `72440f4` POV on ste
 `3dacf2b` grey pipes in Model · `bfd0c83` opens on Plan · `969e599` Plan from POV · `ce570b9` ORBIT ·
 `106f527` Falmec hood · `d476b07` see-through boxings · `007e2ca` generic hob · `7ef82c4` hood at 65 cm ·
 `d6b710f` boxing finishes · `07a5ce5` the Plan/Model button no longer shows pressed · `129407e` ceiling over
-full-height openings · `f106c5a` ▱ Floors see-through. `tools/wc-drain-fit.mjs` committed with the docs (layouts T1 and S).
+full-height openings · `f106c5a` ▱ Floors see-through · `1a40798` `tools/wc-drain-fit.mjs` (layouts T1 and S) ·
+`6da6a2b` View 3D pipe fittings to Nicoll sizes + buildability checks.
 
 ## Resuming from a clean checkout
 
 ```bash
 export PATH="$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node | tail -1)/bin:$PATH"
 npm install                                       # once; node_modules is already present
-npm run dev -- --host --port 5174 --strictPort    # https; report the Network URL
+npm run dev -- --host                             # https on 5173; report the Network URL (stopped at the end of s40)
 npm run build                                     # the only automated check; expect "✓ built in …"
 ```
 
@@ -418,6 +437,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | Path | Role |
 |---|---|
 | `tools/quest-storage.mjs` / `tools/house-query.mjs` | Headset backup/read/write/update-app / query, diff and check a plan in Node |
+| `src/core/pipeFittings.js` | Fittings derived from a pipe network: Nicoll datasheet sizes, `angle` / `short` / `mf` checks (View 3D draws them; Node-testable) |
 | `tools/wc-drain-fit.mjs` | Upper WC drain T1 (default) or `layout=S`, with real Nicoll/Geberit parts: clash check, bay-1 depth, `svg=` face + side views; `screed=`/`slabBottom=` take site measurements |
 | `src/ui/mr.js` | The whole AR session (modes, HUD, PERF, batched overlays, export) |
 | `src/ui/view3d.js` / `src/ui/planLayers3d.js` | Shared renderer and the four camera states / View 3D's ▤ Plan layers |
@@ -432,16 +452,25 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 
 ## Next step
 
-**Active (item 80):**
-1. **Redraw the heating so the ground shower room tees off the kitchen + r74 pair.** Remove its own pair, taking
-   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 526).
-2. **Device QA** (app `f106c5a`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
-   - (10-15) POV under passage r117: the ceiling closes; ◈ Model ▱ Floors see-through with 💧 Pipes;
-   - the hood, the hob, the box tiles, the alcove floor;
-   - View 3D on ▤ Plan, then ◈ Model (wheel, ORBIT keeps the camera, a tap walks), ▤ Plan from POV;
-   - grey pipes in Model; ▯/◫ Windows keep the POV;
-   - the ceiling boxes; the C21 turned at x 1.60 under the box's 2.46 section, clear of r162's door (also fully open); the 37 cm kitchen and 21 cm bedroom boxes;
-   - a PNG download vs the Node render; a link with pipes.
+**Active:**
+1. **A `hood` pipe service** (owner OK, 10-15): add it to `PIPE_SERVICES` (+ colour, i18n, AR cycle), keep it out of
+   `airflow.js`, then draft the Ø150 from the hood's outlet through the south wall. The clear band behind the chimney
+   is ≈ 1.85–2.39 m (conduits at 1.83 and 2.40). Owner: park the hood's datasheet check; write only after the app that
+   knows `hood` is installed (an older app turns an unknown service into `cold`).
+2. **The two spots the fittings still flag:** the WC stack foot in the basement (pn62 → pn63, 9.6 cm, too short)
+   and pn81 (an 8.5° bend on the outside collector). Re-solve with real parts, ask, then W.
+3. **Fittings in AR** (`mr.js` draws ribbons; reuse `derivePipeFittings`), only if the owner wants it.
+4. **Redraw the heating so the ground shower room tees off the kitchen + r74 pair** (item 80). Remove its own pair,
+   taking new ids before removing anything. Read-base-write on the owner's W (fresh read == 287 829).
+5. **Device QA** (app `6da6a2b`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
+   - (10-15) 💧 Pipes fittings in View 3D (Plan and Model), the flags' colours and legend;
+   - the attic layout: no kitchen ceiling boxes but the corner box (41.75 cm), the bedroom box 25.75 cm, the vents
+     flush on the ceiling;
+   - POV under passage r117: the ceiling closes; ◈ Model ▱ Floors see-through with 💧 Pipes;
+   - the hood, the hob, the alcove floor; View 3D Plan/Model/ORBIT/POV; a PNG download; a link with pipes.
+   - (10-16, uncommitted until "c p") the insulation jackets in ▤ Plan; the new View 3D controls (👁 Show menu,
+     icons-only nav on a phone, the legend chip, the floor panel collapsed on a phone); ▭ Ceiling see-through in POV.
+     Headless Chrome screenshots only (demo and a made-up test house), never the Quest browser.
 
    Then, in order: item 78 (veranda, r95 raised, basement floors, sloped stairs), item 76 (garden), item 75 (PIPE
    in ALL FLOORS frame rate, the phone link's orientation), item 69 (WC under the window), then items 73 and
@@ -451,15 +480,16 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 - **Item 80:**
   - the outside of the laundry's west wall at 1.95 m (B's OUT);
   - the slab holes beside the wall's bearing;
-  - the vent above the shower;
   - access hatches; the upper waste's exit to the collector;
   - the real hob model (a generic one is drawn);
-  - the kitchen Ø125 (draft 1d, written): a flexible end at unit B or rigid to the end (undecided; ≈ 2–2.5 Pa);
-    elbow ① is ≈ 0.7 cm from r255/r256's board (offered: both alcove drops 2–3 cm east, not answered); the wall-top
-    opening over the alcove (≈ 40 × 18 × 20 cm, elbows ② ③) and the 13 × 12.5 cm channel in the bedroom wall top
-    (builder);
-  - the r252 / oven-unit 1 cm overlap: offered (run the south box to the east wall, start r252 further north),
-    not answered; re-check against the 37 cm box before drafting.
+  - the kitchen Ø125: a flexible end at unit B or rigid to the end (undecided; ≈ 2–2.5 Pa); the 13 × 12.5 cm channel
+    in the bedroom wall top for the bath Ø100 (builder);
+  - **the C21's boost is a push button on its face** (Proven: the 9V push version), out of reach on the ceiling at
+    2.70: check whether Aldes sells a cord or remote version (not checked);
+  - the attic: the roof underside along x 2.45 (≥ ≈ 3.10 m for full wool over the bath duct) and the joists'
+    direction (Hypothesis inputs of the attic heights);
+  - (done 2026-10-16) the bath duct's two flat 87°30′ are 45° pairs, written: `docs/plumbing-workflow.md` "The bath
+    duct's two flat corners".
 - **Item 79:**
   - the band's real height (drawn at 1.97 m);
   - ceiling boards over the band vs wrapping, and the fire covering;
@@ -505,6 +535,10 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   (`docs/share-view.md`).
 
 **Superseded or rejected (don't redo):**
+- ~~Kitchen and bath ducts in kitchen ceiling boxes (1c, 1d, r252/r261/r262)~~: moved to the attic 10-15 (owner: ugly).
+- ~~Three 45° at the alcove turn~~ (none fits, exhaustive search) / ~~fix B, two F/F~~ (cuts buried conduits) /
+  ~~swapping the ducts in the alcove~~ (a laundry crossing at 1.77 m): fix A chosen 10-15.
+- ~~Ø80 all the way for the ground bath duct~~: ≈ 30 Pa, the vent under 80 Pa at boost.
 - ~~Option A's heights as written 10-09 (bay 1 ≈ 15 cm)~~: real fittings need ≈ 21 cm; T1 replaced it (10-15).
 - ~~A tee at 20 cm with Geberit's bend pointing down~~ / ~~the bend straight back at the current frame depth~~ /
   ~~a 7.6 cm frame move~~: the WC branch is held at ≤ 2.3 cm; 10.1 cm into the north wall; the bend has no forward
@@ -533,8 +567,8 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   ground the bare-pipe figures.
 - **VMC:**
   - the slab build-up over the ducts; fitting sizes; boost pressures (Hypothesis, Colebrook);
-  - the kitchen C21 at boost in PVC: ≈ 64–80 Pa at the vent against its 70 Pa floor (B's curve unpublished; read it at
-    commissioning); whether r261's 4 cm lips count as surfaces (west lip 17 cm from the vent's centre);
+  - at boost (B's curve unpublished; ≥ 122 Pa assumed; read both vents at commissioning): the kitchen C21 ≈ 61–78 Pa
+    against its 70 Pa floor; the bath vent ≈ 84–98 Pa against 80, less when both boost;
   - the EHB² humidity curve; wind;
   - the kitchen vent's real minimum flow.
 - **Upper WC drain T1:** bay 1's real depth and the screed (decide whether T1 is buildable); the socket outer Ø

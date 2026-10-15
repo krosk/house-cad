@@ -81,39 +81,55 @@
           <button id="view3d-floor-toggle" class="view3d-floor-title" type="button" aria-expanded="true"
             title="Collapse / expand"><span class="cx-caret">▾</span> Floors<span id="view3d-floor-current"></span></button>
           <div id="view3d-floor-list"></div>
-          <button id="view3d-lighting" type="button" aria-pressed="false"
-            title="Enable marker lights and dynamic shadows">☼ Basic lighting</button>
-          <button id="view3d-reflections" type="button" aria-pressed="false"
-            title="Reflect a soft room in glossy finishes (heavier on some devices)">✧ No reflections</button>
-          <button id="view3d-realistic" type="button" aria-pressed="false"
-            title="Real sun and shadows, a downloaded sky, ambient occlusion (heavier)">◑ Realistic</button>
-          <button id="view3d-windows" type="button" aria-pressed="false"
-            title="Open every window leaf as far as it goes before it hits furniture or a wall">▯ Windows closed</button>
-          <label id="view3d-sun" class="view3d-sun" hidden title="Time of day for the sun (today, north = plan up)">
-            <span id="view3d-sun-label">☀ 12:00</span>
-            <input id="view3d-sun-time" type="range" min="4" max="22.5" step="0.25" value="12">
-          </label>
-          <div id="view3d-sky-status" class="view3d-sky-status" hidden></div>
         </aside>
-        <!-- Overview: the ruler + Plan + pipes; POV: Overview + tilt + pipes; Plan: Model + the conduit/pipe layers
-             (main.js, view3d.js onNavigationChange). -->
-        <div id="view3d-pipe-legend" class="view3d-pipe-legend" hidden></div>
-        <div id="view3d-nav" hidden>
-          <button id="view3d-plan" type="button"
-            title="The plan in 3D, as in AR: every zone flat on its floor, with the conduits and pipes">▤ Plan</button>
+        <!-- The nav: Overview: Plan + the ruler; POV: Plan + Overview + tilt; Plan: Model; 👁 Show everywhere
+             (main.js onNavigationChange). -->
+        <!-- The pipe legend: a chip in the corner, a tap opens it (main.js renderPipeLegend). -->
+        <div id="view3d-pipe-legend" class="view3d-pipe-legend" hidden>
+          <button id="view3d-legend-chip" type="button" aria-expanded="false" title="Show / hide the pipe legend"></button>
+          <div id="view3d-legend-items"></div>
+        </div>
+        <!-- 👁 Show (owner, 2026-10-16: too many buttons over the view): every show/hide switch and the look
+             options in one menu above the nav; the nav keeps the actions. -->
+        <div id="view3d-show-menu" class="view3d-menu" hidden>
+          <div class="view3d-menu-title">Show</div>
           <button id="view3d-conduits" type="button" aria-pressed="false" hidden
             title="Show the electrical conduit network">⚡ Conduits</button>
           <button id="view3d-pipes" type="button" aria-pressed="false" hidden
             title="Show the pipes, coloured by service">💧 Pipes</button>
-          <button id="view3d-ruler" type="button" aria-pressed="false" hidden
-            title="Measure: tap a wall face, then another (two parallel faces give the gap between them)">📏 Ruler</button>
           <button id="view3d-halfwalls" type="button" aria-pressed="false"
             title="Show half walls and ceiling boxings see-through, to look at what stands inside them">🧱 Half walls + boxing</button>
           <button id="view3d-floors" type="button" aria-pressed="false"
             title="Show the floors see-through, to look at the pipes under them">▱ Floors</button>
+          <button id="view3d-ceilings" type="button" aria-pressed="false" hidden
+            title="Show the ceiling see-through, to look at the ducts and pipes above it">▭ Ceiling</button>
+          <div class="view3d-menu-look">
+            <div class="view3d-menu-title">Look</div>
+            <button id="view3d-lighting" type="button" aria-pressed="false"
+              title="Enable marker lights and dynamic shadows">☼ Basic lighting</button>
+            <button id="view3d-reflections" type="button" aria-pressed="false"
+              title="Reflect a soft room in glossy finishes (heavier on some devices)">✧ No reflections</button>
+            <button id="view3d-realistic" type="button" aria-pressed="false"
+              title="Real sun and shadows, a downloaded sky, ambient occlusion (heavier)">◑ Realistic</button>
+            <button id="view3d-windows" type="button" aria-pressed="false"
+              title="Open every window leaf as far as it goes before it hits furniture or a wall">▯ Windows closed</button>
+            <label id="view3d-sun" class="view3d-sun" hidden title="Time of day for the sun (today, north = plan up)">
+              <span id="view3d-sun-label">☀ 12:00</span>
+              <input id="view3d-sun-time" type="range" min="4" max="22.5" step="0.25" value="12">
+            </label>
+            <div id="view3d-sky-status" class="view3d-sky-status" hidden></div>
+          </div>
+        </div>
+        <div id="view3d-nav" hidden>
+          <button id="view3d-plan" type="button"
+            title="The plan in 3D, as in AR: every zone flat on its floor, with the conduits and pipes">▤ Plan</button>
+          <button id="view3d-ruler" type="button" aria-pressed="false" hidden
+            title="Measure: tap a wall face, then another (two parallel faces give the gap between them)">📏 Ruler</button>
           <button id="view3d-overview" type="button" title="Back to the top-down overview">▦ Overview</button>
           <button id="view3d-tilt" type="button" aria-pressed="false" hidden
             title="Look around by moving the phone">◎ Tilt look</button>
+          <button id="view3d-show" type="button" aria-expanded="false"
+            title="Show or hide layers, see-through, lighting and the look">👁 Show</button>
         </div>
       </section>
       <footer id="toolbar">

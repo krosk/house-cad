@@ -672,7 +672,7 @@ Proven in Node: no conflicts, no dimension deleted, no pipe or conduit within 2 
 lengths: bath 6.70 → 6.84 m, kitchen 2.61 → 2.71 m; bath vent to unit B 13.76 m. Hypothesis (the model of "Unit B
 stays a Classic", Colebrook, B ≥ 122 Pa, room depression 10–20 Pa, OUT 1–3 Pa, 80 Pa vent floor): **Ø80 all the
 way was checked and rejected** (owner asked): ≈ 22.0 Pa friction (1.60 Pa/m) + 6 turns × 1.3 ≈ 30 Pa, the vent ≈ 69–81
-Pa at boost (≈ 42 instead of 45 m³/h); it would need ≈ 7 m. Ø100: ≈ 11 Pa, the vent ≈ 88–108 Pa. The kitchen gains
+Pa at boost (≈ 42 instead of 45 m³/h); it would need ≈ 7 m. Ø100 (recounted 2026-10-16, the route as written: 1.7 m/s, 0.53 Pa/m × 13.76 m ≈ 7.3 Pa, four 87°30′ at K 0.6–0.8 ≈ 4–5.5 Pa, two 45° pairs ≈ 1–1.6, reducers ≈ 0.5): ≈ 13–15 Pa, the vent ≈ 84–98 Pa at boost (lower if the kitchen boosts at the same time: B's pressure falls with its flow). The kitchen gains
 one 45° pair (≈ 2–3 Pa at 135 m³/h), so ≈ 61–78 Pa at its vent at boost in PVC. Open (Hypothesis): the roof underside
 along x 2.45 should be ≥ ≈ 3.10 m (duct top 2.89, wool to 3.06, an air gap); the joists' direction (a duct crossing
 them sits on top and loses that much wool); insulate the attic ducts (≈ 25 mm) and seal the air barrier at the four
@@ -689,7 +689,8 @@ laundry 45° pair "≥ 41 + 41 mm" too (20.4 cm). Ø100 45° CT44 Z 33 (was assu
 Run on the 287 526-char plan, the derivation flags: the kitchen turn over the alcove (① west → south, ② south → down,
 20.75 cm), the laundry pair (12 cm), the WC stack foot in the basement (pn62–pn63, 9.6 cm, drawn before parts were
 chosen) and an 8.5° bend on the outside collector (pn81). Layout S's M/F joints read as `mf` (buildable), as designed.
-- **Fix A (owner: "Show me fix A", then "Cpw"):** ① becomes a Nicoll **CX8** 87°30′ M/F Ø125 (Z 96, L 61, h 157;
+- **Fix A (owner: "Show me fix A", then "Cpw"; written to the headset 2026-10-15 with the laundry fix, 287 516 chars,
+  read back identical; scratch `fixShort.mjs`, nothing added or removed):** ① becomes a Nicoll **CX8** 87°30′ M/F Ø125 (Z 96, L 61, h 157;
   Leroy Merlin, Bricoman, Point P list it), its spigot straight in ② CX88's socket: h 157 + Z 96 = 25.3 cm needed. The
   kitchen run (vent r257, pn311–pn313, pn342–pn343) moves 4.75 cm north to y −4.8175 (25.5 cm); the bedroom box r255
   21 → 25.75 cm deep and the kitchen corner box r254 37 → 41.75 cm (front −4.7325). The buried conduits climbing the
@@ -702,6 +703,26 @@ chosen) and an 8.5° bend on the outside collector (pn81). Layout S's M/F joints
   ducts jog in the attic, and the Ø125 needs the bigger wall-top channel. Loss of ① + ② at the kitchen boost
   (Hypothesis, the model of draft 1d): ≈ 10–13 Pa at 135 m³/h, ≈ 2 at 55, ≈ 0.1 at 15; the swap would save the
   kitchen ≈ 3–5 Pa.
+
+**The bath duct's two flat corners as 45° pairs (owner, 2026-10-16: "introduce the 45 bends where it is missing"; written
+2026-10-16, 287 829 chars, read back identical).** The two flat 87°30′ (attic pn302, south → west; laundry pn306, north → west) each become a Nicoll
+F/F 45° Ø100 pair (Z 33 + L 57 = 9.0 cm reach each, so ≥ 18.0 cm between the elbows): each corner node moves 13 cm back
+along its incoming leg and a new node sits 13 cm along the outgoing one, an 18.4 cm diagonal (attic: pn302 (2.45,
+−4.93), new (2.32, −5.06); laundry: pn306 (−0.65, −4.095), new (−0.78, −3.965)). The other two 87°30′ stay: the
+vent's (ceiling → attic, 14 cm rise, no room) and pn304 (west → down into the alcove column). Proven (scratch
+`bath45.mjs`, the fitting check and a clash check on the draft): no new fitting flag, nothing within 2 cm of
+another pipe, conduit or zone; the bath duct 13.60 m. Hypothesis (the same loss model): ≈ 12–13.5 Pa at the boost
+instead of ≈ 13–15, the vent ≈ 86–99 Pa.
+
+**Which ducts to insulate (owner, 2026-10-16: "mark the ducts that need to be insulated").** DTU 68.3's rule above (a
+duct outside the heated volume: R ≥ 0.6, ≈ 25 mm wool) is derived from the plan in `src/core/ductInsulation.js` and
+drawn in View 3D's ▤ Plan as a translucent yellow jacket over each cold stretch, with the total in the pipe legend.
+A point is cold on an unheated storey (`floor.heat.heated` false: the basement), outside the storey's spaces (rooms,
+stairs, walls, linings; gaps up to 60 cm between zones count as walls), or above its ceiling with no heated space of
+the storey above (an attic). Proven (Node, the draft plan): ≈ 19.5 m of the 34.1 m of VMC duct, the bath duct
+9.65 m (the attic, the wall-top crossing, everything in the basement), the kitchen 5.30 m; the ground floor's alcove
+column and boxes are warm. Hypothesis: the basement is unheated in winter as the plan says; a duct run inside an
+exterior wall counts as warm.
 
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face

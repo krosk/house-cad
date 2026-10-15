@@ -491,6 +491,7 @@ const STRINGS = {
   'pipe.fitting.angle': { en: 'no standard fitting angle', fr: 'angle sans raccord standard', zh: '无标准管件角度' },
   'pipe.fitting.short': { en: 'fittings overlap', fr: 'raccords qui se chevauchent', zh: '管件重叠' },
   'pipe.fitting.mf': { en: 'needs M/F fittings', fr: 'raccords M/F nécessaires', zh: '需公母管件' },
+  'pipe.insulate': { en: 'insulate 25 mm (unheated)', fr: 'à isoler 25 mm (hors volume chauffé)', zh: '需保温 25 mm（非采暖区）' },
   'pipe.pickStart': { en: 'PICK START', fr: 'CHOISIR DÉPART', zh: '选择起点' },
   'pipe.run': { en: 'RUN PIPE', fr: 'TIRER TUYAU', zh: '布水管' },
   'pipe.label': { en: 'pipe', fr: 'tuyau', zh: '水管' },
