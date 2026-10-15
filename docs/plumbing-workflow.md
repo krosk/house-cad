@@ -508,7 +508,7 @@ band above its top skips the taller one's footprint (`src/core/architectural3d.j
 r210's band cut r220 away above 1.15 m, so the boxing looked missing).
 
 **Ceiling boxings (owner, 2026-10-14: "work on boxing those conduits", the ground floor's kitchen and bedroom
-ducts; "new ceiling box kind").** A duct along a ceiling is boxed by a **`soffit` zone** (CEILING BOXING): solid from
+ducts; "new ceiling box kind").** (The kitchen boxes below are superseded, 2026-10-15: "Ground-floor ducts in the attic".) A duct along a ceiling is boxed by a **`soffit` zone** (CEILING BOXING): solid from
 its `foot` (the box's underside, m above the floor; AR's band pad edits it) up to the ceiling, plaster in View 3D,
 a dashed outline with dashed diagonals on sheets (overhead), and it takes no floor area (footprint, room area, heat
 loss and floor finishes run under it, as for furniture). A riser from floor to ceiling stays a half wall (above). Each
@@ -608,7 +608,7 @@ spots of 1c could not be built with them:
 - the vent's turn up into the run: spigot in a socket (61) + Z 96 puts the run's axis 15.7 cm above the box underside and
   the socket's top 6.55 cm above that, ≈ 22 cm, in a 20 cm box (18.75 cm inside the board). An equal-size Ø125 saddle
   or tee was assumed earlier; it is not a standard part (Hypothesis);
-- the double turn over the alcove (west → south 13.75 cm → down): two such elbows need 19.2 cm centre to centre.
+- the double turn over the alcove (west → south 13.75 cm → down): two such elbows need 19.2 cm centre to centre. (Wrong, 2026-10-15: that leaves out the sockets; 31.4 cm. See "Fittings to datasheet sizes" below.)
 
 Draft 1d, scratch `editVent1d.mjs` (new ids r261, r262 taken first, nothing removed):
 - the kitchen run 7 cm north, y −4.865 (the double turn 20.75 cm), and at 2.62 all the way;
@@ -643,6 +643,65 @@ short straight flexible end at the unit (≈ 2–2.5 Pa), generous kitchen windo
 Commissioning: read the kitchen vent's pressure during a boost. Hypothesis: r261's 4 cm lips are no "paroi" (its west lip is 17 cm from the vent's centre, the
 chimney 22 cm, the south wall 28.5 cm); the tile takeoff counts r261's sides whole, ≈ 0.15 m² of them inside the
 neighbouring boxes; r162's real door reach (leaf width and hinge offset; 1.2 cm margin).
+
+**Ground-floor ducts in the attic (owner, 2026-10-15: the ceiling boxes are "regarded as ugly"; "Kitchen goes also in
+the attic"; written to the headset 2026-10-15, 287 526 chars, read back identical). Supersedes the kitchen boxes of
+"Ceiling boxings", 1c and 1d above; the bedroom side (box r255, the drilled wall top, the alcove drops) is unchanged.**
+The single-storey part (x > 0) has a ventilated attic under a roof that slopes down to the east (owner: low side on
+the east wall), with 36 cm of blown Rockwool planned on the ceiling (`docs/heat-loss.md`). Scratch `editAttic.mjs`
+(new ids pn340–pn343, p308–p311 taken first):
+- **Bath:** wall vent r251 becomes the ceiling Bahia Curve S (`aldes-bahia-curve-s-ceiling`) over the shower at
+  (2.45, −1.85), 22.5 cm from the bathroom's west wall and 82 cm from the east wall (kept off the roof's low side).
+  Ø80 stub up to an 87°30 at 2.84 (Ø100 Z 77 + socket 57 ≈ 13.4 cm over the ceiling; Ø80→Ø100 there), Ø100 south
+  over the kitchen to y −5.06, west along the south wall (4 cm off it).
+- **Kitchen:** the C21 r257 stays at (1.60, −4.865), face down flush on the ceiling (2.70); an 87°30 to 2.86 (socket 61
+  + Z 96), west along y −4.865.
+- **The corner:** each duct comes down through two 45° elbows onto the old wall crossing at 2.62 (kitchen y −4.865, bath
+  −5.06): lower elbows at x 0.525, upper at 0.765 (kitchen) / 0.745 (bath). Ø125 45° F/F Z 41 + socket 61 puts the
+  lower elbow's mouth 0.8 cm off the wall face; Ø100 45° Z ≈ 35 is assumed (Hypothesis, not checked), socket 57.
+  The two ducts never cross: the bath stays south of the kitchen run all the way (why the east-side route was kept;
+  a west-wall route would have crossed the kitchen duct at the corner).
+- **Boxes:** r252, r261, r262 and their 10 tile finishes removed; r254 is now only the corner box, x 0.415–0.818 (flush
+  with the wall cabinets' fronts), y −5.15…−4.78, underside 2.50, still tiled. The hood's chimney stays at 2.50 (owner:
+  "Keep chimney as it is for now"); a Ø150 hood exhaust through the south wall is planned (owner), not yet drawn: a
+  `hood` pipe service is to be added so it stays out of the VMC airflow model (`src/core/airflow.js` reads `vmc` only).
+  Behind the chimney the clear band between buried conduits is ≈ 1.85–2.39 m (cs416 at ≈ 1.83, cs418 at 2.40).
+- The conduits the boxes covered (cs95, cs96, cs455, cs456 at 2.55) are buried in the walls (owner).
+
+Proven in Node: no conflicts, no dimension deleted, no pipe or conduit within 2 cm of the moved ducts. Ground-floor
+lengths: bath 6.70 → 6.84 m, kitchen 2.61 → 2.71 m; bath vent to unit B 13.76 m. Hypothesis (the model of "Unit B
+stays a Classic", Colebrook, B ≥ 122 Pa, room depression 10–20 Pa, OUT 1–3 Pa, 80 Pa vent floor): **Ø80 all the
+way was checked and rejected** (owner asked): ≈ 22.0 Pa friction (1.60 Pa/m) + 6 turns × 1.3 ≈ 30 Pa, the vent ≈ 69–81
+Pa at boost (≈ 42 instead of 45 m³/h); it would need ≈ 7 m. Ø100: ≈ 11 Pa, the vent ≈ 88–108 Pa. The kitchen gains
+one 45° pair (≈ 2–3 Pa at 135 m³/h), so ≈ 61–78 Pa at its vent at boost in PVC. Open (Hypothesis): the roof underside
+along x 2.45 should be ≥ ≈ 3.10 m (duct top 2.89, wool to 3.06, an air gap); the joists' direction (a duct crossing
+them sits on top and loses that much wool); insulate the attic ducts (≈ 25 mm) and seal the air barrier at the four
+ceiling holes; a steady fall, no sag.
+
+**Fittings to datasheet sizes, and the two runs too short for them (owner, 2026-10-15: "modelize the bends in 3d
+view", then "make sure the product dimensions are not guessed").** View 3D draws the VMC and waste fittings from the
+drawn angles (`src/core/pipeFittings.js`; CLAUDE.md). Proven (Nicoll datasheets, downloaded 2026-10-15:
+FT_coudes_evac_FF.pdf, FT_coudes_evac_MF.pdf, FT_culottes_simples_FF_evac.pdf, FT_reductions_evac.pdf; all values in
+that module): **Z runs from the corner to the socket bottom** (the M/F drawing: Z ends where L begins; h = Z + L is the
+spigot end), so two F/F fittings need their centres ≥ (Z + L) + (Z + L) apart, and an M/F one ≥ h + the other's Z.
+Corrections this brought: draft 1d's "two 87°30′ Ø125 need 96 + 96 = 19.2 cm" left out the sockets (31.4 cm), and its
+laundry 45° pair "≥ 41 + 41 mm" too (20.4 cm). Ø100 45° CT44 Z 33 (was assumed 35); Ø160 sockets 61.
+Run on the 287 526-char plan, the derivation flags: the kitchen turn over the alcove (① west → south, ② south → down,
+20.75 cm), the laundry pair (12 cm), the WC stack foot in the basement (pn62–pn63, 9.6 cm, drawn before parts were
+chosen) and an 8.5° bend on the outside collector (pn81). Layout S's M/F joints read as `mf` (buildable), as designed.
+- **Fix A (owner: "Show me fix A", then "Cpw"):** ① becomes a Nicoll **CX8** 87°30′ M/F Ø125 (Z 96, L 61, h 157;
+  Leroy Merlin, Bricoman, Point P list it), its spigot straight in ② CX88's socket: h 157 + Z 96 = 25.3 cm needed. The
+  kitchen run (vent r257, pn311–pn313, pn342–pn343) moves 4.75 cm north to y −4.8175 (25.5 cm); the bedroom box r255
+  21 → 25.75 cm deep and the kitchen corner box r254 37 → 41.75 cm (front −4.7325). The buried conduits climbing the
+  wall (cs77, cs299, cs305 at y −4.74/−4.73) stay 0.5–1.7 cm off the duct.
+- **Laundry:** the two 45° CX44 move 15.2 cm back on each leg (pn316 y −4.312, pn338 x −1.002): a 21.5 cm diagonal.
+- Set aside (Proven, Node): fix B (two F/F, the run 10.85 cm north) cuts those three conduits; **no arrangement of
+  three 45°** fits (an exhaustive search: the descent can only start inside the 18 cm alcove column, and two 45° need
+  20.4 cm between centres); swapping the two ducts in the alcove fits with the bedroom box +0.55 cm, but the drops swap
+  sides, so the bath duct must cross under the kitchen one in the laundry (≈ 1.77 m underside, four more 45°), both
+  ducts jog in the attic, and the Ø125 needs the bigger wall-top channel. Loss of ① + ② at the kitchen boost
+  (Hypothesis, the model of draft 1d): ≈ 10–13 Pa at 135 m³/h, ≈ 2 at 55, ≈ 0.1 at 15; the swap would save the
+  kitchen ≈ 3–5 Pa.
 
 **Upper bathroom vent (owner, 2026-10-09/10: "Probable B, i want lean flow", then "Go 17cm"; written to the
 headset 2026-10-10, read back identical):** an Aldes Bahia Curve S (furniture `aldes-bahia-curve-s`, `docs/furniture.md`) on the **south face
@@ -862,6 +921,14 @@ fixture or floor drain below it needs a pump (Hypothesis).
       stack itself moves only 1.4 cm. Not written to the headset; the column's east edge is pinned to passage r56
       (c773), so the passage would widen unless that dimension changes. The VMC Ø80 (x −4.615) and the conduit at
       x −4.59 stay inside the narrower column.
+    - **Written to the headset 2026-10-15** (owner: "c p w", chose "Layout S + narrower column"; this replaces T1 on
+      the plan): tee pn60 (−4.2855, 0.45, 0.0211), bay bend pn71 below it (−0.1899), new vent bend pn339
+      (−4.496, 0.4647, 0.0232) with new pipe p307 from the tee, vent top pn67 over it (1.49), stack pn61
+      (−4.434, −0.30, −0.1975) and pn62 (basement ceiling) at x −4.434; column r122 east face −4.35 (35.5 cm), passage
+      r56 widened to −4.35 (c773 = 0 kept; c227 −0.49 → −0.34 so r57 stays). Solved: no conflict, no deleted
+      dimension, only r56 and r122 changed. Fresh read == 287 757, written and read back identical, **287 926 chars**.
+      Still open for S: the VMC Ø80 p39 overlaps the vent by 2.6 cm (move it west in r220), and the tee's flow use
+      (Hypothesis above).
   - **To check for both layouts (found 2026-10-15 while dimensioning S):** Geberit's figures (11.5–14.5 cm from the
     bend's leg to the finished wall face with the rear clip, 10–13 with the front one) put the finished face 0.8–3.8 cm
     in front of the frame. The box face (half wall r210/r220 at y 0.28) is drawn 5 cm in front of the frame face:

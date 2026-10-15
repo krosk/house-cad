@@ -21,12 +21,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 **Date:** 2026-10-15 (session 40, continued; the Quest reachable)
 
 **Status:**
-- Proven (git): the code head is `f106c5a`, pushed. It is served (`version.json` "f106c5a 1015-0551Z") and in the
-  headset precache (`update-app` 10-15: "installed f106c5a 1015-0551Z").
+- Proven (git, Actions, `version.json`, `update-app` on 10-15): the code head is `1a40798`, pushed, served and
+  installed on the headset.
 - Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-15,
-  287 757 chars (the upper WC drain moved to T1, resolved with real Nicoll/Geberit parts:
+  287 526 chars (the ground bathroom and kitchen VMC ducts moved into the attic, the kitchen boxes removed:
+  `docs/plumbing-workflow.md` "Ground-floor ducts in the attic"). Before it, 287 926 (the upper WC drain as layout S + column r122 narrowed to 35.5 cm, replacing T1 at
+  287 757; resolved with real Nicoll/Geberit parts:
   `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). That is the base for the
-  next write.** Backup `quest-backup-1015-wcT1` (scratchpad, session-local). No save slot holds a pre-edit copy, so undo = reverse the edit.
+  next write.** Backups `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
@@ -138,7 +140,7 @@ plan.
     the vent, bedroom box 21 cm, a 45° pair in the laundry), the vent turned at x 1.60; the owner keeps PVC (≈ 64–80 Pa
     at the vent at boost, Hypothesis).
 
-  All written (287 752); then the upper WC drain T1 (287 757). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
+  All written (287 752); then the upper WC drain T1 (287 757), then layout S + narrower column (287 926). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
   "Ceiling boxings", "Kitchen vent", "Hood and alcove".
 
 - **81** (2026-10-15):
@@ -152,8 +154,17 @@ plan.
     "Fitting study, upper WC drain" hold every number and the rejected layouts;
   - the owner's slanted alternative **layout S** (tee branch down, its run west to the vent and east to the WC)
     solved with real parts (`tools/wc-drain-fit.mjs layout=S teeY=0.45 stackX=-4.434`): fits with ≈ 4 mm margins,
-    same depth as T1, moves the vent to x −4.50 into the drawn VMC Ø80; T1 stays (not written). With the stack at
-    x −4.434 column r122 could narrow 50.5 → 35.5 cm (Hypothesis on the cover; r56 is pinned to its east edge).
+    same depth as T1, moves the vent to x −4.50 into the drawn VMC Ø80. With the stack at x −4.434 column r122
+    narrows 50.5 → 35.5 cm and passage r56 widens with it. **Owner chose S + the narrower column: written
+    (287 926)**, replacing T1; open: move the VMC Ø80 p39 west in r220 (2.6 cm overlap);
+  - **the ground bathroom and kitchen ducts into the attic** (owner: the ceiling boxes are ugly): written (287 526),
+    only a 40 × 37 cm corner box left in the kitchen; Ø80 all the way checked and rejected (≈ 69–81 Pa at the vent at
+    boost, Hypothesis). Next: a `hood` pipe service (owner OK) for the Ø150 hood exhaust through the south wall.
+  - **View 3D pipe fittings** (`src/core/pipeFittings.js`, every size from Nicoll's datasheets): elbows, tees,
+    reducers drawn from the angles, with buildability flags; it found the kitchen turn over the alcove and the laundry
+    45° pair too short (draft 1d had left out the sockets). Owner chose **fix A** (a CX8 M/F at ①, the kitchen run 4.75 cm
+    north, boxes +4.75 cm) and the longer laundry pair: `docs/plumbing-workflow.md` "Fittings to datasheet sizes".
+    Not yet in AR; never seen in a browser (Hypothesis). Still flagged: the WC stack foot (pn62–pn63) and pn81.
 
 Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are still cited in `docs/ar-qa-checklist.md`.
 
@@ -423,7 +434,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 
 **Active (item 80):**
 1. **Redraw the heating so the ground shower room tees off the kitchen + r74 pair.** Remove its own pair, taking
-   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 757).
+   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 526).
 2. **Device QA** (app `f106c5a`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
    - (10-15) POV under passage r117: the ceiling closes; ◈ Model ▱ Floors see-through with 💧 Pipes;
    - the hood, the hob, the box tiles, the alcove floor;
@@ -469,7 +480,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   - Both need re-drafting on the current base.
 - **Item 69:** the basement's east wall under the ground window; a possible slab ring beam at the WC drop; the
   window handle's reach.
-- **Item 65 / 81 (upper WC drain T1, written):** measure the screed, the slab depth in bay 1 and the lintels' depth;
+- **Item 65 / 81 (upper WC drain, layout S written 287 926; T1 is the fallback):** measure the screed, the slab depth in bay 1 and the lintels' depth;
   T1 needs bay 1 ≈ **20.5 cm** under the raw slab top with a 5 cm screed (re-run `tools/wc-drain-fit.mjs` with the
   figures). If bay 1 is shallower: Geberit's sideways offset bend (≈ 12 cm, frame unmoved; check the Ø90→Ø100
   transition length, its mounting depth vs the lower bar, which side is "left") or the frame 10.6 cm forward with the

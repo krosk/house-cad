@@ -7,6 +7,8 @@
 //
 // Runs are thin cylinders (one InstancedMesh per layer) with a 1 px line down their axis, so
 // a 16 mm pipe still reads as a line from across the house and as a tube up close.
+// PVC pipes (VMC, waste) also show their fittings, derived from the drawn angles (owner, 2026-10-15; sizes and
+// checks in src/core/pipeFittings.js): elbows, tees and reducers to size, a failed check in its own colour.
 
 import * as THREE from 'three';
 import { computeFootprint } from '../core/geometry2d.js';
@@ -14,6 +16,7 @@ import { footprintFloorGeometry } from '../core/extrude.js';
 import { ZONE_KINDS, zoneKind, zoneColorHex } from '../core/zoneColors.js';
 import { conduitNetworkSegments, conduitNodePos } from '../core/conduit.js';
 import { roomFloorZ } from '../core/storey.js';
+import { derivePipeFittings } from '../core/pipeFittings.js';
 
 // Shared with AR (mr.js) so a run reads the same colour in both.
 export const CONDUIT_COLOR = 0xa78bfa;
@@ -25,6 +28,9 @@ export const PIPE_SERVICE_COLOR = {
 const CONDUIT_RADIUS = 0.0125; // a 25 mm conduit
 const CONDUIT_NODE_RADIUS = 0.02;
 const PIPE_NODE_SCALE = 1.3;   // a pipe junction: a bead slightly fatter than its pipe
+// Fittings (src/core/pipeFittings.js): PVC-white over the pipe's colour; a check that fails shows in its own colour.
+export const FITTING_FLAG_COLOR = { angle: 0xff3b30, short: 0xff9500, mf: 0xffd60a };
+const FITTING_TINT = 0.55; // toward white
 
 const tubeGeometry = new THREE.CylinderGeometry(1, 1, 1, 10, 1); // unit, along +Y
 const nodeGeometry = new THREE.SphereGeometry(1, 12, 8);
@@ -190,17 +196,61 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
       color: pipeColor ?? (PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold), radius });
     for (const id of [pipe.a, pipe.b]) nodeRadius.set(id, Math.max(nodeRadius.get(id) || 0, radius));
   }
+  const { fittings: allFittings } = derivePipeFittings(project.pipeNodes || [], project.pipes || [], (n) => pipeNodePos(project, n));
+  const fittings = allFittings.filter((f) => shown(project.pipeNodeFloorId(pipeNodes.get(f.nodeId))));
+  const fitted = new Set(fittings.map((f) => f.nodeId));
   const pipeBeads = (project.pipeNodes || [])
-    .filter((n) => shown(project.pipeNodeFloorId(n)))
+    .filter((n) => shown(project.pipeNodeFloorId(n)) && !fitted.has(n.id)) // a fitting replaces its node's bead
     .map((n) => ({ p: pipeNodePos(project, n), color: pipeColor ?? 0xffffff, radius: (nodeRadius.get(n.id) || 0.008) * PIPE_NODE_SCALE }));
+  const pipes = networkLayer(pipeRuns, pipeBeads);
+  const tint = new THREE.Color();
+  addFittings(pipes, fittings, (f) => FITTING_FLAG_COLOR[f.flag]
+    ?? tint.setHex(pipeColor ?? PIPE_SERVICE_COLOR[f.service] ?? PIPE_SERVICE_COLOR.cold).lerp(new THREE.Color(0xffffff), FITTING_TINT).getHex());
+  const fittingIssues = {};
+  for (const f of fittings) if (f.flag) fittingIssues[f.flag] = (fittingIssues[f.flag] || 0) + 1;
 
   return {
     zones,
     conduits: networkLayer(conduitRuns, conduitNodes),
-    pipes: networkLayer(pipeRuns, pipeBeads),
-    // The services present, for the legend.
+    pipes,
+    // The services present, for the legend, and the fitting checks that failed ({ angle, short, mf } counts).
     services: [...new Set(pipeRuns.map((run) => run.service))],
+    fittingIssues,
   };
+}
+
+// The fittings at the shown nodes, drawn into the pipe layer: each leg a socket-wide cylinder from the node to its
+// socket mouth, and a ball of the same width at the node closing the mitre (a moulded elbow or tee).
+function addFittings(group, fittings, colorOf) {
+  if (!fittings.length) return;
+  const legs = fittings.flatMap((f) => f.legs.map((leg) => ({ f, leg })));
+  const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const up = new THREE.Vector3(0, 1, 0);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const color = new THREE.Color();
+  const sleeves = new THREE.InstancedMesh(tubeGeometry, material, legs.length);
+  legs.forEach(({ f, leg }, i) => {
+    const a = world(f.center);
+    const dir = new THREE.Vector3(leg.dir.x, leg.dir.z, -leg.dir.y);
+    quaternion.setFromUnitVectors(up, dir);
+    scale.set(leg.od / 2, leg.reach, leg.od / 2);
+    matrix.compose(a.clone().addScaledVector(dir, leg.reach / 2), quaternion, scale);
+    sleeves.setMatrixAt(i, matrix);
+    sleeves.setColorAt(i, color.setHex(colorOf(f)));
+  });
+  sleeves.computeBoundingSphere();
+  group.add(sleeves);
+  const balls = new THREE.InstancedMesh(nodeGeometry, material, fittings.length);
+  fittings.forEach((f, i) => {
+    scale.setScalar(Math.max(...f.legs.map((leg) => leg.od)) / 2);
+    matrix.compose(world(f.center), quaternion.identity(), scale);
+    balls.setMatrixAt(i, matrix);
+    balls.setColorAt(i, color.setHex(colorOf(f)));
+  });
+  balls.computeBoundingSphere();
+  group.add(balls);
 }
 
 // Free a built layer's own buffers (the shared geometries and fill materials stay).

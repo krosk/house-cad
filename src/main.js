@@ -9,7 +9,7 @@ import { finishSurfaces } from './core/flooring.js';
 import { materialById, markerProductDraws, zoneMaterial } from './core/materials.js';
 import { Sketch2D } from './ui/sketch2d.js';
 import { View3D } from './ui/view3d.js';
-import { PIPE_SERVICE_COLOR } from './ui/planLayers3d.js';
+import { PIPE_SERVICE_COLOR, FITTING_FLAG_COLOR } from './ui/planLayers3d.js';
 import { setupMR } from './ui/mr.js';
 import { installRemoteLog } from './ui/remoteLog.js';
 
@@ -240,6 +240,7 @@ const view3dPipeLegend = document.getElementById('view3d-pipe-legend');
 const view3dPlanTitle = view3dPlan.title;
 const PLAN_LAYERS_KEY = 'house-cad:view3d-plan-layers:v1';
 let planServices = [];
+let planFittingIssues = {}; // failed fitting checks, { angle, short, mf } counts
 function savedPlanLayers() {
   try { return JSON.parse(localStorage.getItem(PLAN_LAYERS_KEY)) || {}; } catch { return {}; }
 }
@@ -256,14 +257,18 @@ function showPlanLayer(button, name, label, on) {
 function renderPipeLegend() {
   const plan = view.navigationMode === 'plan';
   view3dPipeLegend.hidden = !plan || !view.planShow.pipes || !planServices.length;
-  view3dPipeLegend.replaceChildren(...planServices.map((service) => {
-    const item = document.createElement('span');
-    item.textContent = t(`pipe.service.${service}`);
-    item.style.setProperty('--swatch', `#${(PIPE_SERVICE_COLOR[service] ?? PIPE_SERVICE_COLOR.cold).toString(16).padStart(6, '0')}`);
-    return item;
-  }));
+  const item = (text, hex) => {
+    const span = document.createElement('span');
+    span.textContent = text;
+    span.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
+    return span;
+  };
+  view3dPipeLegend.replaceChildren(
+    ...planServices.map((service) => item(t(`pipe.service.${service}`), PIPE_SERVICE_COLOR[service] ?? PIPE_SERVICE_COLOR.cold)),
+    ...Object.entries(planFittingIssues).map(([flag, n]) => item(`${t(`pipe.fitting.${flag}`)} (${n})`, FITTING_FLAG_COLOR[flag])),
+  );
 }
-view.onPlanServices = (services) => { planServices = services; renderPipeLegend(); };
+view.onPlanServices = (services, fittingIssues = {}) => { planServices = services; planFittingIssues = fittingIssues; renderPipeLegend(); };
 for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'], [view3dPipes, 'pipes', '💧 Pipes']]) {
   button.addEventListener('click', () => {
     const on = !view.planShow[name];

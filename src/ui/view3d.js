@@ -278,7 +278,7 @@ export class View3D {
     this.planLayers = null;
     this.planShow = { conduits: false, pipes: false };
     this.planFramedFor = undefined; // the floor filter the plan camera was last framed for
-    this.onPlanServices = null; // (services[]) → main.js draws the pipe legend
+    this.onPlanServices = null; // (services[], fittingIssues) → main.js draws the pipe legend
     this.furnitureBuildToken = 0;
     this.furnitureSources = new Map();
     this.furniturePending = new Map();
@@ -878,7 +878,7 @@ export class View3D {
       if (name !== 'zones') layer.visible = this.planShow[name];
       this.planGroup.add(layer);
     }
-    this.onPlanServices?.(this.planLayers.services);
+    this.onPlanServices?.(this.planLayers.services, this.planLayers.fittingIssues);
   }
 
   // Frame the shown plan from the south, looking down at ~40°, orbiting about its centre.
