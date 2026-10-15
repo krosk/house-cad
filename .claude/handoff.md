@@ -21,11 +21,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 **Date:** 2026-10-15 (session 40, continued; the Quest reachable)
 
 **Status:**
-- Proven (git): the code head is `d36c0fe`, pushed. It is served (`version.json`) and in the headset precache
-  (`update-app` 10-14: "installed d36c0fe 1014-2045Z").
+- Proven (git): the code head is `f106c5a`, pushed. It is served (`version.json` "f106c5a 1015-0551Z") and in the
+  headset precache (`update-app` 10-15: "installed f106c5a 1015-0551Z").
 - Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-15,
-  287 752 chars (item 80's kitchen vent, option 1d: buildable with rigid PVC). That is the base for the next write.**
-  Backup `quest-backup-1015-0128` (scratchpad, session-local). No save slot holds a pre-edit copy, so undo = reverse the edit.
+  287 757 chars (the upper WC drain moved to T1, resolved with real Nicoll/Geberit parts:
+  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). That is the base for the
+  next write.** Backup `quest-backup-1015-wcT1` (scratchpad, session-local). No save slot holds a pre-edit copy, so undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
@@ -137,8 +138,22 @@ plan.
     the vent, bedroom box 21 cm, a 45° pair in the laundry), the vent turned at x 1.60; the owner keeps PVC (≈ 64–80 Pa
     at the vent at boost, Hypothesis).
 
-  All written (287 752). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
+  All written (287 752); then the upper WC drain T1 (287 757). `docs/plumbing-workflow.md` "One unit for the whole house", "Unit B turned",
   "Ceiling boxings", "Kitchen vent", "Hood and alcove".
+
+- **81** (2026-10-15):
+  - `129407e` View 3D: the ceiling closes over an opening whose head reaches the ceiling (passage r117 into the
+    kitchen had a slit);
+  - `f106c5a` View 3D ▱ Floors see-through (to see pipes under a floor);
+  - **the upper WC drain re-solved with real parts** (owner: "Dont assume the pipe layout on the headset is
+    correct"): option A as written did not fit (the drop clashed by 11.8 cm with Nicoll sizes); T1 (the same
+    route, Geberit's bend in its rear clip position) has no clash but needs bay 1 ≈ 20.5 cm deep; written
+    (287 757). `tools/wc-drain-fit.mjs` re-runs it; `docs/plumbing-workflow.md` "Option A with real fittings" and
+    "Fitting study, upper WC drain" hold every number and the rejected layouts;
+  - the owner's slanted alternative **layout S** (tee branch down, its run west to the vent and east to the WC)
+    solved with real parts (`tools/wc-drain-fit.mjs layout=S teeY=0.45 stackX=-4.434`): fits with ≈ 4 mm margins,
+    same depth as T1, moves the vent to x −4.50 into the drawn VMC Ø80; T1 stays (not written). With the stack at
+    x −4.434 column r122 could narrow 50.5 → 35.5 cm (Hypothesis on the cover; r56 is pinned to its east edge).
 
 Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are still cited in `docs/ar-qa-checklist.md`.
 
@@ -185,7 +200,11 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   - the bedroom's south-wall top (x −0.53…0) may be drilled/channelled for the ducts (owner, 10-15; builder's call).
 - **Waste:**
   - no roof vent; a Ø100 façade vent at the upper floor's south-east corner;
-  - a Ø100 air valve on the upper riser.
+  - a Ø100 air valve on the upper riser;
+  - **upper WC drain (owner, 10-15):** only the lintels and the frame's distances (WC axis 60 cm from the west wall,
+    frame face 20 cm from the north wall) are true; the headset's pipe layout is not to be trusted. Fixed: Geberit's
+    bend kept, the frame doesn't move, the vent in boxing r220, the stack down column r122. Kept: **T1**, rear
+    clip. Pipe layouts get checked with real fitting sizes before the contractor works.
 - **AC:** Daikin 5MXM90A, outdoor unit under the west-façade camera; refrigerant lines are pipes, not conduits.
 - **Conduits are drawn on the wall face but are buried in reality** (owner, 10-14). A conduit may touch furniture
   backs. Ducts may cross the wall top above the bedroom alcove (owner, 10-14).
@@ -284,6 +303,16 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   centre to centre. The kitchen layout (draft 1d) was redone for that on 10-15.
 - **A wall cabinet's door sweeps at its top edge:** r162's 60 cm door (hinge x 0.818, y −5.067) reaches x 1.418 at
   2.48 when fully open. Anything lower than 2.48 near there (a vent, a dropped box) must stay outside that sweep.
+- **Real fitting sizes, not the drawn corners, decide a layout:** Nicoll PVC Ø100 87°30 needs **13.4 cm** from the
+  corner to the socket mouth (Z 77 + socket 57); two joined fittings need the sum of theirs (21.1 cm for a CT8 M/F
+  pushed into a BT188 tee). The 9 October option A plot (`opa.mjs`) assumed 9.9 cm and never checked the drop, so it
+  "looked fine". Use `tools/wc-drain-fit.mjs` or the same arithmetic before calling a waste layout buildable.
+- **Geberit Duofix 111.333.00.6 facts (Proven: CAD + manual 972.363.00.0):** drain axis 23 cm above the
+  **finished** floor (the frame's 0 mark; legs reach a raw floor 0–25 cm lower); the supplied PVC bend 90/100 is
+  curved down to 15.7 cm and straight below (cut there, never above); it points down or straight back only; its clip
+  has two positions, the second 15 mm toward the wall (the 10–13 / 11.5–14.5 cm figures are the inlet's reach to the
+  finished wall, not free play). Geberit also sells sideways "offset" bends (366.913.16.1 left / 366.914.16.1 right,
+  Ø90): level outlet 10.3 cm below the WC axis (Proven from their CAD; not yet checked against this frame).
 - **Box r252 sits 1 cm into the tall oven unit r156 and filler r157** (2.47 vs tops 2.48), from before 10-15; not
   fixed (r252 must stay ≤ 2.47 north of y ≈ −3.1, where the bath duct runs at 2.55).
 
@@ -357,7 +386,8 @@ ramps, sloped stairs · `92fffea` links keep room levels · `72440f4` POV on ste
 `ad651fa` links carry the network · `481ad14` PNG pipe sheet · `f9a4340` `soffit` · `61e3493` C21 vent ·
 `3dacf2b` grey pipes in Model · `bfd0c83` opens on Plan · `969e599` Plan from POV · `ce570b9` ORBIT ·
 `106f527` Falmec hood · `d476b07` see-through boxings · `007e2ca` generic hob · `7ef82c4` hood at 65 cm ·
-`d6b710f` boxing finishes · `07a5ce5` the Plan/Model button no longer shows pressed.
+`d6b710f` boxing finishes · `07a5ce5` the Plan/Model button no longer shows pressed · `129407e` ceiling over
+full-height openings · `f106c5a` ▱ Floors see-through. `tools/wc-drain-fit.mjs` committed with the docs (layouts T1 and S).
 
 ## Resuming from a clean checkout
 
@@ -377,6 +407,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | Path | Role |
 |---|---|
 | `tools/quest-storage.mjs` / `tools/house-query.mjs` | Headset backup/read/write/update-app / query, diff and check a plan in Node |
+| `tools/wc-drain-fit.mjs` | Upper WC drain T1 (default) or `layout=S`, with real Nicoll/Geberit parts: clash check, bay-1 depth, `svg=` face + side views; `screed=`/`slabBottom=` take site measurements |
 | `src/ui/mr.js` | The whole AR session (modes, HUD, PERF, batched overlays, export) |
 | `src/ui/view3d.js` / `src/ui/planLayers3d.js` | Shared renderer and the four camera states / View 3D's ▤ Plan layers |
 | `src/core/architectural3d.js` | Plan → slabs, walls, openings, stairs, soffits, finish geometry (pure, Node-testable) |
@@ -392,8 +423,9 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 
 **Active (item 80):**
 1. **Redraw the heating so the ground shower room tees off the kitchen + r74 pair.** Remove its own pair, taking
-   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 752).
-2. **Device QA** (app `d36c0fe`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
+   new ids before removing anything. Do read-base-write on the owner's W (fresh read == 287 757).
+2. **Device QA** (app `f106c5a`; relaunch it). The items are in `docs/ar-qa-checklist.md`:
+   - (10-15) POV under passage r117: the ceiling closes; ◈ Model ▱ Floors see-through with 💧 Pipes;
    - the hood, the hob, the box tiles, the alcove floor;
    - View 3D on ▤ Plan, then ◈ Model (wheel, ORBIT keeps the camera, a tap walks), ▤ Plan from POV;
    - grey pipes in Model; ▯/◫ Windows keep the POV;
@@ -437,8 +469,13 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   - Both need re-drafting on the current base.
 - **Item 69:** the basement's east wall under the ground window; a possible slab ring beam at the WC drop; the
   window handle's reach.
-- **Item 65:** the lintel height and slab type (bay 1 needs ≈ 15 cm); the screed (5 cm assumed); the upper shower's
-  Ø40 route; the optional sink.
+- **Item 65 / 81 (upper WC drain T1, written):** measure the screed, the slab depth in bay 1 and the lintels' depth;
+  T1 needs bay 1 ≈ **20.5 cm** under the raw slab top with a 5 cm screed (re-run `tools/wc-drain-fit.mjs` with the
+  figures). If bay 1 is shallower: Geberit's sideways offset bend (≈ 12 cm, frame unmoved; check the Ø90→Ø100
+  transition length, its mounting depth vs the lower bar, which side is "left") or the frame 10.6 cm forward with the
+  bend straight back (≈ 12 cm). Also: the upper shower's Ø40 route; the optional sink. **Measure the box face too**:
+  Geberit allows 11.5–14.5 cm from the bend's leg (rear clip) to the finished wall face; the half wall drawn at
+  y 0.28 gives 15.7 (Hypothesis until measured; `docs/plumbing-workflow.md` "To check for both layouts").
 - **Item 15:** which French door has the Sw 0.51 glass (Hypothesis r111). **Item 27:** which value was wrong in
   the r59 → r60 conflict.
 
@@ -457,6 +494,10 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
   (`docs/share-view.md`).
 
 **Superseded or rejected (don't redo):**
+- ~~Option A's heights as written 10-09 (bay 1 ≈ 15 cm)~~: real fittings need ≈ 21 cm; T1 replaced it (10-15).
+- ~~A tee at 20 cm with Geberit's bend pointing down~~ / ~~the bend straight back at the current frame depth~~ /
+  ~~a 7.6 cm frame move~~: the WC branch is held at ≤ 2.3 cm; 10.1 cm into the north wall; the bend has no forward
+  adjustment (all 10-15, `docs/plumbing-workflow.md`).
 - ~~Unit A, the Agalina units, B on the laundry wall~~: replaced by item 80's one Aldes unit B, turned.
 - ~~The roof vent~~: the owner chose the façade vent + valve.
 - ~~The WC on the north wall (item 64)~~: replaced by item 69.
@@ -485,6 +526,9 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
     commissioning); whether r261's 4 cm lips count as surfaces (west lip 17 cm from the vent's centre);
   - the EHB² humidity curve; wind;
   - the kitchen vent's real minimum flow.
+- **Upper WC drain T1:** bay 1's real depth and the screed (decide whether T1 is buildable); the socket outer Ø
+  (112 mm assumed); that Geberit's clip has only two positions; that 23 cm is the common drain height (not checked
+  against EN or the V&B bowl's sheet).
 - **Technical unknowns:**
   - why 168 per-marker canvases cost ~47 ms (batching fixed it);
   - the GPU-canvas glitch (the software path avoids it);

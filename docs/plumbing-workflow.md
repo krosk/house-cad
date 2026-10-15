@@ -783,6 +783,90 @@ fixture or floor drain below it needs a pump (Hypothesis).
   dropped; only r56, r122 and r220 move. In the model the screed is assumed 5 cm (pipe z floor-relative).
   Open: the lintel height and slab type (does bay 1 take ≈ 15 cm?), the screed thickness, the third
   lintel, and the shower Ø40's route (it must enter the run in bay 1 flowing south).
+- **Option A with real fittings (2026-10-15; owner asked for a face view with Nicoll sizes):** Proven (Nicoll
+  sheets FT_coudes_evac_FF.pdf and FT_coudes_evac_MF.pdf, FT_culottes_simples_FF_evac.pdf): Ø100 87°30′ bend F/F
+  CT88 Z 77 / L 57 (M/F CT8: Z 77, L 57, spigot 134 from the corner); tee 87°30′ F/F BT188 Z1 77, Z2 77 (branch),
+  Z3 52, L 57 (Z1 / Z3 the run's two ends, read from the sheet's drawing). Proven (Geberit side CAD
+  111.333.00.6_L.dxf): the delivered bend (catalogue: "Coude de raccordement 90° en PVC, ø 90 / 100 mm") is curved
+  down to 15.7 cm above the finished floor, with a straight Ø100 leg below it to 6.4 cm under it. A socket must slide
+  over the straight leg, so a bend under it has its corner ≤ 15.7 − 13.4 = **2.3 cm above the finished floor**
+  (the written branch, z 0.01, fits). The clash: the tee's lower socket and the bay-1 bend's upper socket both need
+  13.4 cm from their corners, 21.1 cm with an M/F bend straight in the tee, but the written plan has 15 cm (tee 0.01,
+  bay-1 axis −0.14): **11.8 cm of overlap**. The tee cannot rise (the WC branch is held at ≤ 2.3 cm), so the
+  bay-1 run would have to sit at ≈ −0.20 (pipe bottom ≈ −0.25, the assumed slab bottom): option A does not fit
+  as drawn (Hypothesis on the screed 5 cm and slab bottom 0.25: unmeasured). The owner's alternative (Geberit bend
+  not used, the connector straight back at 23 cm, a tee at 20 cm at x −4.30 with the run left to a bend up the
+  riser at −4.42 and right to the WC, the trunk down into bay 1 slanted east) also clashes: 6.8 cm between the WC
+  bend and the tee, 12.3 cm between the tee and the riser bend (fittings need ≥ 24.3 cm between corners on a run);
+  its trunk through bay 1 fits (3.4 cm from lintel 2). Socket outer Ø drawn 112 mm (Hypothesis: not on the sheets).
+  Scratch drawing `facefit.py`. Not decided: how to rebuild option A.
+- **Geberit bend straight back (owner asked, 2026-10-15):** Proven (manual 972.363.00.0 p.11): the bend is two
+  pieces on a 45° joint; turning the lower one half a turn moves the outlet from down to straight back; no sideways
+  position is shown. Its depth figures (10–13 cm, or 11.5–14.5 cm with the clip in its second notch) run from the
+  bend's leg axis to the finished wall face: the 3 cm is the inlet's reach to the wall, and the bend itself has two
+  positions **1.5 cm apart** (the second toward the wall). Geberit's CAD shows the first (leg axis to inlet 11.9 cm). Turned a quarter, the outlet would
+  point about 45° to the side and still 30° down and 30° back (geometry; Hypothesis whether Geberit allows it).
+  Straight back, reflected from the CAD's down position: the outlet axis is level at **20.5 cm** above the finished
+  floor, its straight leg from 11.1 cm behind the frame face. A Nicoll CT88 turning west needs its socket on that leg:
+  corner ≥ 13.4 cm further back, body 5.6 cm beyond, so **10.1 cm into the 9 cm north wall** (the bend cannot move
+  toward the room; its second clip position is 1.5 cm toward the wall). Height would then be ample (a tee at ≈ 0.20 leaves 34 cm to the bay-1 bend, 21 needed);
+  only the depth fails: the frame face would have to come ≈ 10.6 cm forward (solver `wcfit/t4.py`: then no clash,
+  bay 1 ≈ 12 cm deep; its 7.6 cm case assumed a forward bend adjustment that does not exist). Scratch drawing `backfit.py`.
+- **Fitting study, upper WC drain (owner, 2026-10-15: "Dont assume the pipe layout on the headset is correct";
+  true are the lintels and the frame's distances to the north and west walls; fixed: Geberit bend, frame, vent in
+  boxing r220, stack down column r122).** Parts as above (Nicoll Ø100, Geberit CAD); Hypotheses: screed 5 cm, slab
+  bottom −0.25, socket outer Ø 112, slope 1 %. Proven arithmetic on those inputs:
+  - The WC bend under Geberit's leg has its corner between **0.006** (its sockets clear the raw slab where the branch
+    crosses lintel 2) and **0.023** (its top socket on Geberit's straight leg).
+  - **T1, the only arrangement that connects the vent:** WC CT88 west → pipe → BT188 tee at about (−4.42, 0.445) with
+    the vent straight up its short end → CT8 M/F spigot in the tee, turning south in bay 1 → pipe at 1 % → CT88 down
+    into the column at (−4.42, −0.30). With the tee as high as it can go (0.020) the bay bend's axis is −0.191, the
+    stack bend's −0.199, and the lowest fitting surface **−0.255: bay 1 must be ≈ 20.5 cm deep under the raw slab
+    top**, i.e. through the whole assumed slab. Also: the WC bend's top socket overlaps the frame's lower bar by
+    **4 mm**; the bend's second clip position (1.5 cm toward the wall) clears it (solver: no clash, 3.7 cm to the wall).
+  - Rejected, with the blocking number: T1 with two 45° in bay 1 (24.7 cm deep); a 45° descent west then a bend south
+    (11 cm deep, but no place for the vent junction: a 45° wye needs 27 cm of fall and leaves bay 1, a tee on the bay
+    run lands in the room); a flat bend south then a 45° descent (2.9 cm out of the half wall into the room, no vent
+    junction); Geberit straight back (10.1 cm into the north wall); a tee at 0.20 (the WC branch is held at ≤ 0.023).
+  - To measure before any work: the screed thickness, the slab depth in bay 1 and the lintels' depth.
+  - **Kept (owner, 2026-10-15: "save this model"): T1 with Geberit's bend in its rear clip position (+15 mm), no clash
+    (Proven: `node tools/wc-drain-fit.mjs`, which places the parts to scale, checks the frame, the lintels, the north
+    wall and the room, and reports the bay-1 depth; `svg=out.svg` draws the face and side views; `screed=`,
+    `slabBottom=`, `slope=`, `clipBack=` re-run it with measured values).** Nodes: WC bend corner (−4.10, 0.437, 0.0230),
+    tee (−4.42, 0.445, 0.0198), bay-1 bend −0.1912, stack bend (−4.42, −0.30, −0.1987), vent to 1.49. Plan draft
+    from the 287 752-char plan (the same five nodes moved, nothing added or removed; no conflict, no deleted
+    dimension). **Written to the headset 2026-10-15** (owner: "Write in the plan"): fresh read == 287 752, rebuilt edit
+    == the reviewed draft, written and read back identical, **287 757 chars**. Still open: bay 1's real depth (20.5 cm
+    needed with a 5 cm screed). A realistic face/side drawing (and a Chinese copy) went to the owner as files.
+  - **Layout S, the owner's slanted alternative, solved with real parts (2026-10-15; `node tools/wc-drain-fit.mjs
+    layout=S teeY=0.45`):** the bay-1 run slanted in plan from the column to a CT8 M/F turning up under the tee; the
+    BT188's branch down onto that spigot; its run level, east to the WC's CT8 M/F (spigot home in the tee), west to a
+    second CT8 M/F turning up the vent. Proven arithmetic on the same Hypotheses as T1:
+    - Spacing is set by the parts: WC corner → tee centre 18.6 cm (134 + Z 52), tee → vent corner 21.1 cm (77 + 134),
+      so the tee sits at x −4.286 and **the vent moves to x −4.497** (from −4.42). Same depth as T1: tee 0.021, trunk
+      bend −0.190, **bay 1 20.3 cm deep**: the tee's branch and the bend under it stack 21.1 cm, like T1's.
+    - With the tee's run on Geberit's leg line (y 0.437) the tee's branch and the bend's spigot hit **the frame's west
+      foot by 0.9 / 0.3 cm**. Turning the WC bend a few degrees in plan so the tee sits at y 0.448–0.452 clears both
+      (0.4 cm) and keeps the vent bend off the north wall (0.9 cm); at 0.455 the vent bend touches the wall. A
+      **≈ 4 mm window**.
+    - The vent at −4.497 crosses the **VMC Ø80 p39 as drawn** (2.6 cm): that duct would have to move west in r220.
+    - Hypothesis (not checked against DTU 60.11): the WC's flow enters the tee's run end and leaves by its branch, with
+      the vent leg straight ahead at the same level; a plumber may refuse a tee used that way (the flush would shoot
+      into the vent leg). T1's vent rises straight above its tee.
+    - Verdict: it fits on paper but gains no depth over T1 and is less forgiving; T1 stays.
+    - **Smaller column r122 (owner asked, 2026-10-15):** the stack can drop anywhere in bay 1 only (the lintels run
+      through the slab over the column too); its west limit is x −4.444 (the stack bend's socket touches lintel 1;
+      solver `stackX=-4.45` clashes by 0.6 cm). Drawn at **x −4.434** (1 cm clear): the slab pipe slants 11° to the
+      lintels (10° before), and the column's east face can come in from −4.20 to about −4.35 (2.8 cm past the socket,
+      Hypothesis on the cover needed): **50.5 → 35.5 cm wide**. The gain comes mostly from the column face; the
+      stack itself moves only 1.4 cm. Not written to the headset; the column's east edge is pinned to passage r56
+      (c773), so the passage would widen unless that dimension changes. The VMC Ø80 (x −4.615) and the conduit at
+      x −4.59 stay inside the narrower column.
+  - **To check for both layouts (found 2026-10-15 while dimensioning S):** Geberit's figures (11.5–14.5 cm from the
+    bend's leg to the finished wall face with the rear clip, 10–13 with the front one) put the finished face 0.8–3.8 cm
+    in front of the frame. The box face (half wall r210/r220 at y 0.28) is drawn 5 cm in front of the frame face:
+    leg → face 15.7 (rear clip) or 14.2 (front clip), both over the range. Hypothesis: the box face on the plan is not
+    measured; if it is right, the WC's connector may not reach. Proof: measure the box face, or the connector's length.
 
 **WC stack (written to the headset 2026-10-08, read back identical; owner: "the WC pipe needs to go alongside the VMC pipe")**, service
 `waste`, Ø100 (Hypothesis: usual French size for a WC): the upper WC's branch from the Duofix outlet
