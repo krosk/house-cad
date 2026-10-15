@@ -83,7 +83,7 @@ switch without moving the view (owner, 2026-10-14: the orbit starts from the ove
 offered in POV; ◈ Model puts that view back as it was when the plan camera did not move, and otherwise shows the model
 from exactly the plan camera in ORBIT: the model on the same free orbit, where a tap walks into POV, whose ▦ Overview
 returns to that orbit, and ▦ Overview in ORBIT frames the top-down overview), and AR hides it. The 💧 Pipes toggle also shows the pipes in the
-Model view (overview and POV) in neutral grey, without the legend (owner, 2026-10-14). A share link carries the network (opt-in `network`, `docs/share-view.md`); without one, the toggles hide. OVERVIEW is locked top-down: a
+Model view (overview and POV) in neutral grey, without the legend (owner, 2026-10-14). ▱ Floors (owner, 2026-10-15) turns the floor slabs faint and hides their finishes, to see the pipes under them; POV still stands on them. A share link carries the network (opt-in `network`, `docs/share-view.md`); without one, the toggles hide. OVERVIEW is locked top-down: a
 drag pans on the plan plane, two fingers (or the wheel) zoom about the gesture point, and it always keeps
 the plan's orientation (owner, 2026-10-12: no 90° turn on a portrait screen); tapping a room animates the camera
 to a 1.65 m POV. In POV, dragging looks around (opt-in phone tilt look on touch devices), tapping a

@@ -213,6 +213,14 @@ view3dHalfWalls.addEventListener('click', () => {
   view3dHalfWalls.setAttribute('aria-pressed', String(on));
   view3dHalfWalls.textContent = on ? '🧱 Half walls + boxing: see-through' : '🧱 Half walls + boxing';
 });
+// Floors see-through (owner, 2026-10-15): to see the pipes under a floor. View-only, session-only.
+const view3dFloors = document.getElementById('view3d-floors');
+view3dFloors.addEventListener('click', () => {
+  const on = !view.floorsSeeThrough;
+  view.setFloorsSeeThrough(on);
+  view3dFloors.setAttribute('aria-pressed', String(on));
+  view3dFloors.textContent = on ? '▱ Floors: see-through' : '▱ Floors';
+});
 function showTiltState(on) {
   view3dTilt.setAttribute('aria-pressed', String(on));
   view3dTilt.textContent = on ? '◉ Tilt look' : '◎ Tilt look';
@@ -277,6 +285,7 @@ view.onNavigationChange = (mode) => {
   view3dNav.hidden = false;
   view3dRuler.hidden = pov || plan || orbit;
   view3dHalfWalls.hidden = plan;
+  view3dFloors.hidden = plan;
   // Plan shows no model: its lighting, reflections, Realistic and window options hide (owner, 2026-10-14).
   document.getElementById('view3d-floor-ctl').classList.toggle('plan-mode', plan);
   view3dOverview.hidden = !(pov || orbit);

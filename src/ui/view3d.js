@@ -198,6 +198,12 @@ export class View3D {
       transparent: true, opacity: 0.18, depthWrite: false,
     });
     this.halfWallsSeeThrough = false;
+    // Floors see-through (owner, 2026-10-15: to see the pipes under them): the slab faint, its finishes hidden.
+    this.floorGlassMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe8dcc8, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.18, depthWrite: false,
+    });
+    this.floorsSeeThrough = false;
     this.doorMaterial = new THREE.MeshStandardMaterial({
       color: 0xa9794f,
       roughness: 0.7,
@@ -340,6 +346,15 @@ export class View3D {
     }
   }
 
+  // Floors see-through: the floor slabs turn faint and their finishes hide; POV still stands on them. View-only.
+  setFloorsSeeThrough(on) {
+    this.floorsSeeThrough = !!on;
+    for (const mesh of this.house.children) {
+      if (mesh.userData.floorSlab) mesh.material = this.floorsSeeThrough ? this.floorGlassMaterial : this.floorMaterial;
+      if (mesh.userData.floorFinish) mesh.visible = this._meshVisible(mesh);
+    }
+  }
+
   // The renderer is shared with WebXR, but the desktop plan does not need its
   // parked 3D canvas to consume GPU continuously. Visible 3D and AR run it;
   // plan view stops it completely until either one is requested again.
@@ -393,8 +408,11 @@ export class View3D {
         ];
       for (const [partGeometry, material, role, halfWall, stairwell] of parts) {
         if (!partGeometry) continue;
-        const mesh = new THREE.Mesh(partGeometry, halfWall && this.halfWallsSeeThrough ? this.halfWallGlassMaterial : material);
+        const glass = halfWall && this.halfWallsSeeThrough ? this.halfWallGlassMaterial
+          : role === 'floor' && this.floorsSeeThrough ? this.floorGlassMaterial : material;
+        const mesh = new THREE.Mesh(partGeometry, glass);
         if (halfWall) mesh.userData.halfWall = true;
+        if (role === 'floor') mesh.userData.floorSlab = true;
         if (stairwell) mesh.userData.stairwell = true;
         mesh.castShadow = role !== 'floor' && role !== 'windows'; // glass lets the sun through
         if (halfWall && this.halfWallsSeeThrough) mesh.castShadow = false;
@@ -441,6 +459,7 @@ export class View3D {
         mesh.userData.floorName = name || '';
         mesh.userData.architecturalRole = finish.role;
         if (finish.halfWall) mesh.userData.halfWallFinish = true;
+        if (finish.role === 'floor') mesh.userData.floorFinish = true;
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
@@ -1168,6 +1187,7 @@ export class View3D {
     const role = mesh.userData.architecturalRole;
     if (role === 'outlines' && (this.lightingEnabled || this.realisticEnabled)) return false;
     if (mesh.userData.halfWallFinish && this.halfWallsSeeThrough) return false;
+    if (mesh.userData.floorFinish && this.floorsSeeThrough) return false;
     // A floor's stairwell under its flights going down: the floor below draws it otherwise.
     if (mesh.userData.stairwell && this.floorFilter == null) return false;
     return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');
