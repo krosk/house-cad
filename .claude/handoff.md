@@ -41,8 +41,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   a scratch/desktop browser, and nothing from items 47–84 has been seen on the Quest. Item 83's controls, ceiling
   see-through and insulation jackets were seen only in headless Chrome screenshots (the demo house and a made-up test
   house); the View 3D fittings (`6da6a2b`) and anything on the owner's own plan were never seen in a browser.
-- **Not written (drafts in the scratchpad, session-local):** option 4d (`draft-4d.json`, rebuild with `opt4d-rebuild.sh`;
-  the owner is adjusting it), option 1e (`draft-col5.json`, rebuild with
+- **Not written (drafts in the scratchpad, session-local):** option 4i (`draft-4i-final.json`, the current layout:
+  chain `opt4f.mjs` (NOBOX=1, GEO with YB0 −1.96, XU 0.46) → `move4h.mjs` (KS=1, CX −0.495) → `up100.mjs` → `final4i.mjs`,
+  each on the previous output, from the 288 795 read; it already holds the BDH vents, so `draft-bdh.json` is folded in), option 4d (superseded by 4i), option 1e (`draft-col5.json`, rebuild with
   `colStack5.mjs` on the 288 795 read: the laundry's two short 90° turns become one long 45° diagonal each; the
   owner's last instruction before the VMC sizing questions), and a bed draft (`draft-bed.json`, STOCKHOLM r262 in
   bedroom r51 for a legroom check), and the BDH vent swap (`draft-bdh.json` via `editBdh.mjs` on the 288 795 read:
@@ -202,7 +203,17 @@ plan.
   rerouted (new cn352): **written (288 795)**. `docs/plumbing-workflow.md` "The bedroom box replaced by a corner column".
   Option 2 (no box at all, through the bedroom floor's lintel gap) set aside until the gap is measured.
 - **86** VMC laundry layout and duct/vent sizing (owner questions, 10-16; nothing written):
-  - **Option 4d drafted, the owner adjusting it (supersedes 1e as the next write):** both ducts cross the kitchen–bedroom
+  - **Option 4i drafted, final form sent (10-17; supersedes 4d as the next write):** 4d with the shower vent moved onto the
+    duct line (11 cm from the wall, the owner's deliberate deviation from Aldes' 20 cm), the shower Ø80 slanting 45°
+    through the 41.5 wall's top from the attic (no kitchen box), unit B moved to the laundry's north-east part and turned
+    (outlet straight south, 1.87 m Ø160 flexible), the upper duct Ø100 in the basement (sealed Ø80 above). The owner plans
+    flexible kitchen and shower ducts. Pressure: the CSTB check (CPT 3828_V1) with the façade's 20 Pa fails for the
+    Compact Classic in every layout; the Compact Premium HP+ passes in rigid PVC, misses one point by ≤ 2 Pa with
+    flexibles. Unit choice open (Classic kept / MW from Leroy Merlin / HP+ from a marketplace seller). Open before W: the
+    wall top at slab height where the slant passes (a ring beam?), the attic lintels at y −1.96, the outlet terminal, the
+    chosen unit's datasheet. Full record: `docs/plumbing-workflow.md` "Option 4i" … "Option 4d", "Vent pressures against
+    the BDH range".
+  - ~~**Option 4d drafted, the owner adjusting it (supersedes 1e as the next write):**~~ (superseded by 4e–4i, same day) both ducts cross the kitchen–bedroom
     wall near the bedroom's north-east corner, every attic run east–west (the lintels run east–west); shower-room Ø80
     10.33 m, kitchen Ø125 7.86 m on the 41.5 wall's kitchen face, a 17 × 58 cm column with an S in each duct; fitting,
     clash and solver checks clean. Full record: `docs/plumbing-workflow.md` "Option 4d". Scratch: `opt4d.mjs`,
@@ -519,9 +530,9 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
-0. **Finish item 86 on option 4d:** take the owner's adjustments to 4d (`opt4d-rebuild.sh`, then the fitting, clash and
-   solver checks and `views4d.mjs`), add the vents' furniture (the kitchen vent as a wall model), the Ø80 loss and a
-   share link, then W. Older wording kept for its steps: get the owner's choices (kitchen Ø125/Ø100, ground shower Ø80/Ø100, the bathroom vent model),
+0. **Item 86 on option 4i:** the owner's unit choice and the open checks (wall top, lintels, terminal), then W of
+   `draft-4i-final.json` with the bed draft chained (recompute ids), fresh read == 288 795. ~~Finish item 86 on option 4d~~
+   (done through 4e–4i; the vents' furniture, losses and share link are in 4i). Older wording kept for its steps: get the owner's choices (kitchen Ø125/Ø100, ground shower Ø80/Ø100, the bathroom vent model),
    redraft on 1e (`colStack5.mjs` + a sizing edit: pipe `diameter` and the reducers' nodes; the column/box follow the
    largest socket), check (`fitTest.mjs`, `solveChk.mjs`, `clashAbs.mjs`, `house-query diff`), drawing, then W
    (fresh read == 288 795). The BDH vent swap (`draft-bdh.json`) can go in the same write, after the push that

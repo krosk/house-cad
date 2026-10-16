@@ -128,8 +128,10 @@ side and height. Window opening against the units: docs/materials.md "Window swi
   ≈ 5.3 m of pipe instead of ≈ 9.6 m.
 - **Unit B turned 90° clockwise** (`facing` 270: OUT Ø160 and the laundry Ø80 west, kitchen Ø125 + bath Ø80 east, the
   side Ø80s north, the lug south), centre (−4.25, −4.475). Spigot ends Proven with the builder at facing 270.
-  OUT runs **straight west through the west wall** (y −4.56). The owner chose the west wall (outside assumed above
-  ground at 1.95 m: to check) and asked for it as far south as possible: the limit is the kitchen duct, which needs
+  OUT runs **straight west through the west wall** (y −4.56). The owner chose the west wall (outside above ground at
+  1.95 m: Proven 2026-10-17 from the headset plan, the Garden level at −0.90, i.e. 1.37 m on the basement's scale, so the
+  Ø160's axis is 0.58 m and its underside ≈ 0.50 m above the garden; window r146's sill 1.32 is 5 cm under it, its
+  light well r235 going down to 0.90) and asked for it as far south as possible: the limit is the kitchen duct, which needs
   ≈ 18 cm between its chute's bottom elbow and its turn west (Ø125 elbows, Hypothesis).
 - **Kitchen and bath ducts flat at spigot height (1.955 m)**, straight west into B's east face (kitchen lane y −4.575,
   bath y −4.38): the chutes drop 31.5 cm (the nicks are unchanged: they depend on the slab and the duct size only).
@@ -427,7 +429,7 @@ the ceiling. The laundry vent as drawn is 16 cm from the north wall.
 dropped. Proven (notice 3963727, Classic product sheet and p. 11 wiring): the Classic is single speed (L/N only);
 its one published point is **122 Pa at 144 m³/h** (0.040 m³/s), 28 W at 221 m³/h max. The notice gives no duct
 length or bend limit (searched). B's flow with both vents at boost is ≤ ≈ 90 m³/h, below that point; a single-speed
-fan usually gives more pressure at less flow, so ≥ 122 Pa is assumed at B (Hypothesis: Aldes publishes no curve).
+fan usually gives more pressure at less flow, so ≥ 122 Pa is assumed at B (Hypothesis: Aldes publishes no curve; ~~wrong~~, 2026-10-16: the approval 14.5/25-2320_V2 publishes it, see "Vent pressures against the BDH range").
 Budget to the upper vent at boost (Hypothesis, Colebrook, Ø77 bore, recomputed 2026-10-10: 2.68 m/s, 1.6 Pa/m,
 8.97 m ≈ 14.4 Pa + 4½ pairs ≈ 5.8 Pa, ≈ 20–23 Pa with the pair behind the vent; Ø160 OUT 2.1 m + wall terminal
 ≈ 1–3 Pa; room depression 10–20 Pa): the vent sees **≈ 76–91 Pa** (≈ 105 Pa at 30 m³/h, ≈ 115 at 15). The low
@@ -757,6 +759,104 @@ the alcove drops, column r256) and the r254 size above.
   wall is an insulated Ø160 flexible, straight and taut, onto a Ø160 wall terminal; never Ø125 (Aldes: not smaller
   than the unit's outlet; Hypothesis: Ø125 would cost ≈ 4–15 Pa more, the exit's dynamic pressure, at every vent).
 
+**4i with the kitchen and shower ducts in flexible (2026-10-17, owner asked; Hypothesis).** Flexible loses ≈ 2× smooth
+PVC per metre (Baillindustrie chart for Ø125/Ø160, extrapolated to Ø80; CPT §3.3.6.4 asks NF DTU 68.3 annex A values,
+not read) and its bends were taken at K 0.6–1.2 (90°) / 0.3–0.6 (45°): kitchen 3.89 m ≈ 21–33 Pa at 135 m³/h (rigid
+16.8–21.0), shower 6.49 m ≈ 16.5–23 Pa at 35 (rigid 12.3–14.6); the upper (Ø80 sealed + Ø100) 16.1–18.8. CPT, 12 %
+leakage, façade + 20: **HP+** fails only the shower room at its own minimum-demand point (78–89 Pa, rigid 89–94);
+**MP** fails the minimum-demand points (63–74) and the shower at the max point; **MW** fails the max point (13–66) and
+the bathrooms at the intermediate (58–75); **Classic** is off its curve at the max point and 42–79 elsewhere.
+
+**Where to buy a Compact Premium (2026-10-17, read on leroymerlin.fr):** Proven: Leroy Merlin's "Kit VMC simple flux
+hygroréglable ALDES Easyhome Hygro Compact Premium" (LM 82201372) is Aldes **11033451**, which Aldes' distributors (Cedeo,
+Sonepar, ManoMano) name "Kit EasyHOME HYGRO COMPACT Premium **MW** BDH" (group + C51 PUSH + B51 + W16 PRES), 309 € from a
+marketplace seller; its spec table: 263 m³/h, 9.8 W-Th-C. The Compact Premium **HP+** group alone is Aldes **11033025**,
+listed on leroymerlin.fr at 370 € (marketplace "Pro market", 7 other offers); 11033020/11033021/11033421 are the
+non-compact EasyHOME Hygro Premium HP+ (5 Ø80 + 1 Ø125, a larger box), not the Compact. Hypothesis: LM 88761043 "KIT VMC
+EASYHOME HYGRO COMPACT PREMIUM" (295 €, sold by the marketplace "Pro market"; 365 m³/h, 9.9 W-Th-C) names no motor.
+**Sold by Leroy Merlin itself** (the site's "Vendu par Leroy Merlin" filter, 11 hygro kits, 2026-10-17): of Aldes, the
+Compact Classic kit 11033404 (259.90 €, the owner's), the Compact Premium MW BDH kit 11033451 (Leroy Merlin is one of
+its "autres offres", ≥ 329.90 €; the main offer is a marketplace seller) and an "Easyhome®" kit 87769196 (259 €) that is
+an EasyHOME HYGRO COMBLE + 3 BDH (20.5 W-Th-C, 213 m³/h; an attic unit, not a Compact). No HP+ is sold by Leroy Merlin
+itself; only marketplace sellers list the Compact Premium HP+ 11033025.
+
+**Option 4i: 4h with the upper duct Ø100 in the basement (owner, 2026-10-17: "Let's assume it is sealed up to basement
+... Switch to 100 and keep unit close to east side?"; drafted in Node, not written).** The upper bathroom duct stays Ø80
+down to the basement ceiling (pn58); from there its two basement runs (p287 south along the west wall 2.80 m, p288 east
+3.74 m) are Ø100, with an 87°30′ Ø100 + reducer where the Ø80 comes down and a reducer Ø100→Ø80 on a 15 cm Ø80 stub
+(new pn363, p333) before unit B's west port. Scratch `up100.mjs`, `lossMixed.mjs`, `views4i.mjs`. Proven (Node): the
+fitting check flags only the old items (the elbow with reducer is an estimate in `pipeFittings.js`, no datasheet); no
+clash for the new pipes; no conflicts, nothing removed. Hypothesis (bores 77 / 96 mm): upper 16.1–18.8 Pa at 35 m³/h
+(all-Ø80 4h 21.0–23.5). CPT with the HP+ (12 % leakage, façade + 20, terminal K 1–3): every point passes, lowest 84–89
+(the upper at its minimum-demand point), then the shower room 89–94; with 5 % leakage the same. The Classic still fails.
+Final form (2026-10-17, scratch `final4i.mjs` → `draft-4i-final.json`, drawings `views4i.mjs`, `side4i.mjs`, a share link
+sent to the owner as a file): the vents get their BDH models, the shower r251 `aldes-bdh-sanitaire-ceiling` at (2.45,
+−1.96), the kitchen r257 `aldes-bdh-cuisine` on the 41.5 wall's kitchen face (centre y −2.13, z 2.45, facing 90 like
+the Metod wall cabinets there), the upper r223 `aldes-bdh-sanitaire`; no dimension on them; Proven (Node): solver clean,
+nothing removed; the share link round-trips all 238 pipes, 267 pipe nodes and 186 markers. The drawings show the
+Nicoll rigid fittings even where the owner plans flexible ducts (kitchen, shower room).
+
+**The upper bathroom duct stays Ø80 (owner, 2026-10-17: "the upper floor duct is already sealed").** Hypothesis: the
+sealed part is the upper floor's run and the riser to the basement ceiling (pn45 → pn58, ≈ 6.7 m); the basement ceiling
+runs (p287, p288, 6.7 m in 4h) are not built yet. CPT check with the HP+, Ø80 everywhere: 4h fails only the upper
+bathroom's minimum-demand point (78–83 Pa); 4h with the basement part in Ø100 (≈ 4.5 Pa less, two reducers) passes,
+lowest 84–89; the unit where it is (4f, OUT 0.35 m west) passes in Ø80, lowest 83–89 (upper) and 86–91 (shower room).
+The Classic fails in every layout.
+
+**Option 4h: 4g with unit B 26.5 cm further east (owner, 2026-10-17: "Sure"; drafted in Node, not written).** Unit B at
+(−0.675…−0.315, −3.18…−2.82), 16.5 cm from the laundry's east wall (Aldes: 10 cm at the lug). Its kitchen port sits
+right under the slab exit (x −0.395), so the kitchen Ø125 turns from its 45° slab slant straight south with one elbow (a
+90° turn, read as 87°30′ within the 3° tolerance) instead of a 45° and an 87°30′. Scratch `move4h.mjs` (KS=1, CX −0.495).
+Proven (Node): fitting check only the old items; the only clash cable cs135; no conflicts, nothing removed. Lengths:
+shower 6.49 m, kitchen 3.89 m (2 × 87°30′ + 3 × 45°), upper bathroom 13.20 m. Hypothesis (the duct model): kitchen
+16.8–21.0 Pa at 135 (4g 18.2–22.9), shower 12.3–14.6 at 35, upper 21.0–23.5 at 35 (Ø100 ≈ 8.3–9.9). CPT with the HP+:
+every point passes except the upper bathroom's minimum-demand point in Ø80 (78–83); with the upper in Ø100 all pass,
+lowest 89–94 (shower room).
+
+**Option 4g: 4f with unit B moved (owner, 2026-10-17: "Is it possible to move the Vmc unit now? And count the pressure
+loss"; drafted in Node, not written).** Unit B r219 to (−0.94…−0.58, −3.18…−2.82), hung as before (1.858–2.045), turned a
+quarter (facing 270 → 0): OUT Ø160 and the laundry Ø80 face south, the kitchen Ø125 and the shower Ø80 north, the upper
+Ø80 west, the lug east (Hypothesis: the port ends are the facing-270 ones, Proven with the builder, turned 90° in plan;
+not re-measured on the builder). The ground ducts leave the slab heading west at 1.955 and turn south (87°30′) straight
+into the north ports: no diagonals across the laundry. The upper duct comes down the west wall to y −3.097 and runs
+straight east 3.6 m into the west port, 7.7 cm south of door r120's sweep. OUT: 1.87 m Ø160 flexible straight south
+through the south wall at x −0.675, 1.2 m east of window r146 (the wall's outside face assumed at −5.10). Laundry vent:
+a stub off the south port. Scratch `move4g.mjs` (no new ids; pn307, pn329, pn357, pn364 and their pipes removed),
+`views4g.mjs`. Proven (Node): fitting check only the old items; the only clash cable cs135 as before; no conflicts,
+nothing removed. Lengths: shower 6.76 m (2 × 87°30′ + 6 × 45°), kitchen 4.16 m (2 × 87°30′ + 4 × 45°), upper bathroom
+12.93 m (4 × 87°30′ + 2 × 45°; was 10.15). Hypothesis (the duct model above): at 35 m³/h shower 12.6–14.8 Pa, upper
+20.7–23.2 Pa (Ø100: ≈ 8–10); kitchen at 135 18.2–22.9 Pa. CPT check (12 % leakage, façade + 20, a terminal of K 1–3):
+with the Compact Premium HP+ every vent passes except the upper bathroom's minimum-demand point (78–84 Pa in Ø80); with
+the upper duct in Ø100 every point passes, lowest 89–94 Pa (shower room). MP still fails the minimum-demand points
+(weak at low flow); the Classic and MW fail as before.
+
+**Option 4f (owner, 2026-10-17: "drill slanted west downward 45 from the attic directly to the bedroom wall"; drafted
+in Node, not written).** Option 4e (vent at (2.45, −1.96)), but the Ø80 leaves its attic run (2.84) with one 45° at
+x 0.46 and slants 45° down-west in a straight line through the 41.5 wall: a ≈ 59 cm hole entering the kitchen face at
+2.74–2.85 (axis 2.795, above the kitchen ceiling) and leaving the bedroom face at 2.32–2.44 (axis 2.38); one 45° at
+(−0.08, −1.96, 2.30) in the column turns it straight down. **No kitchen box**, and the column-top 87°30′ is gone.
+Proven (Node, scratch `opt4f.mjs`, `views4f.mjs`, `side4f.mjs`): fitting check flags only the old items; the only clash
+is the Ø125 drop 0.8 cm from buried cable cs135; no conflicts, nothing removed. Shower room 10.10 m, 1 × 87°30′ (at the
+vent) + 8 × 45°. Hypothesis: ≈ 15.4–17.5 Pa at 35 m³/h, ≈ 2 Pa less than 4e. **Open (Hypothesis):** the hole's kitchen
+end crosses the wall top at slab height (2.70–2.95, where the upper floor bears and a ring beam may run); the wall's
+material; the attic run at 2.84 among the kitchen ceiling's joists.
+
+**Option 4e (owner, 2026-10-17: "the bathroom duct straight east west with no elbow", then "I prefer to violate the
+20 cm rule, make it straight"; drafted in Node, not written).** Option 4d below, but the shower room's vent and its
+riser move 11 cm south, to (2.45, −1.96), onto the duct's line: the Ø80 runs straight west at y −1.96 from the vent's
+87°30′ at 2.84 through the attic, the 45° drop to 2.62 and the wall into the column; the 45° pair that stepped it south
+is gone. **Deliberate deviation:** Aldes (BW51 product sheet) asks "au moins 20 cm entre le centre de la bouche et les
+parois adjacentes"; the vent's centre is 11 cm from the shower room's south wall (−2.07), a BDH's edge 2.5 cm from it.
+(A rolled drop keeping the vent at 22 cm was drafted first and set aside by the owner.) Proven (Node, scratch
+`opt4e.mjs`, `views4e.mjs`): the fitting check flags only the old items; the only clash is the Ø125 drop 0.8 cm from
+buried cable cs135, as in 4d; no conflicts, nothing removed. Shower room 10.28 m, 2 × 87°30′ + 8 × 45° (was 10.33 m,
+10 × 45°). Hypothesis: ≈ 17–20 Pa at 35 m³/h, ≈ 1 Pa less than 4d; the attic has room for the Ø80 at y −1.96 between
+the lintels (unchecked). Then (owner: "The ceiling box can be shorter and the piece in the attic longer"): the drop
+moves 28 cm west (upper 45° at x 0.72, lower at 0.50, whose west socket ends 1.15 cm from the wall's kitchen face at
+0.415; Nicoll 45° Ø80 Z 26.5 + socket 47), so the box shrinks to x 0.415–0.66 and, its north part unused, y −2.0275 to
+−1.8925: **24.5 × 13.5 cm** (was 52.5 × 24.5), underside 2.50. The duct passes the ceiling (2.70) at x ≈ 0.52–0.64,
+inside the box. Checks as above, unchanged; 6.82 m of the shower duct to insulate (the attic piece is longer).
+
 **Option 4d: through the wall near the bedroom's north-east corner (owner, 2026-10-16; drafted, not written).** The
 owner's reason: "there are east west lintels, so I have a hard time doing a north south pipe from the bathroom". The
 written route (1c) runs the shower-room duct north–south in the attic over the shower room and r106, across those
@@ -803,6 +903,59 @@ so their kitchen pressure budgets hold; the bathrooms' 45 m³/h becomes 35. Prov
 - **The approval is 14.5/25-2320_V2 "BDH solution individuelle"** (valid 2025-07-01 to 2032-06-30; Aldes'
   `avis-technique-bdh-solution-individuelle-atec14.5-25-2320_v2.pdf`, read 2026-10-16). It covers the EasyHOME HYGRO
   COMPACT Classic. Every vent works at 80–160 Pa; a kitchen vent's peak holds from 70 Pa.
+- **Vent pressures against the BDH range (2026-10-16/17, owner asked).** Proven (AT 14.5/25-2320_V2 §2.2.2.2.1,
+  §2.2.2.2.5 Tableau 12, §2.3.3, Annexe D Fig. 58 p. 56; **CPT "VMC Hygro / habitat individuel", cahier CSTB
+  3828_V1** of July 2024, §2.2.3, §2.4.2, §3.3, free from ccfat.fr, family 697):
+  - B, B51 and BW51 work at **80–160 Pa**, the BW's boost from 80 Pa, the C's boost from 70 Pa. The design must
+    keep every vent in that range at three kinds of check point, each with a fixed allowance for **the window inlets
+    and the door undercuts: 20 Pa at the maximum flow, 10 Pa at the intermediate flow, 5 Pa at each minimum-demand
+    point**, plus **20 Pa for a façade discharge** (ours: the Ø160 terminal in the west wall; a roof discharge escapes
+    it only if it meets NF DTU 68.3 §6.5.2) and the real loss of the discharge (never a flat value).
+  - Design flows (Tableau 12): C51 27 / 135 m³/h (60 % RH: 52), BW51 5 / 30, B51 5 / 20. Network leakage is added at
+    each vent: 12 % of max(Qmax, 35), or 5 % with class C sealed ducts and fittings fitted per NF DTU 68.3 annex C.
+  - The house (kitchen, 2 SdB/WC, laundry as a salle d'eau) has a maximum flow (CPT Tableau 5) of
+    135 + 30 + 30 + 5 = 200 m³/h, **228.8 with 12 % leakage, 212 with 5 %**. The Compact Classic's published curve
+    stops at **197 m³/h** (112 Pa), where it meets the CPT's minimum curve (Pmin + 20 + 24 (Q/300)^1.9, §2.4.2).
+    So **on paper the Compact Classic cannot serve this house's maximum check point, whatever the ducts**.
+  - The curve (read by eye, ±2 Pa): 128 Pa at 5 m³/h, 120 at 30, 119 at 40, 121 at 55, 124 at 75, 126 at 100,
+    125 at 125, 123 at 140, 121 at 155, 117 at 175, 112 at 197.
+  - Other points, option 4d ducts (Hypothesis: duct losses from the model of draft 1d, scratch `loss4d.mjs`, scaled
+    to each branch flow; discharge 1–2 Pa, an underestimate, see below; scratch `cpt4d.mjs`), façade / without the façade 20 Pa:
+
+    | Point (12 % leakage) | B | Kitchen | Shower room | Upper bathroom | Laundry |
+    |---|---|---|---|---|---|
+    | Intermediate, 186 m³/h | 115 | 75–77 / 95–97 | **56–61** / 76–81 | **59–63** / 79–83 | 82–83 / 102–103 |
+    | Minimum demand, shower room at max, 101 m³/h | 126 | 96–97 | **73–78** / 93–98 | 97–99 | 98–99 |
+    | Minimum demand, upper bathroom at max | 126 | 96–97 | 97–98 | **75–79** / 95–99 | 98–99 |
+
+    With 5 % leakage the intermediate point gives the bathrooms 63–69 (83–89 without the façade 20 Pa). Every vent
+    passes without the façade 20 Pa except the intermediate point's low end at 12 %; with it, the bathrooms fail.
+  - **The discharge (2026-10-17, owner asked):** the CPT (§3.3.6.2) wants its real loss: the duct's friction plus the
+    terminal's loss from its maker, at the whole flow through B. Hypothesis: the 35 cm taut Ø160 flexible ≈ 0.3–0.5 Pa
+    at 186 m³/h (2.6 m/s); the terminal K × 4.0 Pa at 186 (1.2 Pa at 101), ≈ 4–12 Pa for K 1–3 above the free exit
+    the fan test already includes (K unknown until a terminal is chosen). The 1–2 Pa used above is too low at the
+    intermediate point by ≈ 3–10 Pa; choose a terminal with a published flow/pressure curve.
+  - **Ø160 insulated flexible, from a maker's chart (2026-10-17, owner asked):** Proven (Baillindustrie GAI/LV insulated
+    flexible, catalogue p. 152 "Pertes de charge des gaines isolées", read on the log chart ±10 %): the Ø160 line gives
+    1 Pa/m at ≈ 167 m³/h, rising as Q^2.0: 0.36 Pa/m at 101, 0.8 at 150, 1.24 at 186, 1.9 at 229 m³/h, about twice a
+    smooth rigid Ø160. Hypothesis: a straight taut run of ≈ 2.2 m (unit near the laundry's north-east corner, out
+    through the south wall) costs ≈ 0.8 Pa at the minimum-demand points, ≈ 2.7 at the intermediate, ≈ 4.2 at the
+    maximum; ≈ 1.4 Pa more than rigid PVC at the intermediate point. A sag or a bend in it adds more (the chart is
+    for a straight duct). The Aldes Algaine isolée (PVC inner wall) is assumed to be close; Aldes publishes no chart.
+  - **The Compact Premium units (2026-10-17, owner considering one):** Proven (Annexe D Fig. 59, 60, 62, read by eye
+    ±2 Pa): Premium MW 125 Pa at 12 m³/h, ≈ 134 at 70–100, 138 at 145, 126 at 200, 115 at its 231 maximum; Premium
+    MP 110 at 5, 107 at 25, 121 at 100, 138 at 150, 160 at 210, 163 at 230, 124 at its 301 maximum; Premium HP+ 122
+    at 5–40, 133 at 90, 149 at 140, 165 at 190, 175 at 240, 160 at its 340 maximum (the Classic: 112 at 197). Every
+    Compact has 4 Ø80 sanitary ports (MP 5 and HP+ 6 with the supplied doubles) and the 160 outlet. Check (Hypothesis:
+    the 4d ducts, façade + 20, the Ø160 flexible 2.2 m + a terminal of K 1–3; scratch `cptUnits.mjs`), worst vent at
+    each point with 12 % leakage: **Classic** fails the max point (off its curve) and the bathrooms at the others;
+    **MW** fails the max point (22–45 Pa) and the intermediate (60–73); **MP** passes the max and intermediate but
+    fails the minimum-demand points (66–73: weak at low flow, 121 Pa at 101 m³/h); **HP+ passes every point**,
+    lowest 80–88 Pa (shower room at its minimum-demand point, 0–8 Pa of margin), highest 127 (≤ 160). The power
+    curves (by eye) also favour the Premiums at everyday flows: ≈ 11–12 W at 100 m³/h against ≈ 21 W for the Classic.
+  - Below 80 Pa a vent acts as an orifice (flow ∝ √Δp, Hypothesis): 65 Pa gives ≈ 31.5 instead of 35 m³/h.
+  - Levers: a stronger unit (the owner kept the Classic, 2026-10-10), a roof discharge meeting the DTU, class C
+    sealed ducts, Ø100 for the two bathroom ducts (≈ 1/3 of the Ø80 loss), fewer bends.
 - **The house is an F4** (owner, 2026-10-16: 3 bedrooms and 1 living room). Hygro B, F4 with 1 SdB/WC (Tableau 17),
   with the second bathroom as an added SdB/WC and the laundry as an added salle d'eau:
 
