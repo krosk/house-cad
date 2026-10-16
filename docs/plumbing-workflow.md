@@ -361,7 +361,7 @@ Applied to the drafted routes (lengths Proven from the plan; bends at the vents 
   riser's basement part need R ≥ 0.6; A's roof outlet too where it crosses the roof build-up;
 - A's roof outlet: Ø160 roof terminal (Aldes) or Sauter's Ø125 cap: ask the installer.
 
-**Pressure budget for the hygro vents (2026-10-09, owner questions).** Proven (Aldes BW21 Bahia Curve S
+**Pressure budget for the hygro vents (2026-10-09, owner questions; the vents are BDH since 2026-10-16, see "The vents: Aldes BDH").** Proven (Aldes BW21 Bahia Curve S
 sheet, 11015144): the hygro vents hold their flow between **80 and 160 Pa** across the vent; the vent
 must be ≥ 1.80 m up, high on a wall or on the ceiling, its centre **≥ 20 cm from adjacent walls**,
 removable (in a sleeve) and cleaned yearly; the hygro strip needs no power, the 9 V battery (or the
@@ -528,7 +528,7 @@ It replaces the pocket in the wall top and the bore through the basement wall. *
 (Proven geometry, 5 mm clearance included):** kitchen Ø125 at x −0.85: **6.6 cm** into the laundry face × 6.6 cm down from
 the slab, 13.5 cm wide; bath Ø100 at x −0.65: **3.6 × 3.6 cm**, 11 cm wide; ≈ 9 cm of wall between them. Each needs an oval
 hole through the slab next to its bearing on the wall (Hypothesis, structural: the builder's call).
-**Kitchen vent (owner, 2026-10-14):** the kit's C21 (`aldes-bahia-curve-l-ceiling`, `docs/furniture.md`), face down on
+**Kitchen vent (owner, 2026-10-14; a BDH C51 since 2026-10-16, see "The vents: Aldes BDH"):** the kit's C21 (`aldes-bahia-curve-l-ceiling`, `docs/furniture.md`), face down on
 the south box's underside at (0.98, −4.80), its 230 mm along y; centre 56.5 / 35 / 22.5 / 20.5 cm from the west wall, the
 south wall, the box's edge and its step (Aldes: ≥ 20). The Ø125 climbs to 2.60 and jogs 14 cm north to its run (y −4.66).
 Kitchen duct (drafted with the 45° chutes): 9.5 m, ≈ 25.9 Pa at 135 m³/h (Hypothesis, same model), so ≈ 76–86 Pa at the
@@ -713,6 +713,134 @@ vent's (ceiling → attic, 14 cm rise, no room) and pn304 (west → down into th
 `bath45.mjs`, the fitting check and a clash check on the draft): no new fitting flag, nothing within 2 cm of
 another pipe, conduit or zone; the bath duct 13.60 m. Hypothesis (the same loss model): ≈ 12–13.5 Pa at the boost
 instead of ≈ 13–15, the vent ≈ 86–99 Pa.
+
+**The kitchen corner box narrowed (owner, 2026-10-16: "There is opportunity to make ceiling box smaller no?", then
+"Fine", W; written 287 813 chars, read back identical).** Measured under the ceiling (scratch `boxFill2.mjs`: the
+surface of every duct and fitting socket at z ≤ 2.70): the two 45° descents from the attic reach x 0.691, so r254's
+east face moved 0.818 → 0.715 (40.3 → 30 cm west–east; 41.75 south–north, underside 2.50 unchanged; it carries no
+dimension). The bedroom box r255 cannot narrow (its north face is 1.5 cm from a Ø125 socket). Both could rise ≈ 3 cm
+(the lowest socket is at 2.55) but stay at 2.50, in line with the alcove head r259 (owner). Accepted trade-off: the
+wall cabinet r162 below (0.423–0.818, top 2.48) now runs 10 cm past the box's east face. Proven (house-query diff:
+no conflicts, only r254 changed; the clash list identical to the written plan).
+
+**The bedroom box replaced by a corner column (owner, 2026-10-16: allowed "to use the corner to make the ducts drop to
+the basement ... to avoid odd shapes in the ceiling corner"; "I did not mind the ceiling box on the kitchen, I only
+minded the ceiling box in the bedroom"; written 288 795 chars, read back identical; scratch `colStack2.mjs` +
+`colStack3.mjs` on the 287 813 plan).** Supersedes the bedroom side of "Ground-floor ducts in the attic" (box r255,
+the alcove drops, column r256) and the r254 size above.
+- **Route:** both ducts still come down into the kitchen box r254 and cross the 41.5 wall at 2.62, then turn down at
+  once 8 cm from the bedroom's wall face in a **column r261** in the bedroom's south-east corner (17.25 west–east ×
+  41.35 south–north, floor to ceiling, a full-height half wall like r256 was; dimensioned to r51's east and south
+  edges). At the floor a 45° takes each one west and down through the slab, as in the alcove ("it is ok to nick the
+  top of the wall, as little as possible"); started at the floor the slant clears the laundry's east wall top (face
+  −0.15) by 4.2 cm (kitchen) / 5.9 cm (bath), so nothing is nicked (Hypothesis: that wall sits under the 41.5 wall).
+- **Laundry (owner: "the 90 bend can become 45 ... turn in parallel together"):** both leave the slant with a 45°
+  heading west, then turn north and west together as concentric 45° pairs 18 cm apart across the diagonals (north
+  legs x −0.72 bath / −0.92 kitchen) into unit B's lanes (−3.965 / −4.16).
+- **Why the bath moved north:** the laundry needs the bath on the north/east side of the kitchen duct (unit B's
+  bath port is the northern one), so the bath turns west in the attic at y −4.655 (was −5.06), passing north of the
+  kitchen vent's riser; r254 grows north to hold its descent (30 × 57.35 cm, front −4.5765, underside 2.50, still
+  tiled). Its wall crossing passes the hub's cables buried at y −4.74 (cs77, cs299, cs305) 1.7 cm clear; the kitchen
+  drop passes the hub cables 0.7 cm in front of the wall face (buried, so no clash).
+- **Electrical moved:** the hub cn70's cable to the basement (cs433) now runs in the wall to a new junction cn352
+  (0, −4.55, 0.35) and its basement junction cn325 moved to (−0.17, −4.50, 1.70), clear of the bath duct.
+- Removed: r255, r256; alcove head r259 spans the whole 1.02 m opening (right edge dimensioned to r133's).
+- **Ø80 for the bath rejected again** (owner asked): 12.62 m ≈ 20 Pa + bends ≈ 8.5 ≈ 29 Pa, the vent ≈ 70–82 Pa at
+  boost, still under the 80 Pa floor at the low end (Hypothesis, the model of "Unit B stays a Classic"); it needs
+  ≈ 7 m. Ø100 ≈ 13–15 Pa on the 1e route (friction 6.9, the vent's Ø80 elbow 2.6–3.5, the column-top 87°30′ 1.0–1.4, four 45° pairs 2.1–3.1, reducers ≈ 0.5; corrected 2026-10-16 from a quick "9–11").
+- Proven (Node): no conflicts, no dimension deleted, the fittings check flags only the old items (pn60–pn63, pn71,
+  pn81, pn339); no clash with any pipe or cable at true heights (a cross-floor check: `clashAbs.mjs`; the per-floor
+  script skips risers). Bath 13.60 → 12.62 m (1 × 87°30′ + 10 × 45° after the vent's Ø80 elbow), kitchen 9.71 →
+  9.06 m (2 × 87°30′ + 8 × 45°); 19.49 m to insulate. Set aside: crossing at the bedroom's floor depth between the
+  wall and the first north–south wooden lintel (no box at all) needs a ≥ 15 × 15 cm gap, unmeasured.
+- **B's outlet (owner, 2026-10-16: "I settle for flexible for the 160 wall terminal"):** the 35 cm OUT to the west
+  wall is an insulated Ø160 flexible, straight and taut, onto a Ø160 wall terminal; never Ø125 (Aldes: not smaller
+  than the unit's outlet; Hypothesis: Ø125 would cost ≈ 4–15 Pa more, the exit's dynamic pressure, at every vent).
+
+**Option 4d: through the wall near the bedroom's north-east corner (owner, 2026-10-16; drafted, not written).** The
+owner's reason: "there are east west lintels, so I have a hard time doing a north south pipe from the bathroom". The
+written route (1c) runs the shower-room duct north–south in the attic over the shower room and r106, across those
+lintels; 4d keeps every attic run east–west. Arrived at through sketches 4 → 4b → 4c → 4d (owner choices, in order:
+"Shower room vent in the ceiling, duct in the attic", "Duct to be 80 for now"; the kitchen vent "can sit on the 41 cm
+wall high up there in the kitchen, and avoid going in the attic"; "In the bedroom column, instead of going straight
+down, maybe do a s"; the narrow column: "I am trying to make the column less thick in the west east axis").
+- **Shower room (Ø80 from the vent to unit B):** the vent stays on the ceiling at (2.45, −1.85); up 14 cm into the
+  attic, west at y −1.85 to x 1.00, 45° down to 2.62 at x 0.78, a 45° pair 11 cm south (x 0.63 → 0.52, y −1.96), through
+  the 41.5 wall at 2.62, down at x −0.08 (8 cm from the bedroom's wall face).
+- **Kitchen (Ø125):** the vent on the 41.5 wall's kitchen face, north of wall cabinet r166 (its side at y −2.255), centre
+  (0.415, −2.13, 2.45); straight west through the wall, an 87°30′ down at x −0.08. No attic and no box for the kitchen.
+- **Column (new, a full-height half wall) on the bedroom's east wall from its north-east corner:** 17.25 west–east ×
+  58.25 north–south (y −1.88 to −2.4625), like r261's width. Each duct makes an S south in it (two 45°; the kitchen's
+  S higher: Ø125 1.70 → 1.46, Ø80 1.40 → 1.14), so both pass south of the 41 cm wall band between r66 and the basement
+  stairs (y −2.15 to −1.744) before the floor: the Ø80 drops at y −2.22, the Ø125 at −2.37. The S cannot swap the two
+  (one 17 cm plane), so they enter in unit B's port order: Ø80 north, Ø125 south. Socket m59 (x −0.30) stays.
+- **Slab and basement:** at the floor a 45° west through the slab, as today, landing in r66 at x −0.395 (a vertical drop
+  at x −0.08 would land in r66's east wall, x > −0.15). Then west to x −0.66 (Ø80) / −0.605 (Ø125) and one 45°
+  diagonal each, 14.3 cm or more apart, into unit B's lanes (y −3.965 / −4.16), clear of door r120 (head 1.94).
+- **Kitchen box (new, soffit, underside 2.50):** at the kitchen's north-west corner, x 0.415–0.94, y −2.0275 to
+  −1.7825 (52.5 × 24.5 cm); it holds only the Ø80's descent and jog. Gone: box r254, column r261 (and the four
+  dimensions on them), the attic run over the shower room, the south wall crossing.
+- Proven (Node on the 288 795 read, scratch `opt4d.mjs` + `opt4d-rebuild.sh`): the fitting check is clean for every
+  new fitting (the first try had the box's two Ø80 legs at 13 cm, need 14.7, and the Ø125's first basement run at
+  15.5, need 20.4; lengthened); the only flags left are the old pn60, pn62, pn63, pn71, pn81, pn339. True-height
+  clash check: only the Ø125 drop 0.8 cm in front of a cable buried in the east wall at 35 cm (cs135, as r261 today).
+  Solver: no conflicts, no dimension deleted. Lengths: shower room 10.33 m Ø80 (12.62 m Ø100 today), 12 fittings
+  (2 × 87°30′, 10 × 45°; no reducer at unit B); kitchen 7.86 m Ø125 (9.06), 7 fittings (1 × 87°30′, 6 × 45°).
+  To insulate 11.33 m (6.54 + 4.79; 19.49 today).
+- Hypothesis / open: the attic lets the Ø80 run east–west at y −1.85 between the lintels; the slab slant clears r66's
+  east wall top as today; the shower-room Ø80's loss (≈ 21 Pa at 35 m³/h on the longer 1e route, so less here); the
+  vents' furniture (the kitchen vent becomes a wall model on the 41.5 wall); a share link; the owner wants to adjust
+  the layout further before any write.
+
+**The vents: Aldes BDH (owner, 2026-10-16: "Forget everything about Bahia, we are using now the bdh").** The Bahia
+Curve vents drafted until then (~~C21 in the kitchen, BW21 in the bathrooms~~) are superseded, because the owner's kit
+is BDH and each Avis Technique approves only configurations of its own range. The sections above that name a C21 or a
+BW21 record what was drafted or written at the time; the C51 has the C21's figures (15–55 / 135, peak from 70 Pa),
+so their kitchen pressure budgets hold; the bathrooms' 45 m³/h becomes 35. Proven:
+- **The kit is BDH.** Leroy Merlin 82201371 = Aldes 11033404 lists "Groupe EasyHOME Hygro COMPACT+ 3x Bouches Bdh";
+  the owner's boxes hold a **W16 BDH 5/30** presence Ø80 (11015126) and a **B51 BDH 5-35** Ø80 (11015170); there is
+  no kitchen vent yet (owner: to buy).
+- **The approval is 14.5/25-2320_V2 "BDH solution individuelle"** (valid 2025-07-01 to 2032-06-30; Aldes'
+  `avis-technique-bdh-solution-individuelle-atec14.5-25-2320_v2.pdf`, read 2026-10-16). It covers the EasyHOME HYGRO
+  COMPACT Classic. Every vent works at 80–160 Pa; a kitchen vent's peak holds from 70 Pa.
+- **The house is an F4** (owner, 2026-10-16: 3 bedrooms and 1 living room). Hygro B, F4 with 1 SdB/WC (Tableau 17),
+  with the second bathroom as an added SdB/WC and the laundry as an added salle d'eau:
+
+  | Room | Vent | Flow (m³/h, at RH) | Timed flow | Control (Tableau 7) |
+  |---|---|---|---|---|
+  | Kitchen | **C51 BDH** Ø125 | 15–55 at 23/63 % | 135 for 30 min | CORD, or PUSH (2 × AA, 12 V or 230 V) |
+  | Ground shower room r107 + r62 (with the WC) | **BW51 BDH** Ø80 | 5–35 at 35/65 % | 30 for 30 min | CORD or PRES |
+  | Upper bathroom r86 (with the WC) | **BW51 BDH** Ø80 | 5–35 at 35/65 % | 30 for 30 min | CORD or PRES |
+  | Laundry (unit B's room) | **B51 BDH** Ø80 (the owner's) | 5–35 at 45/75 % | none | none |
+
+  C51 references (Aldes BDH Cuisine page): Ø125 cordelette 11015167, push piles 11015168, push 230 V 11015169, sans
+  fût cordelette 11015166; 34 dB(A). The other BDH kitchen vents do not fit this house: the individual-house approval
+  names only the C51, C62 and C66 (10–50 / 90; Hygro B gives the C62 to an F1, the C66 to an F2, the C51 to F3–F7);
+  the C61 (15–50/75), C63 (10–50/105), C64 (10–50/120) and C65 (15–55/135) are the "Logement Collectif" range, where
+  the BDH technical document (p. 10) gives an F4 the C64. The B51 and BW51 are 31 dB(A). The owner wants no presence sensing: the BW51
+  comes as CORD (Tableau 7); its reference was not read (a sans-fût pull-cord BDH, 11015341, €79.68, was found on
+  2026-10-16, needing a sleeve). The W16 (a WC-only vent) has no room: there is no separate WC.
+- **One vent per bathroom (owner, 2026-10-16: "I am only going to put one single vent in the ground floor shower room
+  or the upper shower room. There is no wc room, it is a combined single volume").** The ground shower room is r107 +
+  r62, one L-shaped room with the WC; the upper bathroom r86 holds a WC too.
+- **How the kitchen peak runs** (the BDH Avis Technique and technical document): by hand, never automatic for a
+  kitchen; CORD is a pull cord with a timer, PUSH a motor on a wired push button (Aldes 11026011); the vent returns to
+  its humidity flow after 30 min. A cooker hood must never be connected to the VMC (art. 14 of the arrêté of 24 March
+  1982, on every BDH sheet).
+- **Size (the 3D model, `docs/furniture.md`):** every BDH vent is 170 × 170 mm, its face 43.1 mm proud of the wall,
+  on a 45 mm spigot (D0 sans fût: 47.1 + 41); BDH technical document p. 22.
+
+Consequences (Hypothesis, the loss model above):
+- **The kitchen duct stays Ø125.** The C51's 135 m³/h peak needs ≥ 70 Pa at the vent: Ø125 (option 1e) keeps it, Ø100
+  (≈ 63–76 Pa lost) gives ≈ 113–124.
+- **Ø80 now carries either bathroom.** At ≤ 35 m³/h: the ground shower ≈ 19–22 Pa on the 1e route; the upper bath's
+  12.47 m Ø80 route ≈ 13 Pa of friction plus ≈ 8 Pa of fittings, ≈ 21 Pa, the vent at ≈ 93–100 Pa. The Ø80 bath was
+  rejected earlier at the BW21's 45 m³/h; to recheck with the owner.
+- **B's total:** ≈ 30 at rest (15 + 5 + 5 + 5), ≈ 60–110 in daily use, ≈ 150 with a kitchen peak alone, ≈ 180 with a
+  peak and one shower, ≈ 210 with both showers, ≈ 240 only if the laundry is humid too: above the Classic's published
+  221 maximum in that last case alone. Settle it with Aldes' pressure–flow curve for the Classic, or by reading the
+  vents' pressure at commissioning.
+- **Shops (Leroy Merlin, 2026-10-16):** its Aldes listings carry no C51 or BW51 by name; not checked further.
 
 **Which ducts to insulate (owner, 2026-10-16: "mark the ducts that need to be insulated").** DTU 68.3's rule above (a
 duct outside the heated volume: R ≥ 0.6, ≈ 25 mm wool) is derived from the plan in `src/core/ductInsulation.js` and

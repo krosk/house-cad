@@ -390,6 +390,22 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   within 4 mm. Proven in a scratch browser preview: the top and side renders, orthographic at the drawing's
   scale, sit on the drawing's lines (overlay); bounding box 457.5 × 187.6 × 459.0 mm against the
   drawing's 459 × 187 × 460; 3 028 triangles. Not yet seen in AR, View 3D or on device.
+- `aldes-bdh-sanitaire` (wall) and `-ceiling` (face down), `aldes-bdh-cuisine` and `-ceiling`: Aldes **BDH**
+  humidity-controlled extract vents, the kit's range (owner, 2026-10-16: "we are using now the bdh"; Leroy Merlin
+  82201371 lists "3x Bouches Bdh"; `docs/plumbing-workflow.md` "The vents: Aldes BDH"). `-sanitaire` stands for the
+  B51, BW51 and W16 (Ø80; the drawing's BDH SANITAIRE: a square sensor window funnelling into the opening, a bar
+  across it), `-cuisine` for the C51 (Ø125; BDH CUISINE: a flat window split in two panels; `params.kitchen`).
+  Builder `vmc-vent-bdh`. Size 170 × 170 mm, face 43.1 mm proud of the wall (BDH technical document
+  FR-ALDES-BDH-DTC-012026-391982 p. 22, "Schéma d'encombrement"); outline, inner square, window, logo and the side
+  profile measured on that page at 600 dpi by pixel scans (front 6.95 px/mm, side 7.9 px/mm), listed in the
+  builder's `// Sources:`; the outline's corners fit a superellipse of exponent 5.7. Estimates: the inner square's
+  1.5 mm step, the window's 8 mm funnel, the left and right edges rolled like the top and bottom, the tones. The
+  spigot is not built. Proven in Node (`buildProceduralFurniture`): 170.0 × 170.0 × 43.0 mm, ≈ 1 180 triangles;
+  in a scratch browser preview: the orthographic front render of each, at the drawing's scale, sits on its outline,
+  inner square, window and logo (overlay). Not yet seen in View 3D, AR or on device.
+- ~~`aldes-bahia-curve-l`, `aldes-bahia-curve-s` (and their `-ceiling`)~~: the Bahia Curve vents, superseded by the
+  BDH entries above (owner, 2026-10-16: the kit is BDH). Kept in the catalog only so a plan that still names them
+  renders; the entries below record how they were modelled.
 - `aldes-bahia-curve-l` (wall) and `-ceiling` (face down): Aldes Bahia Curve L **C21**, the kit's kitchen vent (owner,
   2026-10-14: "Look for it"). Which vent: the kit pages (Leroy Merlin 82201371, Tecnomat) say three Bahia Curve vents, the
   kitchen one PUSH 9V, no code; Aldes notice 3963727 p. 16 (Hygro B) gives C21 for F3 and up (C36 only for an F2). Sheet

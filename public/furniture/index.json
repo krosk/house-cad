@@ -745,6 +745,64 @@
     "source": "procedural: Aldes Bahia Curve L hygro kitchen extract vent C21 Ø125 push 9V (Aldes 11015068; the kit's kitchen vent per notice 3963727 p. 16; no manufacturer 3D model); size and front features from Aldes's Bahia Curve technical document p. 20 drawing (sources in the builder vmcVentBahia, params.large); on a ceiling, face down",
     "registeredAt": "2026-10-14T00:00:00.000Z"
   },
+  "aldes-bdh-sanitaire": {
+    "name": "aldes-bdh-sanitaire",
+    "article": "aldes-bdh-sanitaire",
+    "sizeMm": [
+      170,
+      170,
+      43.1
+    ],
+    "procedural": "vmc-vent-bdh",
+    "source": "procedural: Aldes BDH sanitary hygro extract vent Ø80 (B51 11015170, BW51 11015175, W16; no manufacturer 3D model); size and front and side features from the BDH technical document p. 22 drawing (sources in the builder vmcVentBdh); on a wall, face toward the room",
+    "registeredAt": "2026-10-16T00:00:00.000Z"
+  },
+  "aldes-bdh-sanitaire-ceiling": {
+    "name": "aldes-bdh-sanitaire-ceiling",
+    "article": "aldes-bdh-sanitaire-ceiling",
+    "sizeMm": [
+      170,
+      43.1,
+      170
+    ],
+    "procedural": "vmc-vent-bdh",
+    "params": {
+      "ceiling": true
+    },
+    "source": "procedural: Aldes BDH sanitary hygro extract vent Ø80 (B51 11015170, BW51 11015175, W16; no manufacturer 3D model); size and front and side features from the BDH technical document p. 22 drawing (sources in the builder vmcVentBdh); on a ceiling, face down",
+    "registeredAt": "2026-10-16T00:00:00.000Z"
+  },
+  "aldes-bdh-cuisine": {
+    "name": "aldes-bdh-cuisine",
+    "article": "aldes-bdh-cuisine",
+    "sizeMm": [
+      170,
+      170,
+      43.1
+    ],
+    "procedural": "vmc-vent-bdh",
+    "params": {
+      "kitchen": true
+    },
+    "source": "procedural: Aldes BDH kitchen hygro extract vent C51 Ø125 (C51 BDH 15-55/135, 11015167 cordelette; no manufacturer 3D model); size and front and side features from the BDH technical document p. 22 drawing (sources in the builder vmcVentBdh, params.kitchen); on a wall, face toward the room",
+    "registeredAt": "2026-10-16T00:00:00.000Z"
+  },
+  "aldes-bdh-cuisine-ceiling": {
+    "name": "aldes-bdh-cuisine-ceiling",
+    "article": "aldes-bdh-cuisine-ceiling",
+    "sizeMm": [
+      170,
+      43.1,
+      170
+    ],
+    "procedural": "vmc-vent-bdh",
+    "params": {
+      "kitchen": true,
+      "ceiling": true
+    },
+    "source": "procedural: Aldes BDH kitchen hygro extract vent C51 Ø125 (C51 BDH 15-55/135, 11015167 cordelette; no manufacturer 3D model); size and front and side features from the BDH technical document p. 22 drawing (sources in the builder vmcVentBdh, params.kitchen); on a ceiling, face down",
+    "registeredAt": "2026-10-16T00:00:00.000Z"
+  },
   "geberit-duofix-111333": {
     "name": "geberit-duofix-111333",
     "article": "111.333.00.6",

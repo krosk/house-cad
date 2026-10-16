@@ -1610,6 +1610,148 @@ function vmcVentBahia(entry) {
   return g;
 }
 
+// Aldes BDH hygro extract vent (owner, 2026-10-16: the kit's vents, "we are using now the bdh"), wall or
+// ceiling. The visible part only: the 170 × 170 face, 43.1 mm proud of the wall; the spigot (45 mm, into the
+// duct or sleeve) is hidden in the wall and not built. One body for the whole range: the sanitary vents
+// (B51, BW51, W16) have a square sensor window funnelling into the opening, the kitchen vents (C51…,
+// `params.kitchen`) a flat window split in two panels.
+//
+// Sources:
+//   - Aldes "Documentation technico-commerciale BDH" (FR-ALDES-BDH-DTC-012026-391982.pdf,
+//     https://assets.aldes.fr/assets/docsFR/FR-ALDES-BDH-DTC-012026-391982.pdf) p. 22 "Schéma d'encombrement",
+//     BDH SANITAIRE and BDH CUISINE: front 170 × 170; side views D125 / D80: spigot 45 + face 43.1 (D0 sans fût:
+//     41 + 47.1). Rasterised at 600 dpi and measured by pixel scans (front 6.95 px/mm, side 7.9 px/mm), in mm
+//     from the front's centre:
+//       outline: a rounded square whose corner fits a superellipse of exponent 5.7 on the ±85 half-size
+//         (points 19 mm in at 3.9 down, 10 in at 9.6 down, 3.9 in at 18.3 down);
+//       an inner rounded square ±53.5 (exponent 8), with a second line at ±59 round it;
+//       sanitary window ±30.5, its rim to ±24.5, bevels in to the opening ±20; a bar across the opening
+//         from 2.9 below to 10.8 above the centre; the logo −16.5…15.1 across, 66–70 above the centre;
+//       kitchen window ±30 across, 31 above to 30 below the centre, split 3.6 above the centre; logo 67–70.6 up;
+//       side view (D80): depth against height = PROFILE below (flat 43.2 from 35 to 139 mm up; the top and
+//         bottom edges roll off to ≈ 33 at the outline).
+//   - Aldes sheets 11015170 (B51 BDH 5-35 Ø80), 11015175 (BW51 BDH 5-35/30 Ø80), 11015167 (C51 BDH 15-55/135 Ø125
+//     cordelette): "au moins 1,80 mètre au dessus du sol", "au moins 20 cm entre le centre de la bouche et les
+//     parois adjacentes", "en partie haute d'une paroi verticale ou au plafond".
+//   Estimates: the inner square's 1.5 mm step, the window's 8 mm funnel depth, the edge roll-off applied the
+//   same way to the left and right sides (the drawing has no top view), and the tones.
+// `params.ceiling`: the same vent on a ceiling, face down; `sizeMm` is then 170 W × 43.1 H × 170 D.
+function vmcVentBdh(entry) {
+  const p = entry.params || {};
+  if (p.ceiling) {
+    const [W, H, D] = (entry.sizeMm || [170, 43.1, 170]).map((v) => v / 1000);
+    const wall = vmcVentBdh({ ...entry, sizeMm: [W * 1000, D * 1000, H * 1000], params: { ...p, ceiling: false } });
+    wall.rotation.x = Math.PI / 2; // wall front (+Z) → down (−Y), wall up (+Y) → +Z
+    wall.position.set(0, H / 2, -D / 2);
+    const g = new THREE.Group();
+    g.name = entry.name || 'vmc-vent-bdh-ceiling';
+    g.add(wall);
+    return g;
+  }
+  const [W, H, D] = (entry.sizeMm || [170, 170, 43.1]).map((v) => v / 1000);
+  const white = new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.45, side: THREE.DoubleSide });
+  const frame = new THREE.MeshStandardMaterial({ color: 0xe4e5e3, roughness: 0.5, side: THREE.DoubleSide });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x8e9195, roughness: 0.8 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0xa7aaae, roughness: 0.5 });
+  // Depth (mm) against the distance (mm) in from the outline: the side view's top and bottom, averaged.
+  const PROFILE = [[0, 33], [2, 37], [5, 39.5], [8.5, 40.5], [15, 42], [25, 42.7], [35, 43.2]];
+  const N = 5.7, NI = 8, HALF = 85, INNER = 53.5, STEP = 1.5;
+  const WIN = p.kitchen ? [-30, 30, -30, 31] : [-30.5, 30.5, -30.5, 30.5]; // window (mm; x across, z up)
+  const mx = (W * 1000) / 170, mz = (H * 1000) / 170, md = (D * 1000) / 43.1;
+  const prof = (e) => {
+    for (let i = 1; i < PROFILE.length; i++) if (e <= PROFILE[i][0]) {
+      const [e0, d0] = PROFILE[i - 1], [e1, d1] = PROFILE[i];
+      return d0 + (d1 - d0) * (e - e0) / (e1 - e0);
+    }
+    return PROFILE[PROFILE.length - 1][1];
+  };
+  const smooth = (e0, e1, t) => { const u = Math.min(1, Math.max(0, (t - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
+  const se = (x, z, h, n) => ((Math.abs(x) / h) ** n + (Math.abs(z) / h) ** n) ** (1 / n);
+  // Depth in mm at (x, z mm from the centre): the edge roll-off, less the inner square's step.
+  const depthMm = (x, z) => {
+    const e = Math.max(0, (1 - se(x, z, HALF, N)) * HALF);
+    return prof(e) - STEP * smooth(1.01, 0.99, se(x, z, INNER, NI));
+  };
+  const dz = (xmm, zmm) => -D / 2 + depthMm(xmm, zmm) * md / 1000; // metres, from the group's origin
+  // Grid in mm on the ±85 square, with lines on the window edges (its hole) and either side of the inner
+  // square's step. Outside 0.65 of the half-size each point is pulled in radially so the square's edge lands
+  // on the rounded outline; inside (the inner square and the window) the grid is left exact.
+  const lines = (n, extra) => [...new Set([...Array.from({ length: n + 1 }, (_, i) => -HALF + 2 * HALF * i / n), ...extra])].sort((a, b) => a - b);
+  const steps = [-INNER - 1, -INNER + 1, INNER - 1, INNER + 1];
+  const xs = lines(16, [...WIN.slice(0, 2), ...steps]);
+  const zs = lines(16, [...WIN.slice(2), ...steps]);
+  const pos = [], idx = [], NX = xs.length, NZ = zs.length;
+  const vert = (i, j) => {
+    const x = xs[i], z = zs[j], m = Math.max(Math.abs(x), Math.abs(z)) / HALF;
+    const k = 1 + (m / se(x, z, HALF, N) - 1) * smooth(0.65, 1, m);
+    return [x * k, z * k];
+  };
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) { const [x, z] = vert(i, j); pos.push(x * mx / 1000, H / 2 + z * mz / 1000, dz(x, z)); }
+  const id = (i, j) => i * NZ + j;
+  const inHole = (i, j) => { const xm = (xs[i] + xs[i + 1]) / 2, zm = (zs[j] + zs[j + 1]) / 2;
+    return xm > WIN[0] && xm < WIN[1] && zm > WIN[2] && zm < WIN[3]; };
+  for (let i = 0; i < NX - 1; i++) for (let j = 0; j < NZ - 1; j++) {
+    if (inHole(i, j)) continue;
+    idx.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
+  }
+  // The outline's edge down to the wall plane all round, then a flat back.
+  const edge = [];
+  for (let i = 0; i < NX; i++) edge.push(id(i, 0));
+  for (let j = 1; j < NZ; j++) edge.push(id(NX - 1, j));
+  for (let i = NX - 2; i >= 0; i--) edge.push(id(i, NZ - 1));
+  for (let j = NZ - 2; j > 0; j--) edge.push(id(0, j));
+  const base = pos.length / 3;
+  for (const e of edge) pos.push(pos[e * 3], pos[e * 3 + 1], -D / 2);
+  const ne = edge.length;
+  for (let k = 0; k < ne; k++) { const o0 = edge[k], o1 = edge[(k + 1) % ne], b0 = base + k, b1 = base + (k + 1) % ne; idx.push(o0, b1, b0, o0, o1, b1); }
+  const back = pos.length / 3;
+  pos.push(0, H / 2, -D / 2);
+  for (let k = 0; k < ne; k++) idx.push(back, base + k, base + (k + 1) % ne);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const g = new THREE.Group();
+  g.name = entry.name || 'vmc-vent-bdh';
+  g.add(new THREE.Mesh(geo, white));
+  const P = (x, z, d) => [x * mx / 1000, H / 2 + z * mz / 1000, d === undefined ? dz(x, z) : -D / 2 + d * md / 1000];
+  const quad = (q, mat) => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute([...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]], 3));
+    geom.computeVertexNormals();
+    g.add(new THREE.Mesh(geom, mat));
+  };
+  const patch = (x0, x1, z0, z1, mat, d) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry((x1 - x0) * mx / 1000, (z1 - z0) * mz / 1000), mat);
+    const xm = (x0 + x1) / 2, zm = (z0 + z1) / 2;
+    m.position.set(...P(xm, zm, d ?? depthMm(xm, zm) + 0.3));
+    g.add(m);
+  };
+  const [wx0, wx1, wz0, wz1] = WIN, face = depthMm(0, 0);
+  if (p.kitchen) {
+    // A flat window filling the hole, split in two panels 3.6 mm above the centre.
+    patch(wx0, wx1, 3.6 + 0.4, wz1, frame, face);
+    patch(wx0, wx1, wz0, 3.6 - 0.4, frame, face);
+    patch(wx0, wx1, 3.6 - 0.4, 3.6 + 0.4, dark, face - 0.5);
+    patch(-15.5, 15.5, 67, 70.6, grey);              // logo
+    return g;
+  }
+  // Sanitary: the window's rim (±30.5 → ±24.5) at the face, then bevels in to the opening (±20) 8 mm deeper.
+  const R = 24.5, O = 20, F = face - 8;
+  quad([P(wx0, wz1, face), P(wx1, wz1, face), P(R, R, face), P(-R, R, face)], frame);
+  quad([P(wx0, wz0, face), P(-R, -R, face), P(R, -R, face), P(wx1, wz0, face)], frame);
+  quad([P(wx0, wz0, face), P(wx0, wz1, face), P(-R, R, face), P(-R, -R, face)], frame);
+  quad([P(wx1, wz0, face), P(R, -R, face), P(R, R, face), P(wx1, wz1, face)], frame);
+  quad([P(-R, R, face), P(R, R, face), P(O, O, F), P(-O, O, F)], frame);    // top bevel
+  quad([P(-R, -R, face), P(-O, -O, F), P(O, -O, F), P(R, -R, face)], frame); // bottom
+  quad([P(-R, -R, face), P(-R, R, face), P(-O, O, F), P(-O, -O, F)], frame); // left
+  quad([P(R, -R, face), P(O, -O, F), P(O, O, F), P(R, R, face)], frame);     // right
+  patch(-O, O, -O, O, dark, F);                      // the opening
+  patch(-O, O, -2.9, 10.8, frame, F + 0.5);          // the bar across it
+  patch(-16.5, 15.1, 66, 70, grey);                  // logo
+  return g;
+}
+
 // Geberit Duofix 111.333.00.6, the WC frame with the Sigma 12 cm concealed cistern
 // (owner, 2026-10-10). Sources: Geberit CAD views 111.333.00.6_A (front), _L (side),
 // _G (top) .dxf from cdn.data.geberit.com/cad/ (a 3D _P .stp/.sat/.igs exists there
@@ -1793,7 +1935,7 @@ const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
-  'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'geberit-duofix': geberitDuofix,
+  'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'vmc-vent-bdh': vmcVentBdh,'geberit-duofix': geberitDuofix,
   'falmec-lumina': falmecLumina, 'induction-hob': inductionHob,
 };
 
