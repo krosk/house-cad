@@ -268,6 +268,11 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   front matches the photo's rgb(219, 178, 139) (render 216, 178, 139). Wall-hung, feet not included: set the zone's
   FOOT to the height wanted. Proven in a scratch preview (bounding box 800 × 550 × 468; front 3/4 and top views beside
   the photos); not yet seen in View 3D, AR or on device. Sources in the builder.
+- `lapeyre-flavio-60-oak` (owner, 2026-10-17: the ground-floor bathroom's is the 60 cm): the same FLAVIO, 60 cm
+  (Réf 1248229, 417.20 €, [page](https://www.lapeyre.fr/produits/meuble-salle-bains-sous-vasque-chene-naturel-flavio-FPC3079684)):
+  600 × 550 × 468 mm and the same 16 mm case and fronts (its spec table). Its studio photo 202131928 shows the same
+  fronts, frame and centred grip (≈ 205 of 578 px ≈ 200 mm), so it reuses the 80's params; only `sizeMm` differs.
+  Hypothesis: the front heights and grip match the 80's exactly (only checked by eye on that photo).
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives

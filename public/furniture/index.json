@@ -869,5 +869,34 @@
     },
     "source": "procedural: Lapeyre FLAVIO under-basin unit 80 cm, 2 drawers, natural oak veneer, sold without its top (Lapeyre Réf 1248230, 497.20 €; no manufacturer 3D model or manual); 80 x 55 x 46.8 cm and 16 mm case and fronts from the spec table, fronts, gaps, frame and grip measured on the studio photo 202131605 (sources in the builder flavioVanity)",
     "registeredAt": "2026-10-17T00:00:00.000Z"
+  },
+  "lapeyre-flavio-60-oak": {
+    "name": "lapeyre-flavio-60-oak",
+    "article": "1248229",
+    "sizeMm": [
+      600,
+      550,
+      468
+    ],
+    "procedural": "flavio-vanity",
+    "params": {
+      "woodColor": 16765604,
+      "frontsMm": [
+        228,
+        299
+      ],
+      "gapMm": 2.5,
+      "caseMm": 16,
+      "frontMm": 16,
+      "frameMm": 10,
+      "frameReliefMm": 3,
+      "grip": {
+        "topMm": 200,
+        "floorMm": 160,
+        "depthMm": 18
+      }
+    },
+    "source": "procedural: Lapeyre FLAVIO under-basin unit 60 cm, 2 drawers, natural oak veneer, sold without its top (Lapeyre Réf 1248229, 417.20 €, https://www.lapeyre.fr/produits/meuble-salle-bains-sous-vasque-chene-naturel-flavio-FPC3079684); 60 x 55 x 46.8 cm and 16 mm case and fronts from its spec table; the 80 cm unit's fronts, frame and grip (its studio photo 202131928 shows the same build, the grip ≈ 205 of 578 px ≈ 200 mm) (sources in the builder flavioVanity)",
+    "registeredAt": "2026-10-17T00:00:00.000Z"
   }
 }

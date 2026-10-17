@@ -1949,6 +1949,10 @@ function inductionHob(entry) {
 //     202131605_2 (room photo): wall-hung, grain runs horizontally on fronts and sides.
 //     AST3195740 (range line drawing): the 80 cm with its top reads L. 81 cm.
 //   Estimates: the frame's 3 mm relief, the 8 mm back, the top rails, the drawer boxes' sizes, the grip's 160 mm floor.
+// The 60 cm unit (lapeyre-flavio-60-oak, owner 2026-10-17: the ground-floor bathroom): Réf 1248229, 417.20 €,
+//   https://www.lapeyre.fr/produits/meuble-salle-bains-sous-vasque-chene-naturel-flavio-FPC3079684; its spec table gives
+//   60 × 55 × 46.8 cm and the same 16 mm case and fronts. Studio photo 202131928 (3/4 front): the same two fronts, frame
+//   and centred grip, ≈ 205 px of the 578 px front ≈ 200 mm, so the 80's params apply; only the width changes.
 function flavioVanity(entry) {
   const [W, H, D] = (entry.sizeMm || [800, 550, 468]).map((v) => v / 1000);
   const p = entry.params || {};

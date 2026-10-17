@@ -52,7 +52,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Items 91–94 were committed and pushed at the end of session 41 (the commit after `3d426f1`); check `git log` and
+- Items 91–95 were committed and pushed at the end of session 41 (the commit after `3d426f1`); check `git log` and
   `version.json` for whether that push was installed on the headset (it was not when this was written).
 
 ## What the app is today
@@ -273,6 +273,12 @@ plan.
   drawn 3.010 m and would need 2.76 m.
 - **94** Fence `fence_klosup_ajouree_anthracite` (98659652 slat, `boards` 9 cm / 9 mm gap, Hypothesis; no posts drawn).
   The plan has no FENCE zone yet.
+- **95** Furniture `lapeyre-flavio-60-oak` (Réf 1248229, the 80's builder and params at 600 wide). **Drafted, not
+  written:** `vanities.mjs` (scratchpad, session-local; on the 287 012 read) puts the FLAVIO 60 on r130 (Ground, NW
+  corner of r62, front south, beside door r64) and the FLAVIO 80 on r132 (Upper, NE corner of r86, beside door r93),
+  foot 0.33 / top 0.88 (Hypothesis: owner to confirm the height), dropping their size dims (c870 c871, c906 c907).
+  Proven (`house-query diff` / `conflicts`): only r130 and r132 change, no conflict. Rebuild it on the fresh read: set
+  those fields, `x`/`y` = 2.225/−0.298 and −3.62/0.062, `w` 0.6/0.8, `h` 0.468, `productMm`, `facing` 0.
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 
@@ -586,7 +592,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    owner placed anchors or beams in AR; if they did, that read is the new base). Before any route work: `house-query
    anchors` and `house-query beams` on that read. The attic lintels at y −1.96 (open check below) are a natural first
    use of BEAM · FLOOR / CEILING, drawn by the owner.
-0a. **Pending W (owner's go needed):** on a fresh read, the basement tile swap (item 91); optionally the Trez on r243
+0a. **Pending W (owner's go needed):** on a fresh read, the two vanities (item 95) and the basement tile swap (item 91); optionally the Trez on r243
    (item 92), the 2-leaf Trez on r242 resized to 2.76 m (item 93), and FENCE zones once the owner gives their lines
    (item 94). Needs the app with these materials installed first (an older app won't know the ids).
 0. **Item 86 after the 4i write:** the owner's unit choice (Classic / MW / HP+) and the open checks (wall top at slab height
