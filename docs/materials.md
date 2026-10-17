@@ -696,6 +696,28 @@ picks rooms, not ramps (not yet). The driveway ramp r239 (Garden) is cement: 17.
 Proven (Node, the owner's 10-13 plan with these finishes): cement 34.9 m² (52.7 m² with the ramp); dark red 25.1 m²,
 737 tiles, 30 packs, about 12 kg of grout (`groutKg`).
 
+### ARTENS Easy terracotta 45 × 45 replaces the dark red tile (owner, 2026-10-17)
+
+Owner: "add [the Leroy Merlin ARTENS Easy concrete-look terracotta 45 × 45] as a flooring material to replace the
+existing terracotta applied in the basement". Built-in `artens_easy_terracotta_45` (ref 95598422, 16,90 €/m²,
+24 € a box): the retailer's spec table (read in Chrome, DataDome blocks curl) gives glazed red-body stoneware,
+matte, concrete look, not rectified, 9.1 mm, 3 mm joint advised, 12 face designs, 7 tiles = 1.42 m² a box, R10,
+PEI 3, floor and wall (`surface: 'both'`). Drawn by `concreteTile` (`src/ui/finishTextures.js`, grid design
+`concrete`, 4 × 4 tiles a repeat): a flat face with broad light and dark clouds, light wisps, ~1.5 mm mottling,
+pale specks, a sandy grain and a slightly darker eased edge; the bump map has only the eased edge.
+- Sources (ids in the code): the straight 4-tile photo (media 4908555) for the colour and spread, the 12-design
+  photo (4908638) for the clouds, the laid photos (5239251, 5238629) for the grout. The grout colour is an
+  estimate (Hypothesis): the studio shots show white joints, the laid ones a light grey-beige.
+- Proven (scratch preview, the map canvas cropped to 2 × 2 tiles at the photo's scale): mean RGB 147.6,123.7,102.1
+  vs the photo's 148.4,123.9,102.2; spread sd 4.8–5.6 vs 3.6–5.2. Looks compared by eye side by side; not yet
+  seen in View 3D or AR (Hypothesis until then).
+- `drawStoneCloud` gained an `srgb` flag: by default it writes THREE.Color's linear values, which turned this
+  tile's light clouds darker than its face; the older designs keep the default, so their accepted look is unchanged.
+- The swap on the owner's plan: the 7 `tile_200_dark_red` finishes on the Basement (r66, r67, r68, r69, r74, r76,
+  r227) become `artens_easy_terracotta_45`, by a headset write only. Proven (Node takeoff on the 287 012-character
+  read with the swap): 25.1 m², 162 tiles, 24 boxes (576 €), about 4.9 kg of grout (12 kg with the 20 × 20).
+  `tile_200_dark_red` stays in the catalog.
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a free-placed furniture item),
@@ -808,7 +830,29 @@ estimates are embedded in that code** (`docs/product-modelling.md` step 6). In s
   3.68 mm/px): rails 33 mm in, from the top a 70 mm cut slat, 4 slats, a reinforcing rail, 3 slats, a
   cut slat, ≈ 9 mm gaps, the lever 1.0 m up. Another height keeps the slats and gaps; the cut slats
   take the rest.
-- Estimates (both): slats and rails centred in the stile depth, the gate centred in the zone's
+- **Trez aluminium gate, anthracite** (`gate_trez_anthracite`, design `trez`; owner asked 2026-10-17, not yet
+  placed on a zone): [Leroy Merlin 80095323](https://www.leroymerlin.fr/produits/portillon-battant-aluminium-trez-gris-zinc-klos-up-l-99x-h-173-5-cm-80095323.html)
+  (the URL still says gris zinc, H 173.5; the page: anthracite, 99 × 174.5 cm), 104 cm between pillars,
+  RAL 7016T, made to measure 50–150 × 50–200 cm; the exploded-view sheet (PDF media 3607730): stiles
+  93 × 60, rails 92 × 36, open-work slats 90 × 25; the straight studio render (media 3247470, 1.976 mm/px):
+  rails 30 mm in, from the top 14 slats each below a gap, then a 75 mm cut slat resting on the bottom rail,
+  the lever 1.06 m up. The 11.1 mm gap is fitted (Hypothesis until measured): 14 slats leave that cut slat
+  at 174.5 cm. Another height keeps the slats and gaps; the cut slat takes the rest. Proven (scratch
+  preview, orthographic at the photo's scale): every slat edge of the model within 1–3 px (2–6 mm) of the
+  render's at x = 600 px; the leaf width 1 % narrower than the render's (99 cm published).
+- **Trez aluminium driveway gate, 2 leaves, axes 2.70 m, anthracite** (`gate_trez2_anthracite_270`, design
+  `trez`, `leaves: 2`; owner, 2026-10-17: "customized, so that the distance between the door rotation axes is
+  270 cm"): [Leroy Merlin 80092306](https://www.leroymerlin.fr/produits/portail-battant-aluminium-trez-gris-zinc-klos-up-l-299-x-h-173-5-cm-80092306.html),
+  standard 299 × 174.5 cm, 306 between pillars, made to measure 150–500 × 75–200 cm; the single Trez's
+  profiles and slat layout plus a 48 × 50 cover strip and a 50 mm central stop (PDF media 3581468). **A fixed
+  size, unlike the other gates:** the manual (PDF media 3581362 pp. 15–16) sets each hinge axis 65 mm from its
+  pillar; with the 35 mm play a side that is 30 mm inside the gate's edge (`axisIn`), so axes 2.70 m apart
+  (`axisSpan`) make a 2.76 m gate, pillars 2.83 m apart. `buildGate` draws it that wide centred on its GATE
+  zone, whatever the zone's width: draw the zone 2.76 m. Proven (Node, `buildDoorProduct` on 2.76 m and
+  3.01 m zones): the hinge pins at x = ±1.35 m, 2.70 m apart, in both. Hypothesis: that "axis" means the
+  hinge pins, and the 65 mm reading of the manual's figure; Leroy Merlin's made-to-measure form may take the
+  width or the opening instead, so quote 2.76 m gate / 2.83 m between pillars when ordering.
+- Estimates (all): slats and rails centred in the stile depth, the gate centred in the zone's
   depth, hinge shapes simplified, the colour #5a636c (lit studio greys read lighter; the JAX photo
   ≈ #6e7882).
 - Proven 2026-10-12: build; orthographic front renders at each photo's scale put every stile, rail
@@ -922,6 +966,12 @@ as a `{rect}` finish, like a door product, in AR **MATERIAL · FENCE**. `design`
 `color` is its colour (one Standard/Lambert material per colour, no texture). Built-ins: wood slats
 9 cm / 3 cm, composite boards 15 cm / 1 cm, anthracite metal bars 2 cm / 10 cm. These are generic
 looks with typical sizes (Hypothesis, not a product); a real product would be a new entry. No takeoff.
+Product (owner, 2026-10-17: "the clôture can use 98659652 styling"): `fence_klosup_ajouree_anthracite`,
+the Klos'up open-work aluminium slat, Leroy Merlin 98659652 (176 × 9 cm, 25 mm, textured RAL 7016; the
+same slat as the Trez gates): `boards` 9 cm high, 9 mm apart, #5a636c. Hypothesis: the 9 mm gap, read
+off the laid photo (media 5365139, pitch ≈ 98 mm); the page gives no gap and names no post, and `boards`
+draws no posts (the photo shows one every 1.76 m slat). Proven (the 287 012-character read): the plan has
+no FENCE zone yet, so nothing wears it.
 `materialsFor(project, 'fence')` lists only fence materials: a `both` material is a floor or wall
 finish only (2026-10-12; before, door and window lists also offered it).
 

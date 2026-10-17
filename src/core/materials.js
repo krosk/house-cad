@@ -17,7 +17,8 @@
 //   design   optional product look drawn by src/ui/finishTextures.js (plank: 'oak-rustic',
 //            with `bevel` = long-edge V-bevel width, m; brick or grid: 'handmade-gloss', with a
 //            bump map in View 3D, `edgeWobble` m, `bumpScale`; grid: 'stone-sticks', a mosaic
-//            sheet of `mosaic` = [cols, rows] sticks, with a bump map; octagon: 'porcelain-matte',
+//            sheet of `mosaic` = [cols, rows] sticks, with a bump map; grid: 'concrete', a concrete-look face with
+//            `light` clouds and faint `accent2` patches; octagon: 'porcelain-matte',
 //            accent = the tozzetto colour, `grout` = the joint colour; pinwheel/stepped: 'aged-stone',
 //            accent = cloud, `light`, `pit`, `grout`, `edgeWobble` m); `roughness` optional (3D)
 //
@@ -59,6 +60,18 @@ export const BUILTIN_MATERIALS = [
     id: 'fence_metal_bars', surface: 'fence', pattern: 'fence', design: 'bars', w: 0.02, h: 0, joint: 0.1,
     color: 0x374151,
     name: { en: 'Metal bars (anthracite)', fr: 'Barreaux métal (anthracite)', zh: '金属栏杆（炭灰）' },
+  },
+  {
+    // Klos'up open-work aluminium fence slat, anthracite (Leroy Merlin 98659652, "Lame de clôture
+    // aluminium ajourée Klos up! gris zinc, L.176 x Ht.9 cm x Ep.25mm"; leroymerlin.fr/produits/
+    // lame-de-cloture-aluminium-ajouree-klos-up-gris-zinc-l-176-x-ht-9-cm-x-ep-25mm-98659652.html):
+    // spec table 176 × 9 cm, 25 mm, textured RAL 7016; the same 90 × 25 slat as the Trez gates. The
+    // owner's fence styling (2026-10-17). Gap 9 mm: estimate from the laid photo (media 5365139: a
+    // 25.6 px pitch for 23.5 px slats ≈ 98 mm). No posts drawn (the page names none; 'boards' has
+    // none); the colour is the Trez gates' (#5a636c).
+    id: 'fence_klosup_ajouree_anthracite', surface: 'fence', pattern: 'fence', design: 'boards', w: 0.09, h: 0, joint: 0.009,
+    color: 0x5a636c,
+    name: { en: "Klos'up open-work aluminium slats 9 cm, anthracite", fr: "Lames aluminium ajourées Klos'up 9 cm, anthracite", zh: "Klos'up 铝制镂空横板 9 cm（炭灰）" },
   },
   {
     id: 'oak_plank', surface: 'floor', pattern: 'stagger', w: 1.2, h: 0.19, joint: 0,
@@ -179,6 +192,21 @@ export const BUILTIN_MATERIALS = [
     name: { en: 'Dark red tile 20×20', fr: 'Carrelage rouge foncé 20×20', zh: '深红色地砖 20×20' },
   },
   {
+    // Leroy Merlin ARTENS Easy terracotta 45 × 45 (ref 95598422; leroymerlin.fr/produits/
+    // carrelage-sol-mur-interieur-effet-beton-terracotta-mat-easy-l-45xl-45cm-artens-95598422.html):
+    // the owner's basement floor (2026-10-17), replacing tile_200_dark_red. Spec table: glazed red-body
+    // stoneware, matte, concrete look, "Non rectifiés", 9.1 mm, 3 mm joint advised, 12 face designs,
+    // box 7 tiles = 1.42 m², R10, PEI 3, floor and wall. Drawn by concreteTile (src/ui/finishTextures.js):
+    // face colour and spread from the straight 4-tile photo (media 4908555: mean RGB 148,124,102,
+    // sd ≈ 4–5), clouds from the 12-design photo (4908638). Grout colour is an estimate (the laid
+    // room photos 5239251 / 5238629 show a light grey-beige joint).
+    id: 'artens_easy_terracotta_45', surface: 'both', pattern: 'grid', design: 'concrete', sheets: 4,
+    w: 0.45, h: 0.45, joint: 0.003, thickness: 0.0091,
+    color: 0x8f7660, accent: 0xcfc8bd, light: 0xb8a28b, accent2: 0x6f5a49,
+    roughness: 0.8, bumpScale: 1, pack: { pieces: 7 },
+    name: { en: 'ARTENS Easy concrete-look terracotta 45×45', fr: 'ARTENS Easy effet béton terracotta 45×45', zh: 'ARTENS Easy 水泥纹 陶土色 45×45' },
+  },
+  {
     // Irregular light grey stone paving ("opus incertum"), laid in mortar: the owner's veranda
     // floor (2026-10-13, no product named). A look, not a product: stones about 32 cm across,
     // 15 mm joints; the takeoff gives m² and mortar only. Drawn by paintFlagstone
@@ -247,6 +275,27 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, leafDepth: 0.05, roughness: 0.55, metalness: 0.2,
     color: 0x5a636c, accent: 0x5a636c, pack: null,
     name: { en: "Cap's JAX aluminium gate, anthracite", fr: "Portillon aluminium Cap's JAX, anthracite", zh: "Cap's JAX 铝制花园小门（炭灰）" },
+  },
+  {
+    // Leroy Merlin Trez swing gate 99 × 174.5, RAL 7016T (80095323, Klos'up): an aluminium
+    // garden gate with open-work slats, made to measure (the zone is the leaf); a GATE zone's
+    // product. Sources, measurements and estimates: src/ui/doorProducts.js buildGate.
+    id: 'gate_trez_anthracite', surface: 'door', pattern: 'door', design: 'trez', mount: 'gate',
+    w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: 'Trez aluminium gate, anthracite', fr: 'Portillon aluminium Trez, anthracite', zh: 'Trez 铝制花园小门（炭灰）' },
+  },
+  {
+    // Leroy Merlin Trez swing driveway gate, 2 leaves, RAL 7016T (80092306, Klos'up), made to
+    // measure to the owner's order (2026-10-17): 2.70 m between the hinge axes, each axis 30 mm
+    // inside the gate's edge (the manual's 65 mm from the pillar less the 35 mm play), so the gate
+    // is 2.76 m wide, centred on its GATE zone whatever the zone's width (draw the zone 2.76 m;
+    // the pillars 2.83 m apart). Sources and estimates: src/ui/doorProducts.js buildGate.
+    id: 'gate_trez2_anthracite_270', surface: 'door', pattern: 'door', design: 'trez', mount: 'gate', leaves: 2,
+    axisSpan: 2.7, axisIn: 0.03,
+    w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: 'Trez aluminium driveway gate, 2 leaves, axes 2.70 m, anthracite', fr: 'Portail battant aluminium Trez 2 vantaux, axes à 2,70 m, anthracite', zh: 'Trez 铝制双开车道大门（轴距 2.70 m，炭灰）' },
   },
   {
     // Leroy Merlin Bono swing driveway gate 299 × 168.5, RAL 7016T (80118263, Klos'up): two

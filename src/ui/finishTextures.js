@@ -574,8 +574,77 @@ function limestoneTile(ctx, m, x, y, w, h, ppm, r, bump) {
   ctx.restore();
 }
 
+// Matte glazed concrete-look tile, non-rectified (Leroy Merlin ARTENS Easy; tuned against the
+// straight photos of 4 tiles, media 4908555, and of the 12 face designs, 4908638): an even face
+// (`m.color`, per-tile tone) with wispy lighter clouds (`m.light`) and faint darker patches
+// (`m.accent2`), a fine sandy grain and sparse pale specks, and a slightly darker eased edge.
+// Bump: flat face, the eased edge rolls down ~2 mm to the joint.
+function concreteTile(ctx, m, x, y, w, h, ppm, r, bump) {
+  const mm = ppm / 1000;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (bump) {
+    ctx.fillStyle = '#b4b4b4';
+    ctx.fillRect(x, y, w, h);
+    ctx.filter = `blur(${Math.max(1, 1.2 * mm)}px)`;
+    ctx.strokeStyle = '#7a7a7a';
+    ctx.lineWidth = 2 * mm;
+    ctx.strokeRect(x, y, w, h);
+    ctx.filter = 'none';
+    ctx.restore();
+    return;
+  }
+  const base = new THREE.Color(m.color).multiplyScalar(0.985 + r() * 0.03);
+  ctx.fillStyle = `#${base.getHexString()}`;
+  ctx.fillRect(x, y, w, h);
+  // Broad light and dark clouds, then finer light wisps.
+  for (const [g, d, l] of [[2, [0.6, 0.85, 0.12], [0.55, 0.2, 0.3]], [6, [0.7, 0.9, 0.05], [0.48, 0.2, 0.22]]]) {
+    const cloud = stoneField(r, g + Math.floor(r() * 2), 0, x, y, w, h);
+    drawStoneCloud(ctx, cloud, x, y, w, h, m.accent2 ?? 0x7d6553, m.light ?? 0xc4b3a0, d, l, true);
+  }
+  // Mottling at ~1.5 mm: a coarse random light/dark grid scaled up smoothly.
+  const cells = Math.max(8, Math.round(w / (1.5 * mm))), cellsY = Math.max(8, Math.round(h / (1.5 * mm)));
+  const mot = newCanvas();
+  mot.width = cells; mot.height = cellsY;
+  const mx = mot.getContext('2d'), mi = mx.createImageData(cells, cellsY);
+  for (let k = 0; k < cells * cellsY; k++) {
+    const v = r();
+    mi.data.set(v < 0.5 ? [255, 255, 255, (0.5 - v) * 30] : [0, 0, 0, (v - 0.5) * 20], k * 4);
+  }
+  mx.putImageData(mi, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(mot, x, y, w, h);
+  // Sparse pale specks.
+  const n = Math.round((w / mm) * (h / mm) * 0.0006);
+  for (let k = 0; k < n; k++) {
+    ctx.globalAlpha = 0.15 + r() * 0.25;
+    ctx.fillStyle = css(m.light ?? 0xc4b3a0);
+    const s = Math.max(0.8, (0.3 + r() * 0.8) * mm);
+    ctx.fillRect(x + r() * w, y + r() * h, s, s);
+  }
+  ctx.globalAlpha = 1;
+  // Fine sandy grain.
+  const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
+  const img = ctx.getImageData(X, Y, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const f = 1 + (r() - 0.5) * 0.06;
+    d[i] *= f; d[i + 1] *= f; d[i + 2] *= f;
+  }
+  ctx.putImageData(img, X, Y);
+  // Eased (non-rectified) edge: a soft rim a little darker than the face.
+  ctx.filter = `blur(${Math.max(1, 0.8 * mm)}px)`;
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = `#${base.clone().multiplyScalar(0.8).getHexString()}`;
+  ctx.lineWidth = 1.5 * mm;
+  ctx.strokeRect(x, y, w, h);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 const GRID_DESIGNS = {
   'stone-sticks': stoneStick, terrazzo: terrazzoTile, limestone: limestoneTile, 'handmade-gloss': glossTile,
+  concrete: concreteTile,
 };
 
 // Mosaic sheets: GRID_SHEETS × GRID_SHEETS sheets (or `m.sheets`), each `m.mosaic` = [cols, rows] sticks,
@@ -708,15 +777,19 @@ function stoneField(r, g1, bias, x, y, w, h, { aspect = false } = {}) {
 }
 // Paint a field as soft clouds: `darkHex` at alpha up to aD over smoothstep(d0, d1), `lightHex`
 // up to aL over smoothstep(l0, l1) (l0 > l1: low field = light), from a small canvas scaled up.
-function drawStoneCloud(ctx, { field, nx, ny }, x, y, w, h, darkHex, lightHex, [d0, d1, aD], [l0, l1, aL]) {
+// `srgb`: write the hex colours as given (the default writes THREE.Color's linear values, which
+// darkens a mid tone; the designs tuned before 2026-10-17 were tuned with that).
+function drawStoneCloud(ctx, { field, nx, ny }, x, y, w, h, darkHex, lightHex, [d0, d1, aD], [l0, l1, aL], srgb = false) {
   const layer = newCanvas();
   layer.width = nx; layer.height = ny;
   const lx = layer.getContext('2d'), img = lx.createImageData(nx, ny);
-  const tan = new THREE.Color(darkHex), lt = new THREE.Color(lightHex);
+  const rgb = (hex) => (srgb ? [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((v) => v / 255)
+    : (({ r, g, b }) => [r, g, b])(new THREE.Color(hex)));
+  const tan = rgb(darkHex), lt = rgb(lightHex);
   for (let k = 0; k < nx * ny; k++) {
     const v = field[k], dark = smooth(d0, d1, v), light = smooth(l0, l1, v);
     const c = dark > light ? tan : lt, a = Math.max(dark * aD, light * aL);
-    img.data.set([c.r * 255, c.g * 255, c.b * 255, a * 255], k * 4);
+    img.data.set([c[0] * 255, c[1] * 255, c[2] * 255, a * 255], k * 4);
   }
   lx.putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = true;

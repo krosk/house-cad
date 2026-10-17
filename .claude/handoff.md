@@ -18,12 +18,12 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-17 (session 41 ended; the Quest reachable, last read 287 012)
+**Date:** 2026-10-17 (session 41 ended; the Quest **unreachable** at the end: `adb devices` empty; last read 287 012)
 
 **Status:**
-- Proven (git, Actions run success, `version.json`, `update-app` on 10-17): the head is `bd9f0ec` (docs only), pushed,
-  served ("bd9f0ec 1016-2358Z") and installed on the headset; the last code commit is `dd00055` (the Aldes BDH vent
-  models, builder `vmc-vent-bdh`), so the headset app knows the BDH articles.
+- Proven (git, Actions run success, `version.json` "3d426f1 1017-1123Z"): the head is `3d426f1`, pushed and served.
+  **Not installed on the headset:** `update-app` was skipped (no adb device). The headset app has `3d09428` (installed
+  10-17), so it lacks BEAM (`1ee0a41`) and the FLAVIO unit (`3d426f1`). Run `update-app` first when the Quest is back.
 - Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-17, 287 012 chars:
   option 4i + the bed** (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
   backup `quest-backup-1017-4i`): unit B moved and turned, the BDH vents, column r263 (sill 2.7), bed r264 with dims
@@ -52,8 +52,8 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Uncommitted at the end of session 41: this handoff and `docs/plumbing-workflow.md` (the kitchen age-of-air run and the
-  PORT_REACH trap, added after `bd9f0ec`), both mine; commit them if `git status` still shows them.
+- Items 91–94 were committed and pushed at the end of session 41 (the commit after `3d426f1`); check `git log` and
+  `version.json` for whether that push was installed on the headset (it was not when this was written).
 
 ## What the app is today
 
@@ -244,6 +244,37 @@ plan.
     `aldes-bdh-cuisine[-ceiling]` (`dd00055`).
   - All in `docs/plumbing-workflow.md` under "The bedroom box replaced by a corner column" (the loss method, the
     vent flows, B's 221 m³/h capacity risk).
+
+- **87** `d9d0b67` **Pipe anchors** (owner, 10-17): marker types `pipe_anchor_heating|water|waste|vmc`, a beacon
+  where a pipe is known to pass (a slab hole). **No app function** (owner: "they only serve you as a beacon"); drawn as a
+  ring in the service colour (View 3D: one InstancedMesh per floor, `3d09428`), H/W/D/V on sheets/DXF.
+  `house-query anchors <house>` checks a route passes each one within 5 cm. None placed in the owner's plan yet
+  (they place them in AR). `docs/plumbing-workflow.md` "Pipe anchors".
+- **88** `3d09428` AR shows only the relevant dims per mode (owner): a DIMS mode its own kind; other modes the wall dims
+  plus their group's pins; conflicts always. `docs/ar-survey.md` "Which dimensions show".
+- **89** `1ee0a41` **BEAM zones** (owner, 10-17: the lintels, "it needs to help resolution of passing pipes"): PLAN · ADD
+  BEAM · CEILING / BEAM · FLOOR (one kind; stored on the floor it is measured from, band relative to it, negative =
+  under the floor; world box everywhere else). Clashing pipes magenta in AR pipe modes and ▤ Plan;
+  `house-query beams <house>`. None drawn in the owner's plan yet. `docs/plumbing-workflow.md` "Beams".
+- **90** `3d426f1` Furniture `lapeyre-flavio-80-oak` (builder `flavio-vanity`, Lapeyre Réf 1248230, 497.20 €): owner
+  saw the photo comparison; not placed in the plan, no mount height chosen (wall-hung: the zone's FOOT).
+  `docs/furniture.md`.
+- **91** Floor finish `artens_easy_terracotta_45` (Leroy Merlin 95598422, grid design `concrete`, `concreteTile`):
+  owner, 10-17: replaces the dark red 20×20 on the basement. Proven (preview stats vs photo 4908555; Node takeoff with
+  the swap on the 287 012 read: 25.1 m², 162 tiles, 24 boxes). **Not written:** the swap of the 7 `tile_200_dark_red`
+  finishes (r66 r67 r68 r69 r74 r76 r227) waits for W. `drawStoneCloud` gained an `srgb` flag (older designs unchanged).
+  `docs/materials.md` "ARTENS Easy".
+- **92** Gate `gate_trez_anthracite` (80095323, single leaf; design `trez`: 14 slats from the top, a cut slat on the
+  bottom rail; fitted 11.1 mm gap, Hypothesis). Overlay on render 3247470: edges within 2–6 mm. Not placed (r243 has
+  no product in the 287 012 read).
+- **93** Gate `gate_trez2_anthracite_270` (80092306, 2 leaves) made to the owner's order: **2.70 m between hinge
+  axes** → `axisSpan` 2.7, `axisIn` 0.03 (manual: axis 65 mm from the pillar, 35 mm play) → a 2.76 m gate centred on
+  its zone whatever the zone's width, pillars 2.83 m apart. Proven (Node): pins at ±1.35 m. Not placed; r242 is
+  drawn 3.010 m and would need 2.76 m.
+- **94** Fence `fence_klosup_ajouree_anthracite` (98659652 slat, `boards` 9 cm / 9 mm gap, Hypothesis; no posts drawn).
+  The plan has no FENCE zone yet.
+- Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
+  light-grey bands at true height, real width, only in the HEATING pipe modes.
 
 Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are still cited in `docs/ar-qa-checklist.md`.
 
@@ -496,7 +527,8 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 
 ## Commits (sessions 40–41; all pushed, doc-only omitted; earlier sessions: `git log`)
 
-Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs. Session 40:
+Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0b67` pipe anchors + `house-query anchors` ·
+`3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity. Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -531,6 +563,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | Path | Role |
 |---|---|
 | `tools/quest-storage.mjs` / `tools/house-query.mjs` | Headset backup/read/write/update-app / query, diff and check a plan in Node |
+| `src/core/pipeAnchors.js` / `src/core/beams.js` | Anchor types + `checkPipeAnchors` / beam world boxes, `beamBand` defaults, `pipeBeamClashes` (both Node-testable; `house-query anchors` / `beams`) |
 | `src/core/pipeFittings.js` | Fittings derived from a pipe network: Nicoll datasheet sizes, `angle` / `short` / `mf` checks (View 3D draws them; Node-testable) |
 | `src/core/ductInsulation.js` | Which VMC duct stretches lie outside the heated volume (`ductInsulation(project, pos)`); ▤ Plan draws the jackets; Node-testable |
 | `tools/wc-drain-fit.mjs` | Upper WC drain T1 (default) or `layout=S`, with real Nicoll/Geberit parts: clash check, bay-1 depth, `svg=` face + side views; `screed=`/`slabBottom=` take site measurements |
@@ -549,6 +582,13 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
+00. **When the Quest is back:** `update-app` (it lacks `1ee0a41`/`3d426f1`), then a fresh read (expect 287 012 unless the
+   owner placed anchors or beams in AR; if they did, that read is the new base). Before any route work: `house-query
+   anchors` and `house-query beams` on that read. The attic lintels at y −1.96 (open check below) are a natural first
+   use of BEAM · FLOOR / CEILING, drawn by the owner.
+0a. **Pending W (owner's go needed):** on a fresh read, the basement tile swap (item 91); optionally the Trez on r243
+   (item 92), the 2-leaf Trez on r242 resized to 2.76 m (item 93), and FENCE zones once the owner gives their lines
+   (item 94). Needs the app with these materials installed first (an older app won't know the ids).
 0. **Item 86 after the 4i write:** the owner's unit choice (Classic / MW / HP+) and the open checks (wall top at slab height
    where the shower duct slants, attic lintels at y −1.96, the outlet terminal); on the headset, the laundry stub ends
    12.9 cm from unit B (inside airflow.js's 15 cm PORT_REACH: the app's air model ignores the laundry vent). ~~Finish item 86 on option 4d~~

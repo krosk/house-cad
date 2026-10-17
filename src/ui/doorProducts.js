@@ -276,7 +276,48 @@ function place(parts, p) {
 //     the cover strip 13 px = 48 mm over the meeting; the lever 273 px = 1005 mm above the
 //     leaf bottom, ≈ 33 px = 120 mm long; the black stop ≈ 120 × 50 mm under the meeting.
 //     Photos 3312790 (in context), 3481094 (three quarters), 3491424 (colour swatch).
-// Estimates (both): slats and rails centred in the stiles' depth; the leaf centred in the
+// Sources (2026-10-17), TREZ (design 'trez'):
+//   Leroy Merlin 80095323 "Portillon ajoure anthracite Trez Klos up, l.99x H.174.5 cm" (the URL
+//   still says gris zinc, H 173.5)
+//     https://www.leroymerlin.fr/produits/portillon-battant-aluminium-trez-gris-zinc-klos-up-l-99x-h-173-5-cm-80095323.html
+//     spec table: 99 × 174.5 cm; 104 cm between pillars; operating play 5 cm; rails 92 × 36 mm;
+//     stiles 93 × 60 mm; integrated lock; adjustable top hinge, lacquered bottom angle bracket,
+//     2 handles, a strike and a stop; RAL 7016T anthracite; thermolacquered; made to measure
+//     50–150 × 50–200 cm.
+//   PDF media 3607730 (exploded view sheet): stiles 93 × 60, rails 92 × 36, open-work slats
+//     90 × 25 mm, mortise lock fitted, a 98 mm square kit, steel angle hinges with covers, a
+//     bottom bracket. PDF media 4637159: the fitting manual (61 pages, single and double gates;
+//     not used for a dimension).
+//   Photo media 3247470 (straight studio render of the 174.5 cm leaf, 1.976 mm/px from the
+//     1745 mm stile = 883 px): stiles 47–49 px = 93–97 mm; the rails 15–16 px = 30–32 mm in
+//     from the stile ends, 45–47 px = 89–93 mm; from the top rail down 14 slats of 45–46 px
+//     = 90 mm, each below a gap, slat pitch 50.8–51.2 px = 100–101 mm, then a cut slat 38 px
+//     = 75 mm resting on the bottom rail with no gap; the lever axis 538 px = 1063 mm above
+//     the leaf bottom, 65 px = 128 mm long. Photos 1698454 (straight front of a lower leaf:
+//     12 slats, same order: top rail, gap, slats, a cut slat on the bottom rail), 3828988 (in
+//     context with matching fence panels), 3491424 (colour swatch).
+//   Fitted, not published: the gap 11.1 mm (15 gaps: above each slat and the cut one), so that
+//     14 slats leave the photo's 75 mm cut slat
+//     in the 174.5 cm leaf (pitch 101.1 mm, the photo's 100–101; its width, 506 px =
+//     1001 mm, reads 1 % wider than the published 99 cm).
+// Sources (2026-10-17), TREZ 2 leaves (design 'trez', `leaves: 2`), ordered to the owner's size:
+//   Leroy Merlin 80092306 "Portail battant aluminium Trez gris zinc Klos up!, l.299 x H.173.5 cm"
+//     https://www.leroymerlin.fr/produits/portail-battant-aluminium-trez-gris-zinc-klos-up-l-299-x-h-173-5-cm-80092306.html
+//     spec table: 299 × 174.5 cm; 306 cm between pillars (so 35 mm play each side); pillars
+//     1.87 m; operating play 7 cm; rails 92 × 36; stiles 93 × 60; slats 90 wide; opens to the
+//     right seen from the street; integrated lock; a central stop ("sabot central"); a
+//     motorisation reinforcement; RAL 7016T anthracite; 68 kg; made to measure 150–500 × 75–200 cm.
+//   PDF media 3581468 (exploded view sheet): the single Trez's profiles, slats 90 × 25, central
+//     cover strip ("battement central") 48 × 50 mm, mortise lock, a 50 mm high polyamide stop.
+//   PDF media 3581362 (fitting manual) p. 15–16 (gonds A): "Réglez l'axe du gond à 65 mm"
+//     from the pillar: with the 35 mm play, each hinge axis is 30 mm inside the gate's outer
+//     edge (`axisIn`). The owner's order (2026-10-17): 2.70 m between the two hinge axes
+//     (`axisSpan`), so the gate is 2.76 m wide and its pillars 2.83 m apart.
+//   Photos 883331, 1039077 (studio fronts, ~4.4 mm/px: too coarse to measure the slats; the
+//     same order as the single leaf: top rail, gap, slats), 3828945 (in context). The slat
+//     layout is the single Trez's (photo 3247470 above).
+//   Estimates: the stop's 120 × 100 mm footprint (Bono's); the cover strip on the +X leaf.
+// Estimates (all): slats and rails centred in the stiles' depth; the leaf centred in the
 //   zone's depth; for another height the slat count keeps the slat and gap sizes (Bono:
 //   the cut slats take the rest, the reinforcing rail after half the slats, rounded up);
 //   the lever 1.0 m above the leaf bottom; hinge shapes simplified; colours (lit studio
@@ -285,6 +326,11 @@ const GATE_PROFILES = {
   jax: {
     stile: 0.095, stileD: 0.05, rail: 0.095, railD: 0.03, railIn: 0.03,
     slat: 0.09, slatD: 0.015, gap: 0.0097, playHinge: 0.025, under: 0.035, handleZ: 1.0,
+  },
+  trez: {
+    stile: 0.093, stileD: 0.06, rail: 0.092, railD: 0.036, railIn: 0.03,
+    slat: 0.09, slatD: 0.025, gap: 0.0111, cutBottom: 0.03, playHinge: 0.025, under: 0.035, handleZ: 1.06,
+    leafGap: 0.02, battue: [0.048, 0.05], sabot: [0.12, 0.05, 0.1],
   },
   bono: {
     stile: 0.093, stileD: 0.06, rail: 0.092, railD: 0.036, railIn: 0.033,
@@ -318,7 +364,9 @@ function buildGate(p, { lambert }) {
   };
   // From 35 mm above the ground up to the zone's head.
   const y0 = G.under, H = Math.max(0.4, p.head - y0);
-  const W = Math.max(0.3, p.width);
+  // A gate ordered to a hinge-axis spacing (`def.axisSpan`, each axis `def.axisIn` inside the
+  // gate's outer edge) has its own width, centred on the zone; otherwise the zone is the gate.
+  const W = p.def.axisSpan ? p.def.axisSpan + 2 * (p.def.axisIn ?? G.stile / 2) : Math.max(0.3, p.width);
   const two = (p.def.leaves ?? 1) === 2;
   // One leaf from `left` to `right`; `hx` = its hinge side (+1 = right), `lock` = it carries the lock.
   const leaf = (left, right, hx, lock) => {
@@ -342,6 +390,18 @@ function buildGate(p, { lambert }) {
         if (t > 0.001) box(inner, t, h < 0 ? G.railD : G.slatD, cx, y - t / 2, 0);
         y -= t + (i < seq.length - 1 ? G.gap : 0);
       });
+    } else if (G.cutBottom) {
+      // Top down: a gap then a slat, as many as fit leaving at least `cutBottom`; the rest is a
+      // cut slat resting on the bottom rail (no gap under it).
+      const n = Math.max(0, Math.floor((span - G.cutBottom) / (G.slat + G.gap)));
+      let y = lo + span;
+      for (let i = 0; i < n; i++) {
+        y -= G.gap;
+        box(inner, G.slat, G.slatD, cx, y - G.slat / 2, 0);
+        y -= G.slat;
+      }
+      const cut = y - G.gap - lo;
+      if (cut > 0.005) box(inner, cut, G.slatD, cx, lo + cut / 2, 0);
     } else {
       const n = Math.max(1, Math.floor((span - G.gap) / (G.slat + G.gap)));
       const gap = (span - n * G.slat) / (n + 1);
@@ -367,7 +427,8 @@ function buildGate(p, { lambert }) {
     box(0.06, 0.006, 0.06, hingeX + hx * 0.02, y0 - 0.012, 0);
     box(0.006, 0.07, 0.06, hingeX + hx * (G.stile / 2 + G.playHinge - 0.003), y0 + 0.02, 0);
     const pin = new THREE.CylinderGeometry(0.006, 0.006, 0.04, 8);
-    pin.translate(hingeX, y0 - 0.005, 0);
+    const axisX = p.def.axisIn != null ? (hx > 0 ? right - p.def.axisIn : left + p.def.axisIn) : hingeX;
+    pin.translate(axisX, y0 - 0.005, 0);
     parts.push([pin, m.steel]);
   };
   if (two) {
