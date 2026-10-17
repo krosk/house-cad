@@ -19,6 +19,8 @@ import { roomFloorZ } from '../core/storey.js';
 import { derivePipeFittings } from '../core/pipeFittings.js';
 import { ductInsulation, DUCT_INSULATION_M } from '../core/ductInsulation.js';
 import { pipeNodeWorld } from '../core/pipeAnchors.js';
+import { worldBeams, beamsAround, pipeBeamClashes } from '../core/beams.js';
+import { boxesGeometry } from '../core/architectural3d.js';
 
 // Shared with AR (mr.js) so a run reads the same colour in both.
 export const CONDUIT_COLOR = 0xa78bfa;
@@ -31,7 +33,9 @@ const CONDUIT_RADIUS = 0.0125; // a 25 mm conduit
 const CONDUIT_NODE_RADIUS = 0.02;
 const PIPE_NODE_SCALE = 1.3;   // a pipe junction: a bead slightly fatter than its pipe
 // Fittings (src/core/pipeFittings.js): PVC-white over the pipe's colour; a check that fails shows in its own colour.
-export const FITTING_FLAG_COLOR = { angle: 0xff3b30, short: 0xff9500, mf: 0xffd60a };
+// `beam`: a pipe crossing a BEAM zone (src/core/beams.js), the pipe itself drawn in it.
+export const FITTING_FLAG_COLOR = { angle: 0xff3b30, short: 0xff9500, mf: 0xffd60a, beam: 0xff2d95 };
+const BEAM_COLOR = 0xa0703f;
 const FITTING_TINT = 0.55; // toward white
 // A VMC duct outside the heated volume (src/core/ductInsulation.js): a translucent wool jacket over the cold stretch.
 export const INSULATION_COLOR = 0xfacc15;
@@ -183,6 +187,8 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     .map((n) => ({ p: conduitNodePos(project, n), color: 0xffffff, radius: CONDUIT_NODE_RADIUS }));
 
   const pipeNodes = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
+  // Pipes crossing a beam are drawn in the beam flag's colour (the plan's colours only).
+  const clashing = pipeColor == null ? new Set(pipeBeamClashes(project).map((c) => c.pipe.id)) : new Set();
   const pipeRuns = [];
   const nodeRadius = new Map(); // a junction bead fits the fattest pipe at it
   for (const pipe of project.pipes || []) {
@@ -191,7 +197,7 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     if (!a || !b || !(shown(project.pipeNodeFloorId(a)) || shown(project.pipeNodeFloorId(b)))) continue;
     const radius = (pipe.diameter || 0.016) / 2;
     pipeRuns.push({ a: pipeNodePos(project, a), b: pipeNodePos(project, b), service: pipe.service, pipeId: pipe.id,
-      color: pipeColor ?? (PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold), radius });
+      color: pipeColor ?? (clashing.has(pipe.id) ? FITTING_FLAG_COLOR.beam : PIPE_SERVICE_COLOR[pipe.service] || PIPE_SERVICE_COLOR.cold), radius });
     for (const id of [pipe.a, pipe.b]) nodeRadius.set(id, Math.max(nodeRadius.get(id) || 0, radius));
   }
   const { fittings: allFittings } = derivePipeFittings(project.pipeNodes || [], project.pipes || [], (n) => pipeNodePos(project, n));
@@ -206,6 +212,16 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     ?? tint.setHex(pipeColor ?? PIPE_SERVICE_COLOR[f.service] ?? PIPE_SERVICE_COLOR.cold).lerp(new THREE.Color(0xffffff), FITTING_TINT).getHex());
   const fittingIssues = {};
   for (const f of fittings) if (f.flag) fittingIssues[f.flag] = (fittingIssues[f.flag] || 0) + 1;
+  const shownClashes = pipeRuns.filter((run) => clashing.has(run.pipeId)).length;
+  if (shownClashes) fittingIssues.beam = shownClashes;
+  // The beams on (and in the slabs around) the shown floors, as translucent wood boxes in the pipe layer.
+  const beamBoxes = floorId == null ? worldBeams(project) : beamsAround(project, project.floorById(floorId));
+  const beamGeometry = boxesGeometry(beamBoxes);
+  if (beamGeometry) {
+    const beams = new THREE.Mesh(beamGeometry, beamMaterial);
+    beams.renderOrder = 1;
+    pipes.add(beams);
+  }
   // The ducts to insulate, in the plan's colours only (the Model view's grey pipes stay plain).
   let insulateM = 0;
   if (pipeColor == null) {
@@ -234,6 +250,8 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
 const lerpPos = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
 
 // The insulation jackets: [{ a, b, radius }], one translucent instanced cylinder each.
+const beamMaterial = new THREE.MeshStandardMaterial({ color: BEAM_COLOR, roughness: 0.8, transparent: true, opacity: 0.45, depthWrite: false });
+
 function addJackets(group, jackets) {
   if (!jackets.length) return;
   const up = new THREE.Vector3(0, 1, 0);

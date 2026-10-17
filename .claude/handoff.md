@@ -250,7 +250,7 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 ## Standing decisions (the "why" is in the docs)
 
 **Process**
-- **Pipe anchors (2026-10-17):** before drafting or writing any pipe route, run `node tools/house-query.mjs anchors <house>`; a route must pass every anchor of its service (`docs/plumbing-workflow.md` "Pipe anchors"). Anchors are beacons only, no app function.
+- **Pipe anchors (2026-10-17):** before drafting or writing any pipe route, run `node tools/house-query.mjs anchors <house>`; a route must pass every anchor of its service (`docs/plumbing-workflow.md` "Pipe anchors"). Anchors are beacons only, no app function. Also run `house-query beams <house>`: a route must cross no BEAM ("Beams", same doc).
 - **Label every claim Proven or Hypothesis** (in reports, commit bodies and docs).
 - **Git:**
   - commit + push directly on `main`, only when asked; **every push publishes**;

@@ -99,7 +99,7 @@ const MARKER_RECOMMENDED_AMPS = {
   outlet_appliance: 20,
 };
 const ZONE_LABELS = {
-  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', soffit: 'Ceiling boxing', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', ramp: 'Ramp', platform: 'Platform', gate: 'Gate', gardenwall: 'Garden wall', fence: 'Fence', cabinet: 'Cabinet', furniture: 'Furniture',
+  insulation: 'Insulation', door: 'Door', passage: 'Passage', garage: 'Garage door', halfwall: 'Half wall', soffit: 'Ceiling boxing', beam: 'Beam', heater: 'Heater', sliding: 'Sliding door', window: 'Window', recess: 'Recess', stairs_up: 'Stairs up', stairs_down: 'Stairs down', ramp: 'Ramp', platform: 'Platform', gate: 'Gate', gardenwall: 'Garden wall', fence: 'Fence', cabinet: 'Cabinet', furniture: 'Furniture',
 };
 const PRINT_ZONE_KINDS = Object.keys(ZONE_LABELS);
 const printableRectangles = (floor, layers = resolveOutputLayers()) => (floor.rectangles || [])
@@ -432,6 +432,14 @@ function drawZoneGlyph(be, x, y, w, h, kind, hingeEnd = 'lo', compact = false, p
     const dash = { stroke: C_ZONE, width: 0.18, dash: [1.2, 0.8] };
     for (const [ax, ay, bx, by] of [[x, y, x1, y], [x1, y, x1, y1], [x1, y1, x, y1], [x, y1, x, y], [x, y, x1, y1], [x, y1, x1, y]]) {
       be.line(ax, ay, bx, by, dash);
+    }
+    return;
+  }
+  // A beam (in a slab, src/core/beams.js) is hidden structure: a dash-dot outline with one diagonal, no fill.
+  if (kind === 'beam') {
+    const dashDot = { stroke: C_ZONE, width: 0.18, dash: [2, 0.6, 0.4, 0.6] };
+    for (const [ax, ay, bx, by] of [[x, y, x1, y], [x1, y, x1, y1], [x1, y1, x, y1], [x, y1, x, y], [x, y, x1, y1]]) {
+      be.line(ax, ay, bx, by, dashDot);
     }
     return;
   }

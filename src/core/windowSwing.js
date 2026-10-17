@@ -57,6 +57,7 @@ export function windowSwings(floor, materialOf = () => null) {
     else if (kind === 'furniture' || kind === 'cabinet') solids.push({ r, kind, b: r.bounds, z0: r.foot ?? 0, z1: r.top ?? 0.9 });
     else if (kind === 'halfwall') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.sill ?? 1 });
     else if (kind === 'soffit') solids.push({ r, kind, b: r.bounds, z0: r.foot ?? ceil, z1: ceil });
+    else if (kind === 'beam' && (r.foot ?? ceil) < ceil && (r.top ?? 0) > 0) solids.push({ r, kind, b: r.bounds, z0: Math.max(0, r.foot), z1: Math.min(ceil, r.top) });
     else if (kind === 'gardenwall') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.top ?? 1 });
     else if (kind === 'fence') solids.push({ r, kind, b: r.bounds, z0: 0, z1: r.top ?? 1.8 });
   }

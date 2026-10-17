@@ -60,6 +60,37 @@ Each anchor prints its position and either `PASS` (a pipe of its service within 
 heating anchor accepts a supply or a return, a water anchor cold or hot; refrigerant lines have no anchor type.
 An `OFF` anchor is a route to rework, or a question for the owner, never something to move.
 
+### Beams (owner, 2026-10-17)
+
+A **BEAM** zone marks a lintel, joist or ring beam in a slab, so routes avoid it (owner: "it needs to help resolution of
+passing pipes"). Its band [`foot`, `top`] is m from the floor it is stored on. **It is stored on the floor whose walls it
+is measured from**, which is a choice of convenience, not of meaning (owner: "I don't know which floor they should attach
+to"):
+
+- **BEAM · CEILING** (PLAN · ADD): seen from below, e.g. the kitchen ceiling. Default band: the slab over the ceiling
+  (Ground: 2.70 → 2.95).
+- **BEAM · FLOOR** (PLAN · ADD, right after it): seen from above, e.g. the upper floor's joists with the floor open.
+  Default band: the slab under the floor, as deep as the floor below's slab (Upper: −0.25 → 0). The band pad reads it
+  as depths under the floor (BOTTOM ↓ FLOOR 25 = 25 cm down), since it has no minus key.
+
+Both are one kind, `beam`. Everything else uses the world box (`src/core/beams.js` `worldBeams`), so a beam drawn from
+either side is the same beam and shows on both storeys: the AR plan tints it on the other storey too (not pickable
+there), AR's pipe modes and View 3D's ▤ Plan 💧 Pipes draw it as a translucent wood box at its true height (one mesh), View
+3D's model as a wood box (with the storey whose slab it is in too). It cuts no wall and takes no floor area; only a part
+hanging below the ceiling blocks air (`airflow3d.js`) and window leaves (`windowSwing.js`). Sheets: a dash-dot outline
+with one diagonal; DXF: layer `BEAM`.
+
+**A pipe crossing a beam** (its outer radius inside the beam's box by more than 2 mm) is drawn in magenta in AR's pipe
+modes and in ▤ Plan, where the legend counts it ("crosses a beam"). The routing rule (any agent): a route must pass every
+anchor of its service and **cross no beam**. Check every draft with:
+
+```
+node tools/house-query.mjs beams <house.json>
+```
+
+which lists every beam's world box and every clash (the pipe, the beam, the length inside, how deep it goes). A clash is a
+route to rework or a question for the owner (a notch or a hole through a joist is the builder's call, never assumed).
+
 **The pipe tools work like the conduit tools** (owner, 2026-10-12: "Make the same interaction as conduits"):
 
 - **HEATING · PIPE** (draw, as MARKER · CONDUIT). Trigger a fixture, an existing junction or empty space to

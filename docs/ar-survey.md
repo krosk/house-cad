@@ -1010,6 +1010,11 @@ basement negative). The settled design decisions are in `docs/product-intent.md`
   (`stairwellGeometries` in `src/core/architectural3d.js`; View 3D `userData.stairwell` in `_meshVisible`, AR
   skips it in ALL FLOORS). The slab's square-cut ends stick out ≈ 7 cm past the flight's ends, under the
   floor at the foot and under the top tread at the top (Hypothesis: not noticeable).
+- **BEAM zones** (owner, 2026-10-17): PLAN · ADD offers BEAM · CEILING and BEAM · FLOOR (`ADD_KINDS` in `mr.js`, both
+  add kind `beam`, defaults from `beamBand`), a beam in the slab over the ceiling or under the floor; PLAN · EDIT's band
+  pad edits BOTTOM / TOP (a beam under the floor in depths). The other storey's beams tint this storey's plan
+  (`addOtherBeams`); the pipe modes draw every beam around the floor at its true height and a crossing pipe in magenta.
+  Full rules: `docs/plumbing-workflow.md` "Beams".
 - **RAMP and PLATFORM zones** (owner, 2026-10-12). A RAMP is a smooth STAIRS DOWN: it starts at its
   floor's level at its `climb` end (A/X turns it like a stair) and slopes down to the nearest floor
   below (the garden's driveway down to the garage door, 1.37 m). A PLATFORM is a solid block from its

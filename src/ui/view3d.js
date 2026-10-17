@@ -234,6 +234,7 @@ export class View3D {
       depthTest: true,
       depthWrite: false,
     });
+    this.beamMaterial = new THREE.MeshStandardMaterial({ color: 0xa0703f, roughness: 0.8 }); // BEAM zones: plain wood
     this.stairMaterial = new THREE.MeshStandardMaterial({
       color: 0xc7955f,
       map: wood.map,
@@ -409,7 +410,7 @@ export class View3D {
 
     for (const entry of list) {
       const {
-        geometry, floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, ceilingGeometry,
+        geometry, floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, beamGeometry, ceilingGeometry,
         doorGeometry, windowGeometry, outlineGeometry, stairGeometry, elevation, floorId, name,
         markerPlacements, furniture,
       } = entry;
@@ -420,6 +421,7 @@ export class View3D {
           [wallGeometry, this.wallMaterial, 'walls'],
           [halfWallGeometry, this.wallMaterial, 'walls', true],
           [soffitGeometry, this.wallMaterial, 'walls', true], // ceiling boxing: see-through with the half walls
+          [beamGeometry, this.beamMaterial, 'beams'], // beams in the slabs (src/core/beams.js)
           [doorGeometry, this.doorMaterial, 'doors'],
           [windowGeometry, this.windowMaterial, 'windows'],
           [stairGeometry, this.stairMaterial, 'stairs'],
@@ -445,6 +447,7 @@ export class View3D {
         mesh.userData.floorId = floorId || null;
         mesh.userData.floorName = name || '';
         mesh.userData.architecturalRole = role;
+        if (role === 'beams' && entry.beamSpan) mesh.userData.beamWorld = entry.beamSpan.map((z) => (elevation || 0) + z);
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
@@ -559,6 +562,16 @@ export class View3D {
       for (const item of furniture || []) {
         this._addFurniture(item, entry, furnitureToken);
       }
+    }
+    // A beam also shows with the storey whose slab it sits in (drawn from above, it is in the slab over the
+    // floor below's ceiling): a storey reaching from its floor to its floor-to-floor top.
+    for (const mesh of this.house.children) {
+      const w = mesh.userData.beamWorld;
+      if (!w) continue;
+      mesh.userData.alsoFloorIds = list.filter((e) => e.floorId !== mesh.userData.floorId
+        && w[1] > (e.elevation || 0) - 1e-6 && w[0] < (e.elevation || 0) + (e.storeyHeight || e.height || 2.5) + 1e-6)
+        .map((e) => e.floorId);
+      mesh.visible = this._meshVisible(mesh);
     }
     this._applyModelVisibility();
     this._updateLightShadows();
@@ -1237,7 +1250,8 @@ export class View3D {
 
 
   _meshVisible(mesh) {
-    const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter;
+    const onSelectedFloor = this.floorFilter == null || mesh.userData.floorId === this.floorFilter
+      || !!mesh.userData.alsoFloorIds?.includes(this.floorFilter);
     const role = mesh.userData.architecturalRole;
     if (role === 'outlines' && (this.lightingEnabled || this.realisticEnabled)) return false;
     if (mesh.userData.halfWallFinish && this.halfWallsSeeThrough) return false;

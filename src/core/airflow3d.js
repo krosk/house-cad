@@ -31,8 +31,9 @@ function floorAirInput(floor, result, { hmax, doorsOpen }) {
     else if (k === 'heater') solid.push(box(b, Math.max(0, sill), Math.min(H, head)));
     else if (k === 'furniture') solid.push(box(b, r.foot ?? 0, r.top ?? 0));
     else if (k === 'soffit') solid.push(box(b, Math.min(H, r.foot ?? H), H));
+    else if (k === 'beam' && (r.foot ?? H) < H - 1e-6 && (r.top ?? 0) > 1e-6) solid.push(box(b, Math.max(0, r.foot), Math.min(H, r.top))); // only the part hanging into the room
     else continue;
-    if (k !== 'furniture' && k !== 'heater' && k !== 'soffit') { cutsX.push(b.x0, b.x1); cutsY.push(b.y0, b.y1); }
+    if (k !== 'furniture' && k !== 'heater' && k !== 'soffit' && k !== 'beam') { cutsX.push(b.x0, b.x1); cutsY.push(b.y0, b.y1); }
   }
   // Boundary flows (m³/s): + in, − out. A point source sits in the nearest air cell; a stairwell
   // spreads over its overlap box, tagged with its link so the two floors' ends can be paired.

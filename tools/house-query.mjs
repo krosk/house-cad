@@ -16,6 +16,8 @@
 //   node tools/house-query.mjs anchors <house>          every pipe anchor (a point a pipe is known to
 //       pass, docs/plumbing-workflow.md "Pipe anchors"): position, and the nearest pipe of its
 //       service: passes within 5 cm, or how far off it is
+//   node tools/house-query.mjs beams <house>            every beam (docs/plumbing-workflow.md "Beams") as a world box,
+//       then every pipe crossing one: its length inside and how deep its axis goes past the nearest face
 import fs from 'node:fs';
 import { Project } from '../src/core/model.js';
 import { deserializeInto, validateProjectData } from '../src/io/serialize.js';
@@ -23,6 +25,7 @@ import { connectedRoomComponents } from '../src/core/geometry2d.js';
 import { materialTakeoff } from '../src/core/flooring.js';
 import { diagnoseConflicts, isCertain } from '../src/core/conflicts.js';
 import { checkPipeAnchors, PIPE_ANCHOR_TOLERANCE } from '../src/core/pipeAnchors.js';
+import { worldBeams, pipeBeamClashes } from '../src/core/beams.js';
 
 const load = (file) => {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -36,7 +39,21 @@ const box = (b) => `x ${b.x0.toFixed(2)}…${b.x1.toFixed(2)} y ${b.y0.toFixed(2
 const inside = (b, x, y) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1;
 const [cmd, a, b] = process.argv.slice(2);
 
-if (cmd === 'anchors' && a) {
+if (cmd === 'beams' && a) {
+  const p = load(a);
+  const beams = worldBeams(p);
+  if (!beams.length) console.log('no beam');
+  for (const b of beams) {
+    console.log(`${b.floor.name.padEnd(12)} ${b.rect.id.padEnd(6)} ${box(b)} z ${b.z0.toFixed(3)}…${b.z1.toFixed(3)}`
+      + ` (band ${b.rect.foot} … ${b.rect.top} on its floor)`);
+  }
+  const clashes = pipeBeamClashes(p);
+  console.log(clashes.length ? `\n${clashes.length} pipe/beam clash(es):` : '\nno pipe crosses a beam');
+  for (const c of clashes) {
+    console.log(`  ${c.pipe.id.padEnd(6)} ${c.pipe.service.padEnd(14)} Ø${mm(c.pipe.diameter || 0.016)} × ${c.beam.rect.id}`
+      + ` (${c.beam.floor.name}): ${mm(c.length)} mm inside, ${mm(c.depth)} mm deep`);
+  }
+} else if (cmd === 'anchors' && a) {
   const rows = checkPipeAnchors(load(a));
   if (!rows.length) console.log('no pipe anchor');
   for (const r of rows) {

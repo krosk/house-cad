@@ -10,7 +10,7 @@
 // Units are meters throughout (maps 1:1 to WebXR world scale later).
 
 import { makeOriginDistance, ORIGIN_ID, solve, solveMarkers, solveConduitNodes, snapM } from './constraints.js';
-import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, FENCE_TOP, SOFFIT_FOOT, STAIR_CLIMBS, hasClimb, stairClimb } from './zoneColors.js';
+import { ZONE_KINDS, APERTURE_DEFAULTS, FURNITURE_BAND, GARDEN_WALL_TOP, FENCE_TOP, SOFFIT_FOOT, BEAM_BAND, STAIR_CLIMBS, hasClimb, stairClimb } from './zoneColors.js';
 import { translateFloor } from './translate.js';
 import { isSwitch, linkRocker } from './electrical.js';
 import { cleanHeat, cleanFloorHeat, OPENING_KINDS } from './heatLoss.js';
@@ -211,6 +211,11 @@ export class Rectangle {
     } else if (this.kind === 'soffit') {
       // A ceiling boxing (zoneColors.js SOFFIT_FOOT): solid from `foot` up to the ceiling.
       this.foot = Number.isFinite(foot) && foot >= 0 ? foot : SOFFIT_FOOT;
+    } else if (this.kind === 'beam') {
+      // A beam (zoneColors.js BEAM_BAND): solid from `foot` to `top`, m from its floor; negative = under it.
+      const ok = Number.isFinite(foot) && Number.isFinite(top) && foot < top;
+      this.foot = ok ? foot : BEAM_BAND.foot;
+      this.top = ok ? top : BEAM_BAND.top;
     } else if (this.kind === 'insulation' || this.kind === 'wall') {
       // Thermal resistance R (m²K/W) from the product label or the wall's build-up, for
       // the heat-loss calculation (docs/heat-loss.md); or its material's conductivity λ
@@ -263,6 +268,7 @@ export class Rectangle {
       else if (this.kind === 'gardenwall') { delete this.foot; this.top = GARDEN_WALL_TOP; }
       else if (this.kind === 'fence') { delete this.foot; this.top = FENCE_TOP; }
       else if (this.kind === 'soffit') { delete this.top; this.foot = SOFFIT_FOOT; }
+      else if (this.kind === 'beam') { this.foot = BEAM_BAND.foot; this.top = BEAM_BAND.top; }
       else { delete this.foot; delete this.top; }
     }
     return this;

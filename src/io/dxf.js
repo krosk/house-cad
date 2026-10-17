@@ -35,6 +35,7 @@ const LAYERS = [
   ['STAIRS', 2, 'CONTINUOUS'],
   ['CABINET', 6, 'CONTINUOUS'],
   ['FURNITURE', 30, 'CONTINUOUS'],
+  ['BEAM', 30, 'DASHED'], // a beam in a slab (src/core/beams.js)
   ['DIMS', 8, 'DASHED'],
   ['DIMS_EXT', 8, 'DOTTED'],
   ['MARKER_DIMS', 30, 'DASHED'],

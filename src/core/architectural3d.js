@@ -328,7 +328,7 @@ function fitWallsToRooms(floor, boxes, spaces, height, reach) {
   });
 }
 
-function boxesGeometry(boxes) {
+export function boxesGeometry(boxes) {
   const geometries = boxes.map((b) => {
     const geometry = new THREE.BoxGeometry(b.x1 - b.x0, b.z1 - b.z0, b.y1 - b.y0);
     geometry.translate((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, -(b.y0 + b.y1) / 2);
@@ -866,6 +866,13 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const soffits = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'soffit' && validBounds(r.bounds))
     .map((r) => ({ ...r.bounds, z0: Math.min(Math.max(0, r.foot ?? H), H), z1: H, source: 'soffit' }))
     .filter((b) => b.z1 - b.z0 > EPS);
+  // Beams (zoneColors.js BEAM_BAND, src/core/beams.js): solid from their foot to their top, m from this floor, in
+  // the slab over the ceiling or (negative) under the floor. One merged geometry; `beamSpan` [min foot, max top]
+  // lets a viewer also show them with the storey whose slab they sit in.
+  const beams = (floor?.rectangles || []).filter((r) => zoneKind(r) === 'beam' && validBounds(r.bounds) && (r.top ?? 0) > (r.foot ?? 0) + EPS)
+    .map((r) => ({ ...r.bounds, z0: r.foot ?? 0, z1: r.top ?? 0, source: 'beam' }));
+  const beamGeometry = boxesGeometry(beams);
+  const beamSpan = beams.length ? [Math.min(...beams.map((b) => b.z0)), Math.max(...beams.map((b) => b.z1))] : null;
   const wallGeometry = boxesGeometry([...solidBoxes, ...gardenWalls]);
   // Apart from the walls so View 3D's see-through toggle reaches them (owner, 2026-10-14).
   const soffitGeometry = boxesGeometry(soffits);
@@ -876,7 +883,7 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip, { openDoors: !!opts.openDoors });
   const stairGeometry = stairsGeometry(floor, opts);
   return {
-    floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, ceilingGeometry, doorGeometry, windowGeometry,
+    floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, beamGeometry, beamSpan, ceilingGeometry, doorGeometry, windowGeometry,
     outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial),
     pavedParts: pavedParts(floor, opts.fillDepth ?? 0, opts.fenceMaterial),
     stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),

@@ -27,7 +27,7 @@ import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
 import { materialsFor, materialById, zoneMaterial, materialName, markerProduct, markerProductDraws, DEVICE_SURFACE, productFitsMarker } from '../core/materials.js';
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
-import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements, fenceFoot } from '../core/architectural3d.js';
+import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements, fenceFoot, boxesGeometry } from '../core/architectural3d.js';
 import { windowSwings, leafDirection } from '../core/windowSwing.js';
 import { paintFinish } from './textureWorker.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
@@ -57,11 +57,12 @@ import { AIR_INLETS, nextAirInlet } from '../core/airInlets.js';
 import { runAirflow, AIRFLOW_SCENARIOS } from '../core/airflow.js';
 import { houseAirInput, solveHouse3d } from '../core/airflow3d.js';
 import { floorHeatLoss, houseHeatLoss, houseBalance, roomHeaters, roomHeatLoss, heatSettings, floorHeat, OPENING_KINDS, isGlazedKind, LAYER_KINDS, zoneLambda } from '../core/heatLoss.js';
-import { CONDUIT_COLOR, PIPE_SERVICE_COLOR } from './planLayers3d.js'; // shared with View 3D's PLAN mode
+import { CONDUIT_COLOR, PIPE_SERVICE_COLOR, FITTING_FLAG_COLOR } from './planLayers3d.js'; // shared with View 3D's PLAN mode
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, hasClimb, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
 import { PIPE_ANCHOR_SERVICES } from '../core/pipeAnchors.js';
+import { beamBand, beamUnder, beamsAround, worldBeams, pipeBeamClashes } from '../core/beams.js';
 
 const ACCENT = 0x4ea1ff;
 const C_TELEPORT = 0x38bdf8;
@@ -2168,6 +2169,16 @@ export function setupMR(view, project, getFootprint) {
     }
   };
 
+  // A beam drawn from the other side of a slab (src/core/beams.js: stored on the storey it was measured from)
+  // still shows on this storey's plan, as the same tint as its own beams, one mesh. Not pickable here.
+  const addOtherBeams = (floor) => {
+    const geo = rectFillGeo(beamsAround(project, floor).filter((b) => b.floor !== floor).map((b) => b.rect));
+    if (!geo) return;
+    const mesh = new THREE.Mesh(geo, zoneFillMat('beam'));
+    mesh.position.y = 0.001 + ZONE_KINDS.indexOf('beam') * 0.0003;
+    planGroup.add(mesh);
+  };
+
   // Plan symbols for the aperture zones (door swing, window casement, half-wall
   // hatch) and the stairs' tread/arrow, drawn as thin floor strips so AR and the printed sheet stay legible
   // side by side. Segments come from the SAME shared module the sheet/DXF use, so
@@ -2704,6 +2715,7 @@ export function setupMR(view, project, getFootprint) {
     const fillGeo = footprintFloorGeometry(footprint); // merged fill = room free space
     if (fillGeo) planGroup.add(new THREE.Mesh(fillGeo, fillMat));
     addZoneFills(floor, 0); // faint per-kind tint for the subtract zones on top
+    addOtherBeams(floor);   // the beams drawn from the storey above or below, in this storey's slabs
     addApertureGlyphs(floor, 0); // door swing / window casement / half-wall hatch
     // Per-rectangle edge strips, colored per kind (see edgeMat / zoneColors.js).
     // Non-active zones sit lower; the active zone is a lightened tint and on top.
@@ -4064,6 +4076,7 @@ export function setupMR(view, project, getFootprint) {
     const nodeById = new Map((project.pipeNodes || []).map((n) => [n.id, n]));
     const positions = [], colors = [], indices = [];
     const runIndex = new Map(), quads = new Map();
+    const clashing = new Set(pipeBeamClashes(project).map((c) => c.pipe.id)); // drawn in the beam flag colour
     for (const pipe of project.pipes || []) {
       const aNode = nodeById.get(pipe.a), bNode = nodeById.get(pipe.b);
       const aWorld = aNode && pipeNodePos(aNode), bWorld = bNode && pipeNodePos(bNode);
@@ -4077,7 +4090,7 @@ export function setupMR(view, project, getFootprint) {
       for (const i of [0, 1, 2, 0, 2, 3]) own.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
       quads.set(pipe.id, own);
       for (const n of pos) positions.push(n);
-      _cc.setHex(pipeColor(pipe));
+      _cc.setHex(clashing.has(pipe.id) ? FITTING_FLAG_COLOR.beam : pipeColor(pipe));
       for (let k = 0; k < 4; k++) colors.push(_cc.r, _cc.g, _cc.b, PIPE_BASE_ALPHA);
       indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
       quad.geometry.dispose(); quad.material.dispose();
@@ -4095,6 +4108,18 @@ export function setupMR(view, project, getFootprint) {
       runs.renderOrder = 14;
       runs.frustumCulled = false;
       pipeGroup.add(runs);
+    }
+    // The beams around the shown floor (src/core/beams.js) at their true height: one translucent mesh.
+    const beamBoxes = (allFloorsView ? worldBeams(project) : beamsAround(project, project.activeFloor))
+      .map((b) => { const lo = planLocalZ({ z: b.z0 }).z, hi = planLocalZ({ z: b.z1 }).z; return { ...b, z0: lo, z1: hi }; });
+    const beamGeometry = boxesGeometry(beamBoxes);
+    if (beamGeometry) {
+      const beams = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({
+        color: 0xa0703f, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      }));
+      beams.renderOrder = 13; // under the pipe runs (14)
+      beams.frustumCulled = false;
+      pipeGroup.add(beams);
     }
     const overlay = new THREE.Mesh(new THREE.BufferGeometry(), pipeMaterial());
     overlay.renderOrder = 17;
@@ -5300,6 +5325,7 @@ export function setupMR(view, project, getFootprint) {
     windows: exteriorGlassMaterial(),
     ceiling: new THREE.MeshLambertMaterial({ color: 0xf7f6f2, side: THREE.DoubleSide }),
     stairs: new THREE.MeshLambertMaterial({ color: 0xd6c3a5, side: THREE.DoubleSide }),
+    beams: new THREE.MeshLambertMaterial({ color: 0xa0703f, side: THREE.DoubleSide }),
     outlines: new THREE.LineBasicMaterial({ color: 0x475569 }),
   };
   // One Lambert per fence colour (a fence's look is its material, materials.js); never disposed.
@@ -5370,7 +5396,7 @@ export function setupMR(view, project, getFootprint) {
       // material: products are many small meshes, drawn once per eye.
       const layers = {
         struct: [
-          [a.wallGeometry, arch3dMats.walls], [a.soffitGeometry, arch3dMats.walls], [a.doorGeometry, arch3dMats.doors],
+          [a.wallGeometry, arch3dMats.walls], [a.soffitGeometry, arch3dMats.walls], [a.beamGeometry, arch3dMats.beams], [a.doorGeometry, arch3dMats.doors],
           [a.windowGeometry, arch3dMats.windows], [a.stairGeometry, arch3dMats.stairs],
           [a.ceilingGeometry, arch3dMats.ceiling],
           // The stairwell walls around a flight going down: only with this floor alone (the floor
@@ -5480,7 +5506,11 @@ export function setupMR(view, project, getFootprint) {
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one
   // ADD action instead of separate zone modes. ROOM adds; every other semantic
   // zone currently subtracts while keeping its distinct saved kind.
-  let currentZoneKind = ZONE_KINDS[0]; // ZONE_KINDS + zoneKind imported from zoneColors.js
+  // PLAN · ADD's list: the zone kinds, with BEAM twice (owner, 2026-10-17): BEAM · CEILING ('beam', in the slab
+  // over this storey's ceiling) and BEAM · FLOOR ('beam_floor', in the slab under its floor). Both add a `beam`.
+  const ADD_KINDS = ZONE_KINDS.flatMap((k) => (k === 'beam' ? ['beam', 'beam_floor'] : [k]));
+  const addKindZone = (k) => (k === 'beam_floor' ? 'beam' : k);
+  let currentZoneKind = ADD_KINDS[0]; // ZONE_KINDS + zoneKind imported from zoneColors.js
   const zoneOp = (k) => (k === 'room' ? 'add' : 'subtract');
   const zoneKindOf = (r) => zoneKind(r);
   const zoneColor = (k) => zoneColorHex(k); // shared per-kind palette (mode chip + HUD readouts)
@@ -6683,8 +6713,8 @@ export function setupMR(view, project, getFootprint) {
   // PLAN · ADD thumbstick-y: pick which kind the next trigger places. All non-room
   // kinds currently share subtract geometry, but the rectangle keeps its identity.
   function cycleZoneKind(dir = 1) {
-    const i = ZONE_KINDS.indexOf(currentZoneKind);
-    currentZoneKind = ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length];
+    const i = ADD_KINDS.indexOf(currentZoneKind);
+    currentZoneKind = ADD_KINDS[(i + dir + ADD_KINDS.length) % ADD_KINDS.length];
     // The mode breadcrumb deliberately stays PLAN · ADD. The dedicated TYPE
     // readout is the sole UI label that changes with the zone type.
     rlog('zone kind', { kind: currentZoneKind });
@@ -7994,14 +8024,16 @@ export function setupMR(view, project, getFootprint) {
   // Drop a throwaway starter rectangle (ROOM = add; every other kind = subtract) at the user's
   // standing position — no floor touch needed, since the box is throwaway and its
   // edges get pushed to the real walls in EDGE mode. It becomes the active rect.
-  function dropRect(kind) {
+  function dropRect(addKind) {
     if (!placed) return; // need a registered frame (ORIGIN) to define plan space
+    const kind = addKindZone(addKind);
     const e = renderer.xr.getCamera().matrixWorld.elements; // headset world pos
     _drop.set(e[12], floorY, e[14]);
     const { px, py } = worldToPlan(_drop);
     const half = 0.75; // 1.5 m starter box — size is throwaway, edges get pushed
     const op = zoneOp(kind);
-    const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op, kind });
+    const rect = new Rectangle({ x: px - half, y: py - half, w: 2 * half, h: 2 * half, op, kind,
+      ...(kind === 'beam' ? beamBand(project, project.activeFloor, addKind === 'beam_floor') : {}) });
     project.addRectangle(rect);
     surveyed.push(rect.id);
     activeRect = rect;
@@ -8019,6 +8051,7 @@ export function setupMR(view, project, getFootprint) {
     const current = zoneKindOf(selectedRect);
     const i = ZONE_KINDS.indexOf(current);
     selectedRect.setKind(ZONE_KINDS[(i + dir + ZONE_KINDS.length) % ZONE_KINDS.length]);
+    if (selectedRect.kind === 'beam') Object.assign(selectedRect, beamBand(project, project.activeFloor));
     project.touch();
     buildPlan();
     applyPlanMatrix();
@@ -8057,8 +8090,9 @@ export function setupMR(view, project, getFootprint) {
     : ROOM_FIELDS.has(f) ? t(`room.${f}`)
     : selectedRect?.kind === 'gardenwall' ? t(`gardenwall.${f}`)
     : selectedRect?.kind === 'fence' ? t(`fence.${f}`)
+    : selectedRect?.kind === 'beam' ? t(`beam.${f}${beamUnder(selectedRect) ? 'Down' : ''}`)
     : (f === 'foot' || f === 'top') ? t(`furniture.${f}`) : t(`aperture.${f}`);
-  const bandKindLabel = () => selectedRect ? t(`mode.${zoneKindOf(selectedRect)}`) : '';
+  const bandKindLabel = () => selectedRect ? t(beamUnder(selectedRect) ? 'mode.beam_floor' : `mode.${zoneKindOf(selectedRect)}`) : '';
   const bandTitle = () => `${bandKindLabel()}  ·  ${bandFieldLabel(bandField)}`;
   // SWAP names the field it switches TO (null when a single bound is editable → inert).
   const bandSwapLabel = () => {
@@ -8077,6 +8111,7 @@ export function setupMR(view, project, getFootprint) {
       : THERMAL_FIELDS.has(bandField) ? (selectedRect[bandField] != null ? String(selectedRect[bandField]) : '')
       : ROOM_FIELDS.has(bandField) ? roomFieldValue(selectedRect, bandField)
       : selectedRect.kind === 'fence' && bandField === 'foot' ? fmt(fenceFoot(project.activeFloor, selectedRect))
+      : beamUnder(selectedRect) ? fmt(-(selectedRect[bandField] ?? 0)) // depths under the floor (the pad has no minus key)
       : fmt(selectedRect[bandField] ?? 0);
     bandPristine = true;
     redrawBandPad();
@@ -8140,7 +8175,11 @@ export function setupMR(view, project, getFootprint) {
       if (bandField === 'top' && !(m > foot)) { rlog('fence top rejected (<= foot)', { id: selectedRect.id, m }); return; }
     }
     if (!Number.isFinite(val) || val < 0) return; // negatives rejected; 0 = at the floor
-    const m = toMeters(val);
+    // A beam under the floor (BEAM · FLOOR) reads depths: 25 = 25 cm under the floor. Its top stays ≤ 0,
+    // so it never flips to the ceiling reading while typed.
+    const under = beamUnder(selectedRect);
+    const m = under ? -toMeters(val) : toMeters(val);
+    if (under && bandField === 'top' && m > 0) return;
     // A furniture zone carrying a product has the product's fixed height: either bound
     // moves the whole unit (a wall unit lifted above its old top was rejected before).
     const productH = selectedRect.kind === 'furniture' && selectedRect.productMm ? selectedRect.productMm[1] / 1000 : 0;
@@ -10579,12 +10618,12 @@ export function setupMR(view, project, getFootprint) {
         : getOutputSettings().format === 'link' ? 'LINK · 3D VIEW'
         : getOutputSettings().format === 'qr' ? 'QR · 3D VIEW' : getOutputSettings().format.toUpperCase()}` : null;
     checkRemovedDims();
-    const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(selectedRect.outdoor ? 'mode.outdoor_room' : `mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
+    const typeName = dropKind ? t(`mode.${dropKind}`) : editKind ? t(selectedRect.outdoor ? 'mode.outdoor_room' : beamUnder(selectedRect) ? 'mode.beam_floor' : `mode.${editKind}`) : markerType ? t(`marker.${markerType}`) : null;
     const mergeHint = modes[currentMode].id === 'marker' && selectedMarker && project.switchPairPartner(selectedMarker.id)
       ? `\n${t('marker.mergePair')}` : '';
     const readoutText = typeName ? `${t('zone.type')} · ${typeName}${mergeHint}` : translateStatus || linkStatus || wireStatus || checkStatus || matStatus || pipeStatus || exportStatus || heatRStatus || inletStatus || heatStatus
       || (conflictReadout ? conflictReadout.map(([text]) => text).join('\n') : hovDim);
-    const readoutColor = dropKind ? zoneColor(dropKind) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
+    const readoutColor = dropKind ? zoneColor(addKindZone(dropKind)) : editKind ? zoneColor(editKind) : markerType ? C_MARKER
       : checkStatus ? checkColors
       : matStatus ? matColors
       : pipeStatus ? pipeColor(selectedPipe || { service: currentPipeService })
