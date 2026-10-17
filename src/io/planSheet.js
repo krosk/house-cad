@@ -87,7 +87,11 @@ const MARKER_LABELS = {
   tv_antenna: 'TV antenna',
   camera_ethernet: 'Camera Ethernet',
   patch_panel: 'Patch panel', intercom: 'Intercom', panel: 'Panel',
+  pipe_anchor_heating: 'Pipe anchor (heating)', pipe_anchor_water: 'Pipe anchor (water)',
+  pipe_anchor_waste: 'Pipe anchor (waste)', pipe_anchor_vmc: 'Pipe anchor (VMC)',
 };
+// A pipe anchor's sheet glyph: a hole ring with the service's letter (src/core/pipeAnchors.js).
+const PIPE_ANCHOR_LETTER = { pipe_anchor_heating: 'H', pipe_anchor_water: 'W', pipe_anchor_waste: 'D', pipe_anchor_vmc: 'V' };
 const MARKER_RECOMMENDED_AMPS = {
   outlet_cooktop: 32,
   outlet_oven: 20,
@@ -712,7 +716,11 @@ function drawMarkerPins(be, L, floor, layers) {
 // the legend so a symbol always reads the same in both.
 export function drawMarkerGlyph(be, cx, cy, type, size = 2.6) {
   const r = size / 2;
-  if (type === 'switch') {
+  if (PIPE_ANCHOR_LETTER[type]) {
+    be.circle(cx, cy, r, { fill: '#fff', stroke: C_MARK, width: 0.2 });
+    be.circle(cx, cy, r * 0.78, { fill: '#fff', stroke: C_MARK, width: 0.12 });
+    be.text(PIPE_ANCHOR_LETTER[type], cx, cy + r * 0.05, { fill: C_MARK, size: size * 0.5, align: 'center', baseline: 'middle' });
+  } else if (type === 'switch') {
     be.rect(cx - r, cy - r, size, size, { fill: '#fff', stroke: C_MARK, width: 0.2 });
     be.line(cx - r * 0.5, cy + r * 0.5, cx + r * 0.5, cy - r * 0.5, { stroke: C_MARK, width: 0.25 }); // rocker
   } else if (type === 'switch_dual') {

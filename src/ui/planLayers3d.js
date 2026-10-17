@@ -18,6 +18,7 @@ import { conduitNetworkSegments, conduitNodePos } from '../core/conduit.js';
 import { roomFloorZ } from '../core/storey.js';
 import { derivePipeFittings } from '../core/pipeFittings.js';
 import { ductInsulation, DUCT_INSULATION_M } from '../core/ductInsulation.js';
+import { pipeNodeWorld } from '../core/pipeAnchors.js';
 
 // Shared with AR (mr.js) so a run reads the same colour in both.
 export const CONDUIT_COLOR = 0xa78bfa;
@@ -159,14 +160,7 @@ function networkLayer(runs, nodes) {
   return group;
 }
 
-function pipeNodePos(project, node) {
-  if (node?.markerId) {
-    const found = project.findMarker(node.markerId);
-    if (found) return { x: found.marker.x, y: found.marker.y, z: (found.floor.elevation || 0) + (found.marker.z || 0) };
-  }
-  const floor = project.floorById(node?.floorId);
-  return { x: node?.x || 0, y: node?.y || 0, z: (floor?.elevation || 0) + (node?.z || 0) };
-}
+const pipeNodePos = pipeNodeWorld;
 
 // The plan layers for one floor (floorId) or the whole house (null). A run shows when either
 // end is on the shown floor, so a riser appears on both storeys it joins (as AR). `pipeColor`

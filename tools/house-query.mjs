@@ -13,12 +13,16 @@
 //       zone / marker / conduit node whose solved position, band or U value changed
 //   node tools/house-query.mjs conflicts <house>        each conflicting loop block: its dimensions
 //       and the suspects (one of them alone wrong), stored → the value the others imply
+//   node tools/house-query.mjs anchors <house>          every pipe anchor (a point a pipe is known to
+//       pass, docs/plumbing-workflow.md "Pipe anchors"): position, and the nearest pipe of its
+//       service: passes within 5 cm, or how far off it is
 import fs from 'node:fs';
 import { Project } from '../src/core/model.js';
 import { deserializeInto, validateProjectData } from '../src/io/serialize.js';
 import { connectedRoomComponents } from '../src/core/geometry2d.js';
 import { materialTakeoff } from '../src/core/flooring.js';
 import { diagnoseConflicts, isCertain } from '../src/core/conflicts.js';
+import { checkPipeAnchors, PIPE_ANCHOR_TOLERANCE } from '../src/core/pipeAnchors.js';
 
 const load = (file) => {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -32,7 +36,18 @@ const box = (b) => `x ${b.x0.toFixed(2)}…${b.x1.toFixed(2)} y ${b.y0.toFixed(2
 const inside = (b, x, y) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1;
 const [cmd, a, b] = process.argv.slice(2);
 
-if (cmd === 'conflicts' && a) {
+if (cmd === 'anchors' && a) {
+  const rows = checkPipeAnchors(load(a));
+  if (!rows.length) console.log('no pipe anchor');
+  for (const r of rows) {
+    const near = r.nearest ? `${r.nearest.pipe.id} Ø${mm(r.nearest.pipe.diameter || 0)} at ${mm(r.nearest.dist)} mm` : 'no pipe of its service';
+    console.log(`${r.floor.name.padEnd(12)} ${r.marker.id.padEnd(6)} ${r.marker.type.replace('pipe_anchor_', '').padEnd(8)}`
+      + ` x ${r.at.x.toFixed(3)} y ${r.at.y.toFixed(3)} z ${r.marker.z ?? 0} (world ${r.at.z.toFixed(3)})`
+      + `  ${r.pass ? 'PASS' : 'OFF '} ${r.pass ? r.through.map((t) => `${t.pipe.id} ${mm(t.dist)} mm`).join(', ') : near}`
+      + (r.pass && r.missing.length ? `  (no ${r.missing.join('/')})` : ''));
+  }
+  console.log(`(passes = a pipe axis within ${mm(PIPE_ANCHOR_TOLERANCE)} mm of the anchor)`);
+} else if (cmd === 'conflicts' && a) {
   const p = load(a);
   const end = (ep) => (ep.rect === '__origin__' ? 'origin' : `${ep.rect}.${ep.edge}`);
   for (const f of p.floors) {

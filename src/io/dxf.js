@@ -48,6 +48,7 @@ const LAYERS = [
   ['MARKER_OUTLET_WATER_HEATER', 7, 'CONTINUOUS'],
   ['MARKER_OUTLET_APPLIANCE', 7, 'CONTINUOUS'],
   ['MARKER_INTERCOM', 7, 'CONTINUOUS'],
+  ['MARKER_PIPE_ANCHOR', 7, 'CONTINUOUS'],
   ['MARKER_PANEL', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH', 7, 'CONTINUOUS'],
   ['MARKER_SWITCH_DUAL', 7, 'CONTINUOUS'],
@@ -339,6 +340,7 @@ function writeMarkerDimensions(w, floor, layers) {
 }
 
 function markerLayer(type) {
+  if (String(type).startsWith('pipe_anchor_')) return 'MARKER_PIPE_ANCHOR';
   const layer = `MARKER_${String(type || 'outlet').toUpperCase()}`;
   return LAYERS.some(([name]) => name === layer) ? layer : 'MARKER_OUTLET';
 }
@@ -346,7 +348,12 @@ function markerLayer(type) {
 function writeMarker(w, marker) {
   const layer = markerLayer(marker.type);
   const x = marker.x, y = marker.y, r = 0.08;
-  if (marker.type === 'switch') {
+  if (String(marker.type).startsWith('pipe_anchor_')) {
+    // Pipe anchor (src/core/pipeAnchors.js): a hole ring and its service letter.
+    w.circle(layer, x, y, r);
+    w.circle(layer, x, y, r * 0.78);
+    w.text(layer, { pipe_anchor_heating: 'H', pipe_anchor_water: 'W', pipe_anchor_waste: 'D', pipe_anchor_vmc: 'V' }[marker.type] || 'P', x, y, 0.06);
+  } else if (marker.type === 'switch') {
     w.polyline(layer, [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]);
     w.line(layer, x - r * 0.5, y - r * 0.5, x + r * 0.5, y + r * 0.5);
   } else if (marker.type === 'switch_dual') {

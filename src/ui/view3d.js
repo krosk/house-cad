@@ -23,7 +23,8 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sunPosition, sunDirection, loadSky } from './realism.js';
 import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 import { Ruler3D } from './ruler3d.js';
-import { buildPlanLayers, disposePlanLayer, MODEL_PIPE_COLOR } from './planLayers3d.js';
+import { buildPlanLayers, disposePlanLayer, MODEL_PIPE_COLOR, PIPE_SERVICE_COLOR } from './planLayers3d.js';
+import { PIPE_ANCHOR_SERVICES } from '../core/pipeAnchors.js';
 
 // Desktop/mobile camera (view-only, never saved): the overview's vertical FOV, and the
 // narrowest horizontal FOV POV allows on a portrait screen.
@@ -264,6 +265,7 @@ export class View3D {
     // Groups/Meshes; geometry and materials stay shared across rebuilds.
     this.markerBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
     this.markerSocketGeometry = new THREE.CylinderGeometry(1, 1, 1, 18).rotateX(Math.PI / 2);
+    this.pipeAnchorGeometry = new THREE.TorusGeometry(0.06, 0.008, 8, 32); // a pipe anchor's hole ring, in its XY plane
     this.markerWhiteMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.62 });
     this.markerDarkMaterial = new THREE.MeshStandardMaterial({ color: 0x26313a, roughness: 0.58 });
     this.markerAccentMaterials = new Map();
@@ -524,6 +526,10 @@ export class View3D {
       }
       for (const marker of entry.markers || []) {
         const light = marker.type === 'light';
+        if (PIPE_ANCHOR_SERVICES[marker.type]) {
+          this.markerLights.add(this._pipeAnchorFixture(marker, entry, floorId, elevation, markerPlacements));
+          continue;
+        }
         // A product (docs/materials.md "Switches"): { def, z }, or null when another
         // marker of the same double switch draws it.
         const product = light ? undefined : entry.markerProducts?.get(marker.id);
@@ -677,6 +683,28 @@ export class View3D {
       this.markerAccentMaterials.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.55 }));
     }
     return this.markerAccentMaterials.get(color);
+  }
+
+  // A pipe anchor (src/core/pipeAnchors.js) shows the hole: a ring in its service's pipe colour at
+  // the marker itself (never moved onto a face). On the floor or the ceiling it lies flat (a slab
+  // hole); elsewhere it stands in the plane of its nearest wall (a wall hole).
+  _pipeAnchorFixture(marker, entry, floorId, elevation, markerPlacements) {
+    const service = PIPE_ANCHOR_SERVICES[marker.type][0];
+    const color = PIPE_SERVICE_COLOR[service] ?? 0x94a3b8;
+    if (!this.markerAccentMaterials.has(color)) {
+      this.markerAccentMaterials.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.55 }));
+    }
+    const ring = new THREE.Mesh(this.pipeAnchorGeometry, this.markerAccentMaterials.get(color));
+    const z = Number.isFinite(marker.z) ? marker.z : 0;
+    const ceiling = entry.height ?? 2.5; // the ceiling height (main.js)
+    const place = markerPlacements?.get(marker.id);
+    if (z <= 0.05 || z >= ceiling - 0.05 || !place?.snapped) ring.rotation.x = Math.PI / 2;
+    else ring.rotation.y = Math.atan2(place.nx, -place.ny);
+    ring.position.set(Number(marker.x) || 0, (elevation || 0) + z, -(Number(marker.y) || 0));
+    ring.userData.floorId = floorId || null;
+    ring.userData.markerId = marker.id || null;
+    ring.visible = this.floorFilter == null || ring.userData.floorId === this.floorFilter;
+    return ring;
   }
 
   _lightMarkerFixture() {

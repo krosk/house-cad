@@ -18,21 +18,23 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-16 (session 40 ended; the Quest reachable, last read 288 795)
+**Date:** 2026-10-17 (session 41 ended; the Quest reachable, last read 287 012)
 
 **Status:**
-- Proven (git, Actions run success, `version.json`, `update-app` on 10-16): the code head is `d3f566e` (View 3D 👁 Show
-  menu, ▭ Ceiling see-through, duct insulation marking), pushed, served ("d3f566e 1015-2240Z") and installed on the
-  headset (it opens on the next app launch).
-- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-16,
+- Proven (git, Actions run success, `version.json`, `update-app` on 10-17): the head is `bd9f0ec` (docs only), pushed,
+  served ("bd9f0ec 1016-2358Z") and installed on the headset; the last code commit is `dd00055` (the Aldes BDH vent
+  models, builder `vmc-vent-bdh`), so the headset app knows the BDH articles.
+- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-17, 287 012 chars:
+  option 4i + the bed** (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
+  backup `quest-backup-1017-4i`): unit B moved and turned, the BDH vents, column r263 (sill 2.7), bed r264 with dims
+  c1569/c1570, r254 and r261 removed. **287 012 is the base for the next write.** Before it, 2026-10-16,
   288 795 chars (the bedroom box r255 and the alcove column r256 replaced by a corner column r261, the ducts 45° through
   the slab, parallel 45° turns in the laundry, r254 grown to 57.35 cm: `docs/plumbing-workflow.md` "The bedroom box
   replaced by a corner column"). Before it, 287 813 (the kitchen corner box r254 narrowed to 30 cm), 287 829 (the bath duct's two flat corners as 45° pairs), and 287 516 (2026-10-15: fix A at the alcove and the longer laundry 45° pair: `docs/plumbing-workflow.md` "Fittings to datasheet
   sizes"). Before it, 287 526 (the ground bathroom and kitchen VMC ducts moved into the attic, the kitchen boxes removed:
   "Ground-floor ducts in the attic"), and 287 926 (the upper WC drain as layout S + column r122 narrowed to 35.5 cm, replacing T1 at
   287 757; resolved with real Nicoll/Geberit parts:
-  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). 288 795 is the base for the
-  next write.** Backups `quest-backup-1016-col` (pre-column), `quest-backup-1016-box` (pre-box), `quest-backup-1016-bath45` (pre-45° pairs), `quest-backup-1015-fixA` (pre-fix A), `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
+  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). 288 795 was the base until 10-17.** Backups `quest-backup-1016-col` (pre-column), `quest-backup-1016-box` (pre-box), `quest-backup-1016-bath45` (pre-45° pairs), `quest-backup-1015-fixA` (pre-fix A), `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
@@ -41,17 +43,17 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   a scratch/desktop browser, and nothing from items 47–84 has been seen on the Quest. Item 83's controls, ceiling
   see-through and insulation jackets were seen only in headless Chrome screenshots (the demo house and a made-up test
   house); the View 3D fittings (`6da6a2b`) and anything on the owner's own plan were never seen in a browser.
-- **Not written (drafts in the scratchpad, session-local):** option 4i (`draft-4i-final.json`, the current layout:
+- **Written 10-17:** option 4i with the bed (above). Its build chain, for reference:
   chain `opt4f.mjs` (NOBOX=1, GEO with YB0 −1.96, XU 0.46) → `move4h.mjs` (KS=1, CX −0.495) → `up100.mjs` → `final4i.mjs`,
   each on the previous output, from the 288 795 read; it already holds the BDH vents, so `draft-bdh.json` is folded in), option 4d (superseded by 4i), option 1e (`draft-col5.json`, rebuild with
   `colStack5.mjs` on the 288 795 read: the laundry's two short 90° turns become one long 45° diagonal each; the
   owner's last instruction before the VMC sizing questions), and a bed draft (`draft-bed.json`, STOCKHOLM r262 in
   bedroom r51 for a legroom check), and the BDH vent swap (`draft-bdh.json` via `editBdh.mjs` on the 288 795 read:
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
-  ceiling/wall contact and duct nodes kept; solves clean). It needs a build with `vmc-vent-bdh` deployed first. See item 86.
-- Uncommitted at the end of session 40: this handoff and `docs/plumbing-workflow.md` (the 287 813 box write, the
-  288 795 column write, and item 86's vent and sizing findings recorded), both mine; commit them if `git status` still
-  shows them.
+  ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
+  r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
+- Uncommitted at the end of session 41: this handoff and `docs/plumbing-workflow.md` (the kitchen age-of-air run and the
+  PORT_REACH trap, added after `bd9f0ec`), both mine; commit them if `git status` still shows them.
 
 ## What the app is today
 
@@ -203,7 +205,7 @@ plan.
   rerouted (new cn352): **written (288 795)**. `docs/plumbing-workflow.md` "The bedroom box replaced by a corner column".
   Option 2 (no box at all, through the bedroom floor's lintel gap) set aside until the gap is measured.
 - **86** VMC laundry layout and duct/vent sizing (owner questions, 10-16; nothing written):
-  - **Option 4i drafted, final form sent (10-17; supersedes 4d as the next write):** 4d with the shower vent moved onto the
+  - **Option 4i written to the headset with the bed (10-17, 287 012 chars):** 4d with the shower vent moved onto the
     duct line (11 cm from the wall, the owner's deliberate deviation from Aldes' 20 cm), the shower Ø80 slanting 45°
     through the 41.5 wall's top from the attic (no kitchen box), unit B moved to the laundry's north-east part and turned
     (outlet straight south, 1.87 m Ø160 flexible), the upper duct Ø100 in the basement (sealed Ø80 above). The owner plans
@@ -224,7 +226,14 @@ plan.
     x ≈ −1.27. Four 45° per duct instead of six; column and box unchanged; no clash; bath 12.47 m, kitchen 8.90 m.
     Option 1d (north-west slants, tilted elbow planes; bath +3.55 cm north, column 44.9) was set aside for 1e
     (owner: "I am ok if the duct land westward in basement before turning 45").
-  - **Open owner choices** (the redraft depends on them): kitchen Ø125 (as drawn) or Ø100 with two Ø125→Ø100
+  - **Everyday flows and air (10-17, Hypothesis):** an operating-point simulation (`simFlow.mjs`) finds every unit delivers
+    every vent's humidity flow at 40–50 % RH; at the evening peak the Classic's showers fall to ≈ 31.5 of 35 m³/h in wind,
+    the MW to ≈ 34, the HP+ none. The app's age-of-air model (`kitchenAge.mjs`, `ageMap.mjs`; assumed EHB² inlets and two
+    sleepers per bedroom, not in the plan) finds no stagnant kitchen pocket on 4i (91–95 min, the air arriving ≈ 1.5 h old
+    from the living room); the weak point is the bedrooms at night (≈ 15–23 m³/h each, ≈ 1 850–2 260 ppm CO₂ from the
+    10-12 runs), not the kitchen.
+  - ~~**Open owner choices**~~ (settled 10-17: kitchen Ø125 and shower Ø80, both flexible; upper Ø80 sealed + Ø100 in the
+    basement) (the redraft depends on them): kitchen Ø125 (as drawn) or Ø100 with two Ø125→Ø100
     eccentric reducers (C51 daily 15–55 fine, boost ≈ 113–124 instead of 135; the hood covers cooking); ground shower
     Ø100 (as drawn) or Ø80 (fine at the BW51's 35); the upper bath Ø100 (as drawn) or Ø80 (Hypothesis ≈ 21 Pa at 35). Owner settled: **one vent per bathroom**
     (both are combined shower + WC rooms; r107 + r62 is one room), **Ø160 insulated flexible** on B's outlet.
@@ -232,7 +241,7 @@ plan.
     "3x Bouches Bdh"; the approval is 14.5/25-2320_V2. F4 (owner: 3 bedrooms + living), Hygro B: kitchen **C51**
     (to buy; Ø125 cordelette 11015167), a **BW51** in each bathroom (CORD wanted, no presence), the owner's **B51** in
     the laundry; the owner's W16 has no room. Modelled: builder `vmc-vent-bdh`, entries `aldes-bdh-sanitaire[-ceiling]`,
-    `aldes-bdh-cuisine[-ceiling]` (uncommitted at the end of session 41).
+    `aldes-bdh-cuisine[-ceiling]` (`dd00055`).
   - All in `docs/plumbing-workflow.md` under "The bedroom box replaced by a corner column" (the loss method, the
     vent flows, B's 221 m³/h capacity risk).
 
@@ -241,6 +250,7 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 ## Standing decisions (the "why" is in the docs)
 
 **Process**
+- **Pipe anchors (2026-10-17):** before drafting or writing any pipe route, run `node tools/house-query.mjs anchors <house>`; a route must pass every anchor of its service (`docs/plumbing-workflow.md` "Pipe anchors"). Anchors are beacons only, no app function.
 - **Label every claim Proven or Hypothesis** (in reports, commit bodies and docs).
 - **Git:**
   - commit + push directly on `main`, only when asked; **every push publishes**;
@@ -339,6 +349,13 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   The QR drops markers and the network.
 
 ## Findings / traps worth knowing
+
+**Air model and drafts (session 41)**
+- `src/core/airflow.js` treats a `vmc` duct end within 15 cm (`PORT_REACH`) of a VMC unit's footprint as a unit port,
+  not a vent: 4i's laundry stub ends 12.9 cm from unit B, so the model silently drops the laundry vent (and with it all
+  basement airflow). Lengthen the stub (≥ 15 cm clear) before trusting a basement run. Proven by reading the code and a run.
+- A `halfwall` zone's `sill` is its top (default 1.1): a new floor-to-ceiling column needs `sill: 2.7`, or it shows low
+  (the owner caught it on 4i's column r263; the share link carries the sill).
 
 **Headset**
 - **Never run `adb shell pm clear com.krosk.housecad`:** it wipes the owner's autosave and slots.
@@ -477,7 +494,9 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   `apply --unidiff-zero` or `stash --keep-index`.
 - **`rlog` works only on the dev server;** never stage `quest-debug.log`.
 
-## Commits (session 40; all pushed, doc-only omitted; earlier sessions: `git log`)
+## Commits (sessions 40–41; all pushed, doc-only omitted; earlier sessions: `git log`)
+
+Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs. Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -530,8 +549,9 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
-0. **Item 86 on option 4i:** the owner's unit choice and the open checks (wall top, lintels, terminal), then W of
-   `draft-4i-final.json` with the bed draft chained (recompute ids), fresh read == 288 795. ~~Finish item 86 on option 4d~~
+0. **Item 86 after the 4i write:** the owner's unit choice (Classic / MW / HP+) and the open checks (wall top at slab height
+   where the shower duct slants, attic lintels at y −1.96, the outlet terminal); on the headset, the laundry stub ends
+   12.9 cm from unit B (inside airflow.js's 15 cm PORT_REACH: the app's air model ignores the laundry vent). ~~Finish item 86 on option 4d~~
    (done through 4e–4i; the vents' furniture, losses and share link are in 4i). Older wording kept for its steps: get the owner's choices (kitchen Ø125/Ø100, ground shower Ø80/Ø100, the bathroom vent model),
    redraft on 1e (`colStack5.mjs` + a sizing edit: pipe `diameter` and the reducers' nodes; the column/box follow the
    largest socket), check (`fitTest.mjs`, `solveChk.mjs`, `clashAbs.mjs`, `house-query diff`), drawing, then W

@@ -61,6 +61,7 @@ import { CONDUIT_COLOR, PIPE_SERVICE_COLOR } from './planLayers3d.js'; // shared
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, hasClimb, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
+import { PIPE_ANCHOR_SERVICES } from '../core/pipeAnchors.js';
 
 const ACCENT = 0x4ea1ff;
 const C_TELEPORT = 0x38bdf8;
@@ -2715,8 +2716,23 @@ export function setupMR(view, project, getFootprint) {
     markerFace(ctx, marker.type);
   }
 
+  // Pipe anchor faces: the service's pipe colour (VMC darker, to read on the white plate) and a letter.
+  const PIPE_ANCHOR_FACE = {
+    pipe_anchor_heating: ['#f97316', 'H'], pipe_anchor_water: ['#38bdf8', 'W'],
+    pipe_anchor_waste: ['#a16207', 'D'], pipe_anchor_vmc: ['#64748b', 'V'],
+  };
   // Per-type faceplate interior, drawn inside the shared white faceplate above.
   function markerFace(ctx, type) {
+    if (PIPE_ANCHOR_SERVICES[type]) {
+      // Pipe anchor (src/core/pipeAnchors.js): a hole ring in the service's colour, its letter inside.
+      const [color, letter] = PIPE_ANCHOR_FACE[type];
+      ctx.beginPath(); ctx.arc(64, 64, 26, 0, Math.PI * 2);
+      ctx.lineWidth = 9; ctx.strokeStyle = color; ctx.stroke();
+      ctx.fillStyle = '#334155'; ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(letter, 64, 66);
+      return;
+    }
     if (['radiator', 'boiler', 'sink', 'washing_machine'].includes(type)) {
       ctx.strokeStyle = '#334155'; ctx.fillStyle = '#dbeafe'; ctx.lineWidth = 4;
       if (type === 'radiator') {
@@ -5435,6 +5451,7 @@ export function setupMR(view, project, getFootprint) {
     'outlet_oven', 'outlet_water_heater', 'outlet_appliance',
     'switch', 'switch_dual', 'light', 'ethernet', 'ethernet_dual', 'tv_antenna', 'camera_ethernet', 'patch_panel', 'intercom',
     'panel', 'breaker', 'radiator', 'boiler', 'sink', 'washing_machine',
+    'pipe_anchor_heating', 'pipe_anchor_water', 'pipe_anchor_waste', 'pipe_anchor_vmc',
   ];
   let currentMarkerType = MARKER_TYPES[0];
   // PLAN · ADD type, picked by thumbstick-y (same UX as the marker type picker) — one

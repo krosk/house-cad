@@ -34,6 +34,32 @@ both supply and return nodes and both follow the marker when moved.
 
 Available plumbing fixture markers are radiator, boiler, sink, and washing machine.
 
+### Pipe anchors (owner, 2026-10-17)
+
+A **pipe anchor** is a marker for a point where a pipe is already known to pass: a hole already drilled
+through the ground slab to the basement, a wall sleeve, a duct already sealed in place. Four types, one per
+service: `pipe_anchor_heating`, `pipe_anchor_water`, `pipe_anchor_waste`, `pipe_anchor_vmc` (the last four in
+MARKER · EDIT's type list; place it with the tip at the hole's centre, so a slab hole has z 0, and dimension it
+to the walls like any marker).
+
+**It has no function in the app** (owner: "they only serve you as a beacon to identify a point in space"). It
+is not tied to a pipe: no pipe binds to it, nothing moves to it, the electrical checks ignore it. It shows as a
+ring in its service's pipe colour: lying flat when it is at the floor or the ceiling (a slab hole), otherwise in
+the plane of the wall within 30 cm (a wall hole), in View 3D and as a billboard in AR; on sheets and in DXF a
+double circle with the letter H (heating), W (water), D (drain, waste) or V (VMC).
+
+**The routing rule (for any agent drafting a route):** a route of a service must pass through every anchor of
+that service on its way. Before proposing or writing a pipe layout, list the anchors and check the draft:
+
+```
+node tools/house-query.mjs anchors <house.json>
+```
+
+Each anchor prints its position and either `PASS` (a pipe of its service within 5 cm of its axis,
+`PIPE_ANCHOR_TOLERANCE` in `src/core/pipeAnchors.js`) or `OFF` with the nearest such pipe and its distance. A
+heating anchor accepts a supply or a return, a water anchor cold or hot; refrigerant lines have no anchor type.
+An `OFF` anchor is a route to rework, or a question for the owner, never something to move.
+
 **The pipe tools work like the conduit tools** (owner, 2026-10-12: "Make the same interaction as conduits"):
 
 - **HEATING · PIPE** (draw, as MARKER · CONDUIT). Trigger a fixture, an existing junction or empty space to
@@ -759,6 +785,26 @@ the alcove drops, column r256) and the r254 size above.
   wall is an insulated Ø160 flexible, straight and taut, onto a Ø160 wall terminal; never Ø125 (Aldes: not smaller
   than the unit's outlet; Hypothesis: Ø125 would cost ≈ 4–15 Pa more, the exit's dynamic pressure, at every vent).
 
+**Kitchen age of air on 4i (2026-10-17, owner: "Check instead the kitchen"; Hypothesis, scratch `kitchenAge.mjs`,
+`ageMap.mjs`).** The app's whole-house network and 3D age-of-air model (`airflow.js`, `airflow3d.js`), scenario
+"normal" (kitchen 30 m³/h), doors shut, the assumed EHB² inlets on the dry rooms' windows (r80, r108, r109, r113, r115;
+not in the plan) and two sleepers per bedroom. The kitchen has no inlet: its air comes from the living room and hall
+through passage r117, already ≈ 1.5 h old. Inside the kitchen at 1.2–1.7 m: **4i 91–95 min** (the hob's corner ≈ 3 min
+older than the freshest), today's headset plan (ceiling vent by the hob) 90–103 min (the passage's end older). No
+stagnant pocket in either; the kitchen (≈ 19 m³) turns over in ≈ 38 min. No heat plume, hood or eddies in the model.
+**Trap:** `airflow.js` treats a duct end within 15 cm (PORT_REACH) of a VMC unit as one of its ports, not a vent; 4i's
+laundry stub ends 12.9 cm from unit B, so the model drops the laundry vent (the runs lengthened it to 25 cm).
+
+**4i in everyday use, simulated (2026-10-17, owner asked; Hypothesis, scratch `simFlow.mjs`).** An operating-point
+solve: the fan curve, the 4i duct losses (kitchen and shower flexible, mid of the range, ∝ Q^1.9), 5 % leakage, the Ø160
+flexible outlet with a terminal of K 2, a room depression of 10 Pa at 160 m³/h ∝ Q², wind 0 or 20 Pa; each BDH vent holds
+its humidity flow (C51 15→55 at 23→63 % RH, BW51 and B51 5→35 at 35→65 / 45→75 %) while it sees ≥ 80 Pa (C51 boost 70)
+and acts as an orifice below. Results: at 40–50 % RH every unit delivers every flow in calm and wind (vents ≥ 92 Pa).
+Evening peak (both showers, laundry drying, cooking without boost, 168 m³/h): Classic in calm 78–80 Pa at the showers
+(≈ 34.5 of 35), in wind 65–66 Pa (≈ 31.5–32); MW 94–97 calm, 76–78 windy (≈ 34–34.5); HP+ ≥ 99 always. Kitchen boost:
+Classic 128 m³/h calm / 118 windy of 135, MW 135 / 126, HP+ 135 / 135. The Classic's curve beyond 197 m³/h is extended to
+95 Pa at its 221 m³/h maximum (notice), not published.
+
 **4i with the kitchen and shower ducts in flexible (2026-10-17, owner asked; Hypothesis).** Flexible loses ≈ 2× smooth
 PVC per metre (Baillindustrie chart for Ø125/Ø160, extrapolated to Ø80; CPT §3.3.6.4 asks NF DTU 68.3 annex A values,
 not read) and its bends were taken at K 0.6–1.2 (90°) / 0.3–0.6 (45°): kitchen 3.89 m ≈ 21–33 Pa at 135 m³/h (rigid
@@ -781,7 +827,8 @@ an EasyHOME HYGRO COMBLE + 3 BDH (20.5 W-Th-C, 213 m³/h; an attic unit, not a C
 itself; only marketplace sellers list the Compact Premium HP+ 11033025.
 
 **Option 4i: 4h with the upper duct Ø100 in the basement (owner, 2026-10-17: "Let's assume it is sealed up to basement
-... Switch to 100 and keep unit close to east side?"; drafted in Node, not written).** The upper bathroom duct stays Ø80
+... Switch to 100 and keep unit close to east side?"; written to the headset 2026-10-17 with the bed, 287 012 chars,
+read back identical).** The upper bathroom duct stays Ø80
 down to the basement ceiling (pn58); from there its two basement runs (p287 south along the west wall 2.80 m, p288 east
 3.74 m) are Ø100, with an 87°30′ Ø100 + reducer where the Ø80 comes down and a reducer Ø100→Ø80 on a 15 cm Ø80 stub
 (new pn363, p333) before unit B's west port. Scratch `up100.mjs`, `lossMixed.mjs`, `views4i.mjs`. Proven (Node): the
