@@ -353,6 +353,14 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   behind); trigger the same target again to convert/connect, or grip to cancel. Editable diameters,
   valves/manifolds, fixture role validation, derived networks, and output layers are intentionally deferred; see
   `docs/plumbing-workflow.md`.
+- **Which dimensions show (owner, 2026-10-17: "only show relevant dims")** (`dimDomainsFor` in `mr.js`, set in
+  `setMode`): a DIMS mode shows only its own kind: PLAN DIMS the wall dims, OUTLET DIMS the marker pins, CONDUIT
+  DIMS the conduit junction pins, PIPE DIMS the pipe junction pins (with their height dims). Every other mode
+  shows the wall dims (and the sill/head/garden-wall height dims), plus the marker pins and marker heights in the
+  MARKER tools, the conduit junction pins in CONDUIT / CONDUIT EDIT / WIRE and the pipe junction pins in PIPE /
+  PIPE EDIT. A conflicting dimension and its warning sign show in every mode. The filter only leaves dims out of
+  the same batched meshes (no extra draw calls); a mode change that changes the set rebuilds the dims only
+  (ALL FLOORS: the plan).
 - **HEATING · PIPE DIMS** (`id: pipe_dims`) — CONDUIT · DIMS for pipe junctions: trigger a bare junction, then a
   wall edge; the numpad sets the distance (A/X flips, B/Y removes the pin). The pin is a `{node}` endpoint
   (`dimDomain` → `'pipeNode'` when the id is a pipe node, so CONDUIT DIMS and PIPE DIMS each pick only their own

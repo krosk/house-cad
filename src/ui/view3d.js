@@ -398,6 +398,7 @@ export class View3D {
     for (const m of this.house.children) m.geometry.dispose();
     this.house.clear();
     this.ruler?.clear(); // its faces were on the old meshes
+    for (const child of this.markerLights.children) if (child.isInstancedMesh) child.dispose(); // the anchor rings' instance buffers
     this.markerLights.clear();
     this._clearFurniture();
     const furnitureToken = ++this.furnitureBuildToken;
@@ -524,12 +525,10 @@ export class View3D {
         lines.visible = this._meshVisible(lines);
         this.house.add(lines);
       }
+      const anchors = [];
       for (const marker of entry.markers || []) {
         const light = marker.type === 'light';
-        if (PIPE_ANCHOR_SERVICES[marker.type]) {
-          this.markerLights.add(this._pipeAnchorFixture(marker, entry, floorId, elevation, markerPlacements));
-          continue;
-        }
+        if (PIPE_ANCHOR_SERVICES[marker.type]) { anchors.push(marker); continue; }
         // A product (docs/materials.md "Switches"): { def, z }, or null when another
         // marker of the same double switch draws it.
         const product = light ? undefined : entry.markerProducts?.get(marker.id);
@@ -556,6 +555,7 @@ export class View3D {
         fixture.visible = this.floorFilter == null || fixture.userData.floorId === this.floorFilter;
         this.markerLights.add(fixture);
       }
+      if (anchors.length) this.markerLights.add(this._pipeAnchorRings(anchors, entry, floorId, elevation, markerPlacements));
       for (const item of furniture || []) {
         this._addFurniture(item, entry, furnitureToken);
       }
@@ -685,26 +685,30 @@ export class View3D {
     return this.markerAccentMaterials.get(color);
   }
 
-  // A pipe anchor (src/core/pipeAnchors.js) shows the hole: a ring in its service's pipe colour at
+  // Pipe anchors (src/core/pipeAnchors.js) show the hole: a ring in its service's pipe colour at
   // the marker itself (never moved onto a face). On the floor or the ceiling it lies flat (a slab
-  // hole); elsewhere it stands in the plane of its nearest wall (a wall hole).
-  _pipeAnchorFixture(marker, entry, floorId, elevation, markerPlacements) {
-    const service = PIPE_ANCHOR_SERVICES[marker.type][0];
-    const color = PIPE_SERVICE_COLOR[service] ?? 0x94a3b8;
-    if (!this.markerAccentMaterials.has(color)) {
-      this.markerAccentMaterials.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.55 }));
-    }
-    const ring = new THREE.Mesh(this.pipeAnchorGeometry, this.markerAccentMaterials.get(color));
-    const z = Number.isFinite(marker.z) ? marker.z : 0;
+  // hole); elsewhere it stands in the plane of its nearest wall (a wall hole). One floor's rings
+  // are one InstancedMesh (one draw call), coloured per instance.
+  _pipeAnchorRings(anchors, entry, floorId, elevation, markerPlacements) {
+    this.pipeAnchorMaterial ??= new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 });
+    const rings = new THREE.InstancedMesh(this.pipeAnchorGeometry, this.pipeAnchorMaterial, anchors.length);
     const ceiling = entry.height ?? 2.5; // the ceiling height (main.js)
-    const place = markerPlacements?.get(marker.id);
-    if (z <= 0.05 || z >= ceiling - 0.05 || !place?.snapped) ring.rotation.x = Math.PI / 2;
-    else ring.rotation.y = Math.atan2(place.nx, -place.ny);
-    ring.position.set(Number(marker.x) || 0, (elevation || 0) + z, -(Number(marker.y) || 0));
-    ring.userData.floorId = floorId || null;
-    ring.userData.markerId = marker.id || null;
-    ring.visible = this.floorFilter == null || ring.userData.floorId === this.floorFilter;
-    return ring;
+    const pose = new THREE.Object3D(), color = new THREE.Color();
+    anchors.forEach((marker, i) => {
+      const z = Number.isFinite(marker.z) ? marker.z : 0;
+      const place = markerPlacements?.get(marker.id);
+      pose.rotation.set(0, 0, 0);
+      if (z <= 0.05 || z >= ceiling - 0.05 || !place?.snapped) pose.rotation.x = Math.PI / 2;
+      else pose.rotation.y = Math.atan2(place.nx, -place.ny);
+      pose.position.set(Number(marker.x) || 0, (elevation || 0) + z, -(Number(marker.y) || 0));
+      pose.updateMatrix();
+      rings.setMatrixAt(i, pose.matrix);
+      rings.setColorAt(i, color.setHex(PIPE_SERVICE_COLOR[PIPE_ANCHOR_SERVICES[marker.type][0]] ?? 0x94a3b8));
+    });
+    rings.computeBoundingSphere();
+    rings.userData.floorId = floorId || null;
+    rings.visible = this.floorFilter == null || rings.userData.floorId === this.floorFilter;
+    return rings;
   }
 
   _lightMarkerFixture() {

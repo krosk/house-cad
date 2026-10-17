@@ -1787,6 +1787,29 @@ export function setupMR(view, project, getFootprint) {
     return proxy;
   }
 
+  // Which dimension domains the current mode shows (owner, 2026-10-17: only the relevant dims).
+  // A DIMS mode shows only its own domain; every other mode shows the wall dims, plus the outlet
+  // pins in the MARKER tools, the conduit junction pins where the conduit network is shown and
+  // the pipe junction pins where the pipes are. A conflicting dim always shows. null = all
+  // (before the first setMode). Filtering only drops dims from the same batched meshes.
+  let dimDomainsShown = null;
+  function dimDomainsFor(id) {
+    if (id === 'plan_dims') return new Set(['plan']);
+    if (id === 'outlet_dims') return new Set(['marker']);
+    if (id === 'conduit_dims') return new Set(['node']);
+    if (id === 'pipe_dims') return new Set(['pipeNode']);
+    const shown = new Set(['plan']);
+    if (MODE_GROUP[id] === 'marker') shown.add('marker');
+    if (id === 'marker_conduit' || id === 'conduit_edit' || id === 'marker_wire') shown.add('node');
+    if (id === 'marker_pipe' || id === 'pipe_edit') shown.add('pipeNode');
+    return shown;
+  }
+  const constraintDomain = (c) => isMarkerConstraint(c) ? 'marker'
+    : isNodeConstraint(c) ? ((project.pipeNodes || []).some((n) => n.id === (c.a.node || c.b.node)) ? 'pipeNode' : 'node')
+    : 'plan';
+  const dimShown = (c) => !dimDomainsShown || c.conflict || dimDomainsShown.has(constraintDomain(c));
+  const dimDomainShown = (domain) => !dimDomainsShown || dimDomainsShown.has(domain);
+
   // Draw every distance constraint of one floor into planGroup: a dim line between
   // the two edges (offset outward), extension lines, and the value label. `elevation`
   // is zero for the editable active-floor view and the floor's stacked elevation in
@@ -1826,7 +1849,7 @@ export function setupMR(view, project, getFootprint) {
     };
     let xTier = 0, yTier = 0;
     for (const c of (floor.constraints || [])) {
-      if (c.type !== 'distance') continue;
+      if (c.type !== 'distance' || !dimShown(c)) continue;
       if (isMarkerConstraint(c)) {
         // Outlet pin: draw directly from its wall edge to its projected floor
         // coordinate. The outlet is the dependent endpoint; changing the value
@@ -3272,18 +3295,18 @@ export function setupMR(view, project, getFootprint) {
     const batch = makeZDimBatch();
     // Markers and bare conduit junctions use their X/Y pin styling: amber pin strips,
     // with an amber (marker) or cyan (conduit) label — see buildDimensions.
-    for (const m of project.activeFloor.markers || []) {
+    for (const m of dimDomainShown('marker') ? project.activeFloor.markers || [] : []) {
       if (m.zDatum && (m.z || 0) > 1e-4) batch.add(m.x, m.y, 0, m.z, m.z, markerDimMat, '#ff9f43');
     }
     // Marker-bound nodes follow their device and are never dimensioned. A junction's
     // dim only shows with the conduit network itself (the CONDUIT/WIRE modes).
-    for (const n of conduitGroup.visible ? project.conduitNodes || [] : []) {
+    for (const n of conduitGroup.visible && dimDomainShown('node') ? project.conduitNodes || [] : []) {
       if (n.markerId || !n.zDatum || !((n.z || 0) > 1e-4)) continue;
       if (project.conduitNodeFloorId(n) !== project.activeFloorId) continue;
       batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
     }
     // Pipe junctions the same way, while the pipe network is shown (HEATING · PIPE modes).
-    for (const n of pipeGroup.visible ? project.pipeNodes || [] : []) {
+    for (const n of pipeGroup.visible && dimDomainShown('pipeNode') ? project.pipeNodes || [] : []) {
       if (n.markerId || !n.zDatum || !((n.z || 0) > 1e-4)) continue;
       if (project.pipeNodeFloorId(n) !== project.activeFloorId) continue;
       batch.add(n.x, n.y, 0, n.z, n.z, markerDimMat, '#22d3ee');
@@ -3291,7 +3314,7 @@ export function setupMR(view, project, getFootprint) {
     // Apertures (door/garage/window/half-wall/heater/sliding) use the blue structural dim
     // styling: floor→sill and floor→head as two side-by-side dims, offset along the
     // aperture's wall axis. A zero sill and an open top (head:null) are omitted.
-    for (const r of project.activeFloor.rectangles || []) {
+    for (const r of dimDomainShown('plan') ? project.activeFloor.rectangles || [] : []) {
       if (r.kind === 'gardenwall' || r.kind === 'fence') { // a garden wall's top; a fence's bottom and top
         const b = r.bounds, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
         const [dx, dy] = b.x1 - b.x0 >= b.y1 - b.y0 ? [0.04, 0] : [0, 0.04];
@@ -9098,6 +9121,11 @@ export function setupMR(view, project, getFootprint) {
     hoverAdjacent = null;
     buildAdjacentTargets(m.id);
     adjacentGroup.visible = m.id === 'marker_conduit' || m.id === 'marker_wire' || m.id === 'marker_pipe';
+    const domains = dimDomainsFor(m.id);
+    if (!dimDomainsShown || [...domains].join() !== [...dimDomainsShown].join()) {
+      dimDomainsShown = domains;
+      if (allFloorsView) { buildPlan(); applyPlanMatrix(); } else { rebuildDimsOnly(); buildZDims(); }
+    }
     if (toolMenu.group.visible) redrawToolMenu(); // a flick while the TOOL menu is open
   }
 

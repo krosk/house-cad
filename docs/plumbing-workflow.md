@@ -45,7 +45,7 @@ to the walls like any marker).
 **It has no function in the app** (owner: "they only serve you as a beacon to identify a point in space"). It
 is not tied to a pipe: no pipe binds to it, nothing moves to it, the electrical checks ignore it. It shows as a
 ring in its service's pipe colour: lying flat when it is at the floor or the ceiling (a slab hole), otherwise in
-the plane of the wall within 30 cm (a wall hole), in View 3D and as a billboard in AR; on sheets and in DXF a
+the plane of the wall within 30 cm (a wall hole), in View 3D (one instanced mesh per floor, a single draw call however many anchors) and as a billboard in AR; on sheets and in DXF a
 double circle with the letter H (heating), W (water), D (drain, waste) or V (VMC).
 
 **The routing rule (for any agent drafting a route):** a route of a service must pass through every anchor of
