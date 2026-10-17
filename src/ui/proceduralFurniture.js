@@ -1931,12 +1931,101 @@ function inductionHob(entry) {
   return g;
 }
 
+// Lapeyre FLAVIO under-basin vanity unit, 2 drawers, natural oak veneer (owner, 2026-10-17).
+// Sources:
+//   page: https://www.lapeyre.fr/produits/meuble-de-salle-de-bains-sous-vasque-80-cm-2-tiroirs-chene-naturel-flavio-FPC8678918
+//     (Réf 1248230, 497.20 € incl. 2.20 € eco-part, 2026-10-17). No assembly manual on the page (only site-wide PDFs).
+//   spec table: "Largeur: 80 cm", "Hauteur: 55 cm", "Profondeur: 46.8 cm", "Epaisseur du caisson: 1.6 cm",
+//     "Epaisseur porte: 16 mm", "Matériau: Panneau de particules", "Couleur: Chêne naturel", "Composition du meuble:
+//     Sous-vasque 2 tiroirs", "Poignée …: Prise de main intégrée", "Type de pose: A suspendre ou à poser sur pieds",
+//     "Pieds fournis: Non", "Type de plan: Céramique, Bois" (the top is sold apart: none here). Sizes 60 / 80 / 120 cm.
+//   photos (statics-lapeyre.fr zoom1 ids):
+//     202131605 (studio 3/4 front, white ground): the structure, measured on one vertical line through the front
+//       (one depth, 485 px = 550 mm): top front 231 mm, 3 mm gaps, bottom front 299 mm, the bottom panel's 16 mm edge
+//       below; the open top (no top panel); fronts inset between the sides, a ~10 mm raised frame round each front;
+//       the finger grip: a notch in each front's top edge, ≈ 18 mm deep, ≈ 200 mm wide (175 px at that depth), centred.
+//       Oak colour sampled on the lit front: rgb(219, 178, 139).
+//     202131605_4 (top view, drawers open): the grip notch dips the top edge (≈ 195 mm wide at 0.87 px/mm), centred.
+//     202131605_2 (room photo): wall-hung, grain runs horizontally on fronts and sides.
+//     AST3195740 (range line drawing): the 80 cm with its top reads L. 81 cm.
+//   Estimates: the frame's 3 mm relief, the 8 mm back, the top rails, the drawer boxes' sizes, the grip's 160 mm floor.
+function flavioVanity(entry) {
+  const [W, H, D] = (entry.sizeMm || [800, 550, 468]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const mm = (v, d) => (v ?? d) / 1000;
+  const side = mm(p.caseMm, 16), front = mm(p.frontMm, 16), back = mm(p.backMm, 8), gap = mm(p.gapMm, 2.5);
+  const [topFront, bottomFront] = (p.frontsMm || [228, 299]).map((v) => v / 1000);
+  const rim = mm(p.frameMm, 10), relief = mm(p.frameReliefMm, 3);
+  const grip = { top: mm(p.grip?.topMm, 200), floor: mm(p.grip?.floorMm, 160), depth: mm(p.grip?.depthMm, 18) };
+  const color = p.woodColor ?? 0xffd2a4; // tuned so the lit front matches 202131605's rgb(219, 178, 139)
+
+  // Oak veneer, grain along U; UVs in metres (one picture per 60 cm) so every part keeps the same grain scale.
+  const map = paintedTexture('furnWood', { color }, 256, 256, { placeholder: color, variant: 'flavio' });
+  map.repeat.set(1 / 0.6, 1 / 0.6);
+  const oak = new THREE.MeshStandardMaterial({ map, roughness: 0.6 });
+  const inner = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.92), roughness: 0.8 });
+  const metric = (mesh) => { // box projection of the mesh's own vertices, in metres
+    const geo = mesh.geometry, pos = geo.attributes.position, nor = geo.attributes.normal;
+    const uv = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) + mesh.position.x, y = pos.getY(i) + mesh.position.y, z = pos.getZ(i) + mesh.position.z;
+      const ax = Math.abs(nor.getX(i)), ay = Math.abs(nor.getY(i)), az = Math.abs(nor.getZ(i));
+      const [u, v] = ax >= ay && ax >= az ? [z, y] : ay >= az ? [x, z] : [x, y];
+      uv[i * 2] = u; uv[i * 2 + 1] = v;
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return mesh;
+  };
+  const panel = (p0, p1, material = oak) => metric(box(p0, p1, material));
+  const g = new THREE.Group();
+  g.name = entry.name || 'flavio-vanity';
+  const x0 = -W / 2, x1 = W / 2, z0 = -D / 2, z1 = D / 2;
+
+  // Case: two sides and the bottom to the front face, an 8 mm back, two top rails (the top is open for the basin top).
+  for (const [a, b] of [[x0, x0 + side], [x1 - side, x1]]) g.add(panel([a, 0, z0], [b, H, z1]));
+  g.add(panel([x0 + side, 0, z0], [x1 - side, side, z1]));
+  g.add(panel([x0 + side, side, z0], [x1 - side, H, z0 + back], inner));
+  g.add(panel([x0 + side, H - side, z0 + back], [x1 - side, H, z0 + back + 0.08], inner));
+  g.add(panel([x0 + side, H - side, z1 - front - 0.002 - 0.08], [x1 - side, H - side + 0.016, z1 - front - 0.002], inner));
+
+  // The fronts, inset between the sides: a 10 mm frame standing 3 mm proud of the panel, both notched by the grip.
+  const fw = W - 2 * side - 2 * gap;
+  const outline = (w, h, inset) => { // the front's face outline, origin at its bottom centre, the grip notch on top
+    const t = grip.top / 2 + inset * 0.4, f = Math.max(0.01, grip.floor / 2 - inset * 0.4), d = grip.depth + inset;
+    const s = new THREE.Shape();
+    s.moveTo(-w / 2 + inset, inset); s.lineTo(w / 2 - inset, inset); s.lineTo(w / 2 - inset, h - inset);
+    s.lineTo(t, h - inset); s.lineTo(f, h - d); s.lineTo(-f, h - d); s.lineTo(-t, h - inset);
+    s.lineTo(-w / 2 + inset, h - inset); s.closePath();
+    return s;
+  };
+  const extrude = (shape, depth, y, z) => {
+    const m = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), oak);
+    m.position.set(0, y, z);
+    return metric(m);
+  };
+  let y = side + gap;
+  for (const h of [bottomFront, topFront]) {
+    g.add(extrude(outline(fw, h, 0), front - relief, y, z1 - front));
+    const frame = outline(fw, h, 0);
+    frame.holes.push(outline(fw, h, rim));
+    g.add(extrude(frame, relief, y, z1 - relief));
+    // The drawer box behind it (sides, back, bottom), seen through the open top and the grip.
+    const bx0 = x0 + side + 0.013, bx1 = x1 - side - 0.013, bz0 = z0 + back + 0.02, bz1 = z1 - front;
+    const bh = h - 0.04, t = 0.012;
+    for (const [a, b] of [[bx0, bx0 + t], [bx1 - t, bx1]]) g.add(panel([a, y + 0.012, bz0], [b, y + bh, bz1], inner));
+    g.add(panel([bx0, y + 0.012, bz0], [bx1, y + bh, bz0 + t], inner));
+    g.add(panel([bx0, y + 0.012, bz0], [bx1, y + 0.02, bz1], inner));
+    y += h + gap;
+  }
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
   'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'vmc-vent-bdh': vmcVentBdh,'geberit-duofix': geberitDuofix,
-  'falmec-lumina': falmecLumina, 'induction-hob': inductionHob,
+  'falmec-lumina': falmecLumina, 'induction-hob': inductionHob, 'flavio-vanity': flavioVanity,
 };
 
 export function isProcedural(entry) {

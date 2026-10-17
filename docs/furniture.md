@@ -258,6 +258,16 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   (`furnHob`): four zones (Ø180/Ø210 left, Ø210/Ø160 right, as `params.zonesMm`), a printed slider and keys at the
   front. The body under the worktop and the worktop's cut-out are not drawn. `mountZMm: 920` = the worktop top.
   Proven in a scratch preview (590 × 6 × 520 mm, 12 triangles); not yet seen in View 3D, AR or on device.
+- `lapeyre-flavio-80-oak` (owner, 2026-10-17): Lapeyre FLAVIO under-basin unit, 80 cm, 2 drawers, natural oak
+  veneer (Réf 1248230, 497.20 €), sold without its top. Builder `flavio-vanity`. 800 × 550 × 468 mm, 16 mm case and
+  fronts (spec table); no manual exists on the page, so the rest is measured on the studio photo 202131605 along one
+  vertical line (one depth): top front 228, bottom front 299, 2.5 mm gaps, the bottom panel's edge below; fronts inset
+  between the sides with a 10 mm frame 3 mm proud (relief: estimate); the integrated grip a notch in each front's top
+  edge, 200 mm wide at the top, 160 at its floor (estimate), 18 mm deep, centred (also on 202131605_4). The top is open
+  (two inner rails), the drawer boxes are drawn behind the fronts. Oak `woodColor` 0xffd2a4, tuned so the preview's lit
+  front matches the photo's rgb(219, 178, 139) (render 216, 178, 139). Wall-hung, feet not included: set the zone's
+  FOOT to the height wanted. Proven in a scratch preview (bounding box 800 × 550 × 468; front 3/4 and top views beside
+  the photos); not yet seen in View 3D, AR or on device. Sources in the builder.
 - `hoffmann-v120`: W. Hoffmann Vision V120 upright piano (C. Bechstein), the owner's own: traditional
   cabinet (curved front legs on toe blocks), polished black with brass fittings (owner, 2026-09-27).
   1510 × 1200 × 620 mm, 245 kg, 88 keys, 3 pedals (Morley Pianos listing; Bechstein's page gives
