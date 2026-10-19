@@ -844,6 +844,59 @@ leakage, façade + 20: **HP+** fails only the shower room at its own minimum-dem
 **MP** fails the minimum-demand points (63–74) and the shower at the max point; **MW** fails the max point (13–66) and
 the bathrooms at the intermediate (58–75); **Classic** is off its curve at the max point and 42–79 elsewhere.
 
+**4i's shower duct in aluminium semi-rigid (2026-10-18, owner asked).** Proven (read off Lindab's "Semiflexible ducts"
+chart, `08-flexible-ducting.pdf` p. 4, SRFCM0 aluminium; 300 dpi pixel scan, ±10 %): Ø80 at 2 m/s (10 l/s) ≈ 2.7 Pa/m,
+at 20 m/s ≈ 114 Pa/m, so ≈ 2.5 Pa/m at 35 m³/h (1.93 m/s, just under the chart's lowest velocity line). Smooth Ø80
+there is ≈ 1.0–1.1 Pa/m: semi-rigid loses ≈ 2.4× smooth, at least as much as flexible. Hypothesis (6.49 m, the rigid
+fittings' 5.4–7.7 Pa kept): **≈ 22–24 Pa at 35 m³/h** (rigid 12.3–14.6, flexible 16.5–23), so the vent sees
+≈ 9–10 Pa less than rigid, ≈ 79–85 Pa against its 80 Pa floor with the HP+. Another brand's corrugation may differ.
+Same chart page, "Flexible ducts" (Proven, same reading): Ø80 at 2 m/s ≈ 1.5 Pa/m, at 15 m/s ≈ 80 Pa/m (≈ 1.4 Pa/m at
+35 m³/h, ≈ 1.3× smooth, stretched straight), so on one maker's data semi-rigid loses ≈ 1.8× a taut flexible: its
+spiral lock-seam and pleats stand in the air; a flexible's film is smooth between wire turns, but only while taut
+(the doc's ≈ 2× for flexible allows for slack). Aldes' semi-rigid is ALFLEX Alu Compacté (Proven, datasheet
+11091823: A410 aluminium stapled in a spiral, 10/100 mm at Ø80, bend radius 0.6 D, M0; meant for the terminal
+connection from the branch to the vent, with a sleeve); neither it nor ALFLEX Alu Insonorisé D80 (11091970) publishes
+a loss figure.
+Its joints (Proven, datasheet 11091823 "Accessoires" and "Mise en oeuvre"): the duct's female end over the male
+fitting, sealed with mastic or RAF self-amalgamating tape, then clamped with a CSF wire clamp (galvanised wire, Ø125
+11094653, Ø80 11094651) or a polyvalent band clamp (Ø60–145 11090023, buckles 11090031); a steel sleeve (12220 or
+12252) at the vent. Aldes lists no hanger for it.
+**The Ø160 outlet (1.87 m, straight) in semi-rigid** (2026-10-18, owner asked). Proven (the same charts): Ø160 at
+2 m/s (40 l/s) ≈ 1.1 Pa/m semi-rigid, ≈ 0.6 flexible. Hypothesis (exponent ≈ 1.65, smooth by Blasius): at the
+168 m³/h evening peak ≈ 1.4 Pa/m semi-rigid, 0.8 flexible taut, 0.5 smooth: ≈ 2.7 / 1.6 / 1.0 Pa over the run, ≈ 3.6 Pa
+semi-rigid at ≈ 200 m³/h. ≈ 1–2 Pa more than rigid, against the unit's ≈ 120 Pa: no visible effect.
+**Duct 2 in Ø100 semi-rigid outside the bedroom** (2026-10-18, owner asked; not drafted). Hypothesis: the 3.97 m
+outside r51 (ground ceiling and wall crossing 2.78 m, slab and basement 1.19 m) in Ø100 semi-rigid, the 2.52 m in the
+bedroom left Ø80 rigid, four reducers (vent, both sides of the bedroom part, port). Ø100 semi-rigid read at 2 m/s
+≈ 2.0 Pa/m, ≈ 0.9 Pa/m at 35 m³/h (1.24 m/s, below the chart: extrapolated); bends outside the bedroom (2 × 90°,
+≈ 2.5 × 45°) at Ø100's ≈ 1.1 Pa dynamic pressure instead of Ø80's 2.6. Net ≈ 1.5–4 Pa less than all Ø80 rigid
+(≈ 9–13 Pa against 12.3–14.6), against ≈ 24 Pa all Ø80 semi-rigid. Unchecked: a Ø100's room in the 41.5 wall
+hole, the ceiling void at 2.84 m and the beams.
+**Duct 3 (kitchen Ø125, 3.89 m) in semi-rigid** (2026-10-18, owner asked). Proven (Lindab semiflexible chart, pixel
+scan): Ø125 ≈ 1.5 Pa/m at 2 m/s, ≈ 3.0 Pa/m at 135 m³/h (3.06 m/s, on the 3 m/s line); smooth ≈ 1.1. Hypothesis:
+friction 11.7 Pa instead of 4.4, so ≈ 24–28 Pa at boost (rigid 16.8–21.0, flexible 21–33), the bends kept at the rigid
+values (no semi-rigid bend data). At 30 m³/h (normal) under 1 Pa either way.
+**Owner (2026-10-18): the kitchen Ø125 will be flexible or semi-rigid**, because rigid duct is not available in Ø125
+(owner), threaded through the drilled slab and wall holes. Lindab's flexible chart (Proven, same scan): Ø125 ≈ 0.85 Pa/m at 2 m/s, so ≈ 2.0 Pa/m at
+135 m³/h taut, against semi-rigid's 3.0: ≈ 20–24 Pa taut flexible, ≈ 24–28 semi-rigid. Hypothesis: both fall inside the
+21–33 Pa flexible range the HP+ check above already passed for the kitchen, so either is acceptable. Proven (datasheets):
+ALFLEX Alu Compacté comes in 3 m lengths (Ø80–250), so the 3.89 m needs one coupling: keep it out of the holes; ALGAINE
+Alu D80 is sold in 10 m.
+
+**The unit is the Aldes Compact Premium MW, not the HP+ (owner, 2026-10-18).** Re-run of the everyday operating-point
+model above (Hypothesis, scratch `sim-semi.mjs`, `sim-semi-shrig.mjs`: the MW curve, the kitchen Ø125 semi-rigid at
+26 Pa mid at 135 m³/h, the Ø160 outlet semi-rigid from the Lindab chart): every flow is delivered in calm air and at
+40–50 % RH in wind (vents ≥ 100 Pa); the evening peak in wind gives the showers 75–77 Pa (≈ 34.0 / 34.4 of 35 m³/h);
+the kitchen boost 135 m³/h calm (73 Pa at the vent, over the C51's 70) and ≈ 126 windy. Semi-rigid instead of flexible
+changes every figure by ≤ 1 Pa. **Its duct connections** (Proven, Aldes notice "EasyHOME Hygro COMPACT Classic Premium MW …" pp. 8–9,
+`easyhome-hygro-compact-premium-notice-d-installation-et-de-maintenance.pdf`): each port takes an **EasyCLIP** adapter
+(collar + fitting: Ø80 11033011, Ø125 11033010, Ø160 11033016): the fitting goes into the duct, its collar is tightened
+over the duct and clicked shut, then the assembly is pushed into the port until it clicks. A Ø80 duct may instead go
+straight on its port with a wire clamp (the drawing shows an O-ring there); at most 2 Y-pieces per unit; unused ports
+plugged; outside the heated volume the network is insulated. The EasyCLIP is sold "for Algaine" (flexible); that it
+fits an ALFLEX semi-rigid end is Hypothesis. A "manchette" (12220/12252) is the vent end, not the unit's. The ground shower duct in rigid (13.5 Pa mid) brings that shower to 35.0 at the windy
+peak (81 Pa). The CPT check above (12 % leakage, its fixed points) still fails the MW at the max and intermediate points.
+
 **Where to buy a Compact Premium (2026-10-17, read on leroymerlin.fr):** Proven: Leroy Merlin's "Kit VMC simple flux
 hygroréglable ALDES Easyhome Hygro Compact Premium" (LM 82201372) is Aldes **11033451**, which Aldes' distributors (Cedeo,
 Sonepar, ManoMano) name "Kit EasyHOME HYGRO COMPACT Premium **MW** BDH" (group + C51 PUSH + B51 + W16 PRES), 309 € from a

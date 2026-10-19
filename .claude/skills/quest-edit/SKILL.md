@@ -7,7 +7,7 @@ argument-hint: [what to change]
 Follow `docs/headset-data.md` step by step; it is the canonical procedure. This skill only sequences
 it. Requested change: `$ARGUMENTS` (if empty, ask the owner what to change).
 
-1. **Connect** ("Connecting"): adb device, `adb forward tcp:9333 localabstract:chrome_devtools_remote`,
+1. **Connect** ("Connecting"; skill `quest-connect`): adb device, `adb forward tcp:9333 localabstract:chrome_devtools_remote`,
    `prox_close` if the headset is unworn, and ask the owner to open the Quest Browser in front of them.
 2. **Back up, then read** with `tools/quest-storage.mjs backup` and `read` into the scratchpad. Say
    which save slot, if any, still holds the pre-edit plan.

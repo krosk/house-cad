@@ -18,12 +18,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-17 (session 41 ended; the Quest **unreachable** at the end: `adb devices` empty; last read 287 012)
+**Date:** 2026-10-19 (session 41 ended; docs-only Q&A on 10-18/19, item 96; the Quest **unreachable** all evening: `adb devices` empty; last read 287 012)
 
 **Status:**
-- Proven (git, Actions run success, `version.json` "3d426f1 1017-1123Z"): the head is `3d426f1`, pushed and served.
-  **Not installed on the headset:** `update-app` was skipped (no adb device). The headset app has `3d09428` (installed
-  10-17), so it lacks BEAM (`1ee0a41`) and the FLAVIO unit (`3d426f1`). Run `update-app` first when the Quest is back.
+- Proven (git, Actions run success, `version.json` "74ca566 1017-2111Z"): the head is `74ca566`, pushed and served.
+  **Not installed on the headset:** `update-app` was skipped after every push since `3d09428` (no adb device). The
+  headset app has `3d09428` (installed 10-17), so it lacks BEAM (`1ee0a41`), the FLAVIO 80/60 (`3d426f1`, `74ca566`),
+  the ARTENS tile, the Trez gates and the Klos'up fence slat (`796a788`). Run `update-app` first when the Quest is
+  back: a plan written with these ids before that would hold products the headset app cannot resolve.
 - Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-17, 287 012 chars:
   option 4i + the bed** (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
   backup `quest-backup-1017-4i`): unit B moved and turned, the BDH vents, column r263 (sill 2.7), bed r264 with dims
@@ -52,8 +54,8 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Items 91–95 were committed and pushed at the end of session 41 (the commit after `3d426f1`); check `git log` and
-  `version.json` for whether that push was installed on the headset (it was not when this was written).
+- Uncommitted at the end of session 41 (10-19): this file, `docs/plumbing-workflow.md` (item 96, docs only), and the new skill `.claude/skills/quest-connect/` (connect.sh, find-adb-port.py, SKILL.md) with its pointers in `docs/headset-data.md` "Connecting", `.claude/skills/quest-edit/SKILL.md` and CLAUDE.md. Commit all by path on "c p". Proven 10-19: the script reconnected from a stale port by scanning the headset (42795).
+  The vanity draft (item 95) lives only in the scratchpad: rebuild it from item 95 on the fresh read.
 
 ## What the app is today
 
@@ -279,6 +281,18 @@ plan.
   foot 0.33 / top 0.88 (Hypothesis: owner to confirm the height), dropping their size dims (c870 c871, c906 c907).
   Proven (`house-query diff` / `conflicts`): only r130 and r132 change, no conflict. Rebuild it on the fresh read: set
   those fields, `x`/`y` = 2.225/−0.298 and −3.62/0.062, `w` 0.6/0.8, `h` 0.468, `productMm`, `facing` 0.
+- **96** (10-18/19, docs only, no plan change; all in `docs/plumbing-workflow.md` after "4i with the kitchen and shower
+  ducts in flexible"): **owner decisions: the unit is the Aldes Compact Premium MW (not the HP+); the kitchen Ø125 is
+  flexible or semi-rigid (rigid not available in Ø125), threaded through the drilled holes.** Findings: semi-rigid
+  aluminium loses ≈ 2.4× smooth and ≈ 1.8× taut flexible (Lindab chart, Proven reading); Aldes ALFLEX publishes no
+  loss figure; the Ø160 outlet in semi-rigid costs ≈ 1–2 Pa (no effect); the MW re-run (Hypothesis, scratch
+  `sim-semi*.mjs`) delivers every flow except ≈ 34/35 m³/h at the showers on a windy evening peak and ≈ 126/135 at a
+  windy kitchen boost; the ground shower duct (duct 2, 6.49 m Ø80, 3.97 m of it outside bedroom r51) in rigid fixes the
+  shower; Ø100 semi-rigid outside the bedroom ≈ 9–13 Pa (not drafted, room in the holes unchecked); unit connections =
+  EasyCLIP adapters (Ø80 11033011, Ø125 11033010, Ø160 11033016), fit on ALFLEX semi-rigid is Hypothesis; joints CSF
+  wire clamps. Also answered from the 287 012 read: the garden's west garden walls r236/r237 are 0.73 m high; the
+  refrigerant lines 4.66 / 10.84 / 11.44 / 5.48 = 32.41 m; the VMC ducts 25.73 m (Ø80 13.43, Ø100 6.54, Ø125 3.89,
+  Ø160 1.87).
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 
@@ -534,7 +548,9 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 ## Commits (sessions 40–41; all pushed, doc-only omitted; earlier sessions: `git log`)
 
 Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0b67` pipe anchors + `house-query anchors` ·
-`3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity. Session 40:
+`3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity ·
+`796a788` ARTENS Easy tile (`concrete` design), Trez gates (one leaf; two leaves with `axisSpan`/`axisIn`), Klos'up fence
+slat · `74ca566` FLAVIO 60. Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -583,19 +599,21 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | `src/ui/finishTextures.js` / `painters.js` / `textureWorker.js` | Finish designs / named painters / the worker client |
 | `src/io/shareView.js` / `src/io/planSheet.js` | Link payload / sheets (incl. `pipeSheetOptions`) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
+| `src/ui/doorProducts.js` | Door, rail-door and gate builders; `GATE_PROFILES` (jax, trez, bono); a gate with `def.axisSpan` has its own width |
+| scratchpad `vanities.mjs` → `draft-vanities.json` | Item 95's draft on the 287 012 read (session-local; item 95 says how to rebuild it) |
 | scratchpad `colStack2…5.mjs`, `ductViewsCol*.mjs`, `zhCol.mjs`, `clashAbs.mjs`, `cmpDucts.mjs` | Session-local: the corner-column edits (1b…1e), their drawings (EN/ZH), the true-height clash check, duct length/fitting counts. Gone with the scratchpad; rebuild from the doc if needed |
 
 ## Next step
 
 **Active:**
-00. **When the Quest is back:** `update-app` (it lacks `1ee0a41`/`3d426f1`), then a fresh read (expect 287 012 unless the
+00. **When the Quest is back:** `update-app` (it lacks everything after `3d09428`, up to `74ca566`), then a fresh read (expect 287 012 unless the
    owner placed anchors or beams in AR; if they did, that read is the new base). Before any route work: `house-query
    anchors` and `house-query beams` on that read. The attic lintels at y −1.96 (open check below) are a natural first
    use of BEAM · FLOOR / CEILING, drawn by the owner.
 0a. **Pending W (owner's go needed):** on a fresh read, the two vanities (item 95) and the basement tile swap (item 91); optionally the Trez on r243
    (item 92), the 2-leaf Trez on r242 resized to 2.76 m (item 93), and FENCE zones once the owner gives their lines
    (item 94). Needs the app with these materials installed first (an older app won't know the ids).
-0. **Item 86 after the 4i write:** the owner's unit choice (Classic / MW / HP+) and the open checks (wall top at slab height
+0. **Item 86 after the 4i write:** ~~the owner's unit choice~~ decided 2026-10-18: the **Aldes Compact Premium MW** (not the HP+); kitchen Ø125 flexible or semi-rigid (docs/plumbing-workflow.md, after "4i with the kitchen and shower ducts in flexible"). Still open: the checks (wall top at slab height
    where the shower duct slants, attic lintels at y −1.96, the outlet terminal); on the headset, the laundry stub ends
    12.9 cm from unit B (inside airflow.js's 15 cm PORT_REACH: the app's air model ignores the laundry vent). ~~Finish item 86 on option 4d~~
    (done through 4e–4i; the vents' furniture, losses and share link are in 4i). Older wording kept for its steps: get the owner's choices (kitchen Ø125/Ø100, ground shower Ø80/Ø100, the bathroom vent model),

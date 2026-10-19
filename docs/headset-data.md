@@ -20,11 +20,17 @@ unless marked Hypothesis. Skill: `quest-edit`.
 
 ## Connecting
 
-1. `adb devices -l` (either adb: `~/.bubblewrap/android_sdk/platform-tools/adb` or
-   `~/Android/Sdk/platform-tools/adb`; they share one adb server). A paired Quest reconnects by itself
-   over mDNS once Wireless debugging is on; an empty list can just mean asleep or not yet found.
-   If the Quest forgot the pairing: `../quest-mcp-test/.claude/skills/quest-connect/SKILL.md` (pair with
-   QRookie's Flatpak adb; the pairing and connection ports differ and change).
+1. **Skill `quest-connect`** (`.claude/skills/quest-connect/connect.sh [ip]`) does steps 1–2.
+   - **Which adb:** Bubblewrap's, `~/.bubblewrap/android_sdk/platform-tools/adb`.
+     `~/Android/Sdk/platform-tools/adb` is the same version (37.0.1) and shares its server. Never use
+     QRookie's adb (owner, 2026-10-19: Bubblewrap's is much more reliable).
+   - **mDNS reconnect:** a paired Quest often reconnects by itself over mDNS once Wireless debugging is
+     on, but not always. On 2026-10-19 `adb mdns services` listed nothing while the headset was on the
+     network.
+   - **A changed port:** the port changes whenever Wireless debugging restarts, so the saved one is then
+     refused. The script scans that one host for the new port (`find-adb-port.py`, plain TCP connects).
+     Proven 2026-10-19: 42795 found and connected in seconds, from a stale 36663.
+   - **A forgotten pairing:** re-pair with Bubblewrap's `adb pair` (the skill's step 2).
 2. `adb forward tcp:9333 localabstract:chrome_devtools_remote`.
 3. **The Quest Browser must be the app in front of the wearer.** A tab in a background browser, or on
    an awake but unworn headset, never answers DevTools calls (three timeouts; it answered at once when
