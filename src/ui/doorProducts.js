@@ -13,7 +13,10 @@ import { paintedTexture } from './paintedTexture.js';
 
 // Defaults (the Ange-Line); a catalog entry may override each: `frameFace`, `frameDepth`,
 // `threshold` (false = none), `roseDrop` (the key rose below the handle), `metalness`,
-// `roughness`.
+// `roughness`, and `leafInset`: the distance from the zone (the frame's outside) to each
+// vertical edge of the leaf when the leaf sits in a rebate of the jambs (owner, 2026-10-20:
+// a LINE frame 78 cm outside holds a 73 cm leaf, so 2.5 cm). Without it the leaf fits
+// between the jambs (zone − 2 × frame face − 6 mm), as on the Ange-Line.
 const FRAME_DEFAULT = 0.05;       // dormant (frame) face width
 const FRAME_DEPTH_DEFAULT = 0.08; // dormant depth (Ange-Line: 80 mm)
 const HANDLE_Z = 1.05;    // handle height above the floor
@@ -166,15 +169,29 @@ function buildDoorProductAtFloor(p, { lambert = false, open = false } = {}) {
     geometry.translate(x, y, z);
     parts.push([geometry, material]);
   };
+  const leafT = Math.min(p.leafDepth, 0.1);
+  // A rebated frame: the leaf lies flush with the frame's swing face, overlapping each jamb
+  // by FRAME − inset; each jamb is a full-width stop behind the leaf plus a narrower band
+  // (the inset) beside it.
+  const inset = p.def.leafInset;
+  const rebated = Number.isFinite(inset) && inset > 0 && inset < FRAME && leafT < FRAME_DEPTH;
+  const leafZ = rebated ? p.swingZ * (FRAME_DEPTH / 2 - leafT / 2) : 0; // the leaf's centre across the wall
   // Dormant: two jambs and the head, plus a steel threshold.
-  add(new THREE.BoxGeometry(FRAME, h, FRAME_DEPTH), m.body, -w / 2 + FRAME / 2, h / 2, 0);
-  add(new THREE.BoxGeometry(FRAME, h, FRAME_DEPTH), m.body, w / 2 - FRAME / 2, h / 2, 0);
+  for (const side of [-1, 1]) {
+    if (rebated) {
+      const stopD = FRAME_DEPTH - leafT;
+      add(new THREE.BoxGeometry(FRAME, h, stopD), m.body, side * (w / 2 - FRAME / 2), h / 2, -p.swingZ * leafT / 2);
+      add(new THREE.BoxGeometry(inset, h, leafT), m.body, side * (w / 2 - inset / 2), h / 2, leafZ);
+    } else {
+      add(new THREE.BoxGeometry(FRAME, h, FRAME_DEPTH), m.body, side * (w / 2 - FRAME / 2), h / 2, 0);
+    }
+  }
   add(new THREE.BoxGeometry(w - 2 * FRAME, FRAME, FRAME_DEPTH), m.body, 0, h - FRAME / 2, 0);
   if (p.def.threshold !== false) add(new THREE.BoxGeometry(w - 2 * FRAME, 0.015, FRAME_DEPTH + 0.02), m.steel, 0, 0.0075, 0);
   // Leaf: BoxGeometry faces are [+x, −x, +y, −y, +z, −z]. The design's lock edge is at
   // canvas x = 0; +Z's U runs toward +X and −Z's toward −X, so the face whose U starts
   // on the hinge side takes the mirrored texture, and both faces agree in the world.
-  const leafW = w - 2 * FRAME - 0.006, leafH = h - FRAME - 0.018, leafT = Math.min(p.leafDepth, 0.1);
+  const leafW = rebated ? w - 2 * inset : w - 2 * FRAME - 0.006, leafH = h - FRAME - 0.018;
   const plusZ = hingeX < 0 ? m.faceMirrored : m.face;
   const minusZ = hingeX < 0 ? m.face : m.faceMirrored;
   const leafFrom = parts.length; // parts from here to the knuckles move with the leaf
@@ -200,9 +217,10 @@ function buildDoorProductAtFloor(p, { lambert = false, open = false } = {}) {
       .multiply(new THREE.Matrix4().makeTranslation(-px, 0, -pz));
     for (let i = leafFrom; i < parts.length; i++) parts[i][0].applyMatrix4(R);
   }
+  if (leafZ) for (let i = leafFrom; i < parts.length; i++) parts[i][0].translate(0, 0, leafZ);
   // Hinge knuckles on the swing face.
   for (const y of [0.25, 1.1, 1.95].map((f) => f * (h / 2.15))) {
-    add(new THREE.CylinderGeometry(0.011, 0.011, 0.1, 10), m.body, hingeX * (leafW / 2 + 0.003), y, p.swingZ * (leafT / 2 + 0.008));
+    add(new THREE.CylinderGeometry(0.011, 0.011, 0.1, 10), m.body, hingeX * (leafW / 2 + 0.003), y, leafZ + p.swingZ * (leafT / 2 + 0.008));
   }
   return place(parts, p);
 }

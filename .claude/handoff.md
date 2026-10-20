@@ -303,6 +303,23 @@ plan.
     `link`, off for the QR), so tags in a share view name the headset's ids. Proven (Node, the 286 557 plan): +365
     chars, 181/181 ids and geometry kept; a bad `ri` falls back to fresh ids. Node also showed the plan holds 5 orphan
     finishes on r254 (removed 10-17); a link drops them. Harmless; clean them up on a later W if the owner wants.
+- **98** (10-20, drafted, NOT written) **Door zones = the frame's outside** (owner: "the plan should reflect door frames
+  instead of doors"; the door builder already treats the zone as the frame). A blanket +9.52 cm (LINE jambs) did not
+  fit 5 of 8 doors (corridors/stairs too narrow), so the owner measured instead:
+  - r137 (Ground): frame 71, flush with the north wall (new dim c1571 r54.top → r137.top = 0), 2 cm into the south wall.
+  - r138 (Upper): frame 69, against the north wall (c1001 r138.top → r94.top 0.03 → 0): y −1.85 → −1.16, 1 cm
+    short of the opening's south end.
+  - r92 (Upper): frame 78, 12.5 cm from the corridor r87's west face (c987); it crosses the stair-side wall by 9.5 cm
+    (owner confirmed).
+  - r91 (Upper): frame 78, against the corridor's west face (new dim r87.left → r91.left = 0; c986 and c985 deleted).
+
+  Scratch `door137.mjs` then `doorsUpper.mjs` on the 286 557 read (`edit-doors4.json`): `house-query diff` shows only
+  those 4 zones, no conflict. Still to measure: r120, r119, r226, r78.
+
+  **Leaf (uncommitted code):** the owner measured r92's leaf at 73 in its 78 frame. The LINE entry got
+  `leafInset: 0.025` and the builder a rebated leaf (`docs/materials.md` "A rebated leaf"). Proven in Node only. So a
+  LINE frame = leaf + 5 cm (0.78 for a 73), not the 0.825 first assumed. Uncommitted: `src/ui/doorProducts.js`,
+  `src/core/materials.js`, `docs/materials.md`, `docs/ar-qa-checklist.md`, this file.
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 

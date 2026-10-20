@@ -758,6 +758,17 @@ the zone.
 - The door builder's frame face/depth, threshold, key-rose drop and paint finish are catalog fields
   (`frameFace`, `frameDepth`, `threshold`, `roseDrop`, `metalness`, `roughness`), defaulting to the
   Ange-Line's values.
+- **The zone is the frame's outside** (owner, 2026-10-20: "the plan should reflect door frames instead of
+  doors"). Survey a door by the frame's outside width, wall to wall, not by the nominal leaf (63 / 73 / 83).
+- **A rebated leaf** (`leafInset`, owner's measurement 2026-10-20 on door r92: a LINE frame 78 cm outside holds a
+  73 cm leaf). The leaf sits in the jambs' rebate, `leafInset` (2.5 cm) in from each outside edge, flush with the
+  frame's swing face. Each jamb is a full-face stop behind it plus an inset-wide band beside it.
+  - Without `leafInset` (the Ange-Line), the leaf fits between the jambs: zone − 2 × face − 6 mm.
+  - So a LINE leaf of L needs a frame of L + 5 cm: 63 → 0.68, 73 → 0.78, 83 → 0.88. Hypothesis for the 63 and 83:
+    only a 73 was measured.
+  - The leaf height still uses the face (head − face − 18 mm): the frame's outside height was not measured.
+  - Proven (Node, 0.78 zone): leaf 0.73, flush with the swing face; open, it turns about its hinge edge onto the
+    swing side; the Ange-Line build is unchanged. Not yet seen in View 3D or AR.
 - Limits: `door` zones only (not sliding or garage); the texture is stretched over the leaf, so
   the design scales with the opening's proportions.
 - Open in View 3D (owner, 2026-09-27): desktop/mobile View 3D draws every DOOR zone's leaf swung
