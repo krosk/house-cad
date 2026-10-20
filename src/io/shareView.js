@@ -94,7 +94,11 @@ function loadNetwork(n, floors) {
 // default; `markers` remain opt-in because large marker sets cost the QR comfort margin.
 // Links made before the furniture merge carried placed items in floor slot 4; they still
 // decode (and migrate to zones in deserializeInto). New links leave that slot empty.
-export function serializeView(project, { markers = false, furniture = true, network = false } = {}) {
+//
+// `ids` (owner, 2026-10-19) keeps each zone's own id ("r130" travels as 130 in top-level
+// `ri`, one array per floor), so a viewer's #️⃣ Edge # tags name the zones of the plan
+// the link came from. Off for the QR (size); an older viewer ignores `ri`.
+export function serializeView(project, { markers = false, furniture = true, network = false, ids = false } = {}) {
   const kinds = [...new Set(project.floors.flatMap((f) => f.rectangles.map((r) => r.kind || 'room')))];
   const markerTypes = markers
     ? [...new Set(project.floors.flatMap((f) => f.markers.map((m) => m.type || 'outlet')))]
@@ -124,6 +128,10 @@ export function serializeView(project, { markers = false, furniture = true, netw
     ...(customMaterials.length ? { cm: customMaterials.map((m) => ({ ...m })) } : {}),
     ...(network && ((project.conduitNodes || []).length || (project.pipeNodes || []).length)
       ? { n: serializeNetwork(project) } : {}),
+    ...(ids ? { ri: project.floors.map((f) => f.rectangles.map((r) => {
+      const m = /^r(\d+)$/.exec(r.id || '');
+      return m ? Number(m[1]) : null;
+    })) } : {}),
     // Positional arrays keep a large marker set within QR version 40 after deflate.
     // version 40 even after deflate. Trailing defaults are removed before encoding.
     f: project.floors.map((f) => {
@@ -176,7 +184,8 @@ export function loadView(project, view) {
       || view.v !== VIEW_SCHEMA || !Array.isArray(view.f)) {
     throw new Error('Not a house-cad view link.');
   }
-  let rid = 0, mid = 0; // fresh local ids; compact payload carries no ids
+  let rid = 0, mid = 0; // fresh local ids, unless the link carries the zones' own (`ri`)
+  const ownIds = viewRectIds(view);
   const sourceFloors = view.f.map((f) => ({
     name: f[0], height: f[1], slab: f[6], level: f[7],
     rects: (f[2] || []).map((r) => ({
@@ -202,16 +211,17 @@ export function loadView(project, view) {
   }));
   const floors = sourceFloors.map((f, i) => {
     const firstRect = rid; // this floor's rects get ids r(firstRect+1)… in order
+    const idAt = (index) => (ownIds ? `r${ownIds[i][index]}` : `r${firstRect + index + 1}`);
     const rectId = (index) => (Number.isInteger(index) && index >= 0 && index < (f.rects || []).length
-      ? `r${firstRect + index + 1}` : null);
+      ? idAt(index) : null);
     return {
       id: `f${i + 1}`,
       name: f.name || `Floor ${i + 1}`,
       height: typeof f.height === 'number' ? f.height : 2.8,
       slab: typeof f.slab === 'number' ? f.slab : 0,
       level: typeof f.level === 'number' ? f.level : undefined,
-      rectangles: (f.rects || []).map((rc) => ({
-        id: `r${++rid}`, x: rc.x, y: rc.y, w: rc.w, h: rc.h,
+      rectangles: (f.rects || []).map((rc, index) => ({
+        id: (++rid, idAt(index)), x: rc.x, y: rc.y, w: rc.w, h: rc.h,
         op: rc.op || 'add', kind: rc.kind || 'room',
         sill: rc.sill, head: rc.head, hinge: rc.hinge, swing: rc.swing, foot: rc.foot, top: rc.top, climb: rc.climb,
         article: rc.article, facing: rc.facing, floorZ: rc.floorZ, ceiling: rc.ceiling,
@@ -246,6 +256,22 @@ export function loadView(project, view) {
     floors, wires: [], ...loadNetwork(view.n, floors),
     materials: Array.isArray(view.cm) ? view.cm : [],
   });
+}
+
+// The zones' own ids from a link's `ri`, or null (absent, or not one positive integer per
+// zone, unique across floors) so the viewer numbers them afresh.
+function viewRectIds(view) {
+  const ri = view.ri;
+  if (!Array.isArray(ri) || ri.length !== view.f.length) return null;
+  const seen = new Set();
+  for (let i = 0; i < ri.length; i++) {
+    if (!Array.isArray(ri[i]) || ri[i].length !== (view.f[i][2] || []).length) return null;
+    for (const n of ri[i]) {
+      if (!Number.isInteger(n) || n <= 0 || seen.has(n)) return null;
+      seen.add(n);
+    }
+  }
+  return ri;
 }
 
 // ---- URL fragment codec: <codec><base64url>, codec 'z'=deflate-raw, 'u'=identity ----

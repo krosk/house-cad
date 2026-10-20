@@ -56,7 +56,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Uncommitted at the end of session 41 (10-19): this file (the 286 557 write record) and item 97 (`src/ui/sketch2d.js`, `src/main.js`, `src/style.css`, `index.html`, `docs/headset-data.md`, `docs/ar-qa-checklist.md`, CLAUDE.md); commit by path on "c p".
+- Uncommitted (10-20): item 97's zone ids in share links (`src/io/shareView.js`, `src/main.js`, `src/ui/mr.js`, `docs/share-view.md`, `docs/headset-data.md`, this file); commit by path on "c p". The edge-tag tool itself is `d3894d5`.
 
 ## What the app is today
 
@@ -294,11 +294,15 @@ plan.
   wire clamps. Also answered from the 287 012 read: the garden's west garden walls r236/r237 are 0.73 m high; the
   refrigerant lines 4.66 / 10.84 / 11.44 / 5.48 = 32.41 m; the VMC ducts 25.73 m (Ø80 13.43, Ø100 6.54, Ø125 3.89,
   Ø160 1.87).
-- **97** (10-19, uncommitted) Desktop 2D tool **#️⃣ Edge #** (owner: "a way to select an edge with a number" to
+- **97** (`d3894d5`, 10-19) Desktop 2D tool **#️⃣ Edge #** (owner: "a way to select an edge with a number" to
   say "a pipe marker x from one edge and y from another"): numbered pink edge tags, session-only, and an EDGE TAGS list
   with Copy (`Floor: x = … m (left edge of r…, kind; span)`); works in share views. Reading a pasted list: the
   coordinate is the reference (a share link renumbers zones), `docs/headset-data.md` "Pointing at edges". Proven: build,
   synthetic clicks in Chrome; not yet tried by the owner (QA item 2026-10-19).
+  - (10-20, uncommitted) Share links now carry the zone ids (opt-in `ids`, top-level `ri`; on for 🔗 Share view and AR
+    `link`, off for the QR), so tags in a share view name the headset's ids. Proven (Node, the 286 557 plan): +365
+    chars, 181/181 ids and geometry kept; a bad `ri` falls back to fresh ids. Node also showed the plan holds 5 orphan
+    finishes on r254 (removed 10-17); a link drops them. Harmless; clean them up on a later W if the owner wants.
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 

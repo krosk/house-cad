@@ -1134,7 +1134,7 @@ document.getElementById('share-view').addEventListener('click', async () => {
     const in3D = app.classList.contains('show-3d');
     const floorIndex = project.floors.findIndex((f) => f.id === selected3DFloorId);
     const floorParam = floorIndex >= 0 ? `&floor=${floorIndex + 1}` : (hasChosen3DFloor ? '&floor=all' : '');
-    const url = await buildShareUrl(project, { markers: true, network: true }) + (in3D ? `&open=3d${floorParam}` : '');
+    const url = await buildShareUrl(project, { markers: true, network: true, ids: true }) + (in3D ? `&open=3d${floorParam}` : '');
     let copied = false;
     try { await navigator.clipboard?.writeText(url); copied = true; } catch { /* clipboard blocked */ }
     const kb = (new Blob([url]).size / 1024).toFixed(1);

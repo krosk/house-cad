@@ -100,8 +100,11 @@ and 30 cm from #2". The desktop 2D plan's **#️⃣ Edge #** tool does it:
 - **Session-only:** never stored, saved or put in a link.
 
 **Reading a pasted list (agent):**
-- **The coordinate is the reference.** A share link renumbers every zone (r130 on the headset was r81 in the
-  10-19 link), so the rect id matches only when the owner tagged their own copy of the plan.
+- **The rect id matches** the headset plan when the owner tagged their own copy, or a share link made with
+  `ids` (🔗 Share view and AR `link`, since 2026-10-20; `docs/share-view.md` "Zone ids").
+- **The coordinate still decides.** An older link renumbered the zones (r130 was r81 in the 10-19 link), and the
+  plan may have changed since the link was made. Check that the id's edge sits at the quoted coordinate on a
+  fresh read.
 - **Find the edge** on a fresh `read`: the same floor, an edge of a zone on that axis at that coordinate,
   whose span covers the quoted extent.
 - **Ambiguity:** when several zones share the coordinate, the zone kind and the span pick one; ask when they

@@ -48,8 +48,21 @@ View 3D's ▤ Plan) ride in top-level `n`: nodes as `[floorIndex, x, y, z]` floo
 as indexes into them, pipes with a service index and a diameter. A device-bound node travels as a bare node
 where its device stands. Proven in Node on the owner's plan: 312 conduit segments and 229 pipes decode at the
 same world endpoints, pipes exactly and conduits within the links' 1 mm rounding; the link grew to about
-12.9k chars with markers. Older links decode with no network, and an older viewer ignores `n`. Not
-carried: constraints, wires, control links, circuits. To see exactly what a given house loses,
+12.9k chars with markers. Older links decode with no network, and an older viewer ignores `n`.
+
+**Zone ids** (opt-in `ids`, owner 2026-10-19). On for 🔗 Share view and AR `link`; off for the QR.
+- **Why:** the desktop **#️⃣ Edge #** tags (`docs/headset-data.md` "Pointing at edges") name the source plan's
+  zones (r130), not fresh ones.
+- **Format:** top-level `ri`, one array per floor, each zone's numeric id in zone order.
+- **Fallback:** the viewer uses them only when there is one positive integer per zone, unique across floors;
+  otherwise it numbers the zones afresh from r1, as before.
+- **Compatibility:** an older viewer ignores `ri`, and a link without it decodes as before.
+- Proven in Node, 2026-10-20, on the owner's 286 557 plan:
+  - the cost is 365 chars (13 229 → 13 594);
+  - all 181 zones keep their id and geometry, and a new zone in the viewer gets the next id (r265);
+  - a duplicated id falls back to fresh ids.
+
+Not carried: constraints, wires, control links, circuits. To see exactly what a given house loses,
 run `node tools/check-share-link.mjs <house.json>` (Node only: it builds the link with the app's code,
 decodes it, and lists every differing field plus the link length with and without markers). Any of these could be
 added as an opt-in layer.
