@@ -216,7 +216,18 @@ function setRuler(on) {
   view3dRuler.setAttribute('aria-pressed', String(!!on));
   navLabel(view3dRuler, '📏', on ? 'Ruler on' : 'Ruler');
 }
-view3dRuler.addEventListener('click', () => setRuler(!view.ruler.enabled));
+view3dRuler.addEventListener('click', () => { if (!view.ruler.enabled) setDoorsToggle(false); setRuler(!view.ruler.enabled); });
+// 🚪 Doors (owner, 2026-10-20: to see where the handles clash): while on, a tap on a door opens or
+// closes it, in the overview, POV and the orbit; a tap missing every door does what it would
+// otherwise. Each door's state stays for the session, across rebuilds. View-only, shared links too.
+const view3dDoors = document.getElementById('view3d-doors');
+function setDoorsToggle(on) {
+  view.setDoorsToggleEnabled(on);
+  view3dDoors.setAttribute('aria-pressed', String(!!on));
+  navLabel(view3dDoors, '🚪', on ? 'Doors: tap one' : 'Doors');
+}
+setDoorsToggle(false);
+view3dDoors.addEventListener('click', () => { if (!view.doorsToggleEnabled) setRuler(false); setDoorsToggle(!view.doorsToggleEnabled); });
 // Half walls see-through (owner, 2026-10-10): to look at a WC frame inside its half wall; ceiling
 // boxings too (owner, 2026-10-14), to see the ducts they cover.
 // View-only and session-only, in both camera modes; shared links have it too.
@@ -353,6 +364,7 @@ view.onNavigationChange = (mode) => {
   const orbit = mode === 'orbit'; // the model on the plan's free orbit (◈ Model after moving the plan)
   view3dNav.hidden = false;
   view3dRuler.hidden = pov || plan || orbit;
+  view3dDoors.hidden = plan;
   view3dHalfWalls.hidden = plan;
   view3dFloors.hidden = plan;
   view3dCeilings.hidden = !pov; // only POV shows a ceiling
@@ -367,6 +379,7 @@ view.onNavigationChange = (mode) => {
   view3dPipes.hidden = !project.pipes?.length; // Model view too, in grey (owner, 2026-10-14)
   renderPipeLegend();
   if ((pov || plan || orbit) && view.ruler.enabled) setRuler(false);
+  if (plan && view.doorsToggleEnabled) setDoorsToggle(false);
 };
 
 function render3DFloorList() {
@@ -536,6 +549,7 @@ function rebuildView() {
       fenceMaterial: (rect) => zoneMaterial(project, f, rect),
       productDoors: new Set(doorProducts.map((d) => d.rectId)),
       openDoors: true, // every door leaf swung open (the AR 3D view does the same)
+      doorLeavesApart: true, // each plain leaf apart, open and closed: the 🚪 Doors toggle (View3D.closedDoors)
       productWindows: new Set(windowProducts.map((d) => d.rectId)),
       splitHalfWalls: true, // the see-through half walls button
     }),

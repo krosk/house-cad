@@ -95,7 +95,11 @@ landing on a face takes it first; floor-slab edges, door leaves and glass never 
 parallel planes read the gap between them, picking the pair that faces each other (a tape between
 two walls: a thin wall's room-side face, a window's wall face rather than its reveal); otherwise
 point to point with plan X / Y legs. Session-only: nothing is stored; a rebuild, a floor change,
-POV or the button clears it. POV keeps at least 65° horizontal FOV on narrow screens
+POV or the button clears it. **🚪 Doors** (owner, 2026-10-20, to see where handles clash): while on (overview,
+POV, ORBIT), a tap whose first hit is a door opens or closes that one door; a tap missing every door does what
+it would otherwise. Every door (product or plain leaf, `doorLeavesApart`) is built both open and closed and
+`View3D.closedDoors` (`floorId:rectId`, session-only, kept across rebuilds) picks which shows, so a toggle never
+rebuilds the model. POV keeps at least 65° horizontal FOV on narrow screens
 (vertical capped at 100°); the overview stays at 50°. A model rebuild on the same floor (an edit, ▯ Windows open) keeps the camera, overview or POV (owner,
 2026-10-14); only choosing another floor reframes. Camera state is session-only and must not
 mutate project or shared-view data. The viewer initially isolates the

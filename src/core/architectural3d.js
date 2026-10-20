@@ -433,17 +433,24 @@ function openDoorLeafBoxes(rect, z0, z1) {
   });
 }
 
-function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}) {
+// `doorLeavesApart` (View 3D's 🚪 Doors toggle): each plain DOOR zone's leaf comes out apart, open
+// and closed (`doorLeaves`: {rectId, open, closed} geometries), instead of in the merged doors.
+function apertureInsertGeometries(floor, skip = null, { openDoors = false, doorLeavesApart = false } = {}) {
   const height = ceilingHeight(floor);
   const doors = [];
   const windows = [];
+  const doorLeaves = [];
   for (const rect of floor?.rectangles || []) {
     if (!validBounds(rect.bounds) || skip?.has(rect.id)) continue;
     const kind = zoneKind(rect);
     const sill = kind === 'door' || kind === 'sliding' ? Math.max(0, rect.sill ?? 0) : 0;
     if (kind === 'door' && openDoors) {
       const head = clipped(rect.head ?? 2.1, 0, height);
-      if (head - sill > EPS) doors.push(...openDoorLeafBoxes(rect, sill + 0.015, Math.max(sill + 0.015, head - 0.015)));
+      const z0 = sill + 0.015, z1 = Math.max(sill + 0.015, head - 0.015);
+      if (head - sill <= EPS) continue;
+      if (doorLeavesApart) {
+        doorLeaves.push({ rectId: rect.id, open: boxesGeometry(openDoorLeafBoxes(rect, z0, z1)), closed: boxesGeometry([apertureInsertBox(rect, z0, z1)]) });
+      } else doors.push(...openDoorLeafBoxes(rect, z0, z1));
     } else if (kind === 'door' || kind === 'garage' || kind === 'sliding') {
       const head = clipped(rect.head ?? 2.1, 0, height);
       if (head - sill > EPS) doors.push(apertureInsertBox(rect, sill + 0.015, Math.max(sill + 0.015, head - 0.015)));
@@ -457,7 +464,7 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false } = {}
       if (head - sill > EPS) windows.push(apertureInsertBox(rect, sill, head, 0.018));
     }
   }
-  return { doorGeometry: boxesGeometry(doors), windowGeometry: boxesGeometry(windows) };
+  return { doorGeometry: boxesGeometry(doors), windowGeometry: boxesGeometry(windows), doorLeaves };
 }
 
 // Lightweight procedural staircase: one merged thin tread per riser. The flight
@@ -880,10 +887,11 @@ export function buildArchitecturalFloor(floor, opts = {}) {
   // Door/window zones carrying a product draw that product instead
   // (doorProductPlacements / windowProductPlacements).
   const skip = new Set([...(opts.productDoors || []), ...(opts.productWindows || [])]);
-  const { doorGeometry, windowGeometry } = apertureInsertGeometries(floor, skip, { openDoors: !!opts.openDoors });
+  const { doorGeometry, windowGeometry, doorLeaves } = apertureInsertGeometries(floor, skip,
+    { openDoors: !!opts.openDoors, doorLeavesApart: !!opts.doorLeavesApart });
   const stairGeometry = stairsGeometry(floor, opts);
   return {
-    floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, beamGeometry, beamSpan, ceilingGeometry, doorGeometry, windowGeometry,
+    floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, beamGeometry, beamSpan, ceilingGeometry, doorGeometry, doorLeaves, windowGeometry,
     outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial),
     pavedParts: pavedParts(floor, opts.fillDepth ?? 0, opts.fenceMaterial),
     stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),

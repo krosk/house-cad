@@ -211,6 +211,11 @@ export class View3D {
       transparent: true, opacity: 0.18, depthWrite: false,
     });
     this.ceilingsSeeThrough = false;
+    // 🚪 Doors (owner, 2026-10-20: to see where handles clash): while on, a tap on a door opens or
+    // closes it. Every door is built both ways and shows one; `closedDoors` holds `floorId:rectId`
+    // keys, session-only and kept across rebuilds. View-only: nothing reaches the project.
+    this.doorsToggleEnabled = false;
+    this.closedDoors = new Set();
     this.doorMaterial = new THREE.MeshStandardMaterial({
       color: 0xa9794f,
       roughness: 0.7,
@@ -341,6 +346,26 @@ export class View3D {
 
   setRulerEnabled(enabled) {
     this.ruler.setEnabled(enabled);
+  }
+
+  setDoorsToggleEnabled(enabled) {
+    this.doorsToggleEnabled = !!enabled;
+  }
+
+  // Open or close the door under the tap, when a door is the first thing it hits (a wall in
+  // front blocks it). False when it hits no door, so the tap does what it would otherwise.
+  _toggleDoorAtPointer(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.viewNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.viewRaycaster.setFromCamera(this.viewNdc, this.camera);
+    const targets = this.house.children.filter((mesh) => mesh.visible && mesh.isMesh);
+    const key = this.viewRaycaster.intersectObjects(targets, false)[0]?.object.userData.doorKey;
+    if (!key) return false;
+    if (this.closedDoors.has(key)) this.closedDoors.delete(key);
+    else this.closedDoors.add(key);
+    for (const mesh of this.house.children) if (mesh.userData.doorKey === key) mesh.visible = this._meshVisible(mesh);
+    this.renderer.shadowMap.needsUpdate = true;
+    return true;
   }
 
   // Half walls and ceiling boxings see-through: their solid turns faint and their finishes hide. View-only.
@@ -491,19 +516,29 @@ export class View3D {
         mesh.visible = this._meshVisible(mesh);
         this.house.add(mesh);
       }
-      // Door products on DOOR zones (docs/materials.md "Doors"), in place of the plain slab,
-      // shown open like the plain leaves (main.js builds with `openDoors`).
+      // Door products on DOOR zones (docs/materials.md "Doors"), in place of the plain slab, and the
+      // plain leaves (`doorLeaves`, built apart by main.js): each built open and closed, one shown
+      // (open unless the 🚪 Doors toggle closed it, `closedDoors`).
+      const addDoorMesh = (mesh, rectId, open) => {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.position.y = elevation || 0;
+        mesh.userData.floorId = floorId || null;
+        mesh.userData.floorName = name || '';
+        mesh.userData.architecturalRole = 'doors';
+        mesh.userData.doorKey = `${floorId}:${rectId}`;
+        mesh.userData.doorOpen = open;
+        mesh.visible = this._meshVisible(mesh);
+        this.house.add(mesh);
+      };
       for (const placement of entry.doorProducts || []) {
-        for (const mesh of buildDoorProduct(placement, { open: true })) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          mesh.position.y = elevation || 0;
-          mesh.userData.floorId = floorId || null;
-          mesh.userData.floorName = name || '';
-          mesh.userData.architecturalRole = 'doors';
-          mesh.visible = this._meshVisible(mesh);
-          this.house.add(mesh);
+        for (const open of [true, false]) {
+          for (const mesh of buildDoorProduct(placement, { open })) addDoorMesh(mesh, placement.rectId, open);
         }
+      }
+      for (const leaf of entry.doorLeaves || []) {
+        addDoorMesh(new THREE.Mesh(leaf.open, this.doorMaterial), leaf.rectId, true);
+        addDoorMesh(new THREE.Mesh(leaf.closed, this.doorMaterial), leaf.rectId, false);
       }
       // Window products on WINDOW zones (docs/materials.md "Windows"), in place of the pane.
       for (const placement of entry.windowProducts || []) {
@@ -1259,6 +1294,7 @@ export class View3D {
     if (mesh.userData.ceilingFinish && this.ceilingsSeeThrough) return false;
     // A floor's stairwell under its flights going down: the floor below draws it otherwise.
     if (mesh.userData.stairwell && this.floorFilter == null) return false;
+    if (mesh.userData.doorKey && mesh.userData.doorOpen === this.closedDoors.has(mesh.userData.doorKey)) return false;
     return onSelectedFloor && (role !== 'ceiling' || this.navigationMode === 'pov');
   }
 
@@ -1321,7 +1357,8 @@ export class View3D {
     const p = this.viewPointer;
     if (!p || p.id !== event.pointerId) return;
     if (!p.moved && !this.cameraTransition && event.type === 'pointerup') {
-      if (this.navigationMode === 'overview' && this.ruler.enabled) this.ruler.pick(event.clientX, event.clientY);
+      if (this.doorsToggleEnabled && this.navigationMode !== 'plan' && this._toggleDoorAtPointer(event.clientX, event.clientY)) { /* toggled */ }
+      else if (this.navigationMode === 'overview' && this.ruler.enabled) this.ruler.pick(event.clientX, event.clientY);
       else if (this.navigationMode === 'overview' || this.navigationMode === 'orbit') this._enterPovFromPointer(event.clientX, event.clientY);
       else if (this.navigationMode === 'pov') this._walkToPointer(event.clientX, event.clientY);
     }

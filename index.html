@@ -90,7 +90,7 @@
             title="Collapse / expand"><span class="cx-caret">▾</span> Floors<span id="view3d-floor-current"></span></button>
           <div id="view3d-floor-list"></div>
         </aside>
-        <!-- The nav: Overview: Plan + the ruler; POV: Plan + Overview + tilt; Plan: Model; 👁 Show everywhere
+        <!-- The nav: Overview: Plan + the ruler + doors; POV: Plan + doors + Overview + tilt; Plan: Model; 👁 Show everywhere
              (main.js onNavigationChange). -->
         <!-- The pipe legend: a chip in the corner, a tap opens it (main.js renderPipeLegend). -->
         <div id="view3d-pipe-legend" class="view3d-pipe-legend" hidden>
@@ -133,6 +133,8 @@
             title="The plan in 3D, as in AR: every zone flat on its floor, with the conduits and pipes">▤ Plan</button>
           <button id="view3d-ruler" type="button" aria-pressed="false" hidden
             title="Measure: tap a wall face, then another (two parallel faces give the gap between them)">📏 Ruler</button>
+          <button id="view3d-doors" type="button" aria-pressed="false" hidden
+            title="Open / close doors: while on, tap a door to open or close it (to see where handles clash)">🚪 Doors</button>
           <button id="view3d-overview" type="button" title="Back to the top-down overview">▦ Overview</button>
           <button id="view3d-tilt" type="button" aria-pressed="false" hidden
             title="Look around by moving the phone">◎ Tilt look</button>

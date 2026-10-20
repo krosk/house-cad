@@ -18,11 +18,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-19 (session 41 ended; docs-only Q&A on 10-18/19, item 96; the Quest reconnected late on 10-19 with the new skill `quest-connect`; items 95 and 91 written: base **286 557**)
+**Date:** 2026-10-20 (session 42, paused for a compaction; items 97–98: edge tags, zone ids in links, door frames, the LINE rebate, the Meli rail; the headset plan is still **286 557**)
 
 **Status:**
-- Proven (git, `version.json` "6ec32b6 1019-2112Z", `update-app` "installed 6ec32b6 1019-2112Z"): the head is
-  `6ec32b6` (the quest-connect skill + item 96 docs), pushed, served and installed on the headset.
+- Proven (git; `version.json` "fdb802a 1020-1710Z"): the head is `fdb802a` (the LINE rebated leaf), pushed and served.
+  **Not installed on the headset:** the last `update-app` installed `d62477e` (10-20). Run `update-app` before the next W.
 - Proven (`quest-storage write --base`, then a fresh `read` byte-identical to the edit): the **last headset write was
   2026-10-19, 286 557 chars**: the FLAVIO 60 on r130 (Ground) and the FLAVIO 80 on r132 (Upper), foot 0.33 / top 0.88
   (the height is still the owner's to confirm), dims c870 c871 c906 c907 dropped (item 95); the 7 basement
@@ -56,7 +56,9 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Uncommitted (10-20): item 97's zone ids in share links (`src/io/shareView.js`, `src/main.js`, `src/ui/mr.js`, `docs/share-view.md`, `docs/headset-data.md`, this file); commit by path on "c p". The edge-tag tool itself is `d3894d5`.
+- **Uncommitted (10-20, all from this session):** the Meli rail (item 98) in `src/ui/doorProducts.js` (`buildMeliRail`),
+  `src/core/materials.js` (`door_postforme_meli_white`), `docs/materials.md`, `docs/ar-qa-checklist.md`, and this file.
+  The build is clean. Commit by path on "c p".
 
 ## What the app is today
 
@@ -299,7 +301,7 @@ plan.
   with Copy (`Floor: x = … m (left edge of r…, kind; span)`); works in share views. Reading a pasted list: the
   coordinate is the reference (a share link renumbers zones), `docs/headset-data.md` "Pointing at edges". Proven: build,
   synthetic clicks in Chrome; not yet tried by the owner (QA item 2026-10-19).
-  - (10-20, uncommitted) Share links now carry the zone ids (opt-in `ids`, top-level `ri`; on for 🔗 Share view and AR
+  - (`d62477e`, 10-20) Share links now carry the zone ids (opt-in `ids`, top-level `ri`; on for 🔗 Share view and AR
     `link`, off for the QR), so tags in a share view name the headset's ids. Proven (Node, the 286 557 plan): +365
     chars, 181/181 ids and geometry kept; a bad `ri` falls back to fresh ids. Node also showed the plan holds 5 orphan
     finishes on r254 (removed 10-17); a link drops them. Harmless; clean them up on a later W if the owner wants.
@@ -316,10 +318,35 @@ plan.
   Scratch `door137.mjs` then `doorsUpper.mjs` on the 286 557 read (`edit-doors4.json`): `house-query diff` shows only
   those 4 zones, no conflict. Still to measure: r120, r119, r226, r78.
 
-  **Leaf (uncommitted code):** the owner measured r92's leaf at 73 in its 78 frame. The LINE entry got
-  `leafInset: 0.025` and the builder a rebated leaf (`docs/materials.md` "A rebated leaf"). Proven in Node only. So a
-  LINE frame = leaf + 5 cm (0.78 for a 73), not the 0.825 first assumed. Uncommitted: `src/ui/doorProducts.js`,
-  `src/core/materials.js`, `docs/materials.md`, `docs/ar-qa-checklist.md`, this file.
+  **Leaf (`fdb802a`):** the owner measured r92's leaf at 73 in its 78 frame. The LINE entry got `leafInset: 0.025` and
+  the builder a rebated leaf (`docs/materials.md` "A rebated leaf"). Proven in Node only. So a LINE frame = leaf + 5 cm
+  (0.78 for a 73), not the 0.825 first assumed.
+  **Meli rail (10-20, uncommitted):** the owner swapped r93's rail for the ARTENS Meli white (LM 91176300). There's a new
+  entry `door_postforme_meli_white` (`rail: 'meli'`, `buildMeliRail`), and scratch `r93meli.mjs` switches r93's finish
+  in the draft (`edit-doors5.json`, chained after `doorsUpper.mjs`). The Indus rail's end overlapped r91's frame by
+  1.6 cm; the Meli box ends 3.1 cm clear, with the closed leaf flush with its end, as the manual draws (Node).
+  (A first reading put the Meli's first hole inside the opening, which left the leaf 3.7 cm past the rail; the owner
+  spotted it and the manual's pp. 10/18/20 corrected it.)
+
+  **The r91 / r93 corner** (the owner felt r91 is too close to the sliding door). Proven in Node on the draft:
+  - r91 is against the corridor's west wall; the frame stands 1.6 cm proud of each wall face (92 mm frame, 60 mm wall);
+  - r93's opening ends 10 cm from the corner;
+  - the closed sliding leaf (centred, 5 cm over each side) ends 3.4 cm from r91's frame; its face is 5.1 cm off the
+    wall (Meli; the box 6.2 cm, Hypothesis: the leaf centred under the box);
+  - r91 hinges at its east end, so its handles are at the corner end. It opens north into r90.
+
+  **The LINE handle position** (found 2026-10-20, uncommitted): new catalog field `backset` (spindle to the leaf's
+  lock edge; builder default 9 cm, unsourced). LINE: `backset: 0.05`, `roseDrop: 0.07` (was 0.075). Hypothesis,
+  photo-measured: Lapeyre publishes no lock drawing; on both straight front photos (zoom1 202546631/633, an 83 leaf,
+  3.65 px/cm) the roses are 7.5 ± 0.4 cm in from the frame's outside and 7.2 cm apart, matching the usual French lock
+  (axe 50, entraxe 70). The owner's tape on a mounted door would prove it (`docs/materials.md`).
+  Corner with it (arithmetic on the draft, scratch): r91's spindle is 7.5 cm from the corridor's west wall (was 11.5);
+  in plan its rose's west edge lines up with the closed Meli leaf's face (0.2 cm apart across), but the leaf ends
+  2.2 cm short of the handle bar's corridor side and 7.4 cm short of the rose's plane, so they don't touch; the
+  Meli box (from 2.07 m) is far above the 1.05 m handle. The lever points east, away from the corner.
+
+  Drawings (scratch, session-local): `doormap/doors-*.png` (doors to check per floor), `corner91.png`,
+  `top-r91-r93.png` (Indus), `meli-top.png`, `meli-elev.png` (`meliViews.mjs`).
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 
@@ -577,7 +604,8 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0b67` pipe anchors + `house-query anchors` ·
 `3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity ·
 `796a788` ARTENS Easy tile (`concrete` design), Trez gates (one leaf; two leaves with `axisSpan`/`axisIn`), Klos'up fence
-slat · `74ca566` FLAVIO 60. Session 40:
+slat · `74ca566` FLAVIO 60 · `6ec32b6` skill `quest-connect` (port scan) · `d3894d5` 2D #️⃣ Edge # tags · `d62477e`
+links carry zone ids (`ids`) · `fdb802a` the LINE rebated leaf (`leafInset`). Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -627,11 +655,25 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | `src/io/shareView.js` / `src/io/planSheet.js` | Link payload / sheets (incl. `pipeSheetOptions`) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/ui/doorProducts.js` | Door, rail-door and gate builders; `GATE_PROFILES` (jax, trez, bono); a gate with `def.axisSpan` has its own width |
+| `.claude/skills/quest-connect/connect.sh` | Connects adb to the Quest (Bubblewrap's adb; mDNS, the cached address, then a port scan of that one host) and forwards DevTools |
+| scratchpad `door137.mjs` → `doorsUpper.mjs` → `r93meli.mjs` (`edit-doors5.json`), `read-1020.json` | Item 98's door draft on the 286 557 read, chained in that order (session-local; item 98 lists every value to rebuild it) |
 | scratchpad `colStack2…5.mjs`, `ductViewsCol*.mjs`, `zhCol.mjs`, `clashAbs.mjs`, `cmpDucts.mjs` | Session-local: the corner-column edits (1b…1e), their drawings (EN/ZH), the true-height clash check, duct length/fitting counts. Gone with the scratchpad; rebuild from the doc if needed |
 
 ## Next step
 
 **Active:**
+000. **Item 98, in order:**
+   - (a) ~~Find the LINE handle's position~~: done, `backset` (item 98); not yet seen in View 3D.
+   - (b) **"c p"** for the Meli, the LINE `backset`, and View 3D **🚪 Doors** (tap a door to open/close it; uncommitted;
+     Proven in desktop Chrome on the demo house, POV; CLAUDE.md "View 3D", QA checklist).
+   - (c) `update-app`.
+   - (d) **W**: the four door frames (r137, r138, r92, r91) plus r93 → `door_postforme_meli_white`. The fresh read
+     must equal 286 557; rebuild with the three scratch scripts if the scratchpad is gone.
+   - (e) A share link with `ids` (`node` + `encodeViewToHash(p, {markers, furniture, network, ids: true})`), sent
+     as a file.
+   - Before (d), the owner may still want r91 moved off the wall: they felt it was too close to the sliding door.
+     Ask if unsure.
+   - Still to measure: r120, r119, r226, r78 (r78 is a LINE door: 0.78 for a 73 leaf).
 00. **Owner to verify in AR** (the 286 557 write): the two FLAVIO vanities (r130 Ground, r132 Upper) and their height
    (top 0.88, a Hypothesis), and the basement ARTENS tile. Connect with skill `quest-connect`. Before any route work:
    `house-query anchors` and `house-query beams` on a fresh read. The attic lintels at y −1.96 (open check below) are a
