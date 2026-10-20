@@ -750,7 +750,12 @@ the zone.
   handle sold separately. Design from Lapeyre's two straight front photos (zoom1 ids 202546627 push-left,
   202546631 push-right): three thin full-height grooves showing the raw MDF, at 14%, 23% and 32% of the
   leaf width from the lock edge, about 5 mm wide (photo estimates). The two roses sit about 1.06 m and
-  0.98 m up (`roseDrop: 0.075`). No threshold (`threshold: false`), matte paint (`metalness: 0`).
+  0.98 m up. Their position (2026-10-20; Lapeyre publishes no lock drawing): on both front photos (an
+  83 cm leaf, 3.65 px/cm from the 88 cm frame) the rose centres are 7.5 ± 0.4 cm in from the frame's
+  outside, so `backset: 0.05` from the leaf's lock edge (inside the 2.5 cm `leafInset`), and 7.2 cm
+  apart, so `roseDrop: 0.07`. Both match the usual French interior lock (axe 50, entraxe 70).
+  Hypothesis: the rendered photos place the lock as fitted; the owner's tape on a mounted door
+  (spindle to the leaf edge) would prove it. `backset` defaults to 9 cm (unsourced) for other doors. No threshold (`threshold: false`), matte paint (`metalness: 0`).
   The builder still draws a lever handle; the photos show only the roses, since the handle is sold
   separately. Assumed: the grooves are on both faces (Hypothesis; the photos show one face). Proven
   2026-09-27 in a scratch preview: both faces, hinge left; the Ange-Line renders unchanged. Not yet
@@ -808,6 +813,27 @@ the right face.
   - Proven 2026-09-27: build; front and three-quarter renders, closed and open against a wall with
     an 80 cm opening, beside the studio photo (panel layout and proportions agree). Not yet seen
     in View 3D on a real plan or in AR.
+
+- **Postformé sliding door 83 on Meli rail, white** (`door_postforme_meli_white`, `rail: 'meli'`, owner 2026-10-20
+  for r93, replacing the Indus 2; `buildMeliRail` in `src/ui/doorProducts.js`, where every source and estimate is
+  embedded). The same postformé leaf, on the ARTENS **Meli** rail, white
+  ([Leroy Merlin 91176300](https://www.leroymerlin.fr/produits/rail-coulissant-meli-blanc-pour-porte-de-largeur-93-cm-maximum-artens-91176300.html)).
+  - Spec table: 186 cm, 6.2 cm deep, white powder-coated aluminium with a rail cover, doors 63–93 cm and 25–45 mm, 60 kg.
+  - Manual (PDF media 4219562): rail top H + 46 mm; a 10 mm floor gap; the first hole 20 mm outside the jamb (over
+    the wall) on the side away from the park, then every 450 mm; an 83 leaf keeps the full rail (p. 9).
+  - Closed, the leaf's edge is flush with the rail's end (pp. 18 and 20). A first reading put the first hole inside
+    the opening, which left the leaf 3.7 cm past the rail end; the owner spotted it.
+  - The rollers hide in a box (rail + cover, exploded view PDF 4219568), so the model draws only the box, its end
+    caps and the leaf.
+  - Estimates (Hypothesis):
+    - the box section 62 × 62 mm (photo 5162158 shows a square end);
+    - the rail's end 30 mm past the first hole, so 5 cm past the jamb (against 10 cm for the Indus); an 83 leaf
+      centred on a 73 opening then closes flush with it, as drawn;
+    - the leaf centred under the box, 1.1–5.1 cm off the wall.
+  - Proven (Node, the owner's r93 on the draft plan): the box runs y −1.913 to −0.047 at 2.02–2.09 m. The closed leaf
+    (−0.88 to −0.05) ends flush with it, and the open leaf parks under it. The box ends 3.1 cm clear of r91's frame,
+    which the Indus rail overlapped by 1.6 cm.
+  - Not yet seen in View 3D or AR. The plan glyph and the AR readout are unchanged (they draw the opening and the leaf).
 
 ### Garden gates (`mount: 'gate'`)
 

@@ -12,7 +12,8 @@ import * as THREE from 'three';
 import { paintedTexture } from './paintedTexture.js';
 
 // Defaults (the Ange-Line); a catalog entry may override each: `frameFace`, `frameDepth`,
-// `threshold` (false = none), `roseDrop` (the key rose below the handle), `metalness`,
+// `threshold` (false = none), `roseDrop` (the key rose below the handle), `backset` (the
+// handle spindle's distance from the leaf's lock edge; default 9 cm, unsourced), `metalness`,
 // `roughness`, and `leafInset`: the distance from the zone (the frame's outside) to each
 // vertical edge of the leaf when the leaf sits in a rebate of the jambs (owner, 2026-10-20:
 // a LINE frame 78 cm outside holds a 73 cm leaf, so 2.5 cm). Without it the leaf fits
@@ -199,7 +200,7 @@ function buildDoorProductAtFloor(p, { lambert = false, open = false } = {}) {
   leaf.translate(0, 0.015 + leafH / 2, 0);
   parts.push([leaf, [m.body, m.body, m.body, m.body, plusZ, minusZ]]);
   // Handle (bar + rose) and cylinder rose on both faces, on the lock side.
-  const lockX = -hingeX * (leafW / 2 - 0.09);
+  const lockX = -hingeX * (leafW / 2 - (p.def.backset ?? 0.09));
   for (const side of [1, -1]) {
     const zFace = side * (leafT / 2);
     add(new THREE.CylinderGeometry(0.022, 0.022, 0.012, 16).rotateX(Math.PI / 2), m.steel, lockX, HANDLE_Z, zFace + side * 0.006);
@@ -496,7 +497,71 @@ const RAIL = {
   floorGap: 0.01, lineAbove: 0.048, rollerIn: 0.125, wheelR: 0.0295, wheelT: 0.018,
   endPastHole: 0.03, maxDoor: 0.93,
 };
+// Sources (2026-10-20), Meli (`rail: 'meli'`, owner: replaces the Indus 2 on the r93 door):
+//   Leroy Merlin 91176300 "Rail coulissant Meli blanc, pour porte de largeur 93 cm maximum,
+//     ARTENS" (EAN 3276007806069; black 91176301, aluminium 91176304)
+//     https://www.leroymerlin.fr/produits/rail-coulissant-meli-blanc-pour-porte-de-largeur-93-cm-maximum-artens-91176300.html
+//     spec table: length 186 cm, depth 6.2 cm, aluminium, white powder coat, rail cover
+//     supplied ("Cache-rail"), doors 63/73/83/93 cm, 25–45 mm thick, up to 60 kg, cuttable,
+//     stops and a brake included, floor guide invisible once fitted.
+//   Exploded view (PDF media 4219568): rail A and cover B (aluminium, white) forming a box,
+//     end caps E and F, 5 shims, 2 door stoppers, rollers H (with the soft-close) and K,
+//     trigger I, 2 door brackets J, floor guide G.
+//   Manual (PDF media 4219562, 2024/06-V06):
+//     p. 8 / 22: rail 1860 mm; its top H + 36 mm + 10 mm above the floor (H the leaf, a 10 mm
+//       floor gap); the fixing line H + 46 mm;
+//     p. 9: a 63 or 73 cm leaf cuts the rail (60 / 40 cm max), an 83 or 93 does not;
+//     p. 10: the first hole T1 20 mm outside the jamb (over the wall) on the side away from the
+//       park, then T2–T5 every 450 mm toward the park;
+//     p. 18 step 10, p. 20 step 13: closed, the leaf's edge is flush with the rail's end (the stop D
+//       set there), overlapping the opening about equally on both sides;
+//     pp. 11–12: rollers 34.5 mm tall;
+//     pp. 15–16: door brackets 125 mm long, 12.5 cm in from each edge of the leaf.
+//   Photo 5162158 (the rail's end, about 45° on): the section is square (205 px tall,
+//     145 px foreshortened).
+//   Estimates: the box 62 × 62 mm (the published depth, a square section from that photo);
+//     the rail's end 30 mm past T1 (1860 − 4 × 450 = 60, assumed even), so 50 mm past the
+//     jamb: an 83 leaf centred on a 73 opening then closes flush with it, as the manual draws;
+//     end caps 3 mm; the leaf centred under the box (its back face 11 mm off the wall).
+const MELI = { length: 1.86, depth: 0.062, height: 0.062, topAbove: 0.046, floorGap: 0.01, pastJamb: 0.05, cap: 0.003 };
+function buildMeliRail(p, { lambert, open }) {
+  const m = materialsFor(p.def, lambert);
+  const L = p.def.leafWidth ?? p.width, H = p.def.leafHeight ?? p.head, T = Math.min(p.def.leafDepth ?? 0.04, 0.08);
+  const w = p.width, sd = p.hingeEnd === 'hi' ? 1 : -1; // slide (open) direction along local X
+  const wallZ = p.swingZ * (p.depth ?? 0.2) / 2;         // the wall face carrying the rail
+  const out = (d) => wallZ + p.swingZ * d;               // d metres off that face
+  const parts = [];
+  const box = (sx, sy, sz, x, y, z, material) => {
+    const g = new THREE.BoxGeometry(sx, sy, Math.abs(sz));
+    g.translate(x, y, z);
+    parts.push([g, material]);
+  };
+  const leafX = open ? sd * (w / 2 + L / 2) : 0;
+  box(L, H, T, leafX, MELI.floorGap + H / 2, out(MELI.depth / 2), [m.body, m.body, m.body, m.body, m.face, m.face]);
+  // The box (rail + cover): from 50 mm past the jamb on the side away from the park.
+  const top = MELI.floorGap + H + 0.036;
+  const start = -sd * (w / 2 + MELI.pastJamb);
+  const mid = start + sd * MELI.length / 2;
+  const rail = railBodyMaterial(p.def, lambert);
+  box(MELI.length, MELI.height, MELI.depth, mid, top - MELI.height / 2, out(MELI.depth / 2), rail);
+  for (const end of [start, start + sd * MELI.length]) {
+    box(MELI.cap, MELI.height, MELI.depth, end + Math.sign(end - mid) * MELI.cap / 2, top - MELI.height / 2, out(MELI.depth / 2), rail);
+  }
+  return place(parts, p);
+}
+const railBodyCache = new Map();
+function railBodyMaterial(def, lambert) {
+  const color = def.railColor ?? 0xf2f2f0;
+  const key = `${color}|${lambert}`;
+  if (!railBodyCache.has(key)) {
+    railBodyCache.set(key, lambert ? new THREE.MeshLambertMaterial({ color })
+      : new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1 }));
+  }
+  return railBodyCache.get(key);
+}
+
 function buildRailDoor(p, { lambert, open }) {
+  if (p.def.rail === 'meli') return buildMeliRail(p, { lambert, open });
   const m = materialsFor(p.def, lambert);
   const black = railMaterial(lambert);
   const L = p.def.leafWidth ?? p.width, H = p.def.leafHeight ?? p.head, T = Math.min(p.def.leafDepth ?? 0.04, 0.08);

@@ -254,9 +254,13 @@ export const BUILTIN_MATERIALS = [
     // leaf, 92 × 44.6 mm frame, three raw-MDF grooves near the lock edge, no threshold.
     // leafInset (owner's measurement, 2026-10-20, door r92): frame 78 cm outside, leaf 73 cm,
     // so the leaf sits in the jambs' rebate 2.5 cm in from each outside edge.
+    // backset 5 cm, roseDrop 7 cm: measured on the straight front photos (zoom1 202546631,
+    // 202546633; an 83 cm leaf, 3.65 px/cm), roses 7.5 ± 0.4 cm in from the frame's outside, so
+    // 5 cm from the leaf edge, 7.2 cm apart; they match the usual French lock (axe 50,
+    // entraxe 70). Lapeyre publishes neither.
     id: 'door_line_acoustic_white', surface: 'door', pattern: 'door', design: 'line',
     w: 0, h: 0, joint: 0, leafDepth: 0.04, frameFace: 0.0446, frameDepth: 0.092, leafInset: 0.025,
-    threshold: false, roseDrop: 0.075, metalness: 0, roughness: 0.7,
+    threshold: false, roseDrop: 0.07, backset: 0.05, metalness: 0, roughness: 0.7,
     color: 0xf3f3f1, accent: 0xb49f80, pack: null,
     name: { en: 'Lapeyre LINE acoustic door, white', fr: 'Bloc-porte LINE acoustique Lapeyre, blanc', zh: 'Lapeyre LINE 隔音门（白）' },
   },
@@ -268,6 +272,15 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, leafWidth: 0.83, leafHeight: 2.04, leafDepth: 0.04, roughness: 0.6, metalness: 0,
     color: 0xeeede8, accent: 0xeeede8, pack: null,
     name: { en: 'Postformé sliding door 83 on Indus rail, white', fr: 'Porte coulissante postformée 83 sur rail Indus, blanc', zh: '白色模压推拉门 83（Indus 轨道）' },
+  },
+  {
+    // The same Leroy Merlin postformé leaf (60742675, 204 × 83 × 4 cm) on the ARTENS Meli rail,
+    // white (Leroy Merlin 91176300; owner 2026-10-20, for r93): a 62 mm boxed aluminium rail.
+    // Sources and estimates at buildMeliRail (src/ui/doorProducts.js).
+    id: 'door_postforme_meli_white', surface: 'door', pattern: 'door', design: 'postforme', mount: 'rail', rail: 'meli',
+    w: 0, h: 0, joint: 0, leafWidth: 0.83, leafHeight: 2.04, leafDepth: 0.04, roughness: 0.6, metalness: 0,
+    color: 0xeeede8, accent: 0xeeede8, railColor: 0xf2f2f0, pack: null,
+    name: { en: 'Postformé sliding door 83 on Meli rail, white', fr: 'Porte coulissante postformée 83 sur rail Meli, blanc', zh: '白色模压推拉门 83（Meli 轨道）' },
   },
   {
     // Leroy Merlin Cap's JAX swing gate 99.5 × 155.6, anthracite (97503536, Klos'up): an
