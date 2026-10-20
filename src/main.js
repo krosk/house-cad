@@ -632,6 +632,7 @@ const HINTS = {
   dimension: 'Click one edge, then another (same axis) to lock the distance.',
   select: 'Drag rectangles to move, dimension labels to reposition (double-click a label to auto-place). Del to delete.',
   pan: 'Drag anywhere to pan. Pinch or use +/− to zoom.',
+  edgetag: 'Click an edge to number it (click again to remove). Copy the list to point at edges in a message.',
 };
 function setTool(tool) {
   sketch.setTool(tool);
@@ -650,6 +651,32 @@ sketch.onStatus = (msg) => {
     hint.textContent = HINTS[sketch.tool];
   }, 2500);
 };
+
+// ---- edge tags (numbered edges to point at in a message; session-only) ----
+const edgeTagsPanel = document.getElementById('edge-tags');
+const edgeTagsList = document.getElementById('et-list');
+function refreshEdgeTags() {
+  const lines = sketch.describeEdgeTags();
+  edgeTagsPanel.hidden = lines.length === 0;
+  edgeTagsList.replaceChildren(...lines.map((text, i) => {
+    const li = document.createElement('li');
+    li.value = sketch.edgeTags[i].n; // numbers can have gaps after a removal
+    li.textContent = text.replace(/^#\d+ /, '');
+    return li;
+  }));
+}
+sketch.onEdgeTags = refreshEdgeTags;
+project.onChange(refreshEdgeTags); // an edit moves edges; a floor change keeps every tag listed
+document.getElementById('et-clear').addEventListener('click', () => sketch.clearEdgeTags());
+document.getElementById('et-copy').addEventListener('click', async () => {
+  const text = sketch.describeEdgeTags().join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    sketch.onStatus?.('Edge tags copied.');
+  } catch {
+    sketch.onStatus?.('Copy failed: select the list and copy it by hand.');
+  }
+});
 
 // ---- on-screen zoom buttons (touch / Quest controller) ----
 document.getElementById('zoom-in').addEventListener('click', () => sketch.zoomBy(1.2));

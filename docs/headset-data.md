@@ -88,6 +88,31 @@ New fields that the deployed app doesn't know yet (e.g. a finish `edge: 'cap'` b
 must wait until Pages serves the build (`version.json` shows its commit) and the app has updated, or
 an older app misreads them.
 
+## Pointing at edges: desktop #️⃣ Edge # (owner, 2026-10-19)
+
+The owner asked for a way to point at edges when asking for an edit, for example "a pipe marker 40 cm from #1
+and 30 cm from #2". The desktop 2D plan's **#️⃣ Edge #** tool does it:
+- **Tagging:** a click on an edge tags it with the smallest free number; a click on a tagged edge removes it.
+- **The list:** the tags stay drawn (pink) in every tool, and an EDGE TAGS list (bottom left) with **Copy**
+  gives one line per tag, for example
+  `#1 Ground: x = 2.225 m (left edge of r130, furniture; y -0.298 m to 0.170 m)`.
+- **Where it works:** in a share-link view too.
+- **Session-only:** never stored, saved or put in a link.
+
+**Reading a pasted list (agent):**
+- **The coordinate is the reference.** A share link renumbers every zone (r130 on the headset was r81 in the
+  10-19 link), so the rect id matches only when the owner tagged their own copy of the plan.
+- **Find the edge** on a fresh `read`: the same floor, an edge of a zone on that axis at that coordinate,
+  whose span covers the quoted extent.
+- **Ambiguity:** when several zones share the coordinate, the zone kind and the span pick one; ask when they
+  don't. A share link rounds positions to 1 mm.
+- **Distances** from a tagged edge go into dimension constraints from that edge (on the headset id), not into
+  bare coordinates.
+
+Proven 2026-10-19 (production build, Chrome, synthetic clicks on a localhost copy; the owner hasn't tried it):
+- tagging, the list text, removal (the freed number is reused) and Clear;
+- the panel sits clear of the Dimensions list.
+
 ## Applying a supplier quote to the openings (2026-10-04)
 
 The owner's Lapeyre quote (PDF, H × W per line, Uw, Sw):

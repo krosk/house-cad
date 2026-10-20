@@ -479,6 +479,34 @@ body {
 }
 
 /* ---- on-screen zoom buttons (touch / Quest controller) ---- */
+/* Edge tags: numbered edges to point at in a message (owner, 2026-10-19). */
+#edge-tags {
+  position: absolute;
+  left: 10px;
+  bottom: 28px;
+  max-width: min(520px, calc(100% - 80px));
+  max-height: 40%;
+  overflow: auto;
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  font-size: 12px;
+  z-index: 5;
+}
+#edge-tags[hidden] { display: none; }
+#edge-tags .et-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+#edge-tags .et-title { flex: 1; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+#edge-tags ol { margin: 0; padding: 6px 8px 6px 28px; user-select: text; }
+#edge-tags li { margin: 2px 0; }
+#edge-tags li::marker { color: #f472b6; font-weight: bold; }
+
 #zoom-ctl {
   position: absolute;
   right: 10px;

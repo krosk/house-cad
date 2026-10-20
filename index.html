@@ -34,6 +34,14 @@
             </div>
             <div id="fc-list" class="fc-list"></div>
           </aside>
+          <aside id="edge-tags" hidden>
+            <div class="et-head">
+              <span class="et-title">Edge tags</span>
+              <button id="et-copy" type="button" title="Copy the list, to paste into a message">Copy</button>
+              <button id="et-clear" type="button" title="Remove every tag">Clear</button>
+            </div>
+            <ol id="et-list"></ol>
+          </aside>
           <div id="zoom-ctl">
             <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
             <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
@@ -140,6 +148,7 @@
           <button data-tool="dimension" title="Constrain the distance between two edges">📏 Dimension</button>
           <button data-tool="select" title="Select / move / delete rectangles">🖟 Select</button>
           <button data-tool="pan" title="Pan the view (drag anywhere)">✋ Pan</button>
+          <button data-tool="edgetag" title="Number edges to point at them (click an edge; click again to remove), then copy the list">#️⃣ Edge #</button>
         </div>
         <div class="group">
           <label>Height <input id="height" type="number" min="0.1" step="0.1" value="2.8" /> <span class="unit-label">m</span></label>

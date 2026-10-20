@@ -18,18 +18,20 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-19 (session 41 ended; docs-only Q&A on 10-18/19, item 96; the Quest **unreachable** all evening: `adb devices` empty; last read 287 012)
+**Date:** 2026-10-19 (session 41 ended; docs-only Q&A on 10-18/19, item 96; the Quest reconnected late on 10-19 with the new skill `quest-connect`; items 95 and 91 written: base **286 557**)
 
 **Status:**
-- Proven (git, Actions run success, `version.json` "74ca566 1017-2111Z"): the head is `74ca566`, pushed and served.
-  **Not installed on the headset:** `update-app` was skipped after every push since `3d09428` (no adb device). The
-  headset app has `3d09428` (installed 10-17), so it lacks BEAM (`1ee0a41`), the FLAVIO 80/60 (`3d426f1`, `74ca566`),
-  the ARTENS tile, the Trez gates and the Klos'up fence slat (`796a788`). Run `update-app` first when the Quest is
-  back: a plan written with these ids before that would hold products the headset app cannot resolve.
-- Proven (`quest-storage read` after the write, byte-identical): the **last headset write was 2026-10-17, 287 012 chars:
-  option 4i + the bed** (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
+- Proven (git, `version.json` "6ec32b6 1019-2112Z", `update-app` "installed 6ec32b6 1019-2112Z"): the head is
+  `6ec32b6` (the quest-connect skill + item 96 docs), pushed, served and installed on the headset.
+- Proven (`quest-storage write --base`, then a fresh `read` byte-identical to the edit): the **last headset write was
+  2026-10-19, 286 557 chars**: the FLAVIO 60 on r130 (Ground) and the FLAVIO 80 on r132 (Upper), foot 0.33 / top 0.88
+  (the height is still the owner's to confirm), dims c870 c871 c906 c907 dropped (item 95); the 7 basement
+  `tile_200_dark_red` finishes → `artens_easy_terracotta_45` (item 91). Fresh read before == 287 012 (byte-identical);
+  `house-query diff`: only r130, r132 and those finishes, no conflict. Backup `backup-1019` (scratchpad).
+  **286 557 is the base for the next write.** Before it, 2026-10-17, 287 012 chars:
+  option 4i + the bed (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
   backup `quest-backup-1017-4i`): unit B moved and turned, the BDH vents, column r263 (sill 2.7), bed r264 with dims
-  c1569/c1570, r254 and r261 removed. **287 012 is the base for the next write.** Before it, 2026-10-16,
+  c1569/c1570, r254 and r261 removed. Before that, 2026-10-16,
   288 795 chars (the bedroom box r255 and the alcove column r256 replaced by a corner column r261, the ducts 45° through
   the slab, parallel 45° turns in the laundry, r254 grown to 57.35 cm: `docs/plumbing-workflow.md` "The bedroom box
   replaced by a corner column"). Before it, 287 813 (the kitchen corner box r254 narrowed to 30 cm), 287 829 (the bath duct's two flat corners as 45° pairs), and 287 516 (2026-10-15: fix A at the alcove and the longer laundry 45° pair: `docs/plumbing-workflow.md` "Fittings to datasheet
@@ -54,8 +56,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- Uncommitted at the end of session 41 (10-19): this file, `docs/plumbing-workflow.md` (item 96, docs only), and the new skill `.claude/skills/quest-connect/` (connect.sh, find-adb-port.py, SKILL.md) with its pointers in `docs/headset-data.md` "Connecting", `.claude/skills/quest-edit/SKILL.md` and CLAUDE.md. Commit all by path on "c p". Proven 10-19: the script reconnected from a stale port by scanning the headset (42795).
-  The vanity draft (item 95) lives only in the scratchpad: rebuild it from item 95 on the fresh read.
+- Uncommitted at the end of session 41 (10-19): this file (the 286 557 write record) and item 97 (`src/ui/sketch2d.js`, `src/main.js`, `src/style.css`, `index.html`, `docs/headset-data.md`, `docs/ar-qa-checklist.md`, CLAUDE.md); commit by path on "c p".
 
 ## What the app is today
 
@@ -263,8 +264,8 @@ plan.
   `docs/furniture.md`.
 - **91** Floor finish `artens_easy_terracotta_45` (Leroy Merlin 95598422, grid design `concrete`, `concreteTile`):
   owner, 10-17: replaces the dark red 20×20 on the basement. Proven (preview stats vs photo 4908555; Node takeoff with
-  the swap on the 287 012 read: 25.1 m², 162 tiles, 24 boxes). **Not written:** the swap of the 7 `tile_200_dark_red`
-  finishes (r66 r67 r68 r69 r74 r76 r227) waits for W. `drawStoneCloud` gained an `srgb` flag (older designs unchanged).
+  the swap on the 287 012 read: 25.1 m², 162 tiles, 24 boxes). **Written 10-19** (the 286 557 write): the 7 `tile_200_dark_red`
+  finishes (r66 r67 r68 r69 r74 r76 r227) swapped. `drawStoneCloud` gained an `srgb` flag (older designs unchanged).
   `docs/materials.md` "ARTENS Easy".
 - **92** Gate `gate_trez_anthracite` (80095323, single leaf; design `trez`: 14 slats from the top, a cut slat on the
   bottom rail; fitted 11.1 mm gap, Hypothesis). Overlay on render 3247470: edges within 2–6 mm. Not placed (r243 has
@@ -275,8 +276,8 @@ plan.
   drawn 3.010 m and would need 2.76 m.
 - **94** Fence `fence_klosup_ajouree_anthracite` (98659652 slat, `boards` 9 cm / 9 mm gap, Hypothesis; no posts drawn).
   The plan has no FENCE zone yet.
-- **95** Furniture `lapeyre-flavio-60-oak` (Réf 1248229, the 80's builder and params at 600 wide). **Drafted, not
-  written:** `vanities.mjs` (scratchpad, session-local; on the 287 012 read) puts the FLAVIO 60 on r130 (Ground, NW
+- **95** Furniture `lapeyre-flavio-60-oak` (Réf 1248229, the 80's builder and params at 600 wide). **Written 10-19**
+  (the 286 557 write; owner to verify in AR): `vanities.mjs` (on the 287 012 read) put the FLAVIO 60 on r130 (Ground, NW
   corner of r62, front south, beside door r64) and the FLAVIO 80 on r132 (Upper, NE corner of r86, beside door r93),
   foot 0.33 / top 0.88 (Hypothesis: owner to confirm the height), dropping their size dims (c870 c871, c906 c907).
   Proven (`house-query diff` / `conflicts`): only r130 and r132 change, no conflict. Rebuild it on the fresh read: set
@@ -293,6 +294,11 @@ plan.
   wire clamps. Also answered from the 287 012 read: the garden's west garden walls r236/r237 are 0.73 m high; the
   refrigerant lines 4.66 / 10.84 / 11.44 / 5.48 = 32.41 m; the VMC ducts 25.73 m (Ø80 13.43, Ø100 6.54, Ø125 3.89,
   Ø160 1.87).
+- **97** (10-19, uncommitted) Desktop 2D tool **#️⃣ Edge #** (owner: "a way to select an edge with a number" to
+  say "a pipe marker x from one edge and y from another"): numbered pink edge tags, session-only, and an EDGE TAGS list
+  with Copy (`Floor: x = … m (left edge of r…, kind; span)`); works in share views. Reading a pasted list: the
+  coordinate is the reference (a share link renumbers zones), `docs/headset-data.md` "Pointing at edges". Proven: build,
+  synthetic clicks in Chrome; not yet tried by the owner (QA item 2026-10-19).
 - Answered 10-17 (no change): the Ø160 outlet on 4i is **1.87 m** (p70, straight south); AR draws VMC ducts as flat
   light-grey bands at true height, real width, only in the HEATING pipe modes.
 
@@ -600,19 +606,18 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 | `src/io/shareView.js` / `src/io/planSheet.js` | Link payload / sheets (incl. `pipeSheetOptions`) |
 | `src/core/i18n.js` | EN/FR/ZH strings: every new mode needs `mode.*` + `help.*` |
 | `src/ui/doorProducts.js` | Door, rail-door and gate builders; `GATE_PROFILES` (jax, trez, bono); a gate with `def.axisSpan` has its own width |
-| scratchpad `vanities.mjs` → `draft-vanities.json` | Item 95's draft on the 287 012 read (session-local; item 95 says how to rebuild it) |
 | scratchpad `colStack2…5.mjs`, `ductViewsCol*.mjs`, `zhCol.mjs`, `clashAbs.mjs`, `cmpDucts.mjs` | Session-local: the corner-column edits (1b…1e), their drawings (EN/ZH), the true-height clash check, duct length/fitting counts. Gone with the scratchpad; rebuild from the doc if needed |
 
 ## Next step
 
 **Active:**
-00. **When the Quest is back:** `update-app` (it lacks everything after `3d09428`, up to `74ca566`), then a fresh read (expect 287 012 unless the
-   owner placed anchors or beams in AR; if they did, that read is the new base). Before any route work: `house-query
-   anchors` and `house-query beams` on that read. The attic lintels at y −1.96 (open check below) are a natural first
-   use of BEAM · FLOOR / CEILING, drawn by the owner.
-0a. **Pending W (owner's go needed):** on a fresh read, the two vanities (item 95) and the basement tile swap (item 91); optionally the Trez on r243
-   (item 92), the 2-leaf Trez on r242 resized to 2.76 m (item 93), and FENCE zones once the owner gives their lines
-   (item 94). Needs the app with these materials installed first (an older app won't know the ids).
+00. **Owner to verify in AR** (the 286 557 write): the two FLAVIO vanities (r130 Ground, r132 Upper) and their height
+   (top 0.88, a Hypothesis), and the basement ARTENS tile. Connect with skill `quest-connect`. Before any route work:
+   `house-query anchors` and `house-query beams` on a fresh read. The attic lintels at y −1.96 (open check below) are a
+   natural first use of BEAM · FLOOR / CEILING, drawn by the owner.
+0a. **Optional W (owner's go needed):** the Trez on r243 (item 92), the 2-leaf Trez on r242 resized to 2.76 m
+   (item 93), and FENCE zones once the owner gives their lines (item 94). ~~The vanities (95) and the basement tile
+   (91)~~: written 10-19.
 0. **Item 86 after the 4i write:** ~~the owner's unit choice~~ decided 2026-10-18: the **Aldes Compact Premium MW** (not the HP+); kitchen Ø125 flexible or semi-rigid (docs/plumbing-workflow.md, after "4i with the kitchen and shower ducts in flexible"). Still open: the checks (wall top at slab height
    where the shower duct slants, attic lintels at y −1.96, the outlet terminal); on the headset, the laundry stub ends
    12.9 cm from unit B (inside airflow.js's 15 cm PORT_REACH: the app's air model ignores the laundry vent). ~~Finish item 86 on option 4d~~

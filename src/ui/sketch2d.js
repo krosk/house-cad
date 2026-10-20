@@ -55,8 +55,14 @@ export class Sketch2D {
     this._renderFrame = 0; // coalesce high-rate mobile pan/pinch events to display frames
 
     this._dimFirst = null; // first edge picked for a dimension {rect, edge}
-    this._hoverEdge = null; // edge under cursor (dimension tool)
+    this._hoverEdge = null; // edge under cursor (dimension / edge-tag tool)
     this._dimLabelHits = []; // clickable dimension labels, rebuilt each render
+
+    // Numbered edge tags (owner, 2026-10-19): a way to point at an edge when talking to
+    // an agent ("a pipe marker 40 cm from #1 and 30 cm from #2"). Session-only view
+    // state, never project data: [{n, floorId, rectId, edge}], numbered from 1.
+    this.edgeTags = [];
+    this.onEdgeTags = null; // callback(tags) when the list changes
 
     this._bindEvents();
 
@@ -79,9 +85,9 @@ export class Sketch2D {
   }
 
   setTool(tool) {
-    // In read-only only pan (view) and dimension (measure) are allowed; add /
+    // In read-only only pan (view), dimension (measure) and edge tags are allowed; add /
     // subtract / select would mutate geometry, so they fall back to pan.
-    if (this.readOnly && tool !== 'pan' && tool !== 'dimension') tool = 'pan';
+    if (this.readOnly && tool !== 'pan' && tool !== 'dimension' && tool !== 'edgetag') tool = 'pan';
     this.tool = tool;
     this._dimFirst = null;
     this._hoverEdge = null;
@@ -204,6 +210,12 @@ export class Sketch2D {
       return;
     }
 
+    if (this.tool === 'edgetag') {
+      const edge = this._hitEdge(px, py);
+      if (edge) this._toggleEdgeTag(edge);
+      return;
+    }
+
     if (this.tool === 'select') {
       // A dimension label takes priority over rectangle selection. Grabbing it
       // starts a reposition drag; a click without movement focuses its field.
@@ -291,7 +303,7 @@ export class Sketch2D {
           this.canvas.style.cursor = hit ? 'move' : 'default';
         }
         hoverChanged = true;
-      } else if (this.tool === 'dimension') {
+      } else if (this.tool === 'dimension' || this.tool === 'edgetag') {
         this._hoverEdge = this._hitEdge(px, py);
         this.canvas.style.cursor = this._hoverEdge ? 'pointer' : 'crosshair';
         hoverChanged = true;
@@ -655,6 +667,7 @@ export class Sketch2D {
     }
 
     this._drawDimensions();
+    this._drawEdgeTags();
     this._drawEdgePick();
 
     if (this.draft) this._drawDraft();
@@ -667,8 +680,84 @@ export class Sketch2D {
     return edgeLineWorld(ref, this.project.rectangles);
   }
 
+  // ---- edge tags ----
+  // A tap on an edge tags it with the smallest free number; a tap on a tagged edge
+  // removes its tag. Tags stay shown in every tool until cleared.
+  _toggleEdgeTag(ref) {
+    const floorId = this.project.activeFloorId;
+    const i = this.edgeTags.findIndex((t) => t.floorId === floorId
+      && t.rectId === ref.rect.id && t.edge === ref.edge);
+    if (i >= 0) {
+      this.edgeTags.splice(i, 1);
+    } else {
+      let n = 1;
+      while (this.edgeTags.some((t) => t.n === n)) n++;
+      this.edgeTags.push({ n, floorId, rectId: ref.rect.id, edge: ref.edge });
+      this.edgeTags.sort((a, b) => a.n - b.n);
+    }
+    this.onEdgeTags?.(this.edgeTags);
+    this.render();
+  }
+
+  clearEdgeTags() {
+    this.edgeTags = [];
+    this.onEdgeTags?.(this.edgeTags);
+    this.render();
+  }
+
+  // One line per tag, for pasting into a chat. The coordinate is the reference
+  // (rect ids differ between a share link and the plan it came from); the rect id,
+  // zone kind and the edge's extent along the other axis disambiguate.
+  describeEdgeTags() {
+    const m = (v) => `${(+v).toFixed(3)} m`;
+    return this.edgeTags.map((t) => {
+      const floor = this.project.floors.find((f) => f.id === t.floorId);
+      const r = floor?.rectangles.find((x) => x.id === t.rectId);
+      if (!r) return `#${t.n} (edge no longer in the plan)`;
+      const line = edgeLineWorld({ rect: r, edge: t.edge }, floor.rectangles);
+      const vertical = t.edge === 'left' || t.edge === 'right';
+      const span = vertical
+        ? `y ${m(line.p0.y)} to ${m(line.p1.y)}`
+        : `x ${m(line.p0.x)} to ${m(line.p1.x)}`;
+      return `#${t.n} ${floor.name}: ${vertical ? 'x' : 'y'} = ${m(line.coord)}`
+        + ` (${t.edge} edge of ${r.id}, ${zoneKind(r)}; ${span})`;
+    });
+  }
+
+  _drawEdgeTags() {
+    const floorId = this.project.activeFloorId;
+    const ctx = this.ctx;
+    for (const t of this.edgeTags) {
+      if (t.floorId !== floorId) continue;
+      const line = this._edgeLineWorld({ rect: t.rectId, edge: t.edge });
+      if (!line) continue;
+      const a = this.toScreen(line.p0.x, line.p0.y);
+      const c = this.toScreen(line.p1.x, line.p1.y);
+      ctx.strokeStyle = '#f472b6';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.stroke();
+      const mx = (a.x + c.x) / 2, my = (a.y + c.y) / 2;
+      const label = String(t.n);
+      ctx.font = 'bold 12px system-ui';
+      const rad = Math.max(9, ctx.measureText(label).width / 2 + 5);
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(mx, my, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a1d23';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, mx, my + 0.5);
+      ctx.textAlign = 'start';
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
   _drawEdgePick() {
-    if (this.tool !== 'dimension') return;
+    if (this.tool !== 'dimension' && this.tool !== 'edgetag') return;
     const ctx = this.ctx;
     const draw = (ref, color, width) => {
       const line = this._edgeLineWorld(ref);
