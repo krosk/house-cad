@@ -290,6 +290,7 @@ view3dTilt.addEventListener('click', async () => {
 const view3dPlan = document.getElementById('view3d-plan');
 const view3dConduits = document.getElementById('view3d-conduits');
 const view3dPipes = document.getElementById('view3d-pipes');
+const view3dBeams = document.getElementById('view3d-beams'); // owner, 2026-10-22: joists in slabs and over ceilings
 const view3dPipeLegend = document.getElementById('view3d-pipe-legend');
 const view3dPlanTitle = view3dPlan.title;
 const PLAN_LAYERS_KEY = 'house-cad:view3d-plan-layers:v1';
@@ -308,6 +309,7 @@ function showPlanLayer(button, name, label, on) {
   const saved = savedPlanLayers();
   showPlanLayer(view3dConduits, 'conduits', '⚡ Conduits', !!saved.conduits);
   showPlanLayer(view3dPipes, 'pipes', '💧 Pipes', !!saved.pipes);
+  showPlanLayer(view3dBeams, 'beams', '▬ Beams', !!saved.beams);
 }
 // The legend is a chip in the corner (owner, 2026-10-16): services, failed checks and the duct to insulate in
 // one line; a tap opens the full legend (remembered per device).
@@ -344,7 +346,7 @@ function renderPipeLegend() {
 view.onPlanServices = (services, fittingIssues = {}, insulateM = 0) => {
   planServices = services; planFittingIssues = fittingIssues; planInsulateM = insulateM; renderPipeLegend();
 };
-for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'], [view3dPipes, 'pipes', '💧 Pipes']]) {
+for (const [button, name, label] of [[view3dConduits, 'conduits', '⚡ Conduits'], [view3dPipes, 'pipes', '💧 Pipes'], [view3dBeams, 'beams', '▬ Beams']]) {
   button.addEventListener('click', () => {
     const on = !view.planShow[name];
     showPlanLayer(button, name, label, on);
@@ -377,6 +379,7 @@ view.onNavigationChange = (mode) => {
   view3dPlan.title = plan ? 'Back to the 3D model' : view3dPlanTitle;
   view3dConduits.hidden = !plan || !project.conduitSegments?.length;
   view3dPipes.hidden = !project.pipes?.length; // Model view too, in grey (owner, 2026-10-14)
+  view3dBeams.hidden = !project.floors.some((f) => f.rectangles.some((r) => r.kind === 'beam'));
   renderPipeLegend();
   if ((pov || plan || orbit) && view.ruler.enabled) setRuler(false);
   if (plan && view.doorsToggleEnabled) setDoorsToggle(false);

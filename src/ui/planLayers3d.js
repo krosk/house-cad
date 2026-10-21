@@ -214,13 +214,16 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
   for (const f of fittings) if (f.flag) fittingIssues[f.flag] = (fittingIssues[f.flag] || 0) + 1;
   const shownClashes = pipeRuns.filter((run) => clashing.has(run.pipeId)).length;
   if (shownClashes) fittingIssues.beam = shownClashes;
-  // The beams on (and in the slabs around) the shown floors, as translucent wood boxes in the pipe layer.
+  // The beams on (and in the slabs around) the shown floors, as translucent wood boxes in one mesh: their own
+  // layer behind the ▬ Beams switch (owner, 2026-10-22). In the Model view they draw through the floors and
+  // ceilings (x-ray), since joists sit inside a slab or above a ceiling.
+  const beams = new THREE.Group();
   const beamBoxes = floorId == null ? worldBeams(project) : beamsAround(project, project.floorById(floorId));
   const beamGeometry = boxesGeometry(beamBoxes);
   if (beamGeometry) {
-    const beams = new THREE.Mesh(beamGeometry, beamMaterial);
-    beams.renderOrder = 1;
-    pipes.add(beams);
+    const mesh = new THREE.Mesh(beamGeometry, pipeColor == null ? beamMaterial : beamXrayMaterial);
+    mesh.renderOrder = pipeColor == null ? 1 : 10;
+    beams.add(mesh);
   }
   // The ducts to insulate, in the plan's colours only (the Model view's grey pipes stay plain).
   let insulateM = 0;
@@ -240,6 +243,7 @@ export function buildPlanLayers(project, floorId = null, { pipeColor = null } = 
     zones,
     conduits: networkLayer(conduitRuns, conduitNodes),
     pipes,
+    beams,
     // The services present, for the legend, and the fitting checks that failed ({ angle, short, mf } counts).
     services: [...new Set(pipeRuns.map((run) => run.service))],
     fittingIssues,
@@ -251,6 +255,7 @@ const lerpPos = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) *
 
 // The insulation jackets: [{ a, b, radius }], one translucent instanced cylinder each.
 const beamMaterial = new THREE.MeshStandardMaterial({ color: BEAM_COLOR, roughness: 0.8, transparent: true, opacity: 0.45, depthWrite: false });
+const beamXrayMaterial = new THREE.MeshBasicMaterial({ color: BEAM_COLOR, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false });
 
 function addJackets(group, jackets) {
   if (!jackets.length) return;

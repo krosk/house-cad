@@ -290,7 +290,7 @@ export class View3D {
     this.scene.add(this.planGroup);
     this.planProject = null;
     this.planLayers = null;
-    this.planShow = { conduits: false, pipes: false };
+    this.planShow = { conduits: false, pipes: false, beams: false };
     this.planFramedFor = undefined; // the floor filter the plan camera was last framed for
     this.onPlanServices = null; // (services[], fittingIssues, insulateM) → main.js draws the pipe legend
     this.furnitureBuildToken = 0;
@@ -950,8 +950,8 @@ export class View3D {
     this.controls.update();
   }
 
-  // Show or hide one PLAN layer ('conduits' | 'pipes'); view-only. The pipes also show in the Model
-  // view (grey), built only once asked for.
+  // Show or hide one PLAN layer ('conduits' | 'pipes' | 'beams'); view-only. The pipes (grey) and the beams
+  // (x-ray) also show in the Model view, built only once asked for.
   setPlanLayerVisible(name, on) {
     this.planShow[name] = !!on;
     if (this.planLayers?.[name]) this.planLayers[name].visible = !!on;
@@ -967,15 +967,15 @@ export class View3D {
   }
 
   // Rebuilt on every model change and floor choice (cheap: a few draw calls). PLAN: the zones, the
-  // conduits and the pipes by service. Model view (owner, 2026-10-14): only the pipes, neutral grey,
-  // and only while their toggle is on.
+  // conduits, the pipes by service and the beams. Model view (owner, 2026-10-14): only the pipes, neutral
+  // grey, and the beams through the slabs (2026-10-22), each only while its toggle is on.
   _rebuildPlanLayers() {
     this._clearPlanLayers();
     if (!this.planProject) return;
     const plan = this.navigationMode === 'plan';
-    if (!plan && !this.planShow.pipes) return;
+    if (!plan && !this.planShow.pipes && !this.planShow.beams) return;
     this.planLayers = buildPlanLayers(this.planProject, this.floorFilter, plan ? {} : { pipeColor: MODEL_PIPE_COLOR });
-    for (const name of plan ? ['zones', 'conduits', 'pipes'] : ['pipes']) {
+    for (const name of plan ? ['zones', 'conduits', 'pipes', 'beams'] : ['pipes', 'beams']) {
       const layer = this.planLayers[name];
       if (name !== 'zones') layer.visible = this.planShow[name];
       this.planGroup.add(layer);
