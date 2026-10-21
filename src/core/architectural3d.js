@@ -894,7 +894,8 @@ export function buildArchitecturalFloor(floor, opts = {}) {
     floorGeometry, wallGeometry, halfWallGeometry, soffitGeometry, beamGeometry, beamSpan, ceilingGeometry, doorGeometry, doorLeaves, windowGeometry,
     outlineGeometry, stairGeometry, fenceParts: fenceParts(floor, opts.fenceMaterial),
     pavedParts: pavedParts(floor, opts.fillDepth ?? 0, opts.fenceMaterial),
-    stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
+    stairwell: stairwellGeometries(floor, opts), // shown only with this floor alone
+    markerPlacements: wallMarkerPlacements(floor, [...wallBoxes, ...gardenWalls]),
   };
 }
 
