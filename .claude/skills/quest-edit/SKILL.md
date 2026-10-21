@@ -14,10 +14,12 @@ it. Requested change: `$ARGUMENTS` (if empty, ask the owner what to change).
 3. **Work out the targets** with `tools/house-query.mjs` (`openings`, `rooms-with`, `takeoff`). Rooms
    have no names: identify them by contents or size, and ask the owner when a mapping is not certain.
 4. **Edit a copy** with a scratchpad Node script that prints every change; sizes go through dimension
-   constraints. Check with `house-query.mjs diff`: no conflicts, no deleted dimensions, only intended
+   constraints. Then `node tools/solve-house.mjs <edited> <solved>`, and write `<solved>` in step 5: the
+   stored positions then match their dimensions, so the app's next save changes nothing. Check with
+   `house-query.mjs diff`: no conflicts, no deleted dimensions, only intended
    changes; list markers that followed a moved edge.
 5. **Show the owner the change list and get an explicit yes**, with the AR app closed and no house-cad
-   2D page open. Then `quest-storage.mjs write <edited> --base <read>`; it refuses if the headset copy
+   2D page open. Then `quest-storage.mjs write <solved> --base <read>`; it refuses if the headset copy
    changed. If it did, re-read, re-apply, re-check.
 6. **After a push that deploys**: once `version.json` shows the commit, run
    `quest-storage.mjs update-app` if the headset is reachable ("Waiting for a deploy, then updating the

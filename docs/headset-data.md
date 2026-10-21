@@ -57,8 +57,9 @@ when the tab is the app. Proven on the headset after `8dc326f` installed: a plai
 ```bash
 node --experimental-websocket tools/quest-storage.mjs backup <scratch>/quest-backup-<stamp>
 node --experimental-websocket tools/quest-storage.mjs read <scratch>/base.json
-#   edit a copy in Node, check it (below), show the owner the change list, get a yes
-node --experimental-websocket tools/quest-storage.mjs write <scratch>/edited.json --base <scratch>/base.json
+#   edit a copy in Node, then: node tools/solve-house.mjs <scratch>/edited.json <scratch>/solved.json
+#   check it (below), show the owner the change list, get a yes
+node --experimental-websocket tools/quest-storage.mjs write <scratch>/solved.json --base <scratch>/base.json
 ```
 
 `write` re-reads the autosave and refuses unless it still equals `--base`, then reads it back. Before
@@ -69,11 +70,23 @@ When the app runs between your read and your write, it re-saves the plan **in so
 x/y/w/h become the solved values, so the bytes differ although the model is the same.
 `tools/house-query.mjs diff` shows only what moved; re-apply the edit on the new copy.
 
+**Write the solved form** (owner, 2026-10-21): run `node tools/solve-house.mjs <edited> <solved>` and write
+`<solved>`, not the script's output. An edit script changes a dimension's value, but the stored positions keep
+their old values until something re-solves them. The app always shows the solved plan, since it solves on
+load, so nothing looks wrong. But the file keeps a stale number until the app's next save, and then a fresh
+read no longer equals the base.
+- Seen: edit 69 (2026-10-12) set c997 to −0.22 and left outlet m210's stored y at −1.18 for 8 days. The app's
+  save on 10-20 wrote −0.05, so that day's fresh read differed by 1.13 m on one marker.
+- Proven (2026-10-21): `solve-house.mjs` on the app's own save is byte-identical to it. On the stale 10-20 copy it
+  moves only m210's y and matches the app's save except `activeFloorId`, which is UI state.
+- It also prints what moved, and any conflicting or deleted dimension (a furniture dimension that no longer
+  fits is deleted on solve).
+
 ## Editing and checking (`tools/house-query.mjs`)
 
 Edit the JSON with a small Node script in the scratchpad (one script per edit, printing every change).
 Change a size through its **dimension constraints**, never by moving x/y/w/h alone: the solver
-re-imposes the constraints on load. Then:
+re-imposes the constraints on load. Then `tools/solve-house.mjs` (above: write the solved form), and check:
 
 - `diff <base> <edited>`: no conflicts, no deleted dimensions, and only the intended zones, markers
   and finishes change. A marker pinned to a moved edge follows it: list those for the owner.
