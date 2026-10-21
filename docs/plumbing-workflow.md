@@ -75,8 +75,11 @@ to"):
 
 Both are one kind, `beam`. Everything else uses the world box (`src/core/beams.js` `worldBeams`), so a beam drawn from
 either side is the same beam and shows on both storeys: the AR plan tints it on the other storey too (not pickable
-there), AR's pipe modes and View 3D's ▤ Plan 💧 Pipes draw it as a translucent wood box at its true height (one mesh), View
-3D's model as a wood box (with the storey whose slab it is in too). It cuts no wall and takes no floor area; only a part
+there), AR's pipe modes draw it as a translucent wood box at its true height (one mesh), View
+3D's model as a wood box (with the storey whose slab it is in too). View 3D's 👁 Show menu has its own **▬ Beams**
+switch (owner, 2026-10-22; remembered per device, hidden when the plan has no beam): ▤ Plan shows them as translucent
+wood boxes (no longer tied to 💧 Pipes), and the Model view (overview, POV, ORBIT) draws them through the floors and
+ceilings, so joists inside a slab or over a ceiling can be seen. Every beam of the shown storeys is one mesh, in AR too. It cuts no wall and takes no floor area; only a part
 hanging below the ceiling blocks air (`airflow3d.js`) and window leaves (`windowSwing.js`). Sheets: a dash-dot outline
 with one diagonal; DXF: layer `BEAM`.
 
@@ -1227,6 +1230,10 @@ fixture or floor drain below it needs a pump (Hypothesis).
   from the wall), **lintel 2** (x −4.21…−4.15, 49–55 cm), and probably a third at 84–90 cm (owner: "I suppose
   it will"; Hypothesis, likely a beam-and-block slab). Lintels are never cut and no pipe passes under one.
   The VMC Ø80 stays in the trench (x −4.625). Lintel height, slab type and screed thickness are unknown.
+  **Re-measured (owner, 2026-10-22), under the bathroom r86:** joists 7 cm thick, the first 14 cm from the west wall,
+  22 cm clear between them (29 cm pitch: 14–21, 43–50, 72–79 cm…), 10 cm high, under a screed (thickness not given;
+  drawn 5 cm, so a band −0.15 → −0.05). Six BEAM zones r266–r271 across the room, north–south. This moves "lintel 2"
+  from 49–55 to 43–50 cm: the WC drain drawn in bay 1 (p54 drop at x −4.2855, p64) now crosses joist r267.
 - **WC axis 60 cm from the west wall (owner, locked):** bowl r212 dimension c1418 0.356 → 0.416, frame
   r222 x −4.35…−3.85, half wall r210 0.88 → 0.90 (the frame's east top bracket reaches x −3.805), boxing
   r220 27 → 33 cm (air valve). Rejected 55 cm: the riser can pass 1.4 cm behind the frame's 5 cm-deep west
@@ -1439,6 +1446,33 @@ of lintel 2 (≈ 0.6 cm), north of the basement waste run at y −0.30. Upstairs
 10 cm): the south pair west then down the west wall (bathroom r208 teed, bedroom r207), the north pair north
 between the VMC duct's lean and the WC riser (≈ 1 / 2 cm) to bedroom r209. Not checked: pipes against walls,
 lintels and the slab build-up (only pipe-to-pipe).
+**West manifold (owner, 2026-10-21):** the west side has its own manifold, separate from the boiler's: on the basement
+north wall just west of the pillar (x −0.10), outlets at about 1.40 m with the pipes going up, 4 pairs (8 pipes) side
+by side against the pillar. It feeds r204 (living room, through the slab hole at anchor m274, then along the north
+insulation and the west wall), r224 (basement), the r208 + r207 pair (teed upstairs) and r209. The r206 pair
+((−2.48, −0.13)) is not on it yet and stays drawn from the boiler. Drawn: outlets 26 mm apart, 2 cm off the wall,
+the northmost ceiling lane westmost so no stub crosses a lane. Its feed from the boiler is not drawn (route unknown).
+The r224 + r205 pair (owner, 2026-10-22) runs **down the basement west wall like the VMC and the waste**: off the
+band into r67, west to the wall (supply x −4.43, 1.2 cm off the waste Ø100; return −4.404), south into r66, then
+east along r66's north side to its tees (return y −2.33 on the inside of the turn, supply −2.37).
+**The bus order (owner, 2026-10-22):** counted from the basement north wall, pairs 1 and 2 go up the column (r208 +
+r207, then r209), pair 3 goes up early through the hole at m274 (r204), pair 4 goes to the laundry (r224 + r205). Drawn
+as lanes 26 mm apart with r204's pair right under the hole (y 4.30 / 4.274); after the hole a water pair X takes its
+slot. **Pair X** is the upstairs water (shower, basin, WC): two cold lines start at the pillar's west side and run
+west on the north wall 5 cm under the ceiling (2.02 / 1.996 m), not at the ceiling; 10 cm past the r204 hole the lower
+one turns into the bus as X's cold line (lane y 4.30); X's hot line (lane 4.274) is not connected yet (a free end in
+the plan). X follows the bus and rises in the column as the bundle's south row (owner: "south for now"; it touches the
+basement VMC Ø100 there). The other cold line's destination is not known; the risers stop in the upper slab until the
+upstairs routes are drawn. Diameters Ø16 assumed.
+**On the west wall the bus touches the wall** (owner, 2026-10-22): first pipe 8 mm off the basement face (x −4.594),
+then every 26 mm: r208+r207, r209, water X, r224+r205, r206 (not lined). The r224+r205 pair runs straight down beside
+the waste (4–7 mm from it, pipe to pipe), dipping to 1.91 m under the waste's elbow at (−4.434, −0.30).
+**The upstairs risers are a 2×2 bundle against the west wall** (owner, 2026-10-22; this replaces the "one row at
+y −0.19" above): in column r122's north-west corner, north of the VMC (x −4.690 / −4.664, y −0.240 / −0.264). North
+row: the r209 pair (it heads north upstairs); south row: the r208 + r207 pair (it heads south down the west wall). In
+the basement the south row's pipes come in 3 cm lower (1.94 m) and pass under the north row's. The VMC's elbow in the
+upper slab moved 1.5 cm east (x −4.600) to clear the bundle. Still tight: the south-east riser passes 3 mm from the
+basement VMC Ø100 elbow at (−4.615, −0.30), pipe to pipe (its socket is wider).
 
 Owner: "my default was a star topology, but I wonder if there is an opportunity to share some pipes";
 the pipes are **composite (multilayer)**. Owner decisions:
