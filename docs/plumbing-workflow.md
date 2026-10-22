@@ -1003,7 +1003,39 @@ down, maybe do a s"; the narrow column: "I am trying to make the column less thi
   the 41.5 wall at 2.62, down at x −0.08 (8 cm from the bedroom's wall face).
 - **Kitchen (Ø125):** the vent on the 41.5 wall's kitchen face, north of wall cabinet r166 (its side at y −2.255), centre
   (0.415, −2.13, 2.45); straight west through the wall, an 87°30′ down at x −0.08. No attic and no box for the kitchen.
-- **Column (new, a full-height half wall) on the bedroom's east wall from its north-east corner:** 17.25 west–east ×
+- **Column turned east–west (owner, 2026-10-22: "I will settle with this"; supersedes the north–south column and its
+  slab runs below; written to the headset the same day, 300 745 chars, read back identical).** Drafted on the 301 622 read (scratch `col-ew53.mjs` with
+  `BOX=0 ZK=0 ZS=0`, then `remove-m59.mjs`; drawings `col53-plot.mjs`, `col53-face.mjs`; a share link sent as a file).
+  - **The ducts are bare Aldes Alflex Alu Compacté (owner), not rigid PVC.**
+    - Bend radius 0.6 D (Proven, aldes.fr product page): 7.5 cm for the Ø125, 4.8 cm for the Ø80.
+    - The outside diameter is not published (Hypothesis: a few mm over nominal).
+    - The app still draws Nicoll PVC fittings for VMC ducts, so it flags the Ø80's 49° slab bend; Alflex makes it.
+  - **Column r263:** 53 × 17.25, x −0.53…0, y −2.0525…−1.88, full height, from the bedroom's north-east corner.
+    The bed stays (east side −0.60).
+  - **Kitchen vent r257:** at 1.00 m from the kitchen's north wall (centre y −2.08, z 2.45). At 1.00 m, the Ø125
+    runs beside the shower Ø80 with 1.8 cm between them.
+  - **Ø125 kitchen:**
+    - from the vent, a 20° pair in the 41.5 wall onto y −1.966, the column's centre line;
+    - west at 2.45, down at x −0.335;
+    - from the floor, 45° through the slab, leaning west onto the port's line (x −0.395), then straight to the
+      port.
+  - **Ø80 shower room:**
+    - from pn350 in the kitchen box, 45° down to 2.62 and through the wall at 2.62;
+    - west over the Ø125's elbow, with 6.75 cm between them vertically;
+    - down at x −0.47, then from the floor 45° through the slab onto x −0.59 and straight to its port.
+  - **Spacing in the column:** 13.5 cm between centres, 3.25 cm between the ducts.
+  - **The basement wall band** (y −1.744…−2.15) lies under the column, so both slab diagonals cut its top corner.
+    - The owner accepts nicking it.
+    - Notch depth, including 1 cm margin: about 6.4 cm under the Ø125, 4.6 cm under the Ø80. Hypothesis: the
+      band's face was never measured there.
+    - Without a notch, the diagonals would start 9 and 7.5 cm above the floor, and the column would need a foot box
+      about 12 cm high and 11 cm out.
+  - **Socket m59 removed** (owner). Its circuit is rejoined: m58 → m162, one wire. Its conduit drop cn189 has gone;
+    the 35 cm run cn127–cn72 stays behind the column, about 2 cm from the Ø125 (Hypothesis: a cable buried in the
+    wall).
+  - **Proven (Node):** solver clean, nothing removed; no new pipe clash (184, all old); no new beam clash.
+  - **Lengths (Proven, Node):** kitchen Ø125 3.89 → 4.16 m; shower Ø80 from pn350 4.36 → 4.61 m.
+- ~~**Column (new, a full-height half wall)**~~ (superseded 2026-10-22 by the east–west column above) on the bedroom's east wall from its north-east corner: 17.25 west–east ×
   58.25 north–south (y −1.88 to −2.4625), like r261's width. Each duct makes an S south in it (two 45°; the kitchen's
   S higher: Ø125 1.70 → 1.46, Ø80 1.40 → 1.14), so both pass south of the 41 cm wall band between r66 and the basement
   stairs (y −2.15 to −1.744) before the floor: the Ø80 drops at y −2.22, the Ø125 at −2.37. The S cannot swap the two
@@ -1462,11 +1494,33 @@ slot. **Pair X** is the upstairs water (shower, basin, WC): two cold lines start
 west on the north wall 5 cm under the ceiling (2.02 / 1.996 m), not at the ceiling; 10 cm past the r204 hole the lower
 one turns into the bus as X's cold line (lane y 4.30); X's hot line (lane 4.274) is not connected yet (a free end in
 the plan). X follows the bus and rises in the column as the bundle's south row (owner: "south for now"; it touches the
-basement VMC Ø100 there). The other cold line's destination is not known; the risers stop in the upper slab until the
-upstairs routes are drawn. Diameters Ø16 assumed.
+basement VMC Ø100 there). The other cold line's destination is not known. Diameters Ø16 assumed. The upstairs routes: "Upstairs water" below.
 **On the west wall the bus touches the wall** (owner, 2026-10-22): first pipe 8 mm off the basement face (x −4.594),
 then every 26 mm: r208+r207, r209, water X, r224+r205, r206 (not lined). The r224+r205 pair runs straight down beside
 the waste (4–7 mm from it, pipe to pipe), dipping to 1.91 m under the waste's elbow at (−4.434, −0.30).
+**Upstairs water (owner, 2026-10-22; written that day, 306 688 chars, read back identical).**
+- **Where it runs:**
+  - every line is in the bathroom's floor screed, laid on the slab (centre z −0.041), along the walls. Owner:
+    "None of those lines go through the middle of the room";
+  - the pair rises at the west wall (cold x −4.69, hot −4.664, y −0.288);
+  - it steps out to pass the four heating risers: hot x −4.638; cold x −4.612, dipping south under the hot riser;
+  - it runs north along the west wall, then east behind the WC at y 0.36 (hot) and 0.334 (cold), south of the WC
+    drain at y 0.40–0.50;
+  - the tees are inside the WC boxing: cold to the shower (x −4.40) and to the WC (x −4.10, up into the frame);
+    hot to the shower (x −4.30);
+  - both mains go on to the north wall (y 0.52 / 0.494) and along it to the vanity;
+  - the shower lines go back west, south beside the mains past the risers, then onto the west wall's lanes
+    (x −4.69 / −4.664, under the heating that runs above the floor there). Then along the south wall
+    (y −1.85 / −1.824) under the towel rail and the tray, and up the east wall (x −2.83 / −2.856) to the mixer.
+- **Crossing:** the hot shower line crosses over the cold main behind the WC (z −0.022 there). With both mains
+  sending a line back and a line on, one crossing is unavoidable.
+- **Hypotheses, unmeasured:** where the lines leave the floor (WC frame 0.95, vanity wall outlets 0.55, shower
+  mixer 1.10 with outlets 15 cm apart and hot on the north), the tees' spacing, and the crossing.
+- **The upstairs VMC extract** (p39 / p40 / p42) runs in the floor too, "almost below screed level" (owner). Its
+  under-floor stretch was lowered from z −0.07 to −0.093 (top −0.053), so the water passes over it, 4 mm clear.
+- **Proven (Node):** solver clean; the only new pipe clashes are the risers at the bundle's 2.4 cm spacing from the
+  heating risers; no beam clash; the VMC fittings still pass.
+
 **The upstairs risers are a 2×2 bundle against the west wall** (owner, 2026-10-22; this replaces the "one row at
 y −0.19" above): in column r122's north-west corner, north of the VMC (x −4.690 / −4.664, y −0.240 / −0.264). North
 row: the r209 pair (it heads north upstairs); south row: the r208 + r207 pair (it heads south down the west wall). In

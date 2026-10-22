@@ -18,53 +18,27 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-21 (session 42; items 97–100: edge tags, zone ids in links, door frames, the LINE rebate and handle, the Meli rail, View 3D 🚪 Doors, `solve-house.mjs`, the wall-device facing fix; the headset plan is **286 266**)
+**Date:** 2026-10-22 (session 43; items 101–102: the slab-hole anchor, the west heating manifold and bus as installed, the upstairs water, the 3×2 column bundle, the cabinet beam, the bathroom and kitchen joists, View 3D ▬ Beams; the headset plan is **301 622**)
 
 **Status:**
-- Proven (`write --base` on a fresh read equal to the base, read back byte-identical, backup `backup-1022`): **headset
-  write 2026-10-22, 291 747 chars** (item 101, `docs/plumbing-workflow.md` "West manifold"): heating anchor m274 at the
-  living-room slab hole; r204's pair through it along the north insulation; beam r265 over cabinet r125; the west
-  manifold (4 pairs, 1.40 m, west of the pillar); the bus order and the west-wall bus touching the wall; r224+r205 down
-  the wall; the 2×2 upstairs riser bundle + water row (3×2) in column r122; the upstairs water pair X and the two cold
-  lines on the north wall. Owner to verify in AR / ▤ Plan. Open: the hot riser overlaps the basement VMC Ø100 by 8 mm
-  (water row "south for now"); the bundle sits 7–10 cm west of the basement wall face (floor-to-floor offset); r224+r205
-  supply 1–7 mm from the waste; stray p262 (r205 supply → (−3.91, −2.59)) kept; the r208/r207 tees' fitting type unknown.
-- Item 102 (2026-10-22): **joists** drawn as BEAM zones (`docs/plumbing-workflow.md`): upstairs bathroom r266–r271 (7 cm,
-  from 14 cm off the west wall, 22 cm clear, 16 cm high under a 5 cm screed) and kitchen ceiling r272–r279 (4 cm, 16 cm
-  high, 46 cm clear, one centred 40 cm from r65's north edge, above the ceiling 2.70–2.86). Clashes left for the owner:
-  the upstairs WC drain (p54, p64) through r267; the shower-room VMC p318/p319 along r273 (move it to a bay?).
-  View 3D **▬ Beams** switch (commit after 864cebd). Headset write of the joists: see the commit's follow-up.
-- Proven (git; `version.json` "864cebd 1020-1903Z"; `update-app` installed it): the head is `864cebd` (View 3D 🚪 Doors),
-  after `b9e8676` (the Meli rail, the LINE `backset`); pushed, served and on the headset.
-- Proven (`write --base`, read back byte-identical): the **last headset write was 2026-10-20, 286 266 chars**, item 98:
-  r137 0.71 (Ground), r138 0.69, r92 0.78 at 12.5 cm, r91 0.78 against the corridor's west wall, r93 →
-  `door_postforme_meli_white` (Upper). Its fresh read (`read-1020b.json`, 286 339) differed from 286 557 only by the
-  app's solved re-save (snapped floats, dropped defaults, the active floor, and m210's y re-solved to its pins: −0.05);
-  the three scripts were re-run on it, `house-query diff` showed only those doors. Backup `backup-1020` (scratchpad).
-  Then, same day, **r92 7 cm west** (owner: as far as the switch and outlet on r85's face allow; c987 −0.125 →
-  −0.055, the frame 5.5 cm from the corridor's west wall; 1.5 mm left to the Ovalis outlet m53's plate, 5 mm to
-  switch m127's standard face, both centred at x −2.74 on the plan, so a Hypothesis until taped). Fresh read ==
-  286 266, backup `backup-1020b`, read back identical (still 286 266 chars: same length, new value).
-  **286 266 chars (`readback-1020b.json`) is the base for the next write.** Its stored r92 x is still the
-  pre-move −2.625 (the app shows −2.695): the edit was written unsolved; the app's next save rewrites it, and a fresh
-  read will differ by that. From now on write `tools/solve-house.mjs` output (`docs/headset-data.md`).
-  `solved-now.json` (scratch) is that copy solved.
-- Proven (`quest-storage write --base`, then a fresh `read` byte-identical to the edit): the previous write was
-  2026-10-19, 286 557 chars: the FLAVIO 60 on r130 (Ground) and the FLAVIO 80 on r132 (Upper), foot 0.33 / top 0.88
-  (the height is still the owner's to confirm), dims c870 c871 c906 c907 dropped (item 95); the 7 basement
-  `tile_200_dark_red` finishes → `artens_easy_terracotta_45` (item 91). Fresh read before == 287 012 (byte-identical);
-  `house-query diff`: only r130, r132 and those finishes, no conflict. Backup `backup-1019` (scratchpad).
-  Before that, 2026-10-17, 287 012 chars:
-  option 4i + the bed (`write-4i-bed.json` via `bedOn4i.mjs` on `draft-4i-final.json`; fresh read == 288 795 before;
-  backup `quest-backup-1017-4i`): unit B moved and turned, the BDH vents, column r263 (sill 2.7), bed r264 with dims
-  c1569/c1570, r254 and r261 removed. Before that, 2026-10-16,
-  288 795 chars (the bedroom box r255 and the alcove column r256 replaced by a corner column r261, the ducts 45° through
-  the slab, parallel 45° turns in the laundry, r254 grown to 57.35 cm: `docs/plumbing-workflow.md` "The bedroom box
-  replaced by a corner column"). Before it, 287 813 (the kitchen corner box r254 narrowed to 30 cm), 287 829 (the bath duct's two flat corners as 45° pairs), and 287 516 (2026-10-15: fix A at the alcove and the longer laundry 45° pair: `docs/plumbing-workflow.md` "Fittings to datasheet
-  sizes"). Before it, 287 526 (the ground bathroom and kitchen VMC ducts moved into the attic, the kitchen boxes removed:
-  "Ground-floor ducts in the attic"), and 287 926 (the upper WC drain as layout S + column r122 narrowed to 35.5 cm, replacing T1 at
-  287 757; resolved with real Nicoll/Geberit parts:
-  `docs/plumbing-workflow.md` "Fitting study, upper WC drain", `tools/wc-drain-fit.mjs`). 288 795 was the base until 10-17.** Backups `quest-backup-1016-col` (pre-column), `quest-backup-1016-box` (pre-box), `quest-backup-1016-bath45` (pre-45° pairs), `quest-backup-1015-fixA` (pre-fix A), `quest-backup-1015-attic` (pre-attic) and `quest-backup-1015-wcS` (pre-S), scratchpad, session-local. No save slot holds a pre-edit copy, so undo = reverse the edit.
+- Proven (two writes 2026-10-22, each `write --base` on a fresh read equal to its base, read back byte-identical):
+  **item 101** (291 747): anchor m274 at the living-room slab hole and r204's pair through it; beam r265 over cabinet
+  r125; the west manifold beside the basement pillar; the bus in its real order, touching the west wall; r224+r205
+  down the wall; the 3×2 bundle in column r122 (two heating pairs + the water row); the upstairs water pair X and two
+  cold lines on the north wall. **Item 102** (301 622): joists r266–r271 (upstairs bathroom, under a 5 cm screed) and
+  r272–r279 (kitchen ceiling, attic side). Every coordinate and owner decision: `docs/plumbing-workflow.md` "West
+  manifold" and "Re-measured". What the owner must still check or decide: Next step 00b.
+- Proven (git; `version.json` "f1b4def 1021-2337Z"; Actions run success; `update-app` installed it): the head is
+  `f1b4def`, pushed, served and on the headset. Session 43 commits: `e85912c` wall devices face the room (item 100),
+  `c85cb39` `tools/solve-house.mjs` + the write-the-solved-form procedure, `64b29ce` View 3D ▬ Beams, `f1b4def` docs.
+  Only this file is uncommitted.
+- **The base for the next write is 306 688 chars** (the upstairs water, after the east–west column at 300 745;
+  scratch `readback-1022d.json`, written 2026-10-22 after a fresh read byte-identical to 300 745, read back
+  byte-identical; backups `backup-1022` … `backup-1022d`). It was written in solved
+  form (`solve-house.mjs`), so the app's next save should change nothing (Hypothesis until a fresh read shows it).
+- Earlier writes, compressed: 286 266 (10-20, item 98: four door frames, r93 on the Meli, r92 7 cm west), 286 557
+  (10-19: FLAVIO vanities, basement ARTENS tile), 287 012 (10-17: VMC option 4i + bed r264), and the 10-15/16 VMC
+  steps (`docs/plumbing-workflow.md`). No save slot holds a pre-edit copy: undo = reverse the edit.
 - Owner-confirmed on the Quest: AR performance (s29), the MATERIAL flow, the 3D-only AR view, FURNISH removed
   (s32), the floor start corner (s33), PERF clipboard reports and 50–80 fps in the AR 3D view (s37), the
   version.json fix (item 46, by CDP).
@@ -505,6 +479,8 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
 
 ## Findings / traps worth knowing
 
+- **`encodeViewToHash` already returns `view=…`:** a link is `base + '#' + payload`. Prepending `#view=` made a dead
+  `#view=view=…` link on 10-22 (the owner saw no beams). Check a link by decoding the fragment after `#`.
 - **A local test port may still hold a copy of the owner's plan** (10-21: 127.0.0.1:5193 opened on a 3-floor plan from
   an earlier session; closed at once). Before loading the app on a port, open a plain page on that origin (serve a
   `blank.html`) and check `localStorage` is empty, then write the synthetic house there first. Also unregister the
@@ -656,14 +632,15 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   `apply --unidiff-zero` or `stash --keep-index`.
 - **`rlog` works only on the dev server;** never stage `quest-debug.log`.
 
-## Commits (sessions 40–42; all pushed, doc-only omitted; earlier sessions: `git log`)
+## Commits (sessions 40–43; all pushed, doc-only omitted; earlier sessions: `git log`)
 
 Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0b67` pipe anchors + `house-query anchors` ·
 `3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity ·
 `796a788` ARTENS Easy tile (`concrete` design), Trez gates (one leaf; two leaves with `axisSpan`/`axisIn`), Klos'up fence
 slat · `74ca566` FLAVIO 60 · `6ec32b6` skill `quest-connect` (port scan) · `d3894d5` 2D #️⃣ Edge # tags · `d62477e`
 links carry zone ids (`ids`) · `fdb802a` the LINE rebated leaf (`leafInset`). Session 42: `b9e8676` Meli rail +
-LINE `backset` · `864cebd` View 3D 🚪 Doors. Session 40:
+LINE `backset` · `864cebd` View 3D 🚪 Doors. Session 43: `e85912c` wall devices face the room · `c85cb39`
+`tools/solve-house.mjs` · `64b29ce` View 3D ▬ Beams. Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -720,19 +697,37 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
-0000. **Tests (owner, 2026-10-21: "we will implement tests after I compact").** None exist (`package.json` has no
-   `test`). Agreed shape: Node's built-in runner (`node --test`, no new dependency), `npm test`, small synthetic houses in
-   the test files (never the owner's plan), Node stubs for `document` and `setTexturePainter` where a builder needs them;
-   optionally run in `deploy.yml` so a failure blocks the publish. First cases, in order:
-   1. `buildArchitecturalFloor` returns a placement for every wall device, facing the room (item 100's regression);
-   2. no switch/outlet plate cuts a wall on a small test house (scratch `plateCheck.mjs` has the box test);
-   3. solved save: load → serialize → load → serialize is stable (`tools/solve-house.mjs`);
-   4. the constraint solver: signed distances, a flagged conflict;
-   5. share links round-trip zones, finishes and ids (`ids: true`);
-   6. doors: a LINE door in a 0.78 zone gets a 0.73 leaf, handle 5 cm from the lock edge; 🚪 Doors builds open + closed.
-   Then update CLAUDE.md "Commands" (build is no longer the only check) and commit on "c p".
-000. **Before or with the tests: "c p"** for the uncommitted files (Status), then `update-app` (Quest reachable:
-   192.168.1.36, port 42795 on 10-20). The owner then checks the vanity plates on the phone (View 3D) and in AR.
+~~0000. Tests~~: done 10-22, uncommitted until "c p". `npm test` (`node --test test/*.test.js`, 14 tests, Proven
+   passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
+   - device placements facing the room, and no plate cutting a wall (Proven: removing `markerPlacements` makes 2 fail);
+   - a door cutting the wall to its head;
+   - a solved save staying stable, and the save round-trip;
+   - the solver: signed distances, conflicts, the 0.1 mm grid;
+   - a share link round-trip (and no `view=view=`);
+   - the LINE door's 0.73 leaf and its handle 5 cm from the lock edge, and 🚪 Doors open and closed.
+   Found along the way:
+   - `validateProjectData` returns a message and never throws, so `solve-house.mjs` ignored it (fixed: it exits 1);
+   - a dimension moving a zone's edge past its opposite edge flips the zone and is not flagged red (Proven in Node,
+     solver.test.js comment; not fixed; owner's call whether it should be).
+   Next tests worth adding: heat loss, takeoff (`flooring.js`), conduit/pipe risers across floors.
+~~000. "c p" for the uncommitted files~~: done 10-22 (`e85912c`…`f1b4def`, installed on the headset). The owner still
+   checks the vanity plates on the phone (View 3D) and in AR.
+00d. **Upstairs water: written 2026-10-22 (306 688).** Design: `docs/plumbing-workflow.md` "Upstairs water". Still
+   to confirm with the owner: the outlet heights (WC 0.95, vanity 0.55, mixer 1.10), the tees' spacing, the crossing.
+00c. **Column r263 turned east–west: written 2026-10-22 (300 745, read back identical, `readback-1022c.json`), the new base.** Design and numbers:
+   `docs/plumbing-workflow.md` "Column turned east–west".
+   - The draft is session-local and will be lost: scratch `col-ew53.mjs` run with `BOX=0 ZK=0 ZS=0`, then
+     `remove-m59.mjs` from the repo root, on the 301 622 base.
+   - On W, redo it on a fresh read. Re-derive it from the doc if the scratch is gone.
+   - Then the usual steps: app closed, backup, fresh read == base, `solve-house.mjs`, `write --base`, read-back.
+00b. **Items 101–102, owner to verify and decide** (`docs/plumbing-workflow.md` "West manifold", "Re-measured"):
+   - see in AR / View 3D (▤ Plan, 💧 Pipes, ▬ Beams): the bus, manifold, column bundle, water X, the joists;
+   - clashes waiting on the owner: the upstairs WC drain p54/p64 through joist r267 (builder's call); the shower-room
+     VMC p318/p319 lying along kitchen joist r273 (offered: move it into a bay, y −1.73 or −2.23, with its drop at
+     x −0.08); the hot riser 8 mm into the basement VMC Ø100 (water row "south for now"); r224+r205 supply 1–7 mm
+     from the waste; the bundle 7–10 cm west of the basement wall face (ground vs basement wall offset);
+   - unknowns: X's hot source, where the other north-wall cold line goes, ~~the upstairs water routes~~ (drawn,
+     item 00d), the r208/r207 tees' fittings (press or compression; offered: anchors on them), stray p262.
 00a. **Item 98 is written** (286 266). The owner checked the r91 / r93 corner on a draft link and said "R91 is ok now".
    - Owner to verify in AR / View 3D: the four frames, r92 7 cm west (clear of m53 / m127), r93 on the Meli, the
      LINE handle (5 cm) with 🚪 Doors.
