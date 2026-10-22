@@ -20,21 +20,36 @@ A parametric 2.5D CAD tool for house massing (vanilla JS + Vite + Three.js, no f
 
 ## Commands
 
-**Node is provided via `fnm`, not on PATH.** Every `npm`/`node` command must prepend the fnm install dir first, or it will fail with "command not found":
+**Node is not on PATH** on either machine; prepend its install dir to every `npm`/`node` command, or it fails
+with "command not found":
 
 ```bash
-# PowerShell (the primary shell here)
+# Windows, PowerShell (fnm)
 $env:Path = "C:\Users\ahe\AppData\Roaming\fnm\node-versions\v22.22.2\installation;" + $env:Path
+# Linux, the Steam Deck (nvm)
+export PATH=~/.nvm/versions/node/v20.20.2/bin:$PATH
+
 npm install      # once
+npm test         # the unit tests (node --test, test/*.test.js): run before every commit
+npm run build    # production build to dist/: the other verification step
 npm run dev      # dev server at http://localhost:5173 (HMR)
-npm run build    # production build to dist/  — THIS is the verification step
 npm run preview  # serve the production build
 ```
 
-- **`npm run build` is how you verify changes** — there is no test suite, linter, or type checker. A clean build (`✓ built in …`) means imports/syntax are sound. It does **not** catch runtime/visual bugs.
+- **Verify a change with `npm test` and `npm run build`.** There is no linter or type checker. A clean build
+  (`✓ built in …`) means imports and syntax are sound; the tests check the pure model and the 3D builders in
+  Node. Neither catches visual or on-device bugs.
+- **Tests** (`test/`, Node's built-in runner, no dependency): small synthetic houses built in `test/house.js`,
+  never the owner's plan. `stubTextures()` there lets a `src/ui` builder that paints textures run in Node.
+  Add a test with every bug fix that Node can reach. CI (`.github/workflows/deploy.yml`) runs `npm test`
+  before the build, so a failing test stops the publish.
 - When running `vite build` through PowerShell you will see a spurious `node.exe : … NativeCommandError` line — that is PowerShell wrapping Vite's stderr (the chunk-size note), **not** a build failure. Trust the `✓ built in …` line.
-- Changes can only be verified by build + browser; Claude cannot click through the UI. Say so when reporting, and flag the most likely visual regression.
+- What a test cannot reach is verified in a browser or on the headset; say which was done when reporting, and
+  flag the most likely visual regression.
 - The owner QAs from other devices on the LAN (Quest, phone). Keep the dev server running rather than stopping it after a task, and report its **Network** URL (Vite's `➜ Network:` line), not just localhost.
+- Node tools for the owner's saved house (`tools/`, `docs/headset-data.md`): `quest-storage.mjs` (read/write the
+  headset), `solve-house.mjs` (re-save in solved form before a write), `house-query.mjs` (openings, takeoff,
+  diff, conflicts, anchors, beams), `check-share-link.mjs`.
 
 ## Where project knowledge lives (rule)
 
@@ -54,7 +69,7 @@ Design docs: `docs/product-intent.md` (Phase-5 goal, survey method, drift, multi
 
 ## Core architecture
 
-The whole app is a one-way pipeline driven by a change bus. Each `Floor` holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks` (switch→light control links), `finishes`, and `height` (furniture is a `furniture` zone in `rectangles`, optionally carrying a product: `docs/furniture.md`). `Project` (in `src/core/model.js`) additionally owns the **whole-house** `conduitNodes`/`conduitSegments`/`wires` electrical network: a conduit node stores position **relative to its floor** (`{x,y,z,floorId}`, or `{markerId}` bound to a live device), so a segment joining nodes on two storeys is a **riser** through the slab and a wire may connect device markers on different floors. All network positions resolve in absolute world Z (`floor.elevation + z`) at derivation time (`src/core/conduit.js`), never stored — so a floor-height edit re-stacks elevations and every higher node's world height follows. A **bare junction can be dimensioned to a wall** (a `{node}` constraint endpoint, resolved one-way in `solveConduitNodes` like a marker pin), so it tracks that wall on every edit; marker-bound nodes follow their device and are never pinned. `Project` exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
+The whole app is a one-way pipeline driven by a change bus. Each `Floor` holds `rectangles`, `constraints`, `markers`, per-floor `electricalLinks` (switch→light control links), `finishes`, and `height` (furniture is a `furniture` zone in `rectangles`, optionally carrying a product: `docs/furniture.md`). `Project` (in `src/core/model.js`) additionally owns the **whole-house** `pipeNodes`/`pipes` plumbing graph (`docs/plumbing-workflow.md`), the owner's `materials` and `heat` settings, and the `conduitNodes`/`conduitSegments`/`wires` electrical network: a conduit node stores position **relative to its floor** (`{x,y,z,floorId}`, or `{markerId}` bound to a live device), so a segment joining nodes on two storeys is a **riser** through the slab and a wire may connect device markers on different floors. All network positions resolve in absolute world Z (`floor.elevation + z`) at derivation time (`src/core/conduit.js`), never stored — so a floor-height edit re-stacks elevations and every higher node's world height follows. A **bare junction can be dimensioned to a wall** (a `{node}` constraint endpoint, resolved one-way in `solveConduitNodes` like a marker pin), so it tracks that wall on every edit; marker-bound nodes follow their device and are never pinned. `Project` exposes `onChange(fn)`. **Every mutation calls `Project._emit()`, which runs the constraint solver *first*, then notifies listeners** — so every view (`Sketch2D`, `View3D`, the panels) always sees fully-resolved geometry. When mutating a rectangle's fields in place, call `project.touch()` to trigger this cycle.
 
 ```
 rectangles (add/subtract, ordered)

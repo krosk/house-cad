@@ -17,7 +17,11 @@ if (!inp || !out) {
   process.exit(1);
 }
 const data = JSON.parse(fs.readFileSync(inp, 'utf8'));
-validateProjectData(data);
+const invalid = validateProjectData(data); // returns an error message, never throws
+if (invalid) {
+  console.error(`not a house: ${invalid}`);
+  process.exit(1);
+}
 const p = new Project();
 deserializeInto(p, data);
 const solved = serializeProject(p);

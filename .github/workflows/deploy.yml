@@ -29,6 +29,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # A failing test stops the publish (test/, docs: CLAUDE.md "Commands").
+      - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
