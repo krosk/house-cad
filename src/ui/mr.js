@@ -19,7 +19,7 @@ import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js
 import { assembleKitchenUnit, isKitchenUnit } from './kitchenUnits.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
-import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
+import { mergePartsByMaterial, mergeObjectByMaterial, mergeAcrossByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { sunPosition, sunDirection } from './realism.js';
 import { buildDeviceProduct } from './deviceProducts.js';
@@ -5237,6 +5237,8 @@ export function setupMR(view, project, getFootprint) {
   // async; a build token drops a stale rebuild's late arrivals. buildArch3d calls this on
   // every buildPlan, so it returns early when nothing it draws changed.
   let furnitureKey = '';
+  let furnitureBatchMode = 'off'; // buildFurnitureBatch
+  let furnitureBatch = null, furnitureBatchTaken = [];
   function buildFurniture(floor = project.activeFloor) {
     const items = allFloorsView ? [] : furnitureProductPlacements(floor);
     const key = JSON.stringify(items);
@@ -5248,7 +5250,7 @@ export function setupMR(view, project, getFootprint) {
     furnitureCatalogReady.then(() => {
       if (token === furnitureBuildToken) for (const o of furniturePlanPieces(items)) furniturePlanGroup.add(o);
     });
-    for (const item of items) {
+    const loads = items.map((item) => {
       const place = (obj) => {
         if (token !== furnitureBuildToken) return; // a newer rebuild superseded this one
         obj.position.set(item.x, item.z || 0, -item.y); // z = foot elevation off the floor
@@ -5257,14 +5259,46 @@ export function setupMR(view, project, getFootprint) {
         arShadowFlags(obj);
         furnitureGroup.add(obj);
       };
-      loadFurnitureSource(item.article)
+      return loadFurnitureSource(item.article)
         .then((src) => place(instantiateFurniture(src)))
         .catch((err) => { place(furnitureBox(item.article)); rlog('furniture load → box', { article: item.article, err: String(err) }); });
+    });
+    // Once every model is in, the floor's furniture is merged across items (furnitureBatchMode).
+    Promise.allSettled(loads).then(() => { if (token === furnitureBuildToken) buildFurnitureBatch(); });
+  }
+
+  // The floor's furniture merged across items, one mesh per material look (mergeAcrossByMaterial;
+  // docs/ar-survey.md "Performance notes": 36 products were 418 draw calls, both eyes). The
+  // items stay in furnitureGroup, hidden, so the batch can be rebuilt or turned off.
+  // 'off' = per item; 'all' = one batch for the floor; a number = batches per square cell of
+  // that size in metres, so the ones out of view are culled. Set by the test hook for now.
+  function clearFurnitureBatch() {
+    for (const o of furnitureBatchTaken) o.visible = true;
+    furnitureBatchTaken = [];
+    if (furnitureBatch) {
+      furnitureGroup.remove(furnitureBatch);
+      furnitureBatch.traverse((o) => o.geometry?.dispose()); // materials belong to the items
+      furnitureBatch = null;
     }
+  }
+  function buildFurnitureBatch() {
+    clearFurnitureBatch();
+    if (furnitureBatchMode === 'off') return;
+    const items = furnitureGroup.children.slice();
+    const { meshes, taken } = mergeAcrossByMaterial(items, furnitureGroup, { cell: +furnitureBatchMode || 0 });
+    if (!meshes.length) return;
+    furnitureBatch = new THREE.Group();
+    furnitureBatch.userData.furnitureId = 'batch';
+    for (const mesh of meshes) furnitureBatch.add(mesh);
+    for (const o of taken) o.visible = false;
+    furnitureBatchTaken = taken;
+    furnitureGroup.add(furnitureBatch);
+    rlog('furniture batch', { mode: furnitureBatchMode, meshes: meshes.length, merged: taken.length });
   }
 
   function clearFurniture() {
     furnitureKey = '';
+    clearFurnitureBatch();
     for (const child of [...furnitureGroup.children]) {
       furnitureGroup.remove(child);
       child.traverse?.((o) => {
@@ -10315,7 +10349,7 @@ export function setupMR(view, project, getFootprint) {
     if (layers === PERF_LAYERS_3D) {
       out.push('', '## 3D meshes: layer, tris, material');
       const rows = [];
-      const add = (o, layer) => o.traverse((m) => {
+      const add = (o, layer) => o.traverseVisible((m) => { // a batched item's own meshes are hidden
         if (m.isMesh || m.isLine) rows.push([layer, perfTris(m.geometry), perfMatName(m.material)]);
       });
       for (const o of arch3dGroup.children) add(o, o.userData.arch3dLayer || '?');
@@ -10483,6 +10517,12 @@ export function setupMR(view, project, getFootprint) {
         applyPlanMatrix();
         lastHudAt = -Infinity;
         return { yawDeg: +THREE.MathUtils.radToDeg(yaw).toFixed(1), forwardY: +(-m[9]).toFixed(2) };
+      },
+      // The furniture merged across items: 'off', 'all', or a cell size in metres.
+      setFurnitureBatch(mode = 'off') {
+        furnitureBatchMode = mode === 'off' || mode === 'all' ? mode : +mode;
+        buildFurnitureBatch();
+        return { mode: furnitureBatchMode, meshes: furnitureBatch?.children.length ?? 0, merged: furnitureBatchTaken.length };
       },
       // Hide these parts (testPart names) until the next call; [] shows everything.
       hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },

@@ -9,6 +9,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/product-intent.md` | **Why** the AR tool exists: tape survey, drift/RECAL, multi-floor, split levels, room levels |
 | `docs/ar-survey.md` | **How** AR works: every mode, HUD, **performance rules**, AR traps |
 | `docs/ar-qa-checklist.md` | On-device QA items, dated; most are still unwalked |
+| `docs/performance-profiling.md` | **How we profile and optimise AR on the Quest** (skill `quest-perf`); results in `docs/ar-survey.md` "Performance notes" |
 | `docs/headset-data.md` | Reading/writing the owner's live plan on the Quest (skill `quest-edit`) |
 | `docs/plumbing-workflow.md` | Pipe tools; AC, VMC, waste, heating pipes; every owner decision and coordinate of the drawn networks |
 | `docs/heat-loss.md` | Heat loss, balance, laundry heater, bare basement pipes, insulation what-ifs |
@@ -18,19 +19,18 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-23 (session 45; the electrical panel step 1 (item 00e, uncommitted), the kitchen sink drain into the façade vent (item 00g, written); the headset plan is **307 484**. Session 44: tests, the east–west column r263 (00c), the upstairs water (00d))
+**Date:** 2026-10-23 (session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g, written), performance runs driven from here + the AR double-render fix (00h); the headset plan is **307 484**. Session 44: tests, the east–west column r263 (00c), the upstairs water (00d))
 
 **Status:**
 - Proven (session 45, one write 2026-10-23, `write --base` on a fresh read byte-identical to 306 688, read back
   byte-identical, 307 484): the kitchen sink's Ø40 drain into a Ø100 × 40 tee on the façade vent riser (item 00g;
   `docs/plumbing-workflow.md` "Kitchen sink into the façade vent").
-- **Uncommitted (session 45, all mine, `npm test` 19/19 and `npm run build` clean, Proven):** AR Realistic step 1
-  (`mr.js` `applyArSun` + `applyArPhoto`, `realism.js` header, `i18n.js` `sun.*`, `test/realism.test.js`, `docs/realism.md` "In AR",
-  `docs/ar-survey.md` LEFT Y, a QA section; item 00f); the panel step 1
-  (`src/core/panel.js`, `test/panel.test.js`, `materials.js` `panel_drivia_3x13`, `deviceProducts.js` `driviaPanel`,
-  breaker `panel`/`row`/`slot` in `serialize.js`, AR MATERIAL · PANEL in `mr.js` + `i18n.js`, `view3d.js` fill),
-  its docs (`docs/electrical-workflow.md` "The panel", `docs/materials.md` "Panel", a QA item, a `CLAUDE.md` line),
-  the sink-drain section in `docs/plumbing-workflow.md`, and this file. Never seen in a browser or on the headset.
+- **Committed and pushed (session 45, Proven: CI green, `version.json`, `update-app` installed each):** `84e3a90` AR
+  Realistic + panel step 1 + sink doc; `619b37d` the test hook + `tools/quest-perf.mjs`; `6216cdb` the experiment
+  switches + `--view`; `4846925` the AR double-render fix (3D view 10 → 70 fps). Uncommitted: only the post-fix
+  results in `docs/ar-survey.md` and this file.
+- **The headset is left awake** (`prox_close`, owner asked 2026-10-23); `adb shell am broadcast -a
+  com.oculus.vrpowermanager.automation_disable` restores the sensor when the owner wants.
 - Proven (session 44, two writes 2026-10-22, each `write --base` on a fresh read byte-identical to its base, read back
   byte-identical): **00c** (300 745), the east–west column r263 (bare Alflex ducts, vent at 1.00 m, m59 removed);
   **00d** (306 688), the upstairs water. Details: `docs/plumbing-workflow.md` "Column turned east–west", "Upstairs water".
@@ -706,7 +706,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
-00f. **AR Realistic: step 1 (sun + shadows) built 2026-10-23 on the owner's go, uncommitted.** LEFT Y in the AR 3D
+00f. **AR Realistic: step 1 (sun + shadows) built 2026-10-23 on the owner's go (`84e3a90`, pushed).** LEFT Y in the AR 3D
    view toggles it, held LEFT Y + stick-x moves the hour; design and limits in `docs/realism.md` "In AR". Proven:
    `npm test` (19, incl. `test/realism.test.js`: noon sun from plan south, morning from plan east) and the build.
    Hypothesis until seen on the headset: the look (sun 2.4, hemisphere 0.3–0.65, catcher 0.35 are guesses), the fps
@@ -714,7 +714,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Step 2 built too: the photo finishes in AR (`applyArPhoto`, colour only), Proven in Chrome on a scratch page
    (both photo shaders compile and draw on Lambert with a PCF shadow; not seen on the headset). Not in AR, by design:
    the sky and GTAO.
-00h. **Performance runs driven from here (owner asked 2026-10-23), built, uncommitted.** `tools/quest-perf.mjs` + the
+00h. **Performance runs driven from here (owner asked 2026-10-23), built and pushed (`619b37d`, `6216cdb`, `4846925`).** `tools/quest-perf.mjs` + the
    flag-gated test hook (`mr.js` `window.houseCadTest`, `view3d.js` `xrTimingTotal`); design and traps in
    `docs/headset-data.md` "Performance runs". Proven: the hook loads on the headset (a local build through
    `adb reverse`); a DevTools gesture cannot start AR (the browser's "Enter VR" chip waits for the wearer); the
@@ -722,10 +722,11 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Realistic 16; GPU-bound). Then the experiment switches (hide parts, shadow size/type, `--scale`, shadow redraw count,
    `--view`: the owner's standard viewpoint is the living room's NW corner toward the origin, `--view -4.4,4.2`).
    **Found 10-23: AR rendered the scene ~7 times per XR frame** (three's window loop restarted at session start,
-   `docs/ar-survey.md` "Performance notes"). Fixed in `view3d.js` `_animate` (uncommitted), test `test/xrLoop.test.js`.
-   Next: "c p", then re-run `quest-perf.mjs --view -4.4,4.2` (all scenarios) and only then optimise furniture etc. The headset is left awake with
+   `docs/ar-survey.md` "Performance notes"). Fixed (`4846925`, pushed): 3D view 10 → 70 fps, Realistic 10 → 50 from the
+   owner's viewpoint. What is left: the furniture (89 → 70) and Realistic (70 → 50). Next: the owner's choice of the
+   next optimisation (my pick: furniture draw calls/triangles first). The headset is left awake with
    `prox_close` (owner asked); `automation_disable` restores the sensor.
-00e. **The electrical panel (owner 2026-10-22/23), step 1 built, uncommitted (above); the rest parked by the owner.**
+00e. **The electrical panel (owner 2026-10-22/23), step 1 built and pushed (`84e3a90`); the rest parked by the owner.**
    Owner facts: Legrand Drivia ready-wired T4, 3 × 13 (Leroy Merlin 71653631), on the basement's south wall ~20 cm from
    the east wall; the 23 breaker markers (m235–m272) are "placeholders for connecting markers in the same circuit
    line" (20 wires end on them) and stay put. Design: `docs/electrical-workflow.md` "The panel". Not done: a panel
@@ -739,7 +740,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Owner to check: the trap height (0.50 assumed), the route behind corner unit r158 (back panel or plinth). The
    façade vent stays Ø100 (owner asked about smaller: see the doc section). Plot sent (scratch `sink-tee.png`).
 ~~0000. Tests~~: done 10-22 (`3bebe48`, pushed). `npm test` (`node --test test/*.test.js`, 14 tests then, 19 with
-   the uncommitted panel and sun tests, Proven passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
+   the panel and sun tests, 21 with the XR loop test, Proven passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
    - device placements facing the room, and no plate cutting a wall (Proven: removing `markerPlacements` makes 2 fail);
    - a door cutting the wall to its head;
    - a solved save staying stable, and the save round-trip;

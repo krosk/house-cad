@@ -183,7 +183,8 @@ skip it, say so, and tell the owner the app updates over its next launch or two.
 
 ## Performance runs (`tools/quest-perf.mjs`; owner, 2026-10-23)
 
-The owner asked for performance tests driven from here, with nobody in the headset.
+The owner asked for performance tests driven from here, with nobody in the headset. **The process** (how to
+profile and optimise, the standard viewpoint, reading the numbers): `docs/performance-profiling.md`, skill `quest-perf`.
 
 ```bash
 node --experimental-websocket tools/quest-perf.mjs <outDir> [--scenarios plan,3d,real,low] [--sample 10] \

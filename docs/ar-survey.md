@@ -1228,7 +1228,23 @@ teleport reticle; no last-active routing remains.
     had the extra loop), and the test hook's `hide()` doing nothing.
   - **Fix:** `_animate` returns when presenting without an XR frame; `test/xrLoop.test.js` fails
     without it.
-  - **Hypothesis until re-measured on the headset:** the 3D view's fps rises a lot.
+  - **Re-measured, Proven** (`4846925`, same viewpoint, `--view -4.4,4.2`, 8 s samples):
+
+    | scenario | before | after | p50 frame | calls | tris (both eyes) |
+    |---|---|---|---|---|---|
+    | plan | 78.5 | 89.5 | 11.1 ms | 114 | 57k |
+    | 3D view | 10 | 70 | 14.2 ms | 548 | 882k |
+    | 3D, no furniture | 10 | 89.4 | 11.1 ms | 130 | 101k |
+    | 3D, no ceiling / no walls | 10 | 72.9 / 69.2 | | | |
+    | 3D + Realistic (noon or 18:00) | 10 | 50 | 19.9 ms | 550 | 882k |
+    | 3D + Realistic, no furniture | 10 | 61.1 | 16.1 ms | 132 | 102k |
+
+  - **What is left:** the furniture costs the 3D view about 3 ms per frame, from 89 to 70 fps.
+    That is 418 draw calls and 780k triangles of the 882k (both eyes); r160 alone is 50k one pass.
+    Realistic costs about 5 ms more (70 → 50 fps), and 61 fps without the furniture.
+    The shadow map size (1024 vs 2048), its filter (basic vs PCF) and the floor catcher change
+    nothing measurable. The plan moving redraws the shadow map about 3.5 times a second (`shadowMoves`
+    55 over 16 s), not every frame. Walls and ceiling cost little.
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

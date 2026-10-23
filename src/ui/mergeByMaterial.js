@@ -66,3 +66,84 @@ export function mergeObjectByMaterial(root) {
   }
   return root;
 }
+
+// A material's look as a string: two materials with the same signature draw the same, so
+// their meshes can share one draw call. Each furniture instance has its own material copies
+// (instantiateFurniture), so the uuid alone would never match across items. A material with
+// custom shader code keys on its uuid.
+const SIG_MAPS = ['map', 'emissiveMap', 'alphaMap', 'lightMap', 'aoMap', 'normalMap', 'bumpMap', 'roughnessMap', 'metalnessMap'];
+const SIG_PROPS = ['type', 'opacity', 'transparent', 'side', 'alphaTest', 'vertexColors', 'depthWrite', 'depthTest',
+  'blending', 'flatShading', 'wireframe', 'fog', 'toneMapped', 'emissiveIntensity', 'roughness', 'metalness',
+  'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits', 'visible'];
+export function materialSignature(m) {
+  if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.isShaderMaterial) return `uuid:${m.uuid}`;
+  const parts = SIG_PROPS.map((p) => String(m[p]));
+  for (const c of ['color', 'emissive', 'specular']) parts.push(m[c]?.isColor ? m[c].getHexString() : '-');
+  for (const k of SIG_MAPS) parts.push(m[k]?.uuid ?? '-');
+  return parts.join('|');
+}
+
+// A mirrored transform reverses triangle winding: put it back so front faces stay front.
+function flipWinding(geometry) {
+  if (geometry.index) {
+    const a = geometry.index.array;
+    for (let i = 0; i + 2 < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; }
+    geometry.index.needsUpdate = true;
+    return;
+  }
+  for (const attr of Object.values(geometry.attributes)) {
+    const n = attr.itemSize, a = attr.array;
+    for (let v = 0; v + 2 < attr.count; v += 3) {
+      for (let k = 0; k < n; k++) {
+        const i1 = (v + 1) * n + k, i2 = (v + 2) * n + k, t = a[i1];
+        a[i1] = a[i2]; a[i2] = t;
+      }
+    }
+    attr.needsUpdate = true;
+  }
+}
+
+// Merge the meshes of many placed models (the AR 3D view's furniture, docs/ar-survey.md
+// "Performance notes") into one mesh per material look, in `frame` space: 36 products were
+// 209 meshes, each drawn once per eye. `cell` (m, optional) keeps items whose origins fall in
+// different square cells apart, so a batch behind the viewer can still be frustum-culled.
+// The sources are left in place for the caller to hide; the merged meshes own their geometry
+// (`userData.ownGeometry`) and use the first source's material. Returns { meshes, taken }.
+export function mergeAcrossByMaterial(items, frame, { cell = 0 } = {}) {
+  frame.updateMatrixWorld(true);
+  const toFrame = new THREE.Matrix4().copy(frame.matrixWorld).invert();
+  const buckets = new Map(), taken = [], m = new THREE.Matrix4(), origin = new THREE.Vector3();
+  for (const item of items) {
+    origin.setFromMatrixPosition(item.matrixWorld).applyMatrix4(toFrame);
+    const cellKey = cell > 0 ? `${Math.floor(origin.x / cell)},${Math.floor(origin.z / cell)}` : '';
+    item.traverseVisible((o) => {
+      if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || !mergeable(o.geometry, o.material)) return;
+      const attrs = Object.entries(o.geometry.attributes)
+        .map(([name, a]) => `${name}${a.itemSize}${a.normalized ? 'n' : ''}`).sort().join(',');
+      const key = [materialSignature(o.material), attrs, o.geometry.index ? 'i' : 'n',
+        o.castShadow ? 'c' : '', o.receiveShadow ? 'r' : '', o.renderOrder, cellKey].join('#');
+      if (!buckets.has(key)) buckets.set(key, { source: o, meshes: [] });
+      buckets.get(key).meshes.push(o);
+    });
+  }
+  const meshes = [];
+  for (const { source, meshes: group } of buckets.values()) {
+    if (group.length < 2) continue; // nothing to gain: the source stays as it is
+    const geometries = group.map((o) => {
+      m.multiplyMatrices(toFrame, o.matrixWorld);
+      const g = o.geometry.clone().applyMatrix4(m);
+      g.clearGroups();
+      if (m.determinant() < 0) flipWinding(g);
+      return g;
+    });
+    const merged = mergeGeometries(geometries);
+    for (const g of geometries) g.dispose();
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, source.material);
+    mesh.castShadow = source.castShadow; mesh.receiveShadow = source.receiveShadow; mesh.renderOrder = source.renderOrder;
+    mesh.userData.ownGeometry = true;
+    meshes.push(mesh);
+    taken.push(...group);
+  }
+  return { meshes, taken };
+}
