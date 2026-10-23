@@ -49,7 +49,8 @@ npm run preview  # serve the production build
 - The owner QAs from other devices on the LAN (Quest, phone). Keep the dev server running rather than stopping it after a task, and report its **Network** URL (Vite's `➜ Network:` line), not just localhost.
 - Node tools for the owner's saved house (`tools/`, `docs/headset-data.md`): `quest-storage.mjs` (read/write the
   headset), `solve-house.mjs` (re-save in solved form before a write), `house-query.mjs` (openings, takeoff,
-  diff, conflicts, anchors, beams), `check-share-link.mjs`.
+  diff, conflicts, anchors, beams), `check-share-link.mjs`, `quest-perf.mjs` (a performance run on the headset with
+  nobody in it, `docs/headset-data.md` "Performance runs").
 
 ## Where project knowledge lives (rule)
 

@@ -180,3 +180,36 @@ It needs the same conditions as a read (Connecting above): the Quest on adb and 
 answers. **It will not always be reachable** (asleep, off the network, browser not in front): then
 skip it, say so, and tell the owner the app updates over its next launch or two. Confirm on the HUD's
 `update:` line either way.
+
+## Performance runs (`tools/quest-perf.mjs`; owner, 2026-10-23)
+
+The owner asked for performance tests driven from here, with nobody in the headset.
+
+```bash
+node --experimental-websocket tools/quest-perf.mjs <outDir> [--scenarios plan,3d,real,low] [--sample 10]
+```
+
+- **What it does:**
+  - **wakes the headset:** keeps it awake with `prox_close` (Connecting, step 4) and leaves it so (`--restore-sensor` restores the sensor);
+  - **turns the hook on:** sets `house-cad:test-hook:v1` from a `version.json` tab;
+  - **launches the installed app** with `monkey`, which auto-enters AR on the owner's plan;
+  - **drives the app's page over DevTools** (`window.houseCadTest`, `mr.js` "Test hook"). For each scenario it sets the AR **view** state (3D view, Realistic, sun hour) and lets it settle, then:
+    - samples the frame intervals: fps, p50/p95/worst, the CPU split, calls and triangles;
+    - runs one PROJECT · PERF sweep: GPU ms per layer, written to `<scenario>.perf.txt`.
+- **What it never does:** edit the plan.
+- **Always, even on error, it:**
+  - puts the owner's Realistic setting back;
+  - closes the app (`force-stop`);
+  - removes the flag.
+- **Prerequisites:**
+  - the app is closed before a run;
+  - a build with the hook (the commit that adds `quest-perf.mjs` onwards) is deployed and installed (`update-app`).
+- **Traps (Proven 2026-10-23):**
+  - **A DevTools tap is not a real one:** `Runtime.evaluate` with `userGesture: true` gets past `requestSession`'s activation check in the Quest Browser, but the browser then shows an **"Enter VR"** chip in its toolbar for the wearer, and the session never starts (pending after 90 s; a headset capture showed the chip). Never press that chip through the browser's own UI page; it is the wearer's consent. The app's launch is a real activation, hence `monkey`.
+  - **A sleeping headset leaves a session stuck:** `requestSession` from a page on a sleeping headset leaves an active session that never delivers a frame, and the sleeping browser stops answering DevTools. Wake it first; the owner closed the browser to clear it.
+  - **No new tabs:** the Quest Browser opens none over DevTools (`/json/new`: "Could not create new page"); reuse a tab.
+  - **The app's page is listed:** the launched app's page appears in `/json/list` (`…/house-cad/?ar=1`).
+- **Headset screen captures** (`adb exec-out screencap -p`) show everything around the user, including their private windows. Use them only when nothing else can answer, crop to what you need, and delete them at once.
+- **Hypothesis, until the first run:**
+  - an awake, unworn headset renders XR frames at full rate;
+  - the startup placement gives a stable enough view to compare runs. It measures what the headset faces where it sits, so leave it in one place between runs.

@@ -714,6 +714,13 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Step 2 built too: the photo finishes in AR (`applyArPhoto`, colour only), Proven in Chrome on a scratch page
    (both photo shaders compile and draw on Lambert with a PCF shadow; not seen on the headset). Not in AR, by design:
    the sky and GTAO.
+00h. **Performance runs driven from here (owner asked 2026-10-23), built, uncommitted.** `tools/quest-perf.mjs` + the
+   flag-gated test hook (`mr.js` `window.houseCadTest`, `view3d.js` `xrTimingTotal`); design and traps in
+   `docs/headset-data.md` "Performance runs". Proven: the hook loads on the headset (a local build through
+   `adb reverse`); a DevTools gesture cannot start AR (the browser's "Enter VR" chip waits for the wearer); the
+   launched app's page is in `/json/list`. Not yet run end to end: needs the hook deployed ("c p", update-app). Then
+   run the 4 scenarios (plan, 3d, real, low) and optimise from the numbers. The headset is left awake with
+   `prox_close` (owner asked); `automation_disable` restores the sensor.
 00e. **The electrical panel (owner 2026-10-22/23), step 1 built, uncommitted (above); the rest parked by the owner.**
    Owner facts: Legrand Drivia ready-wired T4, 3 × 13 (Leroy Merlin 71653631), on the basement's south wall ~20 cm from
    the east wall; the 23 breaker markers (m235–m272) are "placeholders for connecting markers in the same circuit

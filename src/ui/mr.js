@@ -9631,7 +9631,7 @@ export function setupMR(view, project, getFootprint) {
     renderer.xr.setReferenceSpace(localSpace);
     startupPlacementPending = true;
     startupPoseFrames = 0;
-    view.onXRFrame = (time, frame) => { onXRFrame(time, frame); hideForArch3d(); arSunFrame(); };
+    view.onXRFrame = (time, frame) => { onXRFrame(time, frame); hideForArch3d(); arSunFrame(); testFrame(time); };
     view.onXRAfterRender = restoreAfterArch3d;
   });
 
@@ -10399,6 +10399,71 @@ export function setupMR(view, project, getFootprint) {
     perfEnabled = !perfEnabled;
     if (perfEnabled) perfStart(); else perfStop();
     lastHudAt = -Infinity; // show the change on the next frame
+  }
+  // ---- Test hook (tools/quest-perf.mjs; docs/headset-data.md "Performance runs") -----
+  // Off unless localStorage `house-cad:test-hook:v1` is '1' (set over DevTools, removed by
+  // the tool when it is done): window.houseCadTest then drives the AR session's VIEW state
+  // and samples frames, so a performance run needs nobody in the headset (owner,
+  // 2026-10-23). It never edits the plan, and PERF stops without the clipboard copy.
+  const testFrames = []; // { t, calls, tris } per XR frame while a sample runs
+  let testSampling = false;
+  function testFrame(time) {
+    if (testSampling) testFrames.push({ t: time, calls: renderer.info.render.calls, tris: renderer.info.render.triangles });
+  }
+  let testHookOn = false;
+  try { testHookOn = localStorage.getItem('house-cad:test-hook:v1') === '1'; } catch { /* storage blocked */ }
+  if (testHookOn) {
+    window.houseCadTest = {
+      state: () => ({
+        build: BUILD_ID, presenting: renderer.xr.isPresenting, placed, view3d: arch3dOn, realistic: arRealistic,
+        sunHour: arSunHour, sun: arSunInfo, perf: perfEnabled, floor: project.activeFloor?.name ?? null,
+        allFloors: allFloorsView, mode: modes[currentMode]?.id, fps: fpsText, time: timeText,
+        programs: renderer.info.programs?.length ?? null, textures: renderer.info.memory.textures,
+        geometries: renderer.info.memory.geometries,
+        framebuffer: renderer.xr.getSession()?.renderState.baseLayer
+          ? [renderer.xr.getSession().renderState.baseLayer.framebufferWidth, renderer.xr.getSession().renderState.baseLayer.framebufferHeight] : null,
+        frameRate: renderer.xr.getSession()?.frameRate ?? null,
+      }),
+      set3d(on) { if (!!on !== arch3dOn) toggleArch3d(); return arch3dOn; },
+      setRealistic(on) { if (!!on !== arRealistic) toggleArRealistic(); return arRealistic; },
+      setSunHour(h) {
+        arSunHour = Math.min(AR_SUN_HOURS[1], Math.max(AR_SUN_HOURS[0], +h));
+        applyArSun();
+        return { hour: arSunHour, sun: arSunInfo };
+      },
+      setPerf(on) {
+        if (!!on === perfEnabled) return perfEnabled;
+        perfEnabled = !!on;
+        if (perfEnabled) perfStart(); else perfStop();
+        lastHudAt = -Infinity;
+        return perfEnabled;
+      },
+      perfReport: () => perf.reportText || null, // ready after each full sweep cycle
+      perfCycle: () => ({ phase: perf.phase, layers: (perf.layers || perfLayers()).length, ready: !!perf.reportText }),
+      // Frame intervals over `ms` (XR frame times), the CPU split from View3D.xrTimingTotal,
+      // and the draw calls/triangles of the last render (both eyes).
+      async sample(ms = 10000) {
+        testFrames.length = 0;
+        const t0 = { ...view.xrTimingTotal };
+        testSampling = true;
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        testSampling = false;
+        const t1 = view.xrTimingTotal, n = t1.frames - t0.frames;
+        const gaps = testFrames.slice(1).map((f, i) => f.t - testFrames[i].t).sort((a, b) => a - b);
+        const q = (p) => (gaps.length ? +gaps[Math.min(gaps.length - 1, Math.floor(p * gaps.length))].toFixed(1) : null);
+        const span = testFrames.length > 1 ? testFrames[testFrames.length - 1].t - testFrames[0].t : 0;
+        const last = testFrames[testFrames.length - 1];
+        return {
+          frames: testFrames.length, fps: span ? +((testFrames.length - 1) * 1000 / span).toFixed(1) : 0,
+          p50: q(0.5), p95: q(0.95), worst: gaps.length ? +gaps[gaps.length - 1].toFixed(1) : null,
+          over14ms: gaps.filter((g) => g > 14).length, over20ms: gaps.filter((g) => g > 20).length,
+          js: n ? +((t1.js - t0.js) / n).toFixed(2) : null, render: n ? +((t1.gl - t0.gl) / n).toFixed(2) : null,
+          calls: last?.calls ?? null, tris: last?.tris ?? null,
+        };
+      },
+      end: () => renderer.xr.getSession()?.end(),
+    };
+    rlog('test hook on');
   }
   // HUD lines: the running measurement, then each layer's cost vs 'all', two per line.
   // The 3D view's list is shorter: one layer per line, with its draw calls (both eyes).

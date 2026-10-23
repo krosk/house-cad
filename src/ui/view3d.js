@@ -87,6 +87,7 @@ export class View3D {
     this.onXRFrame = null;
     this.onXRAfterRender = null; // runs right after each XR frame's render (mr.js restores what it hid)
     this.xrTiming = { js: 0, gl: 0, frames: 0 }; // summed ms per XR frame; see _animate
+    this.xrTimingTotal = { js: 0, gl: 0, frames: 0 }; // the same, never reset (mr.js test hook)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     // Kept for the MR lifecycle, which temporarily saves/disables this field.
@@ -1668,8 +1669,9 @@ export class View3D {
       const t1 = performance.now();
       this.renderer.render(this.scene, this.camera);
       this.onXRAfterRender?.();
-      const t = this.xrTiming;
-      t.js += t1 - t0; t.gl += performance.now() - t1; t.frames++;
+      const t = this.xrTiming, total = this.xrTimingTotal, gl = performance.now() - t1;
+      t.js += t1 - t0; t.gl += gl; t.frames++;
+      total.js += t1 - t0; total.gl += gl; total.frames++;
       return;
     }
     this.ruler?.updateLabel();
