@@ -1320,6 +1320,19 @@ teleport reticle; no last-active routing remains.
     `setFurnitureBatch('off')` and the tool's `3d-fnobatch` / `3d-fcell` (no colours) / `3d-fcolours`
     compare them; the `hideFurn` scenarios turn the batch off, as hiding an item cannot reach its
     merged copy.
+  - **Measured as the default (Proven, `5feb7fd`, same view and command):**
+
+    | scenario | fps | p50 frame | CPU render | calls |
+    |---|---|---|---|---|
+    | no batch | 73.5 | 13.6 ms | 4.97 ms | 512 |
+    | 3 m cells, textures only | 78.1 | 12.7 ms | 4.5 ms | 432 |
+    | 3 m cells + colours (the default) | 79.3 | 12.5 ms | 4.13 ms | 372 |
+    | no furniture | 90 | 11.1 ms | 2.41 ms | 130 |
+    | Realistic, default / no batch | 50 / 50 | 19.9 / 19.8 ms | 5.51 / 6.8 ms | 374 / 514 |
+
+    Since the first run today, the furniture's cost went from ~3.1 ms to ~1.4 ms (70.2 → 79.3 fps).
+    What is left of it: 242 calls, mostly textured parts (39 textures, each its own look, split by
+    cell). Realistic stays at 50 fps whatever the furniture's calls: its cost is not the calls.
   - **Multiview (both eyes in one pass) is not in reach:** three 0.186 (latest, 2026-10-23) has it only
     in `WebGPURenderer`'s backends, not in the `WebGLRenderer` this app uses (Proven: its source, `npm
     pack three@latest`). Moving renderers would touch every custom shader patch.

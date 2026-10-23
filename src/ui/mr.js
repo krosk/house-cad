@@ -1437,6 +1437,8 @@ export function setupMR(view, project, getFootprint) {
   let arSunHour = 12; // reset to the current time at each session start
   let arSunInfo = null; // { elevation, azimuth } in degrees, for the HUD
   const AR_SUN_HOURS = [4, 22.5]; // the View 3D slider's range
+  // Realistic's parts the test hook can turn off, to see what each costs (setRealParts).
+  const testReal = { photo: true, shadows: true, sun: true };
   const arSun = new THREE.DirectionalLight(0xffffff, 0);
   arSun.visible = false;
   arSun.castShadow = true;
@@ -5444,7 +5446,7 @@ export function setupMR(view, project, getFootprint) {
   function applyArPhoto(material) {
     const def = material.userData.photoDef;
     if (!def) return;
-    if (!arRealisticOn()) {
+    if (!arRealisticOn() || !testReal.photo) {
       material.userData.photoFailed = false; // the next Realistic tries the download again
       if (material.userData.restorePhoto) {
         material.userData.restorePhoto();
@@ -5630,10 +5632,11 @@ export function setupMR(view, project, getFootprint) {
   // hides and the hemisphere drops to the shade level. Off, the session's stashed state returns.
   function applyArSun() {
     const on = arRealisticOn() && renderer.xr.isPresenting;
-    arSun.visible = on;
+    arSun.visible = on && testReal.sun;
+    arSun.castShadow = testReal.shadows;
     if (!renderer.xr.isPresenting) return; // the desktop state is restored at sessionend
     if (view.sun) view.sun.visible = on ? false : saved.sunVisible ?? true;
-    renderer.shadowMap.enabled = on || (saved.shadowMapEnabled ?? false);
+    renderer.shadowMap.enabled = (on && testReal.shadows) || (saved.shadowMapEnabled ?? false);
     renderer.shadowMap.autoUpdate = on ? false : saved.shadowAutoUpdate ?? true;
     renderer.shadowMap.type = on ? saved.testShadowType ?? THREE.PCFShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
     if (!on) {
@@ -10528,7 +10531,9 @@ export function setupMR(view, project, getFootprint) {
         framebuffer: xrSize(renderer.xr.getBaseLayer?.()), scale: xrScale, foveation: renderer.xr.getFoveation?.() ?? null,
         shadowMoves: arShadowMoves, shadowSize: arSun.shadow.mapSize.x, shadowType: renderer.shadowMap.type,
         shadowMapOn: renderer.shadowMap.enabled, lights: scene.children.filter((o) => o.isLight && o.visible).length + (arSun.visible ? 1 : 0),
-        hidden: [...testHide], hiddenFurniture: [...testHideFurn],
+        hidden: [...testHide], hiddenFurniture: [...testHideFurn], realParts: { ...testReal },
+        lightList: (() => { const l = []; scene.traverseVisible((o) => { if (o.isLight) l.push(`${o.type}${o.castShadow ? '+shadow' : ''}`); }); return l; })(),
+        photoMaterials: [...arch3dFinishMats.values()].filter((m) => m.userData.restorePhoto).length,
         frameRate: renderer.xr.getSession()?.frameRate ?? null,
       }),
       set3d(on) { if (!!on !== arch3dOn) toggleArch3d(); return arch3dOn; },
@@ -10584,6 +10589,13 @@ export function setupMR(view, project, getFootprint) {
       furnitureStats,
       // Hide these parts (testPart names) until the next call; [] shows everything.
       hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },
+      // AR Realistic's parts: { photo, shadows, sun } (false turns one off; unset = on).
+      setRealParts({ photo = true, shadows = true, sun = true } = {}) {
+        Object.assign(testReal, { photo: !!photo, shadows: !!shadows, sun: !!sun });
+        applyArSun();
+        for (const material of arch3dFinishMats.values()) applyArPhoto(material);
+        return { ...testReal };
+      },
       // AR Realistic's shadow: { size, type: 'pcf' | 'basic' | 'soft' }.
       setShadow({ size, type } = {}) {
         if (size) {

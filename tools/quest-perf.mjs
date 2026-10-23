@@ -65,6 +65,11 @@ const SCENARIOS = {
   '3d-fcolours': { view3d: true, realistic: false, furnBatch: 3, colours: true },
   'real-fnobatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'off' },
   'real-fbatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'all', colours: false },
+  // `real`: Realistic's parts turned off (mr.js setRealParts): photo floors, shadows, the sun light.
+  'real-nophoto': { view3d: true, realistic: true, hour: 12, real: { photo: false } },
+  'real-noshadow': { view3d: true, realistic: true, hour: 12, real: { shadows: false } },
+  'real-nosun': { view3d: true, realistic: true, hour: 12, real: { sun: false } },
+  'real-bare': { view3d: true, realistic: true, hour: 12, real: { photo: false, shadows: false, sun: false } },
   // `hideFurn`: furniture items hidden (mr.js hideFurniture): { ids }, { minTris }, { maxTris } (one pass).
   '3d-nodish': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { ids: ['r160'] } },
   '3d-noheavy': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { minTris: 20000 } },
@@ -214,7 +219,7 @@ try {
   for (const name of names) {
     const s = SCENARIOS[name];
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
-      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
+      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setRealParts?.(${JSON.stringify(s.real || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
     const moves0 = (await app.evaluate('window.houseCadTest.state()')).shadowMoves;
     log(name, 'settling');
@@ -230,7 +235,7 @@ try {
     }
     if (report) fs.writeFileSync(path.join(outDir, `${name}.perf.txt`), report);
     const gpuAll = report?.match(/^all: ([\d.]+) ms/m)?.[1] ?? null;
-    results.push({ name, ...s, hiddenFurniture: st.hiddenFurniture, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
+    results.push({ name, ...s, hiddenFurniture: st.hiddenFurniture, lightList: st.lightList, photoMaterials: st.photoMaterials, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
     log(name, JSON.stringify(results.at(-1)));
   }
   fs.writeFileSync(path.join(outDir, 'perf.json'), JSON.stringify({ state, view, scale, results }, null, 1));
