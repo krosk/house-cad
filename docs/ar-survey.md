@@ -1168,6 +1168,25 @@ teleport reticle; no last-active routing remains.
 
 ## Performance notes (per-frame cost)
 
+- **First driven run (`tools/quest-perf.mjs`, 2026-10-23, build `619b37d`, the owner's Ground floor, the headset
+  unworn on a table, 90 Hz, foveation 1).** Proven, as measured:
+
+  | scenario | fps | frame p50 | CPU js / render | calls | tris |
+  |---|---|---|---|---|---|
+  | plan | 85.7 | 11.3 ms | 0.5 / 2.3 ms | 74 | 57k |
+  | 3D view | 27.5 | 35.5 ms | 0.5 / 2.2 ms | 186 | 192k |
+  | 3D + Realistic, noon | 16.4 | 60.5 ms | 0.5 / 2.7 ms | 188 | 192k |
+  | 3D + Realistic, 18:00 | 16.2 | 62.1 ms | 0.4 / 2.6 ms | 188 | 192k |
+
+  - **The 3D view is GPU-bound:** the CPU is under 3.5 ms a frame everywhere.
+  - **PERF's sweep** (frame source: the Quest exposes no GPU timer here) put the 3D view's cost in `struct`
+    (walls, ceiling: 19 ms, 33 ms with Realistic, for 2–4k triangles) and `furn` (21 ms, 32 ms with Realistic;
+    164 meshes, 390k triangles, the biggest product 50k).
+  - **Hypothesis:** `struct` is fill-bound (big surfaces over the whole view, 4× MSAA, both eyes);
+    Realistic adds per-pixel shadow lookups, and maybe a shadow redraw every frame from anchor jitter.
+  - **The next run tests these:** hide the ceiling, walls or furniture one at a time, try the shadow
+    map size and filter, count the shadow redraws, and try `--scale`.
+
 - **Every planGroup overlay group must be in `PLAN_OVERLAY_GROUPS`** (Proven bug, fixed 2026-09-26).
   `clearPlanGeometry` removes every planGroup child it doesn't keep. Its old hand-written skip list
   missed `zDimGroup`, `adjacentGroup`, `checkGroup` and `materialGroup`, so the first plan build

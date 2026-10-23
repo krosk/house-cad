@@ -5547,6 +5547,11 @@ export function setupMR(view, project, getFootprint) {
       arch3dHidden.push(child);
     }
     if (originGizmo.visible) { originGizmo.visible = false; arch3dHidden.push(originGizmo); }
+    if (testHide.size) {
+      for (const o of [...arch3dGroup.children, furnitureGroup]) {
+        if (o.visible && testHide.has(testPart(o))) { o.visible = false; arch3dHidden.push(o); }
+      }
+    }
   }
   function restoreAfterArch3d() {
     for (const o of arch3dHidden) o.visible = true;
@@ -5566,6 +5571,7 @@ export function setupMR(view, project, getFootprint) {
   // the XR loop). On/off persists per device; the hour is session-only (starts at now).
   // The shadow map is redrawn only when the sun, the model or the plan's placement changes.
   const arRealisticOn = () => arch3dOn && arRealistic;
+  let arShadowMoves = 0; // shadow redraws because the plan moved (test hook)
 
   function toggleArRealistic() {
     arRealistic = !arRealistic;
@@ -5590,7 +5596,7 @@ export function setupMR(view, project, getFootprint) {
     if (view.sun) view.sun.visible = on ? false : saved.sunVisible ?? true;
     renderer.shadowMap.enabled = on || (saved.shadowMapEnabled ?? false);
     renderer.shadowMap.autoUpdate = on ? false : saved.shadowAutoUpdate ?? true;
-    renderer.shadowMap.type = on ? THREE.PCFShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = on ? saved.testShadowType ?? THREE.PCFShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
     if (!on) {
       if (view.hemi && saved.hemiIntensity != null) view.hemi.intensity = saved.hemiIntensity;
       return;
@@ -5627,6 +5633,7 @@ export function setupMR(view, project, getFootprint) {
       if (Math.abs(a[i] - b[i]) > 1e-5) {
         arSunMatrix.copy(planGroup.matrix);
         renderer.shadowMap.needsUpdate = true;
+        arShadowMoves++;
         return;
       }
     }
@@ -10333,7 +10340,7 @@ export function setupMR(view, project, getFootprint) {
     const session = renderer.xr.getSession?.();
     out.push('', '## renderer',
       `memory: ${info.memory.geometries} geometries, ${info.memory.textures} textures; ${info.programs?.length ?? '?'} programs`,
-      `xr: ${layer ? `${layer.framebufferWidth}×${layer.framebufferHeight}` : '?'}, `
+      `xr: ${xrSize(layer)}, scale ${xrScale ?? 'default'}, `
         + `foveation ${renderer.xr.getFoveation?.() ?? '?'}, frameRate ${session?.frameRate ?? '?'}, `
         + `blend ${session?.environmentBlendMode ?? '?'}, pixelRatio ${renderer.getPixelRatio()}`,
       `gpu: ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)}`,
@@ -10406,13 +10413,32 @@ export function setupMR(view, project, getFootprint) {
   // and samples frames, so a performance run needs nobody in the headset (owner,
   // 2026-10-23). It never edits the plan, and PERF stops without the clipboard copy.
   const testFrames = []; // { t, calls, tris } per XR frame while a sample runs
+  // Parts of the 3D view the hook can hide for a whole sample (hideForArch3d), to see what
+  // each costs in fps rather than through PERF's 1.5 s windows.
+  const testHide = new Set();
+  function testPart(o) {
+    if (o === furnitureGroup) return 'furniture';
+    const m = o.material;
+    if (m === arShadowCatcher) return 'catcher';
+    if (m === arch3dMats.ceiling) return 'ceiling';
+    if (m === arch3dMats.walls) return 'walls';
+    if (o.isLineSegments) return 'outlines';
+    return o.userData.arch3dLayer || 'other'; // struct (stairs, doors, glass…), finish, doorwin, device
+  }
+  // The hook's launch options, JSON in the flag (the tool sets them before launching the app):
+  // { scale } = the XR framebuffer scale, which only applies to a session not yet started.
+  let xrScale = null;
   let testSampling = false;
   function testFrame(time) {
     if (testSampling) testFrames.push({ t: time, calls: renderer.info.render.calls, tris: renderer.info.render.triangles });
   }
   let testHookOn = false;
-  try { testHookOn = localStorage.getItem('house-cad:test-hook:v1') === '1'; } catch { /* storage blocked */ }
+  try { testHookOn = !!localStorage.getItem('house-cad:test-hook:v1'); } catch { /* storage blocked */ }
   if (testHookOn) {
+    try {
+      const opts = JSON.parse(localStorage.getItem('house-cad:test-hook:v1') === '1' ? '{}' : localStorage.getItem('house-cad:test-hook:v1'));
+      if (opts.scale) { xrScale = +opts.scale; renderer.xr.setFramebufferScaleFactor(xrScale); }
+    } catch { /* a plain '1' */ }
     window.houseCadTest = {
       state: () => ({
         build: BUILD_ID, presenting: renderer.xr.isPresenting, placed, view3d: arch3dOn, realistic: arRealistic,
@@ -10420,8 +10446,10 @@ export function setupMR(view, project, getFootprint) {
         allFloors: allFloorsView, mode: modes[currentMode]?.id, fps: fpsText, time: timeText,
         programs: renderer.info.programs?.length ?? null, textures: renderer.info.memory.textures,
         geometries: renderer.info.memory.geometries,
-        framebuffer: renderer.xr.getSession()?.renderState.baseLayer
-          ? [renderer.xr.getSession().renderState.baseLayer.framebufferWidth, renderer.xr.getSession().renderState.baseLayer.framebufferHeight] : null,
+        framebuffer: xrSize(renderer.xr.getBaseLayer?.()), scale: xrScale, foveation: renderer.xr.getFoveation?.() ?? null,
+        shadowMoves: arShadowMoves, shadowSize: arSun.shadow.mapSize.x, shadowType: renderer.shadowMap.type,
+        shadowMapOn: renderer.shadowMap.enabled, lights: scene.children.filter((o) => o.isLight && o.visible).length + (arSun.visible ? 1 : 0),
+        hidden: [...testHide],
         frameRate: renderer.xr.getSession()?.frameRate ?? null,
       }),
       set3d(on) { if (!!on !== arch3dOn) toggleArch3d(); return arch3dOn; },
@@ -10439,6 +10467,35 @@ export function setupMR(view, project, getFootprint) {
         return perfEnabled;
       },
       perfReport: () => perf.reportText || null, // ready after each full sweep cycle
+      // Stand the unworn headset at plan (x, y) on the active floor, facing plan point
+      // `toward` (owner, 2026-10-23: the living room's NW corner toward the origin is the
+      // hardest view). The headset lies still, so the plan moves: planYaw and navOffset,
+      // session navigation like the LEFT stick's yaw step, never model geometry.
+      viewFrom({ x, y, toward = { x: 0, y: 0 } }) {
+        const m = renderer.xr.getCamera().matrixWorld.elements;
+        const hx = m[12], hz = m[14], fx = -m[8], fz = -m[10]; // headset position, forward (-Z)
+        // R_y(θ) turns a world vector's atan2(x, z) by +θ: the plan's look direction
+        // (plan (dx, dy) is local (dx, -dy)) must land on the headset's forward.
+        const yaw = Math.atan2(fx, fz) - Math.atan2(toward.x - x, -(toward.y - y));
+        planYaw = yaw - anchorYaw;
+        const c = Math.cos(yaw), s = Math.sin(yaw);
+        setNavOffsetForWorldXZ(hx - (x * c - y * s), hz - (-x * s - y * c));
+        applyPlanMatrix();
+        lastHudAt = -Infinity;
+        return { yawDeg: +THREE.MathUtils.radToDeg(yaw).toFixed(1), forwardY: +(-m[9]).toFixed(2) };
+      },
+      // Hide these parts (testPart names) until the next call; [] shows everything.
+      hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },
+      // AR Realistic's shadow: { size, type: 'pcf' | 'basic' | 'soft' }.
+      setShadow({ size, type } = {}) {
+        if (size) {
+          arSun.shadow.mapSize.set(size, size);
+          arSun.shadow.map?.dispose(); arSun.shadow.map = null;
+        }
+        if (type) saved.testShadowType = { pcf: THREE.PCFShadowMap, basic: THREE.BasicShadowMap, soft: THREE.PCFSoftShadowMap }[type];
+        applyArSun();
+        return { size: arSun.shadow.mapSize.x, type: renderer.shadowMap.type };
+      },
       perfCycle: () => ({ phase: perf.phase, layers: (perf.layers || perfLayers()).length, ready: !!perf.reportText }),
       // Frame intervals over `ms` (XR frame times), the CPU split from View3D.xrTimingTotal,
       // and the draw calls/triangles of the last render (both eyes).
@@ -10464,6 +10521,12 @@ export function setupMR(view, project, getFootprint) {
       end: () => renderer.xr.getSession()?.end(),
     };
     rlog('test hook on');
+  }
+  // The XR layer's size: a projection layer (WebXR Layers, the Quest) has textureWidth, a
+  // base layer framebufferWidth.
+  function xrSize(layer) {
+    const w = layer?.textureWidth ?? layer?.framebufferWidth, h = layer?.textureHeight ?? layer?.framebufferHeight;
+    return w ? `${w}×${h}` : '?';
   }
   // HUD lines: the running measurement, then each layer's cost vs 'all', two per line.
   // The 3D view's list is shorter: one layer per line, with its draw calls (both eyes).

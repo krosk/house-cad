@@ -16,7 +16,12 @@
 // --experimental-websocket.
 //
 //   node --experimental-websocket tools/quest-perf.mjs <outDir> [--scenarios a,b,...]
-//        [--sample 10] [--restore-sensor]
+//        [--sample 10] [--scale 0.8] [--no-perf] [--restore-sensor]
+//   --scale: the XR framebuffer scale for this launch (default: the browser's)
+//   --view x,y[,tx,ty]: stand the headset at plan (x, y) facing (tx, ty) (default the origin),
+//     on the floor the app opens on. The owner's hardest view (2026-10-23): the living room's
+//     NW corner toward the origin, --view -4.4,4.2 on Ground.
+//   --no-perf: frames only, no PERF sweep (a scenario then takes ~20 s instead of ~35)
 //
 // Scenarios: plan · 3d · real (3D + Realistic at noon) · low (3D + Realistic at 18:00).
 // Output: a table on stdout, <outDir>/perf.json and <outDir>/<scenario>.perf.txt (the
@@ -36,16 +41,30 @@ const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1
 const APP_PACKAGE = 'com.krosk.housecad';
 const SAFE_PAGE = 'https://krosk.github.io/house-cad/version.json';
 const HOOK_KEY = 'house-cad:test-hook:v1';
+// `hide`: parts hidden for the whole sample (mr.js testPart: ceiling, walls, furniture,
+// catcher, outlines, struct, finish, doorwin, device); `shadow`: Realistic's map size and
+// filter. Unset = 2048 PCF, everything shown.
 const SCENARIOS = {
   plan: { view3d: false, realistic: false },
   '3d': { view3d: true, realistic: false },
   real: { view3d: true, realistic: true, hour: 12 },
   low: { view3d: true, realistic: true, hour: 18 },
+  '3d-noceil': { view3d: true, realistic: false, hide: ['ceiling'] },
+  '3d-nowalls': { view3d: true, realistic: false, hide: ['walls'] },
+  '3d-nofurn': { view3d: true, realistic: false, hide: ['furniture'] },
+  '3d-bare': { view3d: true, realistic: false, hide: ['ceiling', 'walls', 'furniture'] },
+  'real-nocatch': { view3d: true, realistic: true, hour: 12, hide: ['catcher'] },
+  'real-basic': { view3d: true, realistic: true, hour: 12, shadow: { type: 'basic' } },
+  'real-1024': { view3d: true, realistic: true, hour: 12, shadow: { size: 1024 } },
+  'real-nofurn': { view3d: true, realistic: true, hour: 12, hide: ['furniture'] },
 };
 
 const outDir = args[0];
 const names = (opt('--scenarios') || 'plan,3d,real,low').split(',');
 const sampleS = +(opt('--sample') || 10);
+const scale = opt('--scale');
+const sweep = !args.includes('--no-perf');
+const view = opt('--view')?.split(',').map(Number);
 const die = (msg) => { console.error(msg); process.exit(1); };
 if (!outDir || names.some((n) => !SCENARIOS[n])) {
   die(`usage: quest-perf.mjs <outDir> [--scenarios ${Object.keys(SCENARIOS).join(',')}] [--sample s] [--restore-sensor]`);
@@ -110,12 +129,18 @@ async function cleanup() {
     adb('shell', 'am', 'force-stop', APP_PACKAGE);
     log('app closed');
   }
-  const tab = await safeTab().catch((e) => { log('could not remove the hook flag:', e.message); return null; });
-  if (tab) {
-    await app.evaluate(`localStorage.removeItem(${JSON.stringify(HOOK_KEY)}); true`, { ms: 5000 })
-      .then(() => log('hook flag removed')).catch((e) => log('could not remove the hook flag:', e.message));
+  // On the version.json tab (the app's page is gone by now); retried, as the browser can answer
+  // late right after the app closes.
+  let removed = false;
+  for (let i = 0; i < 4 && !removed; i++) {
+    if (i) await sleep(4000);
+    const tab = await safeTab().catch(() => null);
+    if (!tab) continue;
+    removed = await tab.evaluate(`localStorage.removeItem(${JSON.stringify(HOOK_KEY)}); localStorage.getItem(${JSON.stringify(HOOK_KEY)}) === null`, { ms: 15000 })
+      .catch(() => false);
     tab.close();
   }
+  log(removed ? 'hook flag removed' : 'COULD NOT REMOVE the hook flag: remove house-cad:test-hook:v1 by hand');
   if (args.includes('--restore-sensor')) {
     adb('shell', 'am', 'broadcast', '-a', 'com.oculus.vrpowermanager.automation_disable');
     log('proximity sensor restored');
@@ -131,7 +156,8 @@ try {
     await sleep(6000);
   }
   const flagTab = await safeTab();
-  await flagTab.evaluate(`localStorage.setItem(${JSON.stringify(HOOK_KEY)}, '1'); true`);
+  const flag = scale ? JSON.stringify({ scale: +scale }) : '1';
+  await flagTab.evaluate(`localStorage.setItem(${JSON.stringify(HOOK_KEY)}, ${JSON.stringify(flag)}); true`);
   flagTab.close();
   adb('shell', 'monkey', '-p', APP_PACKAGE, '-c', 'android.intent.category.LAUNCHER', '1');
   launched = true;
@@ -155,33 +181,43 @@ try {
     if (state.presenting && state.placed) break;
   }
   if (!state?.presenting) throw new Error('AR did not start in 30 s (the app auto-enters AR on launch)');
-  log('AR on', JSON.stringify({ placed: state.placed, floor: state.floor, framebuffer: state.framebuffer, frameRate: state.frameRate }));
+  log('AR on', JSON.stringify({ placed: state.placed, floor: state.floor, framebuffer: state.framebuffer, scale: state.scale, shadowMapOn: state.shadowMapOn, lights: state.lights, foveation: state.foveation, frameRate: state.frameRate }));
 
+  if (view) {
+    const [x, y, tx = 0, ty = 0] = view;
+    log('view from', JSON.stringify({ x, y, toward: [tx, ty] }), JSON.stringify(
+      await app.evaluate(`window.houseCadTest.viewFrom(${JSON.stringify({ x, y, toward: { x: tx, y: ty } })})`)));
+  }
   fs.mkdirSync(outDir, { recursive: true });
   const results = [];
   for (const name of names) {
     const s = SCENARIOS[name];
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
+      h.hide(${JSON.stringify(s.hide || [])}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
+    const moves0 = (await app.evaluate('window.houseCadTest.state()')).shadowMoves;
     log(name, 'settling');
     await sleep(s.realistic ? 10000 : 5000); // textures, photo atlases, shader compiles
     const frames = await app.evaluate(`window.houseCadTest.sample(${sampleS * 1000})`, { ms: sampleS * 1000 + 15000 });
-    await app.evaluate('window.houseCadTest.setPerf(true)');
-    let report = null;
-    for (let i = 0; i < 60 && !report; i++) { await sleep(1000); report = await app.evaluate('window.houseCadTest.perfReport()'); }
-    await app.evaluate('window.houseCadTest.setPerf(false)');
     const st = await app.evaluate('window.houseCadTest.state()');
+    const shadowMoves = st.shadowMoves - moves0; // over the settle + sample
+    let report = null;
+    if (sweep) {
+      await app.evaluate('window.houseCadTest.setPerf(true)');
+      for (let i = 0; i < 60 && !report; i++) { await sleep(1000); report = await app.evaluate('window.houseCadTest.perfReport()'); }
+      await app.evaluate('window.houseCadTest.setPerf(false)');
+    }
     if (report) fs.writeFileSync(path.join(outDir, `${name}.perf.txt`), report);
     const gpuAll = report?.match(/^all: ([\d.]+) ms/m)?.[1] ?? null;
-    results.push({ name, ...s, ...frames, gpuAll: gpuAll && +gpuAll, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
+    results.push({ name, ...s, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
     log(name, JSON.stringify(results.at(-1)));
   }
-  fs.writeFileSync(path.join(outDir, 'perf.json'), JSON.stringify({ state, results }, null, 1));
-  console.log('\nscenario  fps   p50   p95  worst  >14ms  js    render  gpu(all)  calls  tris');
+  fs.writeFileSync(path.join(outDir, 'perf.json'), JSON.stringify({ state, view, scale, results }, null, 1));
+  console.log(`\n${'scenario'.padEnd(12)}   fps   p50   p95  worst  >14ms    js  render  gpu(all)  calls    tris  shadowMoves`);
   for (const r of results) {
-    console.log([r.name.padEnd(8), String(r.fps).padStart(5), String(r.p50).padStart(5), String(r.p95).padStart(5),
+    console.log([r.name.padEnd(12), String(r.fps).padStart(5), String(r.p50).padStart(5), String(r.p95).padStart(5),
       String(r.worst).padStart(6), String(r.over14ms).padStart(6), String(r.js).padStart(5), String(r.render).padStart(7),
-      String(r.gpuAll ?? '?').padStart(9), String(r.calls).padStart(6), String(r.tris).padStart(7)].join(' '));
+      String(r.gpuAll ?? '-').padStart(9), String(r.calls).padStart(6), String(r.tris).padStart(7), String(r.shadowMoves).padStart(12)].join(' '));
   }
 } catch (error) {
   console.error('FAILED:', error.message || error);

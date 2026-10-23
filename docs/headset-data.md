@@ -186,8 +186,20 @@ skip it, say so, and tell the owner the app updates over its next launch or two.
 The owner asked for performance tests driven from here, with nobody in the headset.
 
 ```bash
-node --experimental-websocket tools/quest-perf.mjs <outDir> [--scenarios plan,3d,real,low] [--sample 10]
+node --experimental-websocket tools/quest-perf.mjs <outDir> [--scenarios plan,3d,real,low] [--sample 10] \
+  [--scale 0.8] [--no-perf]
 ```
+
+- **Scenarios beyond the four:**
+  - `3d-noceil`, `3d-nowalls`, `3d-nofurn`, `3d-bare`, `real-nocatch`, `real-nofurn` hide one part for the whole sample;
+  - `real-basic` and `real-1024` change the shadow filter or map size.
+- **`--scale`** sets the XR framebuffer scale for that launch (passed in the flag as JSON).
+- **`--view x,y[,tx,ty]`** stands the resting headset at a plan point facing another (`viewFrom`: the plan moves,
+  as with the LEFT stick's yaw, never the model). The owner's standard viewpoint (2026-10-23, the hardest one): the
+  living room's north-west corner looking toward the origin, `--view -4.4,4.2` on Ground (r55's NW corner is
+  (−4.705, 4.49); 30 cm in). Use it for every run, so runs compare.
+- **`shadowMoves`** counts the shadow redraws caused by the plan moving.
+- **First results:** `docs/ar-survey.md` "Performance notes".
 
 - **What it does:**
   - **wakes the headset:** keeps it awake with `prox_close` (Connecting, step 4) and leaves it so (`--restore-sensor` restores the sensor);
