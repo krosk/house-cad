@@ -18,23 +18,34 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-22 (session 43; items 101–102: the slab-hole anchor, the west heating manifold and bus as installed, the upstairs water, the 3×2 column bundle, the cabinet beam, the bathroom and kitchen joists, View 3D ▬ Beams; the headset plan is **301 622**)
+**Date:** 2026-10-23 (session 45; the electrical panel step 1 (item 00e, uncommitted), the kitchen sink drain into the façade vent (item 00g, written); the headset plan is **307 484**. Session 44: tests, the east–west column r263 (00c), the upstairs water (00d))
 
 **Status:**
-- Proven (two writes 2026-10-22, each `write --base` on a fresh read equal to its base, read back byte-identical):
-  **item 101** (291 747): anchor m274 at the living-room slab hole and r204's pair through it; beam r265 over cabinet
+- Proven (session 45, one write 2026-10-23, `write --base` on a fresh read byte-identical to 306 688, read back
+  byte-identical, 307 484): the kitchen sink's Ø40 drain into a Ø100 × 40 tee on the façade vent riser (item 00g;
+  `docs/plumbing-workflow.md` "Kitchen sink into the façade vent").
+- **Uncommitted (session 45, all mine, `npm test` 19/19 and `npm run build` clean, Proven):** AR Realistic step 1
+  (`mr.js` `applyArSun` + `applyArPhoto`, `realism.js` header, `i18n.js` `sun.*`, `test/realism.test.js`, `docs/realism.md` "In AR",
+  `docs/ar-survey.md` LEFT Y, a QA section; item 00f); the panel step 1
+  (`src/core/panel.js`, `test/panel.test.js`, `materials.js` `panel_drivia_3x13`, `deviceProducts.js` `driviaPanel`,
+  breaker `panel`/`row`/`slot` in `serialize.js`, AR MATERIAL · PANEL in `mr.js` + `i18n.js`, `view3d.js` fill),
+  its docs (`docs/electrical-workflow.md` "The panel", `docs/materials.md` "Panel", a QA item, a `CLAUDE.md` line),
+  the sink-drain section in `docs/plumbing-workflow.md`, and this file. Never seen in a browser or on the headset.
+- Proven (session 44, two writes 2026-10-22, each `write --base` on a fresh read byte-identical to its base, read back
+  byte-identical): **00c** (300 745), the east–west column r263 (bare Alflex ducts, vent at 1.00 m, m59 removed);
+  **00d** (306 688), the upstairs water. Details: `docs/plumbing-workflow.md` "Column turned east–west", "Upstairs water".
+- Proven (session 43, two writes): **item 101** (291 747): anchor m274 at the living-room slab hole and r204's pair through it; beam r265 over cabinet
   r125; the west manifold beside the basement pillar; the bus in its real order, touching the west wall; r224+r205
   down the wall; the 3×2 bundle in column r122 (two heating pairs + the water row); the upstairs water pair X and two
   cold lines on the north wall. **Item 102** (301 622): joists r266–r271 (upstairs bathroom, under a 5 cm screed) and
   r272–r279 (kitchen ceiling, attic side). Every coordinate and owner decision: `docs/plumbing-workflow.md` "West
   manifold" and "Re-measured". What the owner must still check or decide: Next step 00b.
-- Proven (git; `version.json` "f1b4def 1021-2337Z"; Actions run success; `update-app` installed it): the head is
-  `f1b4def`, pushed, served and on the headset. Session 43 commits: `e85912c` wall devices face the room (item 100),
-  `c85cb39` `tools/solve-house.mjs` + the write-the-solved-form procedure, `64b29ce` View 3D ▬ Beams, `f1b4def` docs.
-  Only this file is uncommitted.
-- **The base for the next write is 306 688 chars** (the upstairs water, after the east–west column at 300 745;
-  scratch `readback-1022d.json`, written 2026-10-22 after a fresh read byte-identical to 300 745, read back
-  byte-identical; backups `backup-1022` … `backup-1022d`). It was written in solved
+- Proven (git; `version.json` "05540e2 1022-1859Z"; Actions run success with its `npm test` step; `update-app`
+  installed it): the head is `05540e2`, pushed, served and on the headset. Session 44 commits: `3bebe48` tests + CI +
+  CLAUDE.md/README refresh + the `solve-house.mjs` validation fix, `05540e2` docs. Uncommitted since: see above.
+- **The base for the next write is 307 484 chars** (the sink drain on 306 688; scratch `readback-1023a.json`,
+  written 2026-10-23, read back byte-identical; backup `backup-1023a` holds the 306 688 state; earlier
+  `backup-1022` … `backup-1022d`; scratch is session-local). It was written in solved
   form (`solve-house.mjs`), so the app's next save should change nothing (Hypothesis until a fresh read shows it).
 - Earlier writes, compressed: 286 266 (10-20, item 98: four door frames, r93 on the Meli, r92 7 cm west), 286 557
   (10-19: FLAVIO vanities, basement ARTENS tile), 287 012 (10-17: VMC option 4i + bed r264), and the 10-15/16 VMC
@@ -56,10 +67,6 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
   r251 and r257 → `aldes-bdh-sanitaire-ceiling` / `aldes-bdh-cuisine-ceiling`, r223 → `aldes-bdh-sanitaire`, centres,
   ceiling/wall contact and duct nodes kept; solves clean; folded into 4i). The bed draft's r262 collides with 4i's new
   r262/r263 (box id taken, column): chain the bed after 4i and recompute its ids. See item 86.
-- **Uncommitted (10-21, all from this session; build clean):** item 100's one-line fix in `src/core/architectural3d.js`;
-  item 99's new `tools/solve-house.mjs` with `docs/headset-data.md` and `.claude/skills/quest-edit/SKILL.md`;
-  `docs/ar-qa-checklist.md` (item 100's QA line); this file. Commit by path on "c p" (two commits read best: the fix,
-  then the tool + docs).
 
 ## What the app is today
 
@@ -640,7 +647,8 @@ Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0
 slat · `74ca566` FLAVIO 60 · `6ec32b6` skill `quest-connect` (port scan) · `d3894d5` 2D #️⃣ Edge # tags · `d62477e`
 links carry zone ids (`ids`) · `fdb802a` the LINE rebated leaf (`leafInset`). Session 42: `b9e8676` Meli rail +
 LINE `backset` · `864cebd` View 3D 🚪 Doors. Session 43: `e85912c` wall devices face the room · `c85cb39`
-`tools/solve-house.mjs` · `64b29ce` View 3D ▬ Beams. Session 40:
+`tools/solve-house.mjs` · `64b29ce` View 3D ▬ Beams. Session 44: `3bebe48` `npm test` (14 tests, run in CI before
+the build). Session 40:
 
 `8dc326f` version.json · `734560a` V&B WC · `ce85140` air volume + balance · `4da7198` shutter outlet products ·
 `74e4bff` window swing · `a913657` refrigerant · `b1cd35d` TOOL menu · `52583bc` VMC service + Agalina ·
@@ -663,7 +671,8 @@ duct insulation marking.
 export PATH="$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node | tail -1)/bin:$PATH"
 npm install                                       # once; node_modules is already present
 npm run dev -- --host                             # https on 5173; report the Network URL (stopped at the end of s40)
-npm run build                                     # the only automated check; expect "✓ built in …"
+npm test                                          # 14 tests, under a second; expect "# fail 0"
+npm run build                                     # expect "✓ built in …"
 ```
 
 The owner tests through the APK, which loads the **published** site, so on-device checks need a push. The APK
@@ -697,8 +706,29 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
-~~0000. Tests~~: done 10-22, uncommitted until "c p". `npm test` (`node --test test/*.test.js`, 14 tests, Proven
-   passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
+00f. **AR Realistic: step 1 (sun + shadows) built 2026-10-23 on the owner's go, uncommitted.** LEFT Y in the AR 3D
+   view toggles it, held LEFT Y + stick-x moves the hour; design and limits in `docs/realism.md` "In AR". Proven:
+   `npm test` (19, incl. `test/realism.test.js`: noon sun from plan south, morning from plan east) and the build.
+   Hypothesis until seen on the headset: the look (sun 2.4, hemisphere 0.3–0.65, catcher 0.35 are guesses), the fps
+   (PERF, 3D view on, Realistic off/on), shadow acne; QA items in `docs/ar-qa-checklist.md` "AR Realistic".
+   Step 2 built too: the photo finishes in AR (`applyArPhoto`, colour only), Proven in Chrome on a scratch page
+   (both photo shaders compile and draw on Lambert with a PCF shadow; not seen on the headset). Not in AR, by design:
+   the sky and GTAO.
+00e. **The electrical panel (owner 2026-10-22/23), step 1 built, uncommitted (above); the rest parked by the owner.**
+   Owner facts: Legrand Drivia ready-wired T4, 3 × 13 (Leroy Merlin 71653631), on the basement's south wall ~20 cm from
+   the east wall; the 23 breaker markers (m235–m272) are "placeholders for connecting markers in the same circuit
+   line" (20 wires end on them) and stay put. Design: `docs/electrical-workflow.md` "The panel". Not done: a panel
+   marker on the plan (owner to place it in AR, or a W with its height), the breakers' slots (owner to give them).
+   The owner found AR markers too big for slots (9 cm vs 17.5 mm) and asked for other UX; offered and **parked**:
+   magnified floating panel (3×) with circuit tags to drop · the app proposes a layout and the owner swaps ·
+   label the real panel in passthrough · walk circuit by circuit with a mini panel on the left controller · pull a
+   rubber-band cable to a slot · a desktop panel editor. My pick: the app proposes, then the magnified panel; also
+   half-size breaker markers (4.5 cm). Wait for the owner's choice.
+00g. **Kitchen sink drain: written 2026-10-23 (307 484).** Owner: the sink is as per plan (unit r159, west wall).
+   Owner to check: the trap height (0.50 assumed), the route behind corner unit r158 (back panel or plinth). The
+   façade vent stays Ø100 (owner asked about smaller: see the doc section). Plot sent (scratch `sink-tee.png`).
+~~0000. Tests~~: done 10-22 (`3bebe48`, pushed). `npm test` (`node --test test/*.test.js`, 14 tests then, 19 with
+   the uncommitted panel and sun tests, Proven passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
    - device placements facing the room, and no plate cutting a wall (Proven: removing `markerPlacements` makes 2 fail);
    - a door cutting the wall to its head;
    - a solved save staying stable, and the save round-trip;
@@ -714,12 +744,11 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    checks the vanity plates on the phone (View 3D) and in AR.
 00d. **Upstairs water: written 2026-10-22 (306 688).** Design: `docs/plumbing-workflow.md` "Upstairs water". Still
    to confirm with the owner: the outlet heights (WC 0.95, vanity 0.55, mixer 1.10), the tees' spacing, the crossing.
-00c. **Column r263 turned east–west: written 2026-10-22 (300 745, read back identical, `readback-1022c.json`), the new base.** Design and numbers:
-   `docs/plumbing-workflow.md` "Column turned east–west".
-   - The draft is session-local and will be lost: scratch `col-ew53.mjs` run with `BOX=0 ZK=0 ZS=0`, then
-     `remove-m59.mjs` from the repo root, on the 301 622 base.
-   - On W, redo it on a fresh read. Re-derive it from the doc if the scratch is gone.
-   - Then the usual steps: app closed, backup, fresh read == base, `solve-house.mjs`, `write --base`, read-back.
+00c. **Column r263 turned east–west: written 2026-10-22 (300 745).** Design and numbers: `docs/plumbing-workflow.md`
+   "Column turned east–west". Owner to see it in View 3D (💧 Pipes, ▱ Floors). Hypotheses still open:
+   - the basement notch depth: the band's face is unmeasured;
+   - the Alflex outside diameter;
+   - View 3D colours the Ø80's 49° slab bend as a failed fitting, because the app models rigid PVC (expected).
 00b. **Items 101–102, owner to verify and decide** (`docs/plumbing-workflow.md` "West manifold", "Re-measured"):
    - see in AR / View 3D (▤ Plan, 💧 Pipes, ▬ Beams): the bus, manifold, column bundle, water X, the joists;
    - clashes waiting on the owner: the upstairs WC drain p54/p64 through joist r267 (builder's call); the shower-room

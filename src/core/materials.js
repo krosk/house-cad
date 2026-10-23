@@ -43,7 +43,10 @@
 // Switch products (`surface: 'switch'`, `pattern: 'device'`) go on a switch MARKER
 // (`marker.product`, not a finish): `design` picks the builder in src/ui/deviceProducts.js,
 // which draws only the visible plate and rocker; sizes are `*Mm` fields. Outlet products
-// (`surface: 'outlet'`) go on socket outlet markers the same way. No takeoff.
+// (`surface: 'outlet'`) go on socket outlet markers the same way. No takeoff. A panel product
+// (`surface: 'panel'`) goes on a panel marker; its rows fill from the house (src/core/panel.js).
+
+import { panelFill } from './panel.js';
 
 export const BUILTIN_MATERIALS = [
   {
@@ -396,6 +399,22 @@ export const BUILTIN_MATERIALS = [
     color: 0xf2f2f0, roughness: 0.35, pack: null,
     name: { en: 'Schneider Ovalis RJ45 socket, white', fr: 'Prise RJ45 Ovalis Schneider, blanc', zh: '施耐德 Ovalis RJ45 网口（白）' },
   },
+  {
+    // Legrand Drivia ready-wired panel, 3 rows × 13 modules, for a T4 (Leroy Merlin 71653631,
+    // Legrand 200884; owner, 2026-10-22). Spec table (Leroy Merlin, read 2026-10-22): 500 × 250 ×
+    // 103.5 mm, 3 rows, 39 modules, a label strip per row. Rails 125 mm apart (legrand.fr 401213,
+    // the bare enclosure). Kit (elecdistrib.fr, Legrand 093057, the same 1 × 63 A + 2 × 40 A + 11
+    // breakers): RCD switches 30 mA 63 A AC, 40 A AC, 40 A A; DNX³ breakers 1 × 32 A, 4 × 20 A,
+    // 4 × 16 A, 2 × 10 A. Which RCD heads which row is an estimate (the product photo shows one
+    // RCD at the left of each row). Module 17.5 mm (Legrand's modular pitch); the window and
+    // module-front sizes are estimates (docs/materials.md "Panel").
+    id: 'panel_drivia_3x13', surface: 'panel', pattern: 'device', design: 'drivia',
+    w: 0.25, h: 0.5, joint: 0, depthMm: 103.5, modulesPerRow: 13, moduleMm: 17.5, railPitchMm: 125,
+    rcdModules: 2,
+    rows: [{ rcd: { amps: 63, type: 'AC' } }, { rcd: { amps: 40, type: 'AC' } }, { rcd: { amps: 40, type: 'A' } }],
+    color: 0xf3f3f1, accent: 0xc9dce6, roughness: 0.4, pack: null,
+    name: { en: 'Legrand Drivia panel, 3 rows × 13 modules', fr: 'Tableau Legrand Drivia 3 rangées 13 modules', zh: '罗格朗 Drivia 配电箱 3 排 13 模块' },
+  },
 ];
 
 export function allMaterials(project) {
@@ -425,7 +444,7 @@ export function materialsFor(project, surface) {
 // shutter outlets (owner, 2026-10-07: the same plate, to see what it collides with; the
 // aircon/cooktop/oven/water-heater variants are usually not sockets), Ethernet products
 // on single Ethernet sockets (a dual socket is a different product).
-export const DEVICE_SURFACE = { switch: 'switch', switch_dual: 'switch', outlet: 'outlet', outlet_appliance: 'outlet', outlet_shutter: 'outlet', ethernet: 'ethernet' };
+export const DEVICE_SURFACE = { switch: 'switch', switch_dual: 'switch', outlet: 'outlet', outlet_appliance: 'outlet', outlet_shutter: 'outlet', ethernet: 'ethernet', panel: 'panel' };
 // A double-switch marker takes only a two-rocker product (a single switch marker may still
 // carry one: the older two-markers-per-double-switch survey, see markerProductDraws).
 export const productFitsMarker = (def, marker) => marker?.type !== 'switch_dual' || (def?.rockers ?? 1) === 2;
@@ -450,6 +469,8 @@ export function markerProductDraws(project, markers) {
       const stack = markers.filter((o) => o.x === m.x && o.y === m.y && markerProduct(project, o)?.id === def.id);
       for (const o of stack) out.set(o.id, null);
       out.set(m.id, { def, z: stack.reduce((sum, o) => sum + zOf(o), 0) / stack.length });
+    } else if (def.surface === 'panel') {
+      out.set(m.id, { def, z: zOf(m), fill: panelFill(project, m, def) });
     } else {
       out.set(m.id, { def, z: zOf(m) });
     }

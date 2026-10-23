@@ -705,6 +705,9 @@ the app UI language (`sheetLabelOpts`). HUD debug lines stay English (diagnostic
   pen and pending picks survive, so a wire can be started on one storey and finished on another
   (owner request, 2026-09-26). `navLift` resets on any LEVEL change and on registration. The stick
   is inert on single floors, whose overlays stay physically registered.
+  **LEFT Y (AR 3D view only)** toggles **Realistic**, the real sun and its shadows (owner asked
+  2026-10-23); held, LEFT stick-x moves the hour instead of turning the plan
+  (`docs/realism.md` "In AR").
 - **No physical controller in the editor (RIGHT) role** → the headset is in hand tracking (controllers
   set down). Rather than going blank, a **"Pick up your controllers"** prompt (`handPrompt`,
   `controllers.pickUp` / `controllers.handMode`) shows and the rest of the HUD stays hidden that frame;

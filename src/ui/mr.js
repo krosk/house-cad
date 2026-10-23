@@ -21,7 +21,9 @@ import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
 import { mergePartsByMaterial, mergeObjectByMaterial } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
+import { sunPosition, sunDirection } from './realism.js';
 import { buildDeviceProduct } from './deviceProducts.js';
+import { panelFill } from '../core/panel.js';
 import { Rectangle, SLEEPERS_MAX, WIRE_TYPES, PIPE_SERVICES, furnitureProductPlacements, ceilingHeight, ceilingAt, roomCeiling, roomFloorZ, stairRises, isSplitLevel, floorBelow, floorAbove } from '../core/model.js';
 import { loadFurnitureCatalog } from './furnitureCatalog.js';
 import { connectedRoomComponent, connectedRoomComponents, recalibrationCorners, multiPolygonArea } from '../core/geometry2d.js';
@@ -29,7 +31,8 @@ import { materialsFor, materialById, zoneMaterial, materialName, markerProduct, 
 import { materialTakeoff, edgeFace, regionBoxes, EDGES, CAP, finishSurfaces, anchorNear, inRoomHalfWalls, halfWallFace } from '../core/flooring.js';
 import { buildArchitecturalFloor, finishGeometries, doorProductPlacements, windowProductPlacements, fenceFoot, boxesGeometry } from '../core/architectural3d.js';
 import { windowSwings, leafDirection } from '../core/windowSwing.js';
-import { paintFinish } from './textureWorker.js';
+import { paintFinish, loadPhotoFinish } from './textureWorker.js';
+import { hasPhotoFinish, patchPhotoMaterial } from './photoFinishes.js';
 import { makeMaterialCard, swatchSpan } from './materialCard.js';
 import { makeDistance, makeOriginDistance, makeMarkerDistance, makeNodeDistance, isMarkerConstraint, isNodeConstraint, ORIGIN_ID, edgeCoord } from '../core/constraints.js';
 import { diagnoseConflicts, conflictRoutes, isCertain, LOOP_TOL } from '../core/conflicts.js';
@@ -1050,6 +1053,12 @@ export function setupMR(view, project, getFootprint) {
     scene.add(c);
     controllers.push(c);
   }
+  // AR Realistic's sun hour (applyArSun), shown on the LEFT controller at the mode label's place.
+  const sunLabel = makeLabel(64);
+  sunLabel.sprite.position.set(TIP_OFFSET.x, TIP_OFFSET.y + PANEL_Y.label, TIP_OFFSET.z);
+  sunLabel.sprite.scale.set(0.16, 0.04, 1);
+  sunLabel.sprite.renderOrder = HUD_ORDER;
+  sunLabel.sprite.visible = false;
   const lastTouch = new THREE.Vector3(NaN, NaN, NaN);
 
   // Head-locked notice shown when NO physical controller drives the editor — i.e.
@@ -1420,6 +1429,23 @@ export function setupMR(view, project, getFootprint) {
   const arch3dGroup = new THREE.Group();
   arch3dGroup.visible = false;
   planGroup.add(arch3dGroup);
+  // AR Realistic's state (the functions are with toggleArRealistic).
+  const AR_REALISTIC_KEY = 'house-cad:ar-realistic:v1';
+  let arRealistic = false;
+  try { arRealistic = localStorage.getItem(AR_REALISTIC_KEY) === '1'; } catch { /* storage blocked */ }
+  let arSunHour = 12; // reset to the current time at each session start
+  let arSunInfo = null; // { elevation, azimuth } in degrees, for the HUD
+  const AR_SUN_HOURS = [4, 22.5]; // the View 3D slider's range
+  const arSun = new THREE.DirectionalLight(0xffffff, 0);
+  arSun.visible = false;
+  arSun.castShadow = true;
+  arSun.shadow.mapSize.set(2048, 2048);
+  arSun.shadow.bias = -0.0004;
+  arSun.shadow.normalBias = 0.03;
+  planGroup.add(arSun, arSun.target);
+  const arShadowCatcher = new THREE.ShadowMaterial({ opacity: 0.35, depthWrite: false });
+  let arSunBox = null; // plan-local box of the drawn model
+  const arSunMatrix = new THREE.Matrix4(); // planGroup's matrix at the last shadow redraw
   // MARKER · CHECK diagnostic rings + pins (one batched mesh + one line batch).
   const checkGroup = new THREE.Group();
   checkGroup.visible = false;
@@ -2121,6 +2147,7 @@ export function setupMR(view, project, getFootprint) {
   const PLAN_OVERLAY_GROUPS = new Set([
     markerGroup, electricalGroup, conduitGroup, routedWireGroup, pipeGroup, furnitureGroup,
     furniturePlanGroup, zDimGroup, adjacentGroup, checkGroup, materialGroup, arch3dGroup,
+    arSun, arSun.target, // AR Realistic's sun (applyArSun)
   ]);
   function clearPlanGeometry() {
     // Clear any previous geometry. Dispose per-rebuild geometry/sprite materials; dim
@@ -4499,8 +4526,8 @@ export function setupMR(view, project, getFootprint) {
   // point, or neighbours inside the reticle) before trigger selects.
   let matHoverDevice = null, matSelDevice = null, matDevicePickAfterId = null; // after = one-shot grip request
   let matDeviceHoverId = null; // the sticky yellow device (gripCycle)
-  const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet' }; // mode → catalog surface
-  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet']);
+  const DEVICE_MODE = { mat_switch: 'switch', mat_outlet: 'outlet', mat_ethernet: 'ethernet', mat_panel: 'panel' }; // mode → catalog surface
+  const MAT_MODES = new Set(['mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet', 'mat_panel']);
   // Zone material modes → the zone kind they edit (door/window: that materials surface;
   // furniture: the furniture catalog, stored as the zone's `article`).
   const APT_KIND = { mat_door: 'door', mat_window: 'window', mat_fence: 'fence', mat_furniture: 'furniture' };
@@ -5227,6 +5254,7 @@ export function setupMR(view, project, getFootprint) {
         obj.position.set(item.x, item.z || 0, -item.y); // z = foot elevation off the floor
         obj.rotation.y = THREE.MathUtils.degToRad(item.rotationY || 0);
         obj.userData.furnitureId = item.id;
+        arShadowFlags(obj);
         furnitureGroup.add(obj);
       };
       loadFurnitureSource(item.article)
@@ -5360,14 +5388,55 @@ export function setupMR(view, project, getFootprint) {
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       });
       arch3dFinishMats.set(key, material);
+      if (hasPhotoFinish(def)) material.userData.photoDef = def;
       finishMapFor(def).then((map) => {
         if (!map) return;
+        material.userData.proceduralMap = map;
+        if (material.userData.restorePhoto) return; // the photo is on: kept for when it goes off
         material.map = map;
         material.color.setHex(0xffffff);
         material.needsUpdate = true;
       });
+      applyArPhoto(material);
     }
     return material;
+  }
+  // AR Realistic swaps a finish's procedural texture for the retailer's photo when one is
+  // registered (src/ui/photoFinishes.js, docs/realism.md "In AR"), as View 3D Realistic
+  // does: the same atlas (shared with View 3D, Cache Storage, so offline once fetched) and
+  // the same shader that lays planks or stepped tiles, patched into the Lambert material.
+  // Colour only: no relief map in AR (frame cost). Off, or until it loads, or on a failed
+  // download, the procedural texture stays.
+  function applyArPhoto(material) {
+    const def = material.userData.photoDef;
+    if (!def) return;
+    if (!arRealisticOn()) {
+      material.userData.photoFailed = false; // the next Realistic tries the download again
+      if (material.userData.restorePhoto) {
+        material.userData.restorePhoto();
+        material.userData.restorePhoto = null;
+        material.map = material.userData.proceduralMap ?? null;
+        material.color.setHex(material.map ? 0xffffff : def.color ?? 0xffffff);
+        material.needsUpdate = true;
+      }
+      return;
+    }
+    if (material.userData.restorePhoto || material.userData.photoLoading || material.userData.photoFailed) return;
+    material.userData.photoLoading = true;
+    loadPhotoFinish(def, 4).then((photo) => {
+      if (!arRealisticOn() || material.userData.restorePhoto) return;
+      material.map = photo.map;
+      material.color.setHex(0xffffff);
+      material.userData.restorePhoto = patchPhotoMaterial(material, photo);
+      rlog('ar photo finish', { id: def.id });
+    }).catch((error) => {
+      material.userData.photoFailed = true;
+      rlog('ar photo finish failed', { id: def.id, error: String(error?.message || error) });
+    })
+      .finally(() => {
+        material.userData.photoLoading = false;
+        applyArPhoto(material); // Realistic may have changed while it loaded
+      });
   }
   function buildArch3d() {
     for (const child of [...arch3dGroup.children]) {
@@ -5377,7 +5446,10 @@ export function setupMR(view, project, getFootprint) {
     furnitureGroup.visible = arch3dOn;        // models only in the 3D view…
     furniturePlanGroup.visible = !arch3dOn;   // …plan pieces otherwise
     buildFurniture(); // products on FURNITURE zones follow every plan edit (no-op if unchanged)
-    if (!arch3dOn) return;
+    arShadowFlags(furnitureGroup); // models already in; later arrivals get theirs in buildFurniture
+    for (const material of arch3dFinishMats.values()) applyArPhoto(material);
+    if (!arch3dOn) { arSunBox = null; applyArSun(); return; }
+    const shadows = arRealisticOn();
     const floors = allFloorsView ? project.floors : [project.activeFloor];
     for (const floor of floors) {
       const doorProducts = doorProductPlacements(floor, (id) => materialById(project, id));
@@ -5389,7 +5461,15 @@ export function setupMR(view, project, getFootprint) {
         openDoors: true, // door leaves swung open, as in View 3D (owner, 2026-09-27)
         productWindows: new Set(windowProducts.map((d) => d.rectId)),
       });
-      a.floorGeometry?.dispose(); // real floor stays visible; the ceiling is drawn (painted white)
+      // The real floor stays visible; the ceiling is drawn (painted white). In Realistic the floor
+      // slab becomes a shadow catcher: invisible, it only darkens the real floor where the sun is blocked.
+      if (shadows && a.floorGeometry) {
+        const catcher = new THREE.Mesh(a.floorGeometry, arShadowCatcher);
+        catcher.position.y = (floor.elevation || 0) - displayElevation();
+        catcher.receiveShadow = true;
+        catcher.userData.arch3dLayer = 'struct';
+        arch3dGroup.add(catcher);
+      } else a.floorGeometry?.dispose();
       if (allFloorsView) a.stairwell.walls?.dispose(); // the floor below draws its own
       const y = (floor.elevation || 0) - displayElevation();
       // Parts by PERF layer (`arch3dLayer`, PERF_LAYERS_3D), each merged into one mesh per
@@ -5420,6 +5500,9 @@ export function setupMR(view, project, getFootprint) {
           const mesh = new THREE.Mesh(geometry, material);
           mesh.position.y = y;
           mesh.userData.arch3dLayer = layer;
+          // Glass lets the sun through (it is opaque in AR, showing an exterior).
+          mesh.castShadow = shadows && material !== arch3dMats.windows && !material.transparent;
+          mesh.receiveShadow = shadows && !material.isMeshBasicMaterial;
           arch3dGroup.add(mesh);
         }
       }
@@ -5430,11 +5513,19 @@ export function setupMR(view, project, getFootprint) {
         arch3dGroup.add(lines);
       }
     }
+    // The sun's shadow camera is fitted to what is drawn (plan-local).
+    arSunBox = new THREE.Box3();
+    for (const o of arch3dGroup.children) {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      arSunBox.union(o.geometry.boundingBox.clone().translate(o.position));
+    }
+    if (arSunBox.isEmpty()) arSunBox = null;
+    applyArSun();
   }
   // A marker's switch product, baked into plan-local world space like the door
   // products (shared geometry is cloned first, so the group's disposal stays safe).
-  function deviceProductParts(marker, { def, z }, place) {
-    const g = buildDeviceProduct(def, { lambert: true, detail: 'low' });
+  function deviceProductParts(marker, { def, z, fill }, place) {
+    const g = buildDeviceProduct(def, { lambert: true, detail: 'low', fill });
     g.position.set(place ? place.x : marker.x, z, -(place ? place.y : marker.y));
     if (place) g.rotation.y = Math.atan2(place.nx, -place.ny);
     g.updateMatrixWorld(true);
@@ -5451,7 +5542,7 @@ export function setupMR(view, project, getFootprint) {
   function hideForArch3d() {
     if (!arch3dOn) return;
     for (const child of planGroup.children) {
-      if (child === arch3dGroup || child === furnitureGroup || !child.visible) continue;
+      if (child === arch3dGroup || child === furnitureGroup || child === arSun || child === arSun.target || !child.visible) continue;
       child.visible = false;
       arch3dHidden.push(child);
     }
@@ -5465,6 +5556,90 @@ export function setupMR(view, project, getFootprint) {
     arch3dOn = !arch3dOn;
     buildArch3d();
     rlog('ar 3d view', { on: arch3dOn, meshes: arch3dGroup.children.length });
+  }
+
+  // ---- AR Realistic (LEFT Y in the AR 3D view; docs/realism.md "In AR") -------------
+  // The real sun for today at an hour (held LEFT Y + LEFT stick-x), with shadows on the
+  // model, and on the real floor through a shadow catcher on each floor slab. The light
+  // lives in planGroup and plan +y is north, so the sun follows the plan's registration on
+  // the room. Not in AR: the sky (passthrough is the background) and GTAO (no post pass in
+  // the XR loop). On/off persists per device; the hour is session-only (starts at now).
+  // The shadow map is redrawn only when the sun, the model or the plan's placement changes.
+  const arRealisticOn = () => arch3dOn && arRealistic;
+
+  function toggleArRealistic() {
+    arRealistic = !arRealistic;
+    try { localStorage.setItem(AR_REALISTIC_KEY, arRealistic ? '1' : '0'); } catch { /* storage blocked */ }
+    buildArch3d();
+    rlog('ar realistic', { on: arRealistic, hour: arSunHour });
+  }
+  function arShadowFlags(root) {
+    const on = arRealisticOn();
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = on && !(Array.isArray(o.material) ? o.material : [o.material]).some((m) => m?.transparent);
+      o.receiveShadow = on;
+    });
+  }
+  // The sun's direction, colour and strength for today at `arSunHour`; the scene's own sun
+  // hides and the hemisphere drops to the shade level. Off, the session's stashed state returns.
+  function applyArSun() {
+    const on = arRealisticOn() && renderer.xr.isPresenting;
+    arSun.visible = on;
+    if (!renderer.xr.isPresenting) return; // the desktop state is restored at sessionend
+    if (view.sun) view.sun.visible = on ? false : saved.sunVisible ?? true;
+    renderer.shadowMap.enabled = on || (saved.shadowMapEnabled ?? false);
+    renderer.shadowMap.autoUpdate = on ? false : saved.shadowAutoUpdate ?? true;
+    renderer.shadowMap.type = on ? THREE.PCFShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
+    if (!on) {
+      if (view.hemi && saved.hemiIntensity != null) view.hemi.intensity = saved.hemiIntensity;
+      return;
+    }
+    const now = new Date();
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, Math.round(arSunHour * 60));
+    const pos = sunPosition(date);
+    const dir = sunDirection(pos);
+    const box = arSunBox || new THREE.Box3(new THREE.Vector3(-5, 0, -5), new THREE.Vector3(5, 3, 5));
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(4, box.getSize(new THREE.Vector3()).length() / 2 + 1);
+    arSun.position.copy(center).addScaledVector(dir, radius * 2);
+    arSun.target.position.copy(center);
+    const cam = arSun.shadow.camera;
+    cam.left = -radius; cam.right = radius; cam.top = radius; cam.bottom = -radius;
+    cam.near = 0.1; cam.far = radius * 4;
+    cam.updateProjectionMatrix();
+    const up = Math.sin(pos.elevation);
+    const lit = THREE.MathUtils.smoothstep(up, 0, 0.15);
+    arSun.intensity = 2.4 * lit;
+    arSun.color.setHex(0xffa860).lerp(new THREE.Color(0xfff3e2), THREE.MathUtils.smoothstep(up, 0.05, 0.5));
+    if (view.hemi) view.hemi.intensity = 0.3 + 0.35 * THREE.MathUtils.smoothstep(up, -0.05, 0.25);
+    arShadowCatcher.opacity = 0.35 * lit;
+    arSunInfo = { elevation: THREE.MathUtils.radToDeg(pos.elevation), azimuth: THREE.MathUtils.radToDeg(pos.azimuth) };
+    renderer.shadowMap.needsUpdate = true;
+  }
+  // Each frame: redraw the shadow map when the plan moved (TELEPORT, a yaw step, the anchor),
+  // since the light and the model move together but the map is drawn in world space.
+  function arSunFrame() {
+    if (!arSun.visible) return;
+    planGroup.updateMatrix();
+    const a = planGroup.matrix.elements, b = arSunMatrix.elements;
+    for (let i = 0; i < 16; i++) {
+      if (Math.abs(a[i] - b[i]) > 1e-5) {
+        arSunMatrix.copy(planGroup.matrix);
+        renderer.shadowMap.needsUpdate = true;
+        return;
+      }
+    }
+  }
+  const hhmm = (h) => {
+    const min = Math.round(h * 60);
+    return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  };
+  const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  function arSunText() {
+    const head = `${t('sun.label')} ${hhmm(arSunHour)} · ${arSunInfo && arSunInfo.elevation > 0
+      ? `${Math.round(arSunInfo.elevation)}° ${COMPASS[Math.round(arSunInfo.azimuth / 45) % 8]}` : t('sun.night')}`;
+    return `${head}\n${t('sun.hint')}`;
   }
 
   let localSpace = null;
@@ -5548,7 +5723,7 @@ export function setupMR(view, project, getFootprint) {
   // CONDUIT · EDIT set it each frame. { mode, label, index, size } or null.
   let gripPick = null;
   const GRIP_PICK_MODES = new Set(['marker', 'marker_link', 'marker_wire', 'marker_conduit', 'conduit_edit', 'pipe_edit',
-    'mat_switch', 'mat_outlet', 'mat_ethernet']);
+    'mat_switch', 'mat_outlet', 'mat_ethernet', 'mat_panel']);
   let currentWireType = WIRE_TYPES[0];
   // MARKER · CONDUIT pen: the node the next segment grows from, plus per-frame hover.
   let penNodeId = null;
@@ -6902,7 +7077,8 @@ export function setupMR(view, project, getFootprint) {
       if (!def) return none(t(`marker.${marker.type || 'outlet'}`));
       // Device geometry is shared by the builder: never disposed here.
       return objectCard(`dev|${def.id}|${lang}|${unit}`, materialName(def, lang),
-        () => buildDeviceProduct(def, { lambert: true, detail: 'low' }));
+        () => buildDeviceProduct(def, { lambert: true, detail: 'low',
+          fill: def.surface === 'panel' ? panelFill(project, marker, def) : null }));
     }
     if (modeId === 'mat_furniture') {
       const rect = matSelDoor || matHoverDoor;
@@ -8753,6 +8929,11 @@ export function setupMR(view, project, getFootprint) {
       onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
     },
     {
+      id: 'mat_panel', color: 0x2dd4bf,
+      // The same for the electrical panel (DEVICE_SURFACE: panel; src/core/panel.js).
+      onTouch: () => { matSelDevice = matHoverDevice; matDevicePickAfterId = null; },
+    },
+    {
       id: 'circuit_check', color: 0xf97316,
       // Read-only diagnostics: trigger does nothing (see buildCheckOverlay).
       onTouch: () => {},
@@ -9026,7 +9207,7 @@ export function setupMR(view, project, getFootprint) {
     'drop', 'edge', 'plan_dims', 'edit', 'ruler',
     'marker', 'outlet_dims', 'marker_link', 'marker_conduit', 'conduit_dims', 'conduit_edit', 'marker_wire', 'circuit_check',
     'marker_pipe', 'pipe_dims', 'pipe_edit', 'vmc_inlet', 'heat', 'heat_r',
-    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet',
+    'mat_floor', 'mat_wall', 'mat_door', 'mat_window', 'mat_fence', 'mat_furniture', 'mat_switch', 'mat_outlet', 'mat_ethernet', 'mat_panel',
     'copy_floor', 'paste_floor', 'move_up', 'move_down', 'translate', 'export', 'save', 'load', 'unit', 'lang', 'perf',
   ];
   const MODE_GROUP = {
@@ -9035,7 +9216,7 @@ export function setupMR(view, project, getFootprint) {
     marker: 'marker', marker_link: 'marker', marker_conduit: 'marker', conduit_dims: 'marker', conduit_edit: 'marker', marker_wire: 'marker', circuit_check: 'marker', outlet_dims: 'marker',
     // HEATING (owner, 2026-10-01): the pipe network, room heat loss and insulation R.
     marker_pipe: 'heating', pipe_dims: 'heating', pipe_edit: 'heating', vmc_inlet: 'heating', heat: 'heating', heat_r: 'heating',
-    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_fence: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material',
+    mat_floor: 'material', mat_wall: 'material', mat_door: 'material', mat_window: 'material', mat_fence: 'material', mat_furniture: 'material', mat_switch: 'material', mat_outlet: 'material', mat_ethernet: 'material', mat_panel: 'material',
     copy_floor: 'project', paste_floor: 'project', move_up: 'project', move_down: 'project',
     translate: 'project', save: 'project', load: 'project', export: 'project', unit: 'project', lang: 'project',
     perf: 'project',
@@ -9397,6 +9578,13 @@ export function setupMR(view, project, getFootprint) {
     saved.markerLightsVisible = view.markerLights?.visible;
     saved.furnitureModelsVisible = view.furnitureModels?.visible;
     saved.planLayersVisible = view.planGroup?.visible; // View 3D's PLAN mode layers
+    // AR Realistic swaps these while on (applyArSun).
+    saved.sunVisible = view.sun?.visible;
+    saved.hemiIntensity = view.hemi?.intensity;
+    saved.shadowMapEnabled = renderer.shadowMap.enabled;
+    saved.shadowAutoUpdate = renderer.shadowMap.autoUpdate;
+    saved.shadowType = renderer.shadowMap.type;
+    { const now = new Date(); arSunHour = Math.min(AR_SUN_HOURS[1], Math.max(AR_SUN_HOURS[0], now.getHours() + Math.round(now.getMinutes() / 15) / 4)); }
 
     scene.background = null; // reveal passthrough
     scene.environment = null; // View 3D reflections are desktop-only (Quest cost)
@@ -9443,7 +9631,7 @@ export function setupMR(view, project, getFootprint) {
     renderer.xr.setReferenceSpace(localSpace);
     startupPlacementPending = true;
     startupPoseFrames = 0;
-    view.onXRFrame = (time, frame) => { onXRFrame(time, frame); hideForArch3d(); };
+    view.onXRFrame = (time, frame) => { onXRFrame(time, frame); hideForArch3d(); arSunFrame(); };
     view.onXRAfterRender = restoreAfterArch3d;
   });
 
@@ -9479,6 +9667,13 @@ export function setupMR(view, project, getFootprint) {
     scene.remove(planGroup);
 
     view.hideMesh = false; // desktop shows the extruded walls again
+    arSun.visible = false;
+    if (view.sun) view.sun.visible = saved.sunVisible ?? true;
+    if (view.hemi && saved.hemiIntensity != null) view.hemi.intensity = saved.hemiIntensity;
+    renderer.shadowMap.enabled = saved.shadowMapEnabled ?? false;
+    renderer.shadowMap.autoUpdate = saved.shadowAutoUpdate ?? true;
+    renderer.shadowMap.type = saved.shadowType ?? THREE.PCFSoftShadowMap;
+    renderer.shadowMap.needsUpdate = true;
     scene.background = saved.background ?? null;
     scene.environment = saved.environment ?? null;
     if (view.grid) view.grid.visible = saved.gridVisible ?? true;
@@ -9936,7 +10131,7 @@ export function setupMR(view, project, getFootprint) {
   }
 
   // Edge-detection state for the mode-cycle / floor-switch inputs.
-  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false, leftStickY: false, leftX: false };
+  const btn = { a: false, b: false, stick: false, stickY: false, leftStick: false, leftStickY: false, leftX: false, leftY: false, leftYScrubbed: false, leftYTime: 0 };
   const PLAN_YAW_STEP = THREE.MathUtils.degToRad(20); // LEFT stick-x nudges plan yaw in 20° steps
   // In-world exit: DOM "EXIT AR" isn't visible in the headset, so hold the
   // thumbstick DOWN (buttons[3]) for EXIT_HOLD_MS to end the session. A hold
@@ -9991,7 +10186,7 @@ export function setupMR(view, project, getFootprint) {
     ['doorwin', arch3dLayer('doorwin')], // door and window products
     ['device', arch3dLayer('device')], // switch, outlet and Ethernet products
     ['furn', () => [furnitureGroup]], // furniture models
-    ['plan', () => planGroup.children.filter((o) => o !== arch3dGroup && o !== furnitureGroup)],
+    ['plan', () => planGroup.children.filter((o) => o !== arch3dGroup && o !== furnitureGroup && o !== arSun && o !== arSun.target)],
   ];
   const perfLayers = () => (arch3dOn ? PERF_LAYERS_3D : PERF_LAYERS);
   const perf = { phase: 0, phaseStart: -1, samples: new Map(), result: new Map(), hidden: [],
@@ -10391,6 +10586,25 @@ export function setupMR(view, project, getFootprint) {
     // the yaw and making the plan visibly rotate about that origin.
     const lgp = leftSource(frame)?.gamepad;
     const lx = lgp?.axes[2] ?? 0;
+    // LEFT Y in the AR 3D view: a tap toggles Realistic; held, stick-x moves the sun's hour
+    // (up to 3 h per second), and the stick does not turn the plan until it is released.
+    const leftY = !!lgp?.buttons[5]?.pressed;
+    if (leftY && !btn.leftY) btn.leftYScrubbed = false;
+    if (leftY && arRealisticOn() && Math.abs(lx) > 0.2) {
+      const dt = Math.min(0.1, Math.max(0, (time - btn.leftYTime) / 1000));
+      arSunHour = Math.min(AR_SUN_HOURS[1], Math.max(AR_SUN_HOURS[0], arSunHour + lx * 3 * dt));
+      applyArSun();
+      btn.leftYScrubbed = true;
+    }
+    if (!leftY && btn.leftY && !btn.leftYScrubbed && arch3dOn && placed) toggleArRealistic();
+    if (!leftY && btn.leftY && btn.leftYScrubbed) {
+      arSunHour = Math.round(arSunHour * 4) / 4; // settle on the quarter hour
+      applyArSun();
+      rlog('ar sun hour', { hour: arSunHour, ...arSunInfo });
+    }
+    btn.leftY = leftY;
+    btn.leftYTime = time;
+    if (leftY) btn.leftStick = true;
     if (placed && !btn.leftStick && Math.abs(lx) > 0.7) {
       const d = (lx > 0 ? 1 : -1) * PLAN_YAW_STEP;
       // XRFrame's viewer pose is authoritative here. The renderer's ArrayCamera
@@ -10519,6 +10733,13 @@ export function setupMR(view, project, getFootprint) {
     });
     // xr-standard button 1 is squeeze/grip. The sheet is a hold-to-view companion:
     // hidden at rest, visible only for as long as the LEFT grip remains pressed.
+    // AR Realistic's hour, on the LEFT controller while the sun is on.
+    const sunCtl = arSun.visible ? controllers.find((c) => c.userData.inputSource === companionCtl) : null;
+    if (sunCtl) {
+      if (sunLabel.sprite.parent !== sunCtl) sunCtl.add(sunLabel.sprite);
+      sunLabel.setText(arSunText(), [0xfbbf24, 0xcbd5e1]);
+    }
+    sunLabel.sprite.visible = !!sunCtl;
     const companionGripPressed = !!companionCtl?.gamepad?.buttons[1]?.pressed;
     // LEFT X (xr-standard button 4 on the left controller) toggles the AR 3D view.
     const companionX = !!companionCtl?.gamepad?.buttons[4]?.pressed;

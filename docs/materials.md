@@ -1117,6 +1117,25 @@ rocker), never the mechanism inside the wall box, because it is invisible. Where
     render beside the front photo (front and angled), bounding box 87 × 87 × 10.7 mm. Not yet seen in the
     real View 3D or in AR.
 
+
+## Panel (the electrical panel, `surface: 'panel'`)
+
+`panel_drivia_3x13` (owner, 2026-10-22): Legrand Drivia ready-wired T4 panel, 3 rows × 13 modules
+(Leroy Merlin 71653631; spec table read in Chrome 2026-10-22, commercial ref 200884). Set on a
+`panel` marker (`marker.product`), drawn by `driviaPanel` in `src/ui/deviceProducts.js`, filled from
+the house (`docs/electrical-workflow.md` "The panel"). No takeoff.
+
+| Size | Source |
+| --- | --- |
+| 500 × 250 × 103.5 mm, 3 rows, 39 modules, label strip per row | Leroy Merlin spec table (Proven, read) |
+| Rails 125 mm apart | legrand.fr 401213, the bare Drivia 3 × 13 enclosure (Proven, read) |
+| RCDs 63 A AC, 40 A AC, 40 A A; DNX³ 1 × 32, 4 × 20, 4 × 16, 2 × 10 A | elecdistrib.fr, Legrand 093057, the same 1 × 63 A + 2 × 40 A + 11 breakers as 123elec's 200884 (Proven, read; that 093057 is the same kit is a Hypothesis) |
+| Module 17.5 mm | Legrand's modular pitch (Hypothesis: not read on this product's page) |
+| Cover 14 mm, window 45 mm high, fronts 8 mm proud, toggles, test button, which RCD heads which row | estimates from the product photo (Hypothesis) |
+
+A scratch front view (Node, mesh bounding boxes) matched the product photo's layout: a label strip
+over each row, the RCD at the left with its test button, the breakers, white blanks after.
+
 ## Open questions
 
 - On the AR plan, a wall face's material is a swatch badge 12 cm inside the middle of the face (it was

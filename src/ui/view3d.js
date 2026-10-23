@@ -572,7 +572,7 @@ export class View3D {
         const product = light ? undefined : entry.markerProducts?.get(marker.id);
         if (product === null) continue;
         const fixture = light ? this._lightMarkerFixture(marker)
-          : product ? this._productMarkerFixture(product.def) : this._wallMarkerFixture(marker);
+          : product ? this._productMarkerFixture(product.def, product.fill) : this._wallMarkerFixture(marker);
         fixture.userData.floorId = floorId || null;
         fixture.userData.markerId = marker.id || null;
         // Wall fixtures sit flush on their nearest finished face, turned to face the
@@ -779,8 +779,8 @@ export class View3D {
 
   // A switch carrying a product (docs/materials.md "Switches") shows that product in
   // place of the standard faceplate, in the same convention (back at z = 0, front +Z).
-  _productMarkerFixture(def) {
-    const fixture = buildDeviceProduct(def);
+  _productMarkerFixture(def, fill = null) {
+    const fixture = buildDeviceProduct(def, { fill });
     fixture.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     return fixture;
   }

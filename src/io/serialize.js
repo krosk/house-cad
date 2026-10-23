@@ -82,6 +82,12 @@ function breakerFields(m) {
   if (m.number != null) out.number = m.number;
   if (m.rating != null) out.rating = m.rating;
   if (m.poles != null) out.poles = m.poles;
+  // Its place in a panel (src/core/panel.js): the panel marker's id, row and slot (1-based).
+  if (typeof m.panel === 'string' && m.panel) {
+    out.panel = m.panel;
+    if (m.row != null) out.row = m.row;
+    if (m.slot != null) out.slot = m.slot;
+  }
   return out;
 }
 
@@ -278,6 +284,13 @@ export function pasteFloorClipboard(project, clipboard, { targetId = project.act
     markerIds.set(m.id, copy.id);
     return copy;
   });
+  // A breaker's panel moves with the paste when the panel is on the copied floor; otherwise
+  // the slot is dropped (the source floor's panel is not this floor's).
+  for (const m of markers) {
+    if (!m.panel) continue;
+    if (markerIds.has(m.panel)) m.panel = markerIds.get(m.panel);
+    else { delete m.panel; delete m.row; delete m.slot; }
+  }
 
   // Conduit network + wires (whole-house): the clipboard carries the source floor's
   // intra-floor subset at the top level; older floor clipboards stored it inside `floor`.

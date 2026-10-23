@@ -1,6 +1,6 @@
 // Device products (docs/materials.md "Switches"): a catalog material with
-// `surface: 'switch'` (or 'outlet', 'ethernet') set on a switch (or socket outlet, Ethernet) marker
-// (`marker.product`) replaces that marker's standard 8 cm faceplate in 3D. Only the
+// `surface: 'switch'` (or 'outlet', 'ethernet', 'panel') set on a switch (or socket outlet,
+// Ethernet, panel) marker (`marker.product`) replaces that marker's standard 8 cm faceplate in 3D. Only the
 // visible part is modelled (owner, 2026-09-27): the plate and the rocker or insert, never
 // the mechanism inside the wall box.
 //
@@ -85,6 +85,10 @@ function materialsFor(def, lambert) {
     split: new M({ color: 0x2a2a2a, ...std(0.8) }),
     hole: new M({ color: 0xc9c9c7, ...std(0.6) }),
     pin: new M({ color: 0xc8c8c8, ...(lambert ? {} : { roughness: 0.25, metalness: 0.8 }) }),
+    // Panel modules (driviaPanel): light grey fronts, dark grey toggles, the RCD's test button.
+    module: new M({ color: 0xdedfdc, ...std(0.5) }),
+    toggle: new M({ color: 0x4a4c4e, ...std(0.5) }),
+    test: new M({ color: 0xe0b100, ...std(0.5) }),
   };
   matCache.set(key, m);
   return m;
@@ -260,19 +264,63 @@ function rj45Socket(def, m) {
   return g;
 }
 
-const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet, 'rj45': rj45Socket };
+// Legrand Drivia panel (docs/materials.md "Panel"; owner, 2026-10-22): the white enclosure
+// (`w` × `h` × `depthMm`), its front cover with one window per DIN row (rows `railPitchMm`
+// apart, `modulesPerRow` × `moduleMm` wide), a label strip above each window, and the row's
+// modules through the window (`fill`, src/core/panel.js): the RCD switch with its test button,
+// each placed breaker with its toggle, a white blank on every free module. The window height,
+// the module fronts and the toggles are estimates; only the outside size and the rail pitch are
+// published.
+function driviaPanel(def, m, fill) {
+  const g = new THREE.Group();
+  const mm = (v) => v / 1000;
+  const W = def.w, H = def.h, D = mm(def.depthMm ?? 103.5), mod = mm(def.moduleMm ?? 17.5);
+  const box = (w, h, d, x, y, z, material) => {
+    const b = new THREE.BoxGeometry(w, h, d);
+    b.translate(x, y, z);
+    g.add(new THREE.Mesh(b, material));
+  };
+  const coverD = mm(14), winH = mm(45), rowW = (def.modulesPerRow ?? 13) * mod;
+  box(W, H, D - coverD, 0, 0, (D - coverD) / 2, m.plate); // the back box
+  box(W - mm(6), H - mm(6), coverD, 0, 0, D - coverD / 2, m.plate); // the cover, a little inset
+  const n = def.rows?.length || 0, pitch = mm(def.railPitchMm ?? 125);
+  for (let r = 0; r < n; r++) {
+    const y = ((n - 1) / 2 - r) * pitch;
+    // The window: a dark recess the module fronts stand in.
+    box(rowW + mm(3), winH + mm(3), mm(0.4), 0, y, D + mm(0.2), m.split);
+    // The label strip above it (Drivia: a clear strip over a printed label).
+    box(rowW, mm(14), mm(1.2), 0, y + winH / 2 + mm(14), D + mm(0.6), m.rocker);
+    const row = fill?.rows?.[r];
+    const used = new Set();
+    for (const md of row?.modules || []) {
+      for (let k = 0; k < md.width; k++) used.add(md.slot + k);
+      const x = -rowW / 2 + (md.slot - 1 + md.width / 2) * mod, w = md.width * mod - mm(0.6);
+      box(w, winH, mm(10), x, y, D + mm(3), m.module); // the front through the window, 8 mm proud
+      box(mm(7), mm(13), mm(9), x - (md.width > 1 ? mod / 2 : 0), y + mm(4), D + mm(12), m.toggle); // the toggle
+      if (md.kind === 'rcd') box(mm(5), mm(5), mm(2), x + mod / 2, y - mm(12), D + mm(9), m.test); // the test button
+    }
+    for (let s = 1; s <= (def.modulesPerRow ?? 13); s++) {
+      if (used.has(s)) continue;
+      box(mod - mm(0.6), winH, mm(1), -rowW / 2 + (s - 0.5) * mod, y, D + mm(0.5), m.plate); // a blank
+    }
+  }
+  return g;
+}
+
+const DESIGNS = { 'rocker': rockerSwitch, 'socket': socketOutlet, 'rj45': rj45Socket, 'drivia': driviaPanel };
 
 // Built once per catalog entry and material kind; callers get a clone that shares the
 // geometry and materials, so they must never dispose them (a baked copy clones first).
 const built = new Map();
 // `detail`: 'full' (desktop) or 'low' (AR: 48 directions, fewer slope rings; ~1/4 of the
 // triangles, same outline and heights).
-export function buildDeviceProduct(def, { lambert = false, detail = 'full' } = {}) {
-  const key = `${JSON.stringify(def)}|${lambert}|${detail}`;
+// `fill`: a panel's rows (src/core/panel.js panelFill), part of the cache key.
+export function buildDeviceProduct(def, { lambert = false, detail = 'full', fill = null } = {}) {
+  const key = `${JSON.stringify(def)}|${lambert}|${detail}|${fill ? JSON.stringify(fill.rows) : ''}`;
   if (!built.has(key)) {
     D = DETAIL[detail] || DETAIL.full;
     try {
-      const g = (DESIGNS[def.design] || rockerSwitch)(def, materialsFor(def, lambert));
+      const g = (DESIGNS[def.design] || rockerSwitch)(def, materialsFor(def, lambert), fill);
       g.name = def.id || 'device-product';
       built.set(key, g);
     } finally { D = DETAIL.full; }

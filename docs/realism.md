@@ -54,6 +54,39 @@ browser paused rendering). **Hypothesis:** usable on the Deck and the iPhone 14;
   thread for 0.2 s (sky), 2.9 s (Charme) and 0.9 s (Monastère), measured in Chrome on the Steam
   Deck. The page only wraps the results and builds the PMREM, which needs the GPU.
 
+## In AR (owner asked 2026-10-23)
+
+**LEFT Y** in the AR 3D view (LEFT X) toggles Realistic; held, the LEFT stick-x moves the hour
+(up to 3 h a second, settles on the quarter hour; the stick turns the plan again once released). The
+on/off persists per device (`house-cad:ar-realistic:v1`); the hour starts at the current time each
+session, today's date. The LEFT controller shows `SUN 14:30 · 52° S` (or `NIGHT`) while it is on.
+`mr.js` `applyArSun`:
+
+- **The sun:** its own DirectionalLight in `planGroup`, so its direction is plan-local and follows the
+  plan's registration on the room (plan +y = north; a Node test checks noon from plan south and morning
+  from plan east, `test/realism.test.js`). Same direction, warmth and fade as View 3D, strength 2.4.
+  The scene's own sun hides and the hemisphere drops to the shade level (0.3–0.65); both come back
+  when it is off or the session ends.
+- **Shadows:** a 2048 map fitted to the drawn model, PCF (not soft). The model's meshes and the
+  furniture cast and receive; the opaque AR glass does not cast, so the sun comes through windows.
+  Each floor slab becomes a **shadow catcher** (`ShadowMaterial`, opacity 0.35): invisible, it darkens
+  the real floor where the house blocks the sun, so the sun patches show on the passthrough floor.
+  The map is redrawn only when the sun, the model or the plan's placement changes (`autoUpdate` off).
+- **Photo finishes** (`mr.js` `applyArPhoto`): a finish registered in `photoFinishes.js` (Beaulieu
+  charme, Monastère) swaps its procedural texture for the photo atlas, laid by the same shader
+  (`patchPhotoMaterial` patches `map_fragment`, which the Lambert material has too). Colour only: no
+  relief map in AR (frame cost). The atlas is shared with View 3D and its download is in Cache Storage,
+  so offline once fetched; until it loads, or if it fails, the procedural texture stays (a failure is
+  retried at the next Realistic). **Proven** (Chrome on the Steam Deck, a scratch page, 2026-10-23): both
+  photos download and the patched Lambert shaders compile and draw, planks and stepped tiles, with a PCF
+  sun shadow on them, no WebGL error. Atlases: Charme 1760 × 2695, Monastère 1536 × 3380 (about
+  20–30 MB of GPU memory each with mips; **Hypothesis:** fine on the Quest 3).
+- **Not in AR:** the sky (passthrough is the background; `mr.js` clears it), GTAO (no post pass in the
+  XR loop; 2 eyes at 72–90 fps).
+- **Hypothesis, not yet seen on the headset:** the look (the strengths and the catcher's 0.35 are
+  guesses to tune), the fps (check PROJECT · PERF with the 3D view on, Realistic off then on), and
+  shadow acne or peter-panning with the bias values copied from View 3D.
+
 ## Photo finishes (Realistic only)
 
 `src/ui/photoFinishes.js`: a finish whose catalog id is registered there swaps its procedural texture

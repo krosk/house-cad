@@ -82,6 +82,11 @@ const STRINGS = {
   'mode.mat_switch': { en: 'SWITCH', fr: 'INTERRUPTEUR', zh: '开关' },
   'mode.mat_outlet': { en: 'OUTLET', fr: 'PRISE', zh: '插座' },
   'mode.mat_ethernet': { en: 'ETHERNET', fr: 'RÉSEAU', zh: '网口' },
+  'mode.mat_panel': { en: 'PANEL', fr: 'TABLEAU', zh: '配电箱' },
+  // AR Realistic (LEFT Y in the AR 3D view): the sun's hour on the LEFT controller.
+  'sun.label': { en: 'SUN', fr: 'SOLEIL', zh: '太阳' },
+  'sun.night': { en: 'NIGHT', fr: 'NUIT', zh: '夜间' },
+  'sun.hint': { en: 'HOLD Y + STICK: HOUR', fr: 'Y MAINTENU + STICK : HEURE', zh: '按住 Y + 摇杆：时间' },
   'mode.recal':    { en: 'RECAL',  fr: 'RECAL',    zh: '校准' },
   'mode.plan_dims':   { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
   'mode.outlet_dims': { en: 'DIMS', fr: 'COTES', zh: '尺寸' },
@@ -278,6 +283,11 @@ const STRINGS = {
     en: 'Choose a socket product for an Ethernet socket. Trigger selects the socket under the reticle; where sockets overlap, grip cycles them first. Thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Shown in the 3D view (LEFT X).',
     fr: 'Choisissez un modèle pour une prise réseau. Gâchette : sélectionner la prise visée ; si elles se superposent, grip les fait défiler d’abord. Joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Visible dans la vue 3D (GAUCHE X).',
     zh: '为网口选择型号。扳机选择准星下的网口；网口重叠时先用握把循环。摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。在三维视图中显示（左 X）。',
+  },
+  'help.mat_panel': {
+    en: 'Choose the product for the electrical panel. Trigger selects the panel under the reticle; thumbstick up/down cycles the product (none first); B/Y clears it; grip deselects. Each row shows its RCD and the breakers placed in it. Shown in the 3D view (LEFT X).',
+    fr: 'Choisissez le modèle du tableau électrique. Gâchette : sélectionner le tableau visé ; joystick haut/bas : faire défiler le modèle (aucun d’abord) ; B/Y l’efface ; grip désélectionne. Chaque rangée montre son interrupteur différentiel et les disjoncteurs qui y sont placés. Visible dans la vue 3D (GAUCHE X).',
+    zh: '为配电箱选择型号。扳机选择准星下的配电箱；摇杆上/下循环型号（首项为无）；B/Y 清除；握把取消选择。每排显示其漏电开关和已放入的断路器。在三维视图中显示（左 X）。',
   },
   'help.mat_furniture': {
     en: 'Choose the product for a FURNITURE zone. Trigger selects the zone under the reticle; thumbstick up/down cycles the product (none first); A/X turns it 90°; B/Y clears it. The zone takes the product\'s size; a dimension that no longer fits is removed. Shown in the 3D view (LEFT X).',

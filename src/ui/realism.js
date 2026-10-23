@@ -1,6 +1,6 @@
 // View 3D "Realistic" setting (docs/realism.md): the real sun for a time of day, a
-// photographed sky for ambient light and reflections, and ambient occlusion. Desktop
-// only; the AR session never uses any of it.
+// photographed sky for ambient light and reflections, and ambient occlusion. The AR
+// session uses only the sun (mr.js applyArSun, docs/realism.md "In AR"): no sky, no AO.
 import * as THREE from 'three';
 import { loadSkyPixels } from './textureWorker.js';
 

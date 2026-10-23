@@ -143,7 +143,8 @@ plate to the nearest exposed side of the resolved wall boxes at the marker's hei
 facing away from that wall, so room-side, exterior, and jamb-mounted fixtures all face open air.
 It is presentation-only: marker data is never changed.
 A switch, socket-outlet or Ethernet marker carrying a product (`marker.product`, `docs/materials.md` "Switches") shows that
-product (`src/ui/deviceProducts.js`) at the same placement instead of the standard faceplate.
+product (`src/ui/deviceProducts.js`) at the same placement instead of the standard faceplate. A `panel` marker's
+product is the whole enclosure, its rows filled from the breakers that name it (`src/core/panel.js`, `docs/electrical-workflow.md` "The panel").
 
 Production builds emit an un-precached `version.json` beside `index.html`; `src/core/versionCheck.js`
 fetches it with `cache: no-store` plus a timestamp query and compares its complete build id with the

@@ -1256,6 +1256,20 @@ elsewhere. Window distance: the sources disagree (1 m, 3 m, "+40 cm"); none allo
 (the invert at the wall or the connection box) plus its fall (≥ 1 %) back to the upstream end; a basement
 fixture or floor drain below it needs a pump (Hypothesis).
 
+**Kitchen sink into the façade vent (owner, 2026-10-23; written to the headset the same day, read back identical, 307 484):**
+the sink unit r159 stands on the kitchen's west wall, 1.3 m north of the south wall r135. Its Ø40 drain joins the
+façade vent's riser from the side, through a Ø100 × 40 tee below the vent's top, so the riser is the sink's vent above
+the tee and its wet stack below it. Drawn (`pn447`–`pn451`, `p418`–`p423`): trap outlet (0.62, −3.57) at 0.50 m
+(assumed), west to x 0.47, south along the west wall behind the corner unit r158 (through its back, or in the plinth),
+2 × 45° back to x 0.62, through r135 to the tee `pn447` at 0.4548 m on the riser (p72 split into p418/p419); 2 % all
+the way, ≈ 2.26 m, 4.5 cm drop. Hypotheses: the trap height, the route behind the units, ≈ 4 direction changes on an
+unvented Ø40 being acceptable (limits of ≈ 3–4 m and 3 bends recalled, not read in DTU 60.11 / EN 12056). Never enter
+the riser from above its top, no low point in the wall, never a climb to the tee; insulate or box the wet part outside
+(grease sets in the cold) and put a cleaning plug at its foot. Diameter (owner question, same day): keep Ø100. Reducing
+the riser is the main trap risk (pressure out through the traps: the air valve only lets air in); Ø75 at most, above
+the paving and with the contractor's written agreement, never Ø50 (resistance ≈ 4× at Ø75, ≈ 20–30× at Ø50 for the
+same air; Hypothesis: 20 L/s of air assumed). No Ø40 fitting datasheet in `pipeFittings.js`, so no fitting is drawn on it.
+
 **Upper WC position and its drain (owner, 2026-10-09; drain option A chosen and written to the headset the same day, read back identical):**
 - **Slab constraint (owner, corrected 2026-10-09):** along the whole west wall of the upper floor, a 14 cm
   trench next to the wall, then **lintel 1** (x −4.56…−4.50, 6 cm), a 29 cm clear bay (**bay 1**, 20–49 cm

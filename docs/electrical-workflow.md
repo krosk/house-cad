@@ -194,6 +194,40 @@ These are settled; don't reopen them without the owner.
   excluded from plan sheets and change maps; in DXF they are an opt-in `wiring` layer (default
   off). Markers and control links are unaffected.
 
+## The panel (owner, 2026-10-22)
+
+The owner's panel is a **Legrand Drivia ready-wired T4 panel**, 3 rows × 13 modules (Leroy Merlin
+71653631), on the basement's south wall about 20 cm from its east wall (owner). Built-in product
+`panel_drivia_3x13` (`src/core/materials.js`, sources there and in `docs/materials.md` "Panel").
+
+- **A `panel` marker carries the product** (`marker.product`, like a switch product; AR
+  `MATERIAL · PANEL`). The marker is the enclosure's centre on the wall; the 3D model stands on its
+  nearest wall face like any wall device (`wallMarkerPlacements`), back on the wall.
+- **The breaker markers stay where they were surveyed.** The owner uses them as the head of each
+  circuit line (owner, 2026-10-22: "placeholders for connecting markers in the same circuit line"):
+  the home run's conduit and wires end on them. Moving them into the panel would re-route every
+  home run, so they are not moved.
+- **A breaker's place in the panel is three fields on the breaker:** `panel` (the panel marker's
+  id), `row` (1..3, top first) and `slot` (1..13, the module its left edge is on). Saved additively
+  (`breakerFields`, no FILE_VERSION bump); a floor paste keeps them only when the panel was copied
+  too. Nothing is stored on the panel.
+- **The fill is derived** (`panelFill`, `src/core/panel.js`): each row starts with its RCD switch
+  (the product's `rows[i].rcd`, 2 modules), then the breakers that name it, in slot order. A
+  breaker off the rail or overlapping another module is listed as `misplaced` and not drawn (the
+  first in marker order keeps the slot). Every free module shows a white blank.
+- **Which RCD heads which row is an estimate** (63 A AC, 40 A AC, 40 A type A, top to bottom);
+  confirm on the panel. Type A is the one the washing machine and the hob need (NF C 15-100,
+  Hypothesis until checked against the standard).
+
+Next steps, not built yet (proposal 2026-10-22, owner to confirm the order):
+1. AR editing of a breaker's slot (and its `number`/`rating`/name), today only through a headset write.
+2. A label on each module (circuit number, rating, name) in its circuit's colour, and a thin line from
+   each slot to its breaker marker.
+3. Pointing: a slot highlights its circuit's wires and devices on every floor; a device highlights its slot.
+4. Checks on the panel: a full row, a breaker rating too high for the cable, a washing machine or hob not
+   under the type A RCD, a breaker marker with no slot.
+5. The three label strips as a printout.
+
 ## Status (as of this writing)
 
 - Conduit network, wires, routing, risers, wall-pinned junctions: **implemented**
@@ -206,5 +240,5 @@ These are settled; don't reopen them without the owner.
   build- and Node-verified, not yet walked on device.
 - **Not yet done** (deliberately deferred): surfacing circuits in any output (the print
   sheet stays as-is), per-circuit coloring/numbering/schedule, diagnostics outside AR (desktop/sheets),
-  AR editing of breaker `number`/`rating`, and tying a breaker to a `panel` enclosure
-  (`panelId`) for schedule grouping.
+  AR editing of breaker `number`/`rating`/slot. A breaker's place in a panel (`panel`/`row`/`slot`)
+  and the panel's 3D fill: **implemented** (2026-10-22, Node-verified; see "The panel").

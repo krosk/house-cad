@@ -411,6 +411,15 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] Basement STAIRS UP (7 treads to 1.26 m) + Ground STAIRS DOWN (5 treads to −0.90 m) match the real basement stair
 - [ ] Tread depth (25 cm assumed) against the real treads; the same treads in desktop View 3D
 
+## AR Realistic (LEFT Y in the 3D view)  ⬜ NEW (2026-10-23) — build + Node-verified only
+- [ ] LEFT X, then a LEFT Y tap: the LEFT controller shows `SUN hh:mm · elevation° direction`; another tap turns it off and the old lighting returns
+- [ ] Hold LEFT Y and push LEFT stick-x: the hour moves (04:00–22:30), the shadows follow; release: it settles on the quarter hour, and the plan does not turn
+- [ ] With the plan registered, the midday sun comes from the real south, the morning sun from the real east (plan +y = north)
+- [ ] Sun patches through the windows show on the real floor (the shadow catcher), the rest of the floor slightly darker; walls and furniture cast shadows; no acne stripes on walls
+- [ ] PROJECT · PERF with the 3D view on, Realistic off then on: note the fps both ways
+- [ ] A Beaulieu charme or Monastère floor: with Realistic on it turns to the photo planks or tiles (a few seconds the first time, then offline), back to the procedural look when off
+- [ ] TELEPORT and a LEFT stick yaw step with it on: the shadows stay on the model (the map is redrawn)
+
 ## HEAT LOSS · WHAT IF  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] The panel shows HOUSE W · kWh/yr under the title, and "All insulation and windows counted"
 - [ ] Wall insulation / Attic insulation / Windows → no: the room labels and heat map change, a red "vs all counted" line appears; back to yes removes it
@@ -597,3 +606,4 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] ⬜ NEW (2026-10-20) Desktop View 3D 🚪 Doors: with it on, a tap on a door (product or plain) closes it, another opens it; in POV a tap on the floor still walks; the state survives an edit and the floor picker; Ruler and Doors turn each other off. Proven in desktop Chrome on the demo house (a LINE and a plain door, POV): close and reopen both, no console error. Not tried on a phone or in the overview.
 - [ ] ⬜ NEW (2026-10-20) r93 (Upper) on `door_postforme_meli_white`: a white 62 mm box rail above the leaf, top about 2.09 m, ending about 5 cm past the opening's north jamb (3 cm short of r91's frame), the closed leaf flush with its end; open, the leaf parks south under the box. No black bar, spacers or wheels. Proven only in Node (bounding boxes).
 - [ ] ⬜ NEW (2026-10-22) View 3D 👁 Show **▬ Beams**: ▤ Plan shows the beams with 💧 Pipes off; Model overview and POV show the kitchen ceiling joists through the ceiling and the upstairs bathroom joists through the floor; off hides them again (the model's own wood beams stay). Proven only in Node (one mesh, 180 triangles for 15 beams; x-ray material in the Model view); not tried in a browser. In AR the 14 joists should cost no extra draw call (every beam path is one merged mesh per layer, from the code).
+- [ ] ⬜ NEW (2026-10-22) MATERIAL · PANEL: place a `panel` marker on the basement's south wall (~20 cm from the east wall, its centre at the panel's centre), select it and pick "Legrand Drivia panel, 3 rows × 13 modules": the 3D view (LEFT X) and desktop View 3D show a white 25 × 50 cm box, 10 cm deep, on the wall, three windows 12.5 cm apart, a light blue label strip over each, a grey 2-module RCD with a yellow test button at the left of each row and white blanks after it. A breaker marker given `panel`/`row`/`slot` (a headset write for now) shows as a grey module with a dark toggle in that slot. Proven only in Node (bounding boxes, a scratch front view); not seen in a browser or on the headset.
