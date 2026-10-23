@@ -61,6 +61,10 @@ const SCENARIOS = {
   '3d-fbatch': { view3d: true, realistic: false, furnBatch: 'all' },
   '3d-fcell': { view3d: true, realistic: false, furnBatch: 3 },
   'real-fbatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'all' },
+  // `hideFurn`: furniture items hidden (mr.js hideFurniture): { ids }, { minTris }, { maxTris } (one pass).
+  '3d-nodish': { view3d: true, realistic: false, hideFurn: { ids: ['r160'] } },
+  '3d-noheavy': { view3d: true, realistic: false, hideFurn: { minTris: 20000 } },
+  '3d-nosmall': { view3d: true, realistic: false, hideFurn: { maxTris: 10000 } },
 };
 
 const outDir = args[0];
@@ -194,10 +198,19 @@ try {
   }
   fs.mkdirSync(outDir, { recursive: true });
   const results = [];
+  // What the furniture's draw calls are, per item (once its models are in: 3D view on).
+  await app.evaluate('window.houseCadTest.set3d(true)');
+  await sleep(4000);
+  const furn = await app.evaluate('window.houseCadTest.furnitureStats?.() ?? null');
+  if (furn) {
+    fs.writeFileSync(path.join(outDir, 'furniture.json'), JSON.stringify(furn, null, 1));
+    log('furniture:', furn.items.length, 'items,', furn.items.reduce((n, i) => n + i.meshes, 0), 'meshes,',
+      furn.maps.length, 'textures,', furn.textured, 'textured looks');
+  }
   for (const name of names) {
     const s = SCENARIOS[name];
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
-      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch || 'off')}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
+      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch || 'off')}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
     const moves0 = (await app.evaluate('window.houseCadTest.state()')).shadowMoves;
     log(name, 'settling');
@@ -213,7 +226,7 @@ try {
     }
     if (report) fs.writeFileSync(path.join(outDir, `${name}.perf.txt`), report);
     const gpuAll = report?.match(/^all: ([\d.]+) ms/m)?.[1] ?? null;
-    results.push({ name, ...s, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
+    results.push({ name, ...s, hiddenFurniture: st.hiddenFurniture, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
     log(name, JSON.stringify(results.at(-1)));
   }
   fs.writeFileSync(path.join(outDir, 'perf.json'), JSON.stringify({ state, view, scale, results }, null, 1));

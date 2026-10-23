@@ -19,7 +19,7 @@ import { buildProceduralFurniture, isProcedural } from './proceduralFurniture.js
 import { assembleKitchenUnit, isKitchenUnit } from './kitchenUnits.js';
 import { buildDoorProduct } from './doorProducts.js';
 import { buildWindowProduct } from './windowProducts.js';
-import { mergePartsByMaterial, mergeObjectByMaterial, mergeAcrossByMaterial } from './mergeByMaterial.js';
+import { mergePartsByMaterial, mergeObjectByMaterial, mergeAcrossByMaterial, materialSignature } from './mergeByMaterial.js';
 import { exteriorGlassMaterial } from './exteriorView.js';
 import { sunPosition, sunDirection } from './realism.js';
 import { buildDeviceProduct } from './deviceProducts.js';
@@ -5586,6 +5586,11 @@ export function setupMR(view, project, getFootprint) {
         if (o.visible && testHide.has(testPart(o))) { o.visible = false; arch3dHidden.push(o); }
       }
     }
+    if (testHideFurn.size) {
+      for (const o of furnitureGroup.children) {
+        if (o.visible && testHideFurn.has(o.userData.furnitureId)) { o.visible = false; arch3dHidden.push(o); }
+      }
+    }
   }
   function restoreAfterArch3d() {
     for (const o of arch3dHidden) o.visible = true;
@@ -10450,6 +10455,46 @@ export function setupMR(view, project, getFootprint) {
   // Parts of the 3D view the hook can hide for a whole sample (hideForArch3d), to see what
   // each costs in fps rather than through PERF's 1.5 s windows.
   const testHide = new Set();
+  const testHideFurn = new Set(); // furniture item ids (hideFurniture)
+  const meshTris = (g) => (g.index ? g.index.count : g.attributes.position?.count || 0) / 3;
+  // A texture's look at 16×16: mean colour and spread (0–255), to find maps that are near one colour.
+  function mapSpread(tex) {
+    const img = tex?.image;
+    if (!img || !(img.width > 0)) return null;
+    try {
+      const c = new OffscreenCanvas(16, 16), x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0, 16, 16);
+      const d = x.getImageData(0, 0, 16, 16).data, mean = [0, 0, 0], n = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) mean[k] += d[i + k] / n;
+      let v = 0;
+      for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) v += (d[i + k] - mean[k]) ** 2 / (3 * n);
+      return { size: `${img.width}×${img.height}`, mean: mean.map(Math.round), spread: +Math.sqrt(v).toFixed(1) };
+    } catch { return { size: `${img.width}×${img.height}`, mean: null, spread: null }; }
+  }
+  // The furniture's draw content per item (meshes drawn, triangles one pass, textures), for
+  // finding what its draw calls are (docs/ar-survey.md "Performance notes").
+  function furnitureStats() {
+    const maps = new Map(), sigs = new Set();
+    const items = furnitureGroup.children.map((o) => {
+      let meshes = 0, tris = 0;
+      const own = new Set();
+      o.traverse((m) => {
+        if (!m.isMesh) return;
+        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+          if (!mat?.map) continue;
+          own.add(mat.map.uuid);
+          if (!maps.has(mat.map.uuid)) maps.set(mat.map.uuid, { ...mapSpread(mat.map), uses: 0 });
+          maps.get(mat.map.uuid).uses++;
+          sigs.add(materialSignature(mat));
+        }
+        meshes++; tris += meshTris(m.geometry);
+      });
+      const id = o.userData.furnitureId;
+      const rect = project.activeFloor?.rectangles.find((r) => r.id === id);
+      return { id, article: rect?.article ?? null, meshes, tris, maps: own.size };
+    });
+    return { items, maps: [...maps.values()], textured: sigs.size };
+  }
   function testPart(o) {
     if (o === furnitureGroup) return 'furniture';
     const m = o.material;
@@ -10483,7 +10528,7 @@ export function setupMR(view, project, getFootprint) {
         framebuffer: xrSize(renderer.xr.getBaseLayer?.()), scale: xrScale, foveation: renderer.xr.getFoveation?.() ?? null,
         shadowMoves: arShadowMoves, shadowSize: arSun.shadow.mapSize.x, shadowType: renderer.shadowMap.type,
         shadowMapOn: renderer.shadowMap.enabled, lights: scene.children.filter((o) => o.isLight && o.visible).length + (arSun.visible ? 1 : 0),
-        hidden: [...testHide],
+        hidden: [...testHide], hiddenFurniture: [...testHideFurn],
         frameRate: renderer.xr.getSession()?.frameRate ?? null,
       }),
       set3d(on) { if (!!on !== arch3dOn) toggleArch3d(); return arch3dOn; },
@@ -10524,6 +10569,17 @@ export function setupMR(view, project, getFootprint) {
         buildFurnitureBatch();
         return { mode: furnitureBatchMode, meshes: furnitureBatch?.children.length ?? 0, merged: furnitureBatchTaken.length };
       },
+      // Hide furniture items until the next call: { ids }, and/or those of at least `minTris` or
+      // under `maxTris` triangles (one pass); {} shows them all. Returns the ids hidden.
+      hideFurniture({ ids = [], minTris = null, maxTris = null } = {}) {
+        testHideFurn.clear();
+        for (const id of ids) testHideFurn.add(id);
+        for (const it of furnitureStats().items) {
+          if ((minTris != null && it.tris >= minTris) || (maxTris != null && it.tris < maxTris)) testHideFurn.add(it.id);
+        }
+        return [...testHideFurn];
+      },
+      furnitureStats,
       // Hide these parts (testPart names) until the next call; [] shows everything.
       hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },
       // AR Realistic's shadow: { size, type: 'pcf' | 'basic' | 'soft' }.

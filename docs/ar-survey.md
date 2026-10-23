@@ -1245,6 +1245,29 @@ teleport reticle; no last-active routing remains.
     The shadow map size (1024 vs 2048), its filter (basic vs PCF) and the floor catcher change
     nothing measurable. The plan moving redraws the shadow map about 3.5 times a second (`shadowMoves`
     55 over 16 s), not every frame. Walls and ceiling cost little.
+- **The furniture merged across items (2026-10-23, `e3a434c`, test hook `setFurnitureBatch`, off by
+  default).** `mergeAcrossByMaterial` merges every item's meshes into one per material look (materials
+  compared by signature, as each instance has its own copies). Proven, same viewpoint
+  (`--view -4.4,4.2 --no-perf --sample 8`):
+
+  | scenario | fps | p50 frame | CPU render | calls | tris |
+  |---|---|---|---|---|---|
+  | 3D view | 70.2 | 14.2 ms | 5.27 ms | 548 | 882k |
+  | 3D, no furniture | 89.9 | 11.1 ms | 2.5 ms | 130 | 101k |
+  | 3D, batch (whole floor) | 72.6 | 13.7 ms | 4.96 ms | 484 | 882k |
+  | 3D, batch (3 m cells) | 71 | 14.1 ms | 5.13 ms | 516 | 882k |
+  | Realistic | 49.7 | 20.1 ms | 7.06 ms | 550 | 882k |
+  | Realistic, no furniture | 61.4 | 16.1 ms | 2.71 ms | 132 | 102k |
+  | Realistic, batch | 49.3 | 20.2 ms | 6.59 ms | 486 | 882k |
+
+  - **Only 64 of the furniture's 418 calls merged.** The rest have different textures: each IKEA
+    rotera part (the kitchen units) has its own map, and a merge cannot join two maps without an atlas.
+  - **Hypothesis:** the furniture's cost follows its draw calls, not its triangles. The 64 calls saved
+    ~0.5 ms of frame, and at that rate the 418 calls would be its whole ~3 ms. three's CPU render time
+    also grows with them (2.5 → 5.3 ms). To prove it: hide one heavy item with few calls (the
+    dishwasher, r160, 50k triangles) and, apart, many small items with few triangles, same view.
+  - **Realistic is not helped:** 49.7 vs 49.3. Its extra cost is elsewhere (the shadow pass draws
+    the furniture again, and per-pixel shadow lookups).
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.
