@@ -1,6 +1,7 @@
 // The 3D viewport: a Three.js scene with constrained overview/POV navigation.
 // Call setGeometry() whenever the model changes to replace the house mesh.
 
+import { onceByKey } from './onceByKey.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -295,8 +296,8 @@ export class View3D {
     this.planFramedFor = undefined; // the floor filter the plan camera was last framed for
     this.onPlanServices = null; // (services[], fittingIssues, insulateM) → main.js draws the pipe legend
     this.furnitureBuildToken = 0;
-    this.furnitureSources = new Map();
-    this.furniturePending = new Map();
+    // One decoded scene per article, shared by every instance and kitchen unit (onceByKey).
+    this.furnitureSources = onceByKey((article) => this._fetchFurnitureSource(article));
     this.furnitureCatalog = {};
     this.ikeaProxy = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
     const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
@@ -626,42 +627,29 @@ export class View3D {
     }
   }
 
-  async _loadFurnitureSource(article) {
-    if (this.furnitureSources.has(article)) return this.furnitureSources.get(article);
-    if (this.furniturePending.has(article)) return this.furniturePending.get(article);
+  _loadFurnitureSource(article) { return this.furnitureSources(article); }
+
+  async _fetchFurnitureSource(article) {
     await this.furnitureCatalogReady;
     const entry = this.furnitureCatalog[article];
-    if (isProcedural(entry)) {
-      const scene = buildProceduralFurniture(entry);
-      this.furnitureSources.set(article, scene);
-      return scene;
-    }
+    if (isProcedural(entry)) return buildProceduralFurniture(entry);
     if (isKitchenUnit(entry)) { // IKEA part models assembled by code (src/ui/kitchenUnits.js)
-      const pending = assembleKitchenUnit(entry, (part) => this._loadFurnitureSource(part))
-        .then((scene) => { this.furnitureSources.set(article, scene); return scene; });
-      this.furniturePending.set(article, pending);
-      try { return await pending; } finally { this.furniturePending.delete(article); }
+      return assembleKitchenUnit(entry, (part) => this._loadFurnitureSource(part));
     }
     if (!this.ikeaProxy) throw new Error('no VITE_IKEA_PROXY');
     const url = `${this.ikeaProxy}/${article}`;
-    const pending = (async () => {
-      const cache = globalThis.caches ? await caches.open('house-cad:furniture:v1') : null;
-      const hit = cache && await cache.match(url);
-      let buffer;
-      if (hit) buffer = await hit.arrayBuffer();
-      else {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`proxy ${response.status}`);
-        if (cache) await cache.put(url, response.clone());
-        buffer = await response.arrayBuffer();
-      }
-      const scene = await new Promise((resolve, reject) =>
-        this.furnitureLoader.parse(buffer, '', (gltf) => resolve(gltf.scene), reject));
-      this.furnitureSources.set(article, scene);
-      return scene;
-    })();
-    this.furniturePending.set(article, pending);
-    try { return await pending; } finally { this.furniturePending.delete(article); }
+    const cache = globalThis.caches ? await caches.open('house-cad:furniture:v1') : null;
+    const hit = cache && await cache.match(url);
+    let buffer;
+    if (hit) buffer = await hit.arrayBuffer();
+    else {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`proxy ${response.status}`);
+      if (cache) await cache.put(url, response.clone());
+      buffer = await response.arrayBuffer();
+    }
+    return new Promise((resolve, reject) =>
+      this.furnitureLoader.parse(buffer, '', (gltf) => resolve(gltf.scene), reject));
   }
 
   _furnitureInstance(source) {

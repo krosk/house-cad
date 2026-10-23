@@ -1268,6 +1268,34 @@ teleport reticle; no last-active routing remains.
     dishwasher, r160, 50k triangles) and, apart, many small items with few triangles, same view.
   - **Realistic is not helped:** 49.7 vs 49.3. Its extra cost is elsewhere (the shadow pass draws
     the furniture again, and per-pixel shadow lookups).
+- **Calls or triangles? (2026-10-23, `1a3fbb3`, same view and command; test hook `hideFurniture`).**
+  Proven, as measured:
+
+  | scenario | fps | p50 frame | CPU render | calls | tris (both eyes) |
+  |---|---|---|---|---|---|
+  | 3D view | 70.3 | 14.1 ms | 5.09 ms | 548 | 882k |
+  | no furniture | 89.9 | 11.1 ms | 2.37 ms | 130 | 101k |
+  | no dishwasher (r160, 55k tris, 5 meshes) | 71.7 | 13.9 ms | 4.92 ms | 538 | 772k |
+  | no heavy items (20k+ tris: 9 kitchen units) | 79.3 | 12.5 ms | 4.24 ms | 444 | 401k |
+  | no small items (under 10k tris: 22 items) | 81.4 | 12.2 ms | 3.81 ms | 304 | 782k |
+  | batch (whole floor) | 73.6 | 13.5 ms | 4.75 ms | 484 | 882k |
+
+  - **Both count, calls more.** Hiding the small items removes 244 calls and 100k triangles and saves
+    ~1.9 ms; hiding the heavy ones removes 104 calls and 481k triangles and saves ~1.6 ms. A rough
+    fit of the four: ~9 µs per call, ~1.3 µs per 1000 triangles (both eyes). **Hypothesis:** the sum
+    over-predicts the whole (4.9 vs 3 ms), so the CPU submission and the GPU partly overlap.
+  - **Simplifying the dishwasher alone gains ~0.2 ms** (70.3 → 71.7 fps).
+  - **The furniture's textures** (`furnitureStats`, saved as `furniture.json` by the tool): 36 items,
+    164 meshes, 86 textures, all distinct, so 86 textured looks. The kitchen units of the same article
+    do not share their textures (r162 and r164 are both `metod-wall-60-313-r`, 3 textures each), so the
+    merge cannot join them. 24 maps are near one colour (spread under 4/255 at 16×16; 12 are 1×1).
+  - **Why they do not share (Proven, by reading the code):** `loadFurnitureSource` registered its
+    in-flight promise only after an `await` (the catalog), so every item asking for the same model at
+    startup passed the cache check and downloaded and decoded its own copy, with its own textures.
+    Desktop View 3D's `_loadFurnitureSource` had the same race. Both now go through
+    `src/ui/onceByKey.js`, which registers the load before it starts (`test/onceByKey.test.js`).
+    **Hypothesis:** the kitchen units now share their part textures, so the batch merges far more,
+    and the headset holds fewer textures; to be measured with `3d-fbatch` and `furnitureStats`.
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

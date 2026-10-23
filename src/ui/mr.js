@@ -64,6 +64,7 @@ import { CONDUIT_COLOR, PIPE_SERVICE_COLOR, FITTING_FLAG_COLOR } from './planLay
 import { ZONE_KINDS, zoneKind, zoneColorHex, lightenHex, isAperture, isStairs, hasClimb, verticalBandFields } from '../core/zoneColors.js';
 import { doorSwingSegments, garageDoorSegments, windowCasementSegments, halfWallHatchSegments, heaterFinSegments, slidingDoorSegments, resolveApertureOrient, stairSegments, rampSegments, resolveStairOrient, passageSegments } from '../core/apertureGlyph.js';
 import { rlog } from './remoteLog.js';
+import { onceByKey } from './onceByKey.js';
 import { PIPE_ANCHOR_SERVICES } from '../core/pipeAnchors.js';
 import { beamBand, beamUnder, beamsAround, worldBeams, pipeBeamClashes } from '../core/beams.js';
 
@@ -5122,8 +5123,7 @@ export function setupMR(view, project, getFootprint) {
   // origin-allowlists direct browser fetches. See docs/furniture.md.
   const furnitureDraco = new DRACOLoader().setDecoderPath(import.meta.env.BASE_URL + 'draco/');
   const furnitureLoader = new GLTFLoader().setDRACOLoader(furnitureDraco);
-  const furnitureSrc = new Map();     // article -> decoded source scene (cloned per instance)
-  const furniturePending = new Map(); // article -> in-flight Promise (dedupe concurrent loads)
+  const furnitureSources = onceByKey(fetchFurnitureSource); // article -> decoded source scene (cloned per instance)
   let furnitureCatalog = {};          // article -> { name, sizeMm } (from public/furniture/index.json)
   const IKEA_PROXY = (import.meta.env.VITE_IKEA_PROXY || '').replace(/\/+$/, '');
   const furnitureUrl = (article) => (IKEA_PROXY ? `${IKEA_PROXY}/${article}` : null);
@@ -5159,43 +5159,32 @@ export function setupMR(view, project, getFootprint) {
   // Fetch a GLB via the proxy, preferring the on-device Cache API so a model pulled once
   // works offline (on-site, no wifi). Returns the decoded source scene, cached in-memory
   // per article; concurrent requests for the same article share one promise.
-  async function loadFurnitureSource(article) {
-    if (furnitureSrc.has(article)) return furnitureSrc.get(article);
-    if (furniturePending.has(article)) return furniturePending.get(article);
+  // One decoded scene per article, shared by every instance and kitchen unit (onceByKey).
+  function loadFurnitureSource(article) { return furnitureSources(article); }
+  async function fetchFurnitureSource(article) {
     await furnitureCatalogReady;
     const entry = furnitureCatalog[article];
     if (isProcedural(entry)) {
-      const scene = buildProceduralFurniture(entry);
-      furnitureSrc.set(article, scene);
-      return scene;
+      return buildProceduralFurniture(entry);
     }
     if (isKitchenUnit(entry)) { // IKEA part models assembled by code (src/ui/kitchenUnits.js)
-      const pending = assembleKitchenUnit(entry, loadFurnitureSource)
-        .then((scene) => { furnitureSrc.set(article, scene); return scene; });
-      furniturePending.set(article, pending);
-      try { return await pending; } finally { furniturePending.delete(article); }
+      return assembleKitchenUnit(entry, loadFurnitureSource);
     }
     const url = furnitureUrl(article);
     if (!url) throw new Error('no VITE_IKEA_PROXY');
-    const p = (async () => {
-      let buf;
-      const cache = self.caches ? await caches.open(FURNITURE_CACHE) : null;
-      const hit = cache && await cache.match(url);
-      if (hit) { buf = await hit.arrayBuffer(); rlog('furniture cache hit', { article }); }
-      else {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`proxy ${res.status}`);
-        if (cache) await cache.put(url, res.clone());
-        buf = await res.arrayBuffer();
-        rlog('furniture fetched', { article, kb: Math.round(buf.byteLength / 1024) });
-      }
-      const scene = await new Promise((resolve, reject) =>
-        furnitureLoader.parse(buf, '', (gltf) => resolve(gltf.scene), reject));
-      furnitureSrc.set(article, scene);
-      return scene;
-    })();
-    furniturePending.set(article, p);
-    try { return await p; } finally { furniturePending.delete(article); }
+    let buf;
+    const cache = self.caches ? await caches.open(FURNITURE_CACHE) : null;
+    const hit = cache && await cache.match(url);
+    if (hit) { buf = await hit.arrayBuffer(); rlog('furniture cache hit', { article }); }
+    else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`proxy ${res.status}`);
+      if (cache) await cache.put(url, res.clone());
+      buf = await res.arrayBuffer();
+      rlog('furniture fetched', { article, kb: Math.round(buf.byteLength / 1024) });
+    }
+    return new Promise((resolve, reject) =>
+      furnitureLoader.parse(buf, '', (gltf) => resolve(gltf.scene), reject));
   }
 
   // --- FURNISH authoring state (M3) ---------------------------------------------
