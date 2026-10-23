@@ -5226,8 +5226,9 @@ export function setupMR(view, project, getFootprint) {
   // async; a build token drops a stale rebuild's late arrivals. buildArch3d calls this on
   // every buildPlan, so it returns early when nothing it draws changed.
   let furnitureKey = '';
-  let furnitureBatchMode = 'off'; // buildFurnitureBatch
-  let furnitureBatch = null, furnitureBatchTaken = [];
+  let furnitureBatchMode = 3; // buildFurnitureBatch: 3 m cells (docs/ar-survey.md "Performance notes")
+  let furnitureBatchColours = true; // untextured parts of any colour share one batch (vertex colours)
+  let furnitureBatch = null, furnitureBatchTaken = [], furnitureBatchTimer = 0;
   function buildFurniture(floor = project.activeFloor) {
     const items = allFloorsView ? [] : furnitureProductPlacements(floor);
     const key = JSON.stringify(items);
@@ -5253,20 +5254,29 @@ export function setupMR(view, project, getFootprint) {
         .catch((err) => { place(furnitureBox(item.article)); rlog('furniture load → box', { article: item.article, err: String(err) }); });
     });
     // Once every model is in, the floor's furniture is merged across items (furnitureBatchMode).
-    Promise.allSettled(loads).then(() => { if (token === furnitureBuildToken) buildFurnitureBatch(); });
+    // Debounced: an edit dragged across frames rebuilds the items each time, and the merge (~150
+    // meshes) waits until the edits pause; meanwhile the items draw one by one.
+    Promise.allSettled(loads).then(() => {
+      if (token !== furnitureBuildToken) return;
+      clearTimeout(furnitureBatchTimer);
+      furnitureBatchTimer = setTimeout(() => { if (token === furnitureBuildToken) buildFurnitureBatch(); }, 300);
+    });
   }
 
   // The floor's furniture merged across items, one mesh per material look (mergeAcrossByMaterial;
   // docs/ar-survey.md "Performance notes": 36 products were 418 draw calls, both eyes). The
   // items stay in furnitureGroup, hidden, so the batch can be rebuilt or turned off.
   // 'off' = per item; 'all' = one batch for the floor; a number = batches per square cell of
-  // that size in metres, so the ones out of view are culled. Set by the test hook for now.
+  // that size in metres, so the ones out of view are culled. The test hook can change it.
   function clearFurnitureBatch() {
     for (const o of furnitureBatchTaken) o.visible = true;
     furnitureBatchTaken = [];
     if (furnitureBatch) {
       furnitureGroup.remove(furnitureBatch);
-      furnitureBatch.traverse((o) => o.geometry?.dispose()); // materials belong to the items
+      furnitureBatch.traverse((o) => { // other materials belong to the items
+        o.geometry?.dispose();
+        if (o.material?.userData.ownMaterial) o.material.dispose();
+      });
       furnitureBatch = null;
     }
   }
@@ -5274,7 +5284,8 @@ export function setupMR(view, project, getFootprint) {
     clearFurnitureBatch();
     if (furnitureBatchMode === 'off') return;
     const items = furnitureGroup.children.slice();
-    const { meshes, taken } = mergeAcrossByMaterial(items, furnitureGroup, { cell: +furnitureBatchMode || 0 });
+    const { meshes, taken } = mergeAcrossByMaterial(items, furnitureGroup,
+      { cell: +furnitureBatchMode || 0, bakeColours: furnitureBatchColours });
     if (!meshes.length) return;
     furnitureBatch = new THREE.Group();
     furnitureBatch.userData.furnitureId = 'batch';
@@ -10552,9 +10563,11 @@ export function setupMR(view, project, getFootprint) {
         lastHudAt = -Infinity;
         return { yawDeg: +THREE.MathUtils.radToDeg(yaw).toFixed(1), forwardY: +(-m[9]).toFixed(2) };
       },
-      // The furniture merged across items: 'off', 'all', or a cell size in metres.
-      setFurnitureBatch(mode = 'off') {
+      // The furniture merged across items: 'off', 'all', or a cell size in metres; `colours`:
+      // untextured parts of different colours share a batch (vertex colours).
+      setFurnitureBatch(mode = 3, { colours = true } = {}) {
         furnitureBatchMode = mode === 'off' || mode === 'all' ? mode : +mode;
+        furnitureBatchColours = !!colours;
         buildFurnitureBatch();
         return { mode: furnitureBatchMode, meshes: furnitureBatch?.children.length ?? 0, merged: furnitureBatchTaken.length };
       },

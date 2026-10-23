@@ -67,3 +67,21 @@ test('a mirrored item keeps its faces outward', () => {
     assert.ok(face.dot(nrm) > 0.99, `triangle ${t / 3} faces inward`);
   }
 });
+
+test('bakeColours joins untextured parts of different colours, colour per vertex', () => {
+  const frame = new THREE.Group();
+  const red = new THREE.MeshLambertMaterial({ color: 0xff0000 }), blue = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+  const a = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), red), b = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), blue);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
+  b.position.x = 2;
+  frame.add(a, b, glass);
+  assert.equal(mergeAcrossByMaterial([a, b, glass], frame).meshes.length, 0); // without it: nothing shared
+  const { meshes, taken } = mergeAcrossByMaterial([a, b, glass], frame, { bakeColours: true });
+  assert.equal(meshes.length, 1);
+  assert.deepEqual(taken, [a, b]); // the transparent one stays apart
+  const [mesh] = meshes, col = mesh.geometry.attributes.color, n = a.geometry.attributes.position.count;
+  assert.ok(mesh.material.vertexColors && mesh.material.color.getHex() === 0xffffff && mesh.material.userData.ownMaterial);
+  assert.deepEqual([col.getX(0), col.getY(0), col.getZ(0)], [red.color.r, red.color.g, red.color.b]);
+  assert.deepEqual([col.getX(n), col.getY(n), col.getZ(n)], [blue.color.r, blue.color.g, blue.color.b]);
+  assert.equal(red.color.getHex(), 0xff0000); // the items' own materials are untouched
+});

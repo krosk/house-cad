@@ -75,10 +75,12 @@ const SIG_MAPS = ['map', 'emissiveMap', 'alphaMap', 'lightMap', 'aoMap', 'normal
 const SIG_PROPS = ['type', 'opacity', 'transparent', 'side', 'alphaTest', 'vertexColors', 'depthWrite', 'depthTest',
   'blending', 'flatShading', 'wireframe', 'fog', 'toneMapped', 'emissiveIntensity', 'roughness', 'metalness',
   'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits', 'visible'];
-export function materialSignature(m) {
+export function materialSignature(m, { ignoreColour = false } = {}) {
   if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.isShaderMaterial) return `uuid:${m.uuid}`;
   const parts = SIG_PROPS.map((p) => String(m[p]));
-  for (const c of ['color', 'emissive', 'specular']) parts.push(m[c]?.isColor ? m[c].getHexString() : '-');
+  for (const c of ['color', 'emissive', 'specular']) {
+    parts.push(c === 'color' && ignoreColour ? '*' : m[c]?.isColor ? m[c].getHexString() : '-');
+  }
   for (const k of SIG_MAPS) parts.push(m[k]?.uuid ?? '-');
   return parts.join('|');
 }
@@ -103,13 +105,22 @@ function flipWinding(geometry) {
   }
 }
 
+// An untextured, opaque material whose colour can move into the vertices: meshes that differ
+// only by colour then share one material (`bakeColours`). Vertex colours multiply the
+// material colour in three's shaders, both in linear space, so the look is unchanged.
+const SIG_ANY_MAP = SIG_MAPS.concat(['specularMap', 'envMap', 'displacementMap']);
+const bakeable = (geometry, m) => m.isMeshLambertMaterial && !m.vertexColors && !m.transparent
+  && !geometry.attributes.color && !SIG_ANY_MAP.some((k) => m[k]);
+
 // Merge the meshes of many placed models (the AR 3D view's furniture, docs/ar-survey.md
 // "Performance notes") into one mesh per material look, in `frame` space: 36 products were
 // 209 meshes, each drawn once per eye. `cell` (m, optional) keeps items whose origins fall in
 // different square cells apart, so a batch behind the viewer can still be frustum-culled.
+// `bakeColours` also joins untextured opaque Lambert meshes of different colours, their colour
+// written per vertex on a white copy of the material (`userData.ownMaterial`).
 // The sources are left in place for the caller to hide; the merged meshes own their geometry
 // (`userData.ownGeometry`) and use the first source's material. Returns { meshes, taken }.
-export function mergeAcrossByMaterial(items, frame, { cell = 0 } = {}) {
+export function mergeAcrossByMaterial(items, frame, { cell = 0, bakeColours = false } = {}) {
   frame.updateMatrixWorld(true);
   const toFrame = new THREE.Matrix4().copy(frame.matrixWorld).invert();
   const buckets = new Map(), taken = [], m = new THREE.Matrix4(), origin = new THREE.Vector3();
@@ -120,26 +131,39 @@ export function mergeAcrossByMaterial(items, frame, { cell = 0 } = {}) {
       if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || !mergeable(o.geometry, o.material)) return;
       const attrs = Object.entries(o.geometry.attributes)
         .map(([name, a]) => `${name}${a.itemSize}${a.normalized ? 'n' : ''}`).sort().join(',');
-      const key = [materialSignature(o.material), attrs, o.geometry.index ? 'i' : 'n',
-        o.castShadow ? 'c' : '', o.receiveShadow ? 'r' : '', o.renderOrder, cellKey].join('#');
-      if (!buckets.has(key)) buckets.set(key, { source: o, meshes: [] });
+      const bake = bakeColours && bakeable(o.geometry, o.material);
+      const key = [materialSignature(o.material, { ignoreColour: bake }), attrs, o.geometry.index ? 'i' : 'n',
+        o.castShadow ? 'c' : '', o.receiveShadow ? 'r' : '', o.renderOrder, cellKey, bake ? 'vc' : ''].join('#');
+      if (!buckets.has(key)) buckets.set(key, { source: o, meshes: [], bake });
       buckets.get(key).meshes.push(o);
     });
   }
   const meshes = [];
-  for (const { source, meshes: group } of buckets.values()) {
+  for (const { source, meshes: group, bake } of buckets.values()) {
     if (group.length < 2) continue; // nothing to gain: the source stays as it is
     const geometries = group.map((o) => {
       m.multiplyMatrices(toFrame, o.matrixWorld);
       const g = o.geometry.clone().applyMatrix4(m);
       g.clearGroups();
       if (m.determinant() < 0) flipWinding(g);
+      if (bake) {
+        const { r, g: gr, b } = o.material.color, n = g.attributes.position.count, c = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { c[3 * i] = r; c[3 * i + 1] = gr; c[3 * i + 2] = b; }
+        g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      }
       return g;
     });
     const merged = mergeGeometries(geometries);
     for (const g of geometries) g.dispose();
     if (!merged) continue;
-    const mesh = new THREE.Mesh(merged, source.material);
+    let material = source.material;
+    if (bake) {
+      material = source.material.clone();
+      material.color.setRGB(1, 1, 1);
+      material.vertexColors = true;
+      material.userData.ownMaterial = true;
+    }
+    const mesh = new THREE.Mesh(merged, material);
     mesh.castShadow = source.castShadow; mesh.receiveShadow = source.receiveShadow; mesh.renderOrder = source.renderOrder;
     mesh.userData.ownGeometry = true;
     meshes.push(mesh);

@@ -1296,6 +1296,33 @@ teleport reticle; no last-active routing remains.
     `src/ui/onceByKey.js`, which registers the load before it starts (`test/onceByKey.test.js`).
     **Hypothesis:** the kitchen units now share their part textures, so the batch merges far more,
     and the headset holds fewer textures; to be measured with `3d-fbatch` and `furnitureStats`.
+  - **Measured after the fix (Proven, `0d2e7a1`, same view and command):** 39 textures instead of 86,
+    146 meshes instead of 164 (the per-item merge now joins shared parts).
+
+    | scenario | fps | p50 frame | CPU render | calls |
+    |---|---|---|---|---|
+    | 3D view | 72.6 | 13.7 ms | 5.03 ms | 512 |
+    | no furniture | 90 | 11.1 ms | 2.48 ms | 130 |
+    | batch (whole floor) | 77.1 | 12.9 ms | 4.32 ms | 390 |
+    | batch (3 m cells) | 77.6 | 12.8 ms | 4.56 ms | 432 |
+    | Realistic | 49.9 | 20 ms | 6.75 ms | 514 |
+    | Realistic, batch | 49 | 20.1 ms | 5.7 ms | 392 |
+
+    From the first run (70.2) to the batch on the fixed loader (77.1–77.6): about 1.4 ms of the
+    furniture's ~3 ms. Realistic is unchanged by the batch (its CPU render drops ~1 ms, its frame does
+    not): its cost is elsewhere.
+  - **Now the default (owner, 2026-10-23: "Ok"):** the AR furniture is merged across items in 3 m
+    cells (`furnitureBatchMode = 3` in `mr.js`), 300 ms after the last furniture rebuild (an edit
+    dragged across frames draws the items one by one until it pauses). Untextured opaque Lambert parts
+    of any colour now share a batch too, their colour written per vertex on a white copy of the
+    material (`bakeColours`, `test/furnitureBatch.test.js`); the look is unchanged (Hypothesis until
+    seen on the headset: vertex colours multiply the material colour, both linear). The hook's
+    `setFurnitureBatch('off')` and the tool's `3d-fnobatch` / `3d-fcell` (no colours) / `3d-fcolours`
+    compare them; the `hideFurn` scenarios turn the batch off, as hiding an item cannot reach its
+    merged copy.
+  - **Multiview (both eyes in one pass) is not in reach:** three 0.186 (latest, 2026-10-23) has it only
+    in `WebGPURenderer`'s backends, not in the `WebGLRenderer` this app uses (Proven: its source, `npm
+    pack three@latest`). Moving renderers would touch every custom shader patch.
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

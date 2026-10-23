@@ -57,14 +57,18 @@ const SCENARIOS = {
   'real-basic': { view3d: true, realistic: true, hour: 12, shadow: { type: 'basic' } },
   'real-1024': { view3d: true, realistic: true, hour: 12, shadow: { size: 1024 } },
   'real-nofurn': { view3d: true, realistic: true, hour: 12, hide: ['furniture'] },
-  // `furnBatch`: the furniture merged across items (mr.js buildFurnitureBatch): 'all', or a cell size in m.
-  '3d-fbatch': { view3d: true, realistic: false, furnBatch: 'all' },
-  '3d-fcell': { view3d: true, realistic: false, furnBatch: 3 },
-  'real-fbatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'all' },
+  // `furnBatch`: the furniture merged across items (mr.js buildFurnitureBatch): 'off', 'all', or a cell
+  // size in m (default 3, with `colours`: untextured parts of any colour together). Unset = the app's default.
+  '3d-fnobatch': { view3d: true, realistic: false, furnBatch: 'off' },
+  '3d-fbatch': { view3d: true, realistic: false, furnBatch: 'all', colours: false },
+  '3d-fcell': { view3d: true, realistic: false, furnBatch: 3, colours: false },
+  '3d-fcolours': { view3d: true, realistic: false, furnBatch: 3, colours: true },
+  'real-fnobatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'off' },
+  'real-fbatch': { view3d: true, realistic: true, hour: 12, furnBatch: 'all', colours: false },
   // `hideFurn`: furniture items hidden (mr.js hideFurniture): { ids }, { minTris }, { maxTris } (one pass).
-  '3d-nodish': { view3d: true, realistic: false, hideFurn: { ids: ['r160'] } },
-  '3d-noheavy': { view3d: true, realistic: false, hideFurn: { minTris: 20000 } },
-  '3d-nosmall': { view3d: true, realistic: false, hideFurn: { maxTris: 10000 } },
+  '3d-nodish': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { ids: ['r160'] } },
+  '3d-noheavy': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { minTris: 20000 } },
+  '3d-nosmall': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { maxTris: 10000 } },
 };
 
 const outDir = args[0];
@@ -210,7 +214,7 @@ try {
   for (const name of names) {
     const s = SCENARIOS[name];
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
-      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch || 'off')}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
+      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
     const moves0 = (await app.evaluate('window.houseCadTest.state()')).shadowMoves;
     log(name, 'settling');
