@@ -1184,8 +1184,9 @@ teleport reticle; no last-active routing remains.
     164 meshes, 390k triangles, the biggest product 50k).
   - **Hypothesis:** `struct` is fill-bound (big surfaces over the whole view, 4× MSAA, both eyes);
     Realistic adds per-pixel shadow lookups, and maybe a shadow redraw every frame from anchor jitter.
-  - **The next run tests these:** hide the ceiling, walls or furniture one at a time, try the shadow
-    map size and filter, count the shadow redraws, and try `--scale`.
+  - **Second run, from the owner's viewpoint** (`--view -4.4,4.2`, the living room's NW corner toward the
+    origin): the 3D view at 10 fps (652 calls, 939k triangles), unchanged when the hook hid the
+    furniture, walls or ceiling. That led to the double render below; the numbers above all include it.
 
 - **Every planGroup overlay group must be in `PLAN_OVERLAY_GROUPS`** (Proven bug, fixed 2026-09-26).
   `clearPlanGeometry` removes every planGroup child it doesn't keep. Its old hand-written skip list
@@ -1214,16 +1215,20 @@ teleport reticle; no last-active routing remains.
   view's triangles (180k of ~190k, Node count of the owner's 2026-10-03 export), mostly sub-pixel,
   and since the merge they are drawn wherever you look. **Hypothesis:** those triangles were the
   frame cost; unmeasured (PROJECT · PERF `device` in the 3D list will show it).
-- **Open: the plan may still be drawn under the AR 3D view.** Two PROJECT · PERF reports on the
-  owner's Ground floor (2026-10-03, build d00be61) gave identical, deterministic per-layer calls that
-  match each layer's meshes × materials × 2 eyes, and `plan` cost 90 calls and 58.9k triangles,
-  exactly twice the plan group's content, although `hideForArch3d` should leave nothing to hide.
-  **Hypothesis:** some plan objects stay visible in the 3D view; the code path (hide in
-  `view.onXRFrame`, restore in `onXRAfterRender`) reads correct, so the cause is unknown. The same
-  content ran at 23 fps then at 82 fps minutes apart (CPU 0.6–0.7 ms js, 2.7–3.0 ms render), so the
-  frame rate depended on something outside the scene (Hypothesis: headset GPU clock / thermal state).
-  The owner chose not to pursue it (fps 50–80 is fine). To resume: record, in `perfBeforeRender`,
-  which `planGroup` children are visible while `arch3dOn`, and put them in the report.
+- **The scene was rendered several times per XR frame (found 2026-10-23, the cause of "the plan
+  may still be drawn under the AR 3D view", open since 2026-10-03).** The app opens on the 2D plan,
+  so View 3D's loop is parked. At AR start three stops its window loop, then View 3D's `sessionstart`
+  listener calls `setAnimationLoop(_animate)` (the XR loop needs that callback), which restarts the
+  window loop too. Each window frame then ran `_animate`'s desktop branch: a full render into the XR
+  framebuffer, with nothing hidden (no `onXRFrame`, so no `hideForArch3d`).
+  - **Proven** on the headset with a probe on `scene.onBeforeRender` (reached through the hook's
+    closure over DevTools): 37 XR-path renders (plan 3 children visible) against 219 window-path
+    renders (350 visible) in the same 3 s. This explains the October PERF reports' `plan` layer
+    (hidden yet drawn), the same content at 23 then 82 fps (a session started from View 3D never
+    had the extra loop), and the test hook's `hide()` doing nothing.
+  - **Fix:** `_animate` returns when presenting without an XR frame; `test/xrLoop.test.js` fails
+    without it.
+  - **Hypothesis until re-measured on the headset:** the 3D view's fps rises a lot.
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

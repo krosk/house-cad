@@ -720,7 +720,10 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    `adb reverse`); a DevTools gesture cannot start AR (the browser's "Enter VR" chip waits for the wearer); the
    launched app's page is in `/json/list`. First run done 10-23 on `619b37d` (results in `docs/ar-survey.md` "Performance notes": plan 86 fps, 3D 27,
    Realistic 16; GPU-bound). Then the experiment switches (hide parts, shadow size/type, `--scale`, shadow redraw count,
-   `--view`: the owner's standard viewpoint is the living room's NW corner toward the origin, `--view -4.4,4.2`). The headset is left awake with
+   `--view`: the owner's standard viewpoint is the living room's NW corner toward the origin, `--view -4.4,4.2`).
+   **Found 10-23: AR rendered the scene ~7 times per XR frame** (three's window loop restarted at session start,
+   `docs/ar-survey.md` "Performance notes"). Fixed in `view3d.js` `_animate` (uncommitted), test `test/xrLoop.test.js`.
+   Next: "c p", then re-run `quest-perf.mjs --view -4.4,4.2` (all scenarios) and only then optimise furniture etc. The headset is left awake with
    `prox_close` (owner asked); `automation_disable` restores the sensor.
 00e. **The electrical panel (owner 2026-10-22/23), step 1 built, uncommitted (above); the rest parked by the owner.**
    Owner facts: Legrand Drivia ready-wired T4, 3 × 13 (Leroy Merlin 71653631), on the basement's south wall ~20 cm from

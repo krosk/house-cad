@@ -1648,6 +1648,12 @@ export class View3D {
   }
 
   _animate(time, frame) {
+    // While presenting, only the XR session's frames render. The sessionstart listener's
+    // setAnimationLoop (needed: the XR loop takes its callback from it) also restarts three's
+    // window loop, whose calls come here without a frame and rendered the whole scene again,
+    // unhidden, into the XR framebuffer: about 6 extra renders per XR frame on the Quest
+    // (Proven 2026-10-23 by call stacks at render start; docs/ar-survey.md "Performance notes").
+    if (!frame && this.renderer.xr.isPresenting) return;
     if (!this.renderer.xr.isPresenting && this.cameraTransition) {
       const a = Math.min(1, (time - this.cameraTransition.start) / this.cameraTransition.duration);
       const eased = a * a * (3 - 2 * a);
