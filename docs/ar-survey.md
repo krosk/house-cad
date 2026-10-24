@@ -1383,8 +1383,9 @@ teleport reticle; no last-active routing remains.
     | no shadow | 73.4 | 13.6 ms |
 
     **Owner, 2026-10-24: "solution A"**, the basic filter on every surface, now the default (`applyArSun`);
-    `real-pcf` measures the old filter. **Hypothesis:** the edges look acceptable and show no acne; to be
-    seen on the headset (`docs/ar-qa-checklist.md`).
+    `real-pcf` measures the old filter. **Proven** (`85f9f6c`, same view and command): 3D 75.8 fps, Realistic
+    66.5 (p50 14.9 ms), Realistic with PCF 49.4 (20 ms). **Hypothesis:** the edges look acceptable and show no
+    acne; to be seen on the headset (`docs/ar-qa-checklist.md`).
     The 2026-10-23 basic run is confirmed void. The map's texel is ~1 cm over the Ground floor
     (Hypothesis: radius ~10.6 m from `arSunBox`, 2048 texels), so basic's hard edge steps by ~1 cm.
   - **A run whose `app loaded` build is not the one just deployed is void:** `update-app` failed once

@@ -19,16 +19,18 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-23 (session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g, written), performance runs driven from here + the AR double-render fix (00h); the headset plan is **307 484**. Session 44: tests, the east–west column r263 (00c), the upstairs water (00d))
+**Date:** 2026-10-24 (session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written); the headset plan is **308 126**. Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
 
 **Status:**
+- Proven (session 46, one write 2026-10-24, `write --base` on a fresh read byte-identical to 307 484, read back
+  byte-identical, 308 126): the outside waste collector to the city sewer, Ø160, 4 nodes pn452–pn455 + a Ø100 drop
+  from pn80 (item 00i; `docs/plumbing-workflow.md` "The connection to the city sewer").
+- **Committed and pushed (session 46, Proven: CI green, `version.json`, `update-app` installed each):** `e3a434c`
+  … `85f9f6c` (see Commits). Head `85f9f6c` is on the headset. Uncommitted: the last results line in
+  `docs/ar-survey.md` and this file.
 - Proven (session 45, one write 2026-10-23, `write --base` on a fresh read byte-identical to 306 688, read back
   byte-identical, 307 484): the kitchen sink's Ø40 drain into a Ø100 × 40 tee on the façade vent riser (item 00g;
   `docs/plumbing-workflow.md` "Kitchen sink into the façade vent").
-- **Committed and pushed (session 45, Proven: CI green, `version.json`, `update-app` installed each):** `84e3a90` AR
-  Realistic + panel step 1 + sink doc; `619b37d` the test hook + `tools/quest-perf.mjs`; `6216cdb` the experiment
-  switches + `--view`; `4846925` the AR double-render fix (3D view 10 → 70 fps). Uncommitted: only the post-fix
-  results in `docs/ar-survey.md` and this file.
 - **The headset is left awake** (`prox_close`, owner asked 2026-10-23); `adb shell am broadcast -a
   com.oculus.vrpowermanager.automation_disable` restores the sensor when the owner wants.
 - Proven (session 44, two writes 2026-10-22, each `write --base` on a fresh read byte-identical to its base, read back
@@ -641,7 +643,14 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   `apply --unidiff-zero` or `stash --keep-index`.
 - **`rlog` works only on the dev server;** never stage `quest-debug.log`.
 
-## Commits (sessions 40–43; all pushed, doc-only omitted; earlier sessions: `git log`)
+## Commits (sessions 40–46; all pushed, doc-only omitted; earlier sessions: `git log`)
+
+Session 46: `e3a434c` furniture merged across items (hook switch) + the profiling doc · `1a3fbb3` hideFurniture /
+furnitureStats · `0d2e7a1` furniture loads once per article (`onceByKey`) · `5feb7fd` the merge by default + colours
+per vertex · `9f3fcca` / `b550f2a` / `aa34d0a` Realistic's parts behind switches, shadow-pass count, forced filter
+recompile · `85f9f6c` the basic shadow filter + the sewer docs. Session 45: `84e3a90` AR Realistic + panel step 1 ·
+`619b37d` test hook + `tools/quest-perf.mjs` · `6216cdb` experiment switches + `--view` · `4846925` the AR
+double-render fix.
 
 Session 41: `dd00055` Aldes BDH vent models (`vmc-vent-bdh`) + VMC docs · `d9d0b67` pipe anchors + `house-query anchors` ·
 `3d09428` per-mode AR dims, batched anchor rings · `1ee0a41` BEAM zones + `house-query beams` · `3d426f1` FLAVIO vanity ·
@@ -673,7 +682,7 @@ duct insulation marking.
 export PATH="$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node | tail -1)/bin:$PATH"
 npm install                                       # once; node_modules is already present
 npm run dev -- --host                             # https on 5173; report the Network URL (stopped at the end of s40)
-npm test                                          # 14 tests, under a second; expect "# fail 0"
+npm test                                          # 28 tests, a few seconds; expect "# fail 0"
 npm run build                                     # expect "✓ built in …"
 ```
 
@@ -716,18 +725,23 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Step 2 built too: the photo finishes in AR (`applyArPhoto`, colour only), Proven in Chrome on a scratch page
    (both photo shaders compile and draw on Lambert with a PCF shadow; not seen on the headset). Not in AR, by design:
    the sky and GTAO.
-00h. **Performance runs driven from here (owner asked 2026-10-23), built and pushed (`619b37d`, `6216cdb`, `4846925`).** `tools/quest-perf.mjs` + the
-   flag-gated test hook (`mr.js` `window.houseCadTest`, `view3d.js` `xrTimingTotal`); design and traps in
-   `docs/headset-data.md` "Performance runs". Proven: the hook loads on the headset (a local build through
-   `adb reverse`); a DevTools gesture cannot start AR (the browser's "Enter VR" chip waits for the wearer); the
-   launched app's page is in `/json/list`. First run done 10-23 on `619b37d` (results in `docs/ar-survey.md` "Performance notes": plan 86 fps, 3D 27,
-   Realistic 16; GPU-bound). Then the experiment switches (hide parts, shadow size/type, `--scale`, shadow redraw count,
-   `--view`: the owner's standard viewpoint is the living room's NW corner toward the origin, `--view -4.4,4.2`).
-   **Found 10-23: AR rendered the scene ~7 times per XR frame** (three's window loop restarted at session start,
-   `docs/ar-survey.md` "Performance notes"). Fixed (`4846925`, pushed): 3D view 10 → 70 fps, Realistic 10 → 50 from the
-   owner's viewpoint. What is left: the furniture (89 → 70) and Realistic (70 → 50). Next: the owner's choice of the
-   next optimisation (my pick: furniture draw calls/triangles first). The headset is left awake with
-   `prox_close` (owner asked); `automation_disable` restores the sensor.
+00h. **AR performance (owner, 2026-10-23/24), skill `quest-perf` (`docs/performance-profiling.md`); results and every
+   table in `docs/ar-survey.md` "Performance notes".** From the owner's viewpoint (`--view -4.4,4.2`), Proven on
+   `85f9f6c`: plan ~89 fps, 3D view 75.8, Realistic 66.5 (from 10 / 10 before the double-render fix, 70 / 49 before
+   this session). Done in session 46, all pushed: the furniture merged across items in 3 m cells with untextured
+   colours baked per vertex (default; `mergeAcrossByMaterial`), the furniture loader race fixed (`onceByKey`, AR and
+   desktop: identical models were decoded per item, 86 → 39 textures), and the **basic shadow filter in AR** (owner's
+   "solution A": PCF read the map 17× per pixel, ~5.7 ms). Owner to see on the headset: the merged furniture's
+   colours and the hard shadow edges (`docs/ar-qa-checklist.md`, "AR Realistic"). What is left: the furniture's
+   ~1.2 ms (39 distinct textures: an atlas would merge them), Realistic's ~1.3 ms (photo floors ~0.7). Not reachable:
+   multiview (three has it only in WebGPURenderer). No further optimisation asked; the owner moved to another topic.
+   The headset is left awake with `prox_close`; `automation_disable` restores the sensor.
+00i. **The connection to the city sewer: written 2026-10-24 (308 126).** Owner's figures (0 / 6 / 15 m from the west
+   limit; 100 / 76 / 40 cm to the top of the pipe; ground ≈ 10 cm under the laundry window), the local regulation
+   (Paris Est Marne&Bois: ≥ 3 %, anti-backflow, a pump only for what cannot fall), frost ≈ 0.50 m, the laundry sink
+   (IKEA HAVSEN) by gravity, what to write in the quote; plot sent (scratch `sewer/sewer-profile.png`, script
+   `sewer/profile.py`). Hypotheses the owner can settle: the pipe's diameter (Ø160 assumed), where the west limit is
+   on the garden wall, the line's place in the strip, the sink's trap height and place (not in the plan).
 00e. **The electrical panel (owner 2026-10-22/23), step 1 built and pushed (`84e3a90`); the rest parked by the owner.**
    Owner facts: Legrand Drivia ready-wired T4, 3 × 13 (Leroy Merlin 71653631), on the basement's south wall ~20 cm from
    the east wall; the 23 breaker markers (m235–m272) are "placeholders for connecting markers in the same circuit
@@ -742,7 +756,7 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    Owner to check: the trap height (0.50 assumed), the route behind corner unit r158 (back panel or plinth). The
    façade vent stays Ø100 (owner asked about smaller: see the doc section). Plot sent (scratch `sink-tee.png`).
 ~~0000. Tests~~: done 10-22 (`3bebe48`, pushed). `npm test` (`node --test test/*.test.js`, 14 tests then, 19 with
-   the panel and sun tests, 21 with the XR loop test, Proven passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
+   the panel and sun tests, 21 with the XR loop test, 28 with the furniture batch and onceByKey tests (2026-10-24), Proven passing; CI runs it before the build). Synthetic houses in `test/house.js`. They cover:
    - device placements facing the room, and no plate cutting a wall (Proven: removing `markerPlacements` makes 2 fail);
    - a door cutting the wall to its head;
    - a solved save staying stable, and the save round-trip;
