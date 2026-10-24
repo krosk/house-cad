@@ -69,6 +69,8 @@ const SCENARIOS = {
   'real-nophoto': { view3d: true, realistic: true, hour: 12, real: { photo: false } },
   'real-noshadow': { view3d: true, realistic: true, hour: 12, real: { shadows: false } },
   'real-nosun': { view3d: true, realistic: true, hour: 12, real: { sun: false } },
+  'real-noreceive': { view3d: true, realistic: true, hour: 12, real: { receive: false } },
+  'real-freeze': { view3d: true, realistic: true, hour: 12, real: { freeze: true } },
   'real-bare': { view3d: true, realistic: true, hour: 12, real: { photo: false, shadows: false, sun: false } },
   // `hideFurn`: furniture items hidden (mr.js hideFurniture): { ids }, { minTris }, { maxTris } (one pass).
   '3d-nodish': { view3d: true, realistic: false, furnBatch: 'off', hideFurn: { ids: ['r160'] } },
@@ -221,12 +223,13 @@ try {
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
       h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setRealParts?.(${JSON.stringify(s.real || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
-    const moves0 = (await app.evaluate('window.houseCadTest.state()')).shadowMoves;
+    const st0 = await app.evaluate('window.houseCadTest.state()'), moves0 = st0.shadowMoves;
     log(name, 'settling');
     await sleep(s.realistic ? 10000 : 5000); // textures, photo atlases, shader compiles
     const frames = await app.evaluate(`window.houseCadTest.sample(${sampleS * 1000})`, { ms: sampleS * 1000 + 15000 });
     const st = await app.evaluate('window.houseCadTest.state()');
     const shadowMoves = st.shadowMoves - moves0; // over the settle + sample
+    const shadowRenders = st.shadowRenders != null ? st.shadowRenders - st0.shadowRenders : null; // passes drawn, same span
     let report = null;
     if (sweep) {
       await app.evaluate('window.houseCadTest.setPerf(true)');
@@ -235,15 +238,15 @@ try {
     }
     if (report) fs.writeFileSync(path.join(outDir, `${name}.perf.txt`), report);
     const gpuAll = report?.match(/^all: ([\d.]+) ms/m)?.[1] ?? null;
-    results.push({ name, ...s, hiddenFurniture: st.hiddenFurniture, lightList: st.lightList, photoMaterials: st.photoMaterials, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
+    results.push({ name, ...s, hiddenFurniture: st.hiddenFurniture, lightList: st.lightList, photoMaterials: st.photoMaterials, ...frames, gpuAll: gpuAll && +gpuAll, shadowMoves, shadowRenders, sun: st.sun, programs: st.programs, textures: st.textures, geometries: st.geometries });
     log(name, JSON.stringify(results.at(-1)));
   }
   fs.writeFileSync(path.join(outDir, 'perf.json'), JSON.stringify({ state, view, scale, results }, null, 1));
-  console.log(`\n${'scenario'.padEnd(12)}   fps   p50   p95  worst  >14ms    js  render  gpu(all)  calls    tris  shadowMoves`);
+  console.log(`\n${'scenario'.padEnd(12)}   fps   p50   p95  worst  >14ms    js  render  gpu(all)  calls    tris  shadowMoves  shadowDraws`);
   for (const r of results) {
     console.log([r.name.padEnd(12), String(r.fps).padStart(5), String(r.p50).padStart(5), String(r.p95).padStart(5),
       String(r.worst).padStart(6), String(r.over14ms).padStart(6), String(r.js).padStart(5), String(r.render).padStart(7),
-      String(r.gpuAll ?? '-').padStart(9), String(r.calls).padStart(6), String(r.tris).padStart(7), String(r.shadowMoves).padStart(12)].join(' '));
+      String(r.gpuAll ?? '-').padStart(9), String(r.calls).padStart(6), String(r.tris).padStart(7), String(r.shadowMoves).padStart(12), String(r.shadowRenders ?? '-').padStart(12)].join(' '));
   }
 } catch (error) {
   console.error('FAILED:', error.message || error);

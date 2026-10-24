@@ -1438,7 +1438,7 @@ export function setupMR(view, project, getFootprint) {
   let arSunInfo = null; // { elevation, azimuth } in degrees, for the HUD
   const AR_SUN_HOURS = [4, 22.5]; // the View 3D slider's range
   // Realistic's parts the test hook can turn off, to see what each costs (setRealParts).
-  const testReal = { photo: true, shadows: true, sun: true };
+  const testReal = { photo: true, shadows: true, sun: true, receive: true, freeze: false };
   const arSun = new THREE.DirectionalLight(0xffffff, 0);
   arSun.visible = false;
   arSun.castShadow = true;
@@ -5502,7 +5502,7 @@ export function setupMR(view, project, getFootprint) {
       if (shadows && a.floorGeometry) {
         const catcher = new THREE.Mesh(a.floorGeometry, arShadowCatcher);
         catcher.position.y = (floor.elevation || 0) - displayElevation();
-        catcher.receiveShadow = true;
+        catcher.receiveShadow = testReal.receive;
         catcher.userData.arch3dLayer = 'struct';
         arch3dGroup.add(catcher);
       } else a.floorGeometry?.dispose();
@@ -5538,7 +5538,7 @@ export function setupMR(view, project, getFootprint) {
           mesh.userData.arch3dLayer = layer;
           // Glass lets the sun through (it is opaque in AR, showing an exterior).
           mesh.castShadow = shadows && material !== arch3dMats.windows && !material.transparent;
-          mesh.receiveShadow = shadows && !material.isMeshBasicMaterial;
+          mesh.receiveShadow = shadows && testReal.receive && !material.isMeshBasicMaterial;
           arch3dGroup.add(mesh);
         }
       }
@@ -5625,7 +5625,7 @@ export function setupMR(view, project, getFootprint) {
     root.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow = on && !(Array.isArray(o.material) ? o.material : [o.material]).some((m) => m?.transparent);
-      o.receiveShadow = on;
+      o.receiveShadow = on && testReal.receive;
     });
   }
   // The sun's direction, colour and strength for today at `arSunHour`; the scene's own sun
@@ -5674,7 +5674,7 @@ export function setupMR(view, project, getFootprint) {
     for (let i = 0; i < 16; i++) {
       if (Math.abs(a[i] - b[i]) > 1e-5) {
         arSunMatrix.copy(planGroup.matrix);
-        renderer.shadowMap.needsUpdate = true;
+        if (!testReal.freeze) renderer.shadowMap.needsUpdate = true;
         arShadowMoves++;
         return;
       }
@@ -10459,6 +10459,7 @@ export function setupMR(view, project, getFootprint) {
   // each costs in fps rather than through PERF's 1.5 s windows.
   const testHide = new Set();
   const testHideFurn = new Set(); // furniture item ids (hideFurniture)
+  let testShadowRenders = 0; // shadow passes drawn (hook on)
   const meshTris = (g) => (g.index ? g.index.count : g.attributes.position?.count || 0) / 3;
   // A texture's look at 16×16: mean colour and spread (0–255), to find maps that are near one colour.
   function mapSpread(tex) {
@@ -10521,6 +10522,13 @@ export function setupMR(view, project, getFootprint) {
       const opts = JSON.parse(localStorage.getItem('house-cad:test-hook:v1') === '1' ? '{}' : localStorage.getItem('house-cad:test-hook:v1'));
       if (opts.scale) { xrScale = +opts.scale; renderer.xr.setFramebufferScaleFactor(xrScale); }
     } catch { /* a plain '1' */ }
+    // Count the shadow passes three actually draws (its render returns early when none is due).
+    const shadowRender = renderer.shadowMap.render.bind(renderer.shadowMap);
+    renderer.shadowMap.render = (...args) => {
+      const sm = renderer.shadowMap;
+      if (sm.enabled && (sm.autoUpdate || sm.needsUpdate)) testShadowRenders++;
+      return shadowRender(...args);
+    };
     window.houseCadTest = {
       state: () => ({
         build: BUILD_ID, presenting: renderer.xr.isPresenting, placed, view3d: arch3dOn, realistic: arRealistic,
@@ -10531,7 +10539,7 @@ export function setupMR(view, project, getFootprint) {
         framebuffer: xrSize(renderer.xr.getBaseLayer?.()), scale: xrScale, foveation: renderer.xr.getFoveation?.() ?? null,
         shadowMoves: arShadowMoves, shadowSize: arSun.shadow.mapSize.x, shadowType: renderer.shadowMap.type,
         shadowMapOn: renderer.shadowMap.enabled, lights: scene.children.filter((o) => o.isLight && o.visible).length + (arSun.visible ? 1 : 0),
-        hidden: [...testHide], hiddenFurniture: [...testHideFurn], realParts: { ...testReal },
+        hidden: [...testHide], hiddenFurniture: [...testHideFurn], realParts: { ...testReal }, shadowRenders: testShadowRenders,
         lightList: (() => { const l = []; scene.traverseVisible((o) => { if (o.isLight) l.push(`${o.type}${o.castShadow ? '+shadow' : ''}`); }); return l; })(),
         photoMaterials: [...arch3dFinishMats.values()].filter((m) => m.userData.restorePhoto).length,
         frameRate: renderer.xr.getSession()?.frameRate ?? null,
@@ -10590,8 +10598,15 @@ export function setupMR(view, project, getFootprint) {
       // Hide these parts (testPart names) until the next call; [] shows everything.
       hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },
       // AR Realistic's parts: { photo, shadows, sun } (false turns one off; unset = on).
-      setRealParts({ photo = true, shadows = true, sun = true } = {}) {
-        Object.assign(testReal, { photo: !!photo, shadows: !!shadows, sun: !!sun });
+      // receive: false = no surface reads the shadow map; freeze: true = it is not redrawn when
+      // the plan moves (anchor jitter), so it is drawn once.
+      setRealParts({ photo = true, shadows = true, sun = true, receive = true, freeze = false } = {}) {
+        Object.assign(testReal, { photo: !!photo, shadows: !!shadows, sun: !!sun, receive: !!receive, freeze: !!freeze });
+        arShadowFlags(furnitureGroup);
+        const on = arRealisticOn();
+        arch3dGroup.traverse((o) => {
+          if (o.isMesh) o.receiveShadow = on && testReal.receive && !o.material?.isMeshBasicMaterial;
+        });
         applyArSun();
         for (const material of arch3dFinishMats.values()) applyArPhoto(material);
         return { ...testReal };

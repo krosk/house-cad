@@ -1336,6 +1336,25 @@ teleport reticle; no last-active routing remains.
   - **Multiview (both eyes in one pass) is not in reach:** three 0.186 (latest, 2026-10-23) has it only
     in `WebGPURenderer`'s backends, not in the `WebGLRenderer` this app uses (Proven: its source, `npm
     pack three@latest`). Moving renderers would touch every custom shader patch.
+- **Where Realistic's cost is (2026-10-24, `9f3fcca`, same view and command; test hook `setRealParts`).**
+  Proven, as measured:
+
+  | scenario | fps | p50 frame | lights drawn |
+  |---|---|---|---|
+  | 3D view (furniture batched) | 78.8 | 12.6 ms | hemisphere, View 3D's sun |
+  | Realistic, noon | 50.2 | 19.8 ms | hemisphere, AR sun + shadow |
+  | no photo floors | 52.3 | 19.1 ms | |
+  | no shadows (the sun still lights) | 75.1 | 13.3 ms | |
+  | no sun | 75.8 | 13.1 ms | hemisphere only |
+  | none of the three | 78.7 | 12.6 ms | |
+
+  - **The shadow is ~6.5 ms of Realistic's ~7 ms;** the photo floors ~0.7 ms. No other light casts
+    a shadow (the light list), so a second shadow-casting light is ruled out.
+  - The map's size (1024 / 2048) and filter (basic / PCF) changed nothing (2026-10-23). **Hypothesis:**
+    the map is redrawn far more often than `shadowMoves` (2–5 a second) says; a redraw draws the whole
+    model again from the sun (~190 calls, 440k triangles), and its cost does not depend on the map's
+    size. Next run: `shadowRenders` (the passes three actually draws), `real-freeze` (never redrawn
+    after the first) and `real-noreceive` (drawn, but no surface reads it).
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.
