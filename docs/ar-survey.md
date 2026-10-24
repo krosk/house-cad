@@ -1370,6 +1370,23 @@ teleport reticle; no last-active routing remains.
     `shadowMap.type` does, so the materials kept the PCF shader. `setShadow` now forces the recompile.
     Next run: `real-basic` (1 read per pixel), `real-floorshadow` (only the floors' catchers read the map),
     `real-basic-floor`.
+  - **The filter, measured for real (Proven, `aa34d0a`, same view and command; the program count rose
+    30 → 42, so the materials did recompile):**
+
+    | scenario | fps | p50 frame |
+    |---|---|---|
+    | 3D view | 76.4 | 13 ms |
+    | Realistic (PCF, 17 reads, every surface) | 49.2 | 19.9 ms |
+    | basic filter (1 read, hard edges), every surface | 68.1 | 14.6 ms |
+    | PCF, floors only (the catchers) | 69.9 | 14.1 ms |
+    | basic, floors only | 70.1 | 14.2 ms |
+    | no shadow | 73.4 | 13.6 ms |
+
+    **Owner, 2026-10-24: "solution A"**, the basic filter on every surface, now the default (`applyArSun`);
+    `real-pcf` measures the old filter. **Hypothesis:** the edges look acceptable and show no acne; to be
+    seen on the headset (`docs/ar-qa-checklist.md`).
+    The 2026-10-23 basic run is confirmed void. The map's texel is ~1 cm over the Ground floor
+    (Hypothesis: radius ~10.6 m from `arSunBox`, 2048 texels), so basic's hard edge steps by ~1 cm.
   - **A run whose `app loaded` build is not the one just deployed is void:** `update-app` failed once
     (the DevTools port was not forwarded), the tool launched the old build and the new switches did
     nothing (2026-10-24). Check the build line before reading a table.

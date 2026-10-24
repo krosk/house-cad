@@ -5638,7 +5638,10 @@ export function setupMR(view, project, getFootprint) {
     if (view.sun) view.sun.visible = on ? false : saved.sunVisible ?? true;
     renderer.shadowMap.enabled = (on && testReal.shadows) || (saved.shadowMapEnabled ?? false);
     renderer.shadowMap.autoUpdate = on ? false : saved.shadowAutoUpdate ?? true;
-    renderer.shadowMap.type = on ? saved.testShadowType ?? THREE.PCFShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
+    // Basic, one read of the map per pixel (owner, 2026-10-24, "solution A"): three's PCF reads it 17 times,
+    // which cost Realistic ~5.7 ms a frame on the Quest (49 → 68 fps; docs/ar-survey.md "Performance notes").
+    // Hard edges, stepped by about one texel (~1 cm over the Ground floor).
+    renderer.shadowMap.type = on ? saved.testShadowType ?? THREE.BasicShadowMap : saved.shadowType ?? THREE.PCFSoftShadowMap;
     if (!on) {
       if (view.hemi && saved.hemiIntensity != null) view.hemi.intensity = saved.hemiIntensity;
       return;

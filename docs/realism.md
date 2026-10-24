@@ -67,7 +67,9 @@ session, today's date. The LEFT controller shows `SUN 14:30 · 52° S` (or `NIGH
   from plan east, `test/realism.test.js`). Same direction, warmth and fade as View 3D, strength 2.4.
   The scene's own sun hides and the hemisphere drops to the shade level (0.3–0.65); both come back
   when it is off or the session ends.
-- **Shadows:** a 2048 map fitted to the drawn model, PCF (not soft). The model's meshes and the
+- **Shadows:** a 2048 map fitted to the drawn model, **basic filter** (owner, 2026-10-24, "solution A": one
+  read of the map per pixel, hard edges stepped by about one texel, ~1 cm over the Ground floor; three's PCF
+  read it 17 times and cost ~5.7 ms a frame on the Quest, 49 → 68 fps, `docs/ar-survey.md` "Performance notes"). The model's meshes and the
   furniture cast and receive; the opaque AR glass does not cast, so the sun comes through windows.
   Each floor slab becomes a **shadow catcher** (`ShadowMaterial`, opacity 0.35): invisible, it darkens
   the real floor where the house blocks the sun, so the sun patches show on the passthrough floor.
@@ -79,7 +81,7 @@ session, today's date. The LEFT controller shows `SUN 14:30 · 52° S` (or `NIGH
   so offline once fetched; until it loads, or if it fails, the procedural texture stays (a failure is
   retried at the next Realistic). **Proven** (Chrome on the Steam Deck, a scratch page, 2026-10-23): both
   photos download and the patched Lambert shaders compile and draw, planks and stepped tiles, with a PCF
-  sun shadow on them, no WebGL error. Atlases: Charme 1760 × 2695, Monastère 1536 × 3380 (about
+  sun shadow on them (the filter then; basic since 2026-10-24), no WebGL error. Atlases: Charme 1760 × 2695, Monastère 1536 × 3380 (about
   20–30 MB of GPU memory each with mips; **Hypothesis:** fine on the Quest 3).
 - **Not in AR:** the sky (passthrough is the background; `mr.js` clears it), GTAO (no post pass in the
   XR loop; 2 eyes at 72–90 fps).

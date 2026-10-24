@@ -1256,6 +1256,144 @@ elsewhere. Window distance: the sources disagree (1 m, 3 m, "+40 cm"); none allo
 (the invert at the wall or the connection box) plus its fall (≥ 1 %) back to the upstream end; a basement
 fixture or floor drain below it needs a pump (Hypothesis).
 
+**The connection to the city sewer (owner, 2026-10-24), along the south side, outside the house, within the
+property.** Distances from the property's west limit, depths below the ground surface (owner's figures):
+
+| point | from the west limit | depth | slope to the next point west |
+|---|---|---|---|
+| point de liaison (the connection) | 0 m | 100 cm | |
+| point de connexion futur (future connection) | 6 m | 76 cm | 24 cm over 6 m = 4.0 % |
+| WC existant (existing WC) | 15 m | 40 cm | 36 cm over 9 m = 4.0 % |
+
+- **One straight fall of 4.0 %, 60 cm over 15 m** (arithmetic on the owner's figures). It is the slope of the
+  pipe only if the ground surface is level along the line (Hypothesis: depths from the paving, not from a datum).
+  4 % is above the ≥ 1 % this doc uses for the collector (Hypothesis on the norm: DTU 60.11 / the local
+  "règlement d'assainissement" set the minimum, often 1–3 %; ask the contractor).
+- **In plan coordinates (Hypothesis on the reference):** the garden's west wall r236 is x −11.032…−10.792
+  (Proven, 2026-10-24 headset plan). With the limit at its outer face, a point d m from the limit is at
+  x = −11.03 + d: the connection at x −11.03, the future connection at x −5.03 (the house's west face, r196's
+  outer face, is x −5.195: the SW corner, 0.17 m east of it), the existing WC at x 3.97 (the house's SE corner,
+  r197's outer face, is x 3.675). With the limit at the wall's inner face, add 0.24 m. The garden's south
+  wall r244 is y −7.03…−6.76; the house's south outer face is y −5.54, so the line runs in the 1.2 m strip
+  between them.
+- **Heights.** The depths are from the ground level, which the owner measured at about 10 cm below the
+  basement laundry window r146 (owner, 2026-10-24). r146's sill is 1.32 m above the basement floor (Proven,
+  2026-10-24 headset plan), so the ground is ≈ 1.22 m above the basement floor, −1.05 from the ground floor
+  (the basement floor is −2.27). Hypothesis: the ground is level along the line, and "profondeur" is the
+  pipe's invert (its inside bottom). The inverts are then:
+
+  | point | invert, from the ground floor | above the basement floor |
+  |---|---|---|
+  | WC existant (15 m) | −1.45 | 0.82 m |
+  | connexion futur (6 m) | −1.81 | 0.46 m |
+  | liaison (0 m) | −2.05 | 0.22 m |
+
+  - Below the line, nothing drains by gravity: a basement fixture or floor drain at the west end whose
+    outlet is lower than ≈ 0.46 m above the basement floor (the future connection) needs a pump.
+  - The drafted collector tee pn80 (x 0.62, 1.00 m above the basement floor) sits ≈ 0.31 m above the line
+    there (0.69 m), so it would drop into it, not run along it.
+  - The line is ≈ 0.4–0.8 m below the ground, so a pipe leaving the basement to reach it crosses the
+    buried part of the south wall (a sealed sleeve, Hypothesis). The upper stack run p58, which stops in r66
+    1.90 m up, has ≥ 1.1 m to fall to it.
+  - The owner's 2026-10-10 "≈ 1 m above the basement floor" for the collector's east end is ≈ 0.18 m above the
+    existing WC's 0.82 m.
+- **Cover and slope guidance (owner question, 2026-10-24; Hypothesis: secondary summaries of NF DTU 60.1 /
+  60.11 / NF EN 12056, not the texts):** no single national minimum depth for a private waste pipe; ≈ 60 cm
+  cover is the usual recommendation, adjusted to the local frost depth (≈ 50–90 cm in France by region, more
+  with altitude); ≈ 80 cm where vehicles cross (public-works practice), otherwise SN8 pipe or a concrete slab
+  over it. The commune's "règlement d'assainissement" governs the connection to the public sewer. Slope: the
+  generic sources give 1 % minimum and 3 % as the top of the usual range, but the local regulation overrides
+  them (next bullet: ≥ 3 % minimum), so this line's 4 % is compliant. The existing WC at 40 cm is under the usual cover (waste pipes
+  empty between flushes, so they tolerate frost better than supply pipes; insulation board over it is the
+  usual fix when depth cannot be gained). Sources: sfa.fr "Quelles normes pour l'évacuation des eaux usées",
+  obterra.com "Profondeur enfouissement canalisation eaux usées", guevel-tp.fr, neatfx.fr (pente).
+  Questions for the contractor: the local frost depth; the 40 cm WC pipe (keep, insulate, lower); vehicles on
+  the strip; 4 % acceptable; the commune's regulation.
+- **The local regulation (Proven: its text, read 2026-10-24):** sanitation at Saint-Maur-des-Fossés is run by
+  the territory Paris Est Marne&Bois (EPT10, owner); its "Règlement de service de l'assainissement" (version of
+  délibération D18.41, 25 June 2018, parisestmarnebois.fr; a newer edition may exist, ask the service) says:
+  - art. 50, buried private pipes: the shortest route to the street sewer, as few changes of slope and
+    direction as possible, **slope ≥ 3 %**;
+  - art. 9.1, the public part of the branch: ≥ 3 %, inside Ø ≥ 160 mm for waste water; a branch box
+    ("boîte de branchement") on the private side within 1 m of the public/private limit (or on the public
+    side), brought up to ground level, watertight, visible, accessible;
+  - art. 45, backflow: every drain outlet below the level of the street the sewer runs in needs an
+    anti-backflow device, and pipes and joints below it must withstand the pressure (the basement's
+    fixtures, Hypothesis: the basement floor is ≈ 1.2 m below the ground here);
+  - art. 46: every fixture trapped, with an accessible cleaning point, protected from frost.
+  It sets no burial depth; no depth figure was found in its text.
+  - On pumps (art. 15/16, Proven: its text): a building below the public sewer counts as connectable and must
+    then have a lifting device at the owner's cost; installations below the street need a backflow valve
+    (clapet anti-retour) on the private side, before or in the branch box, "and if necessary" a lifting
+    device. So a pump is for what cannot fall by gravity; a backflow valve is a different device.
+- **The owner's concern (2026-10-24): that the contractor does not dig to the future connection and proposes a
+  pump instead.** Arithmetic on the owner's figures: the connection is 24 cm deeper than the future
+  connection, so gravity works all the way at 4 % (≥ 3 %, art. 50); nothing between them needs lifting. A pump
+  is justified only for a basement outlet lower than the line where it joins (≈ 0.46 m above the basement floor
+  at the future connection, less the pipe's own fall from the outlet); a washing machine pumps its own water
+  up to a standpipe, a laundry sink's trap outlet is usually ≈ 0.45–0.55 m up (Hypothesis, typical
+  heights), a floor drain would need one. What to write into the quote: the inverts (fil d'eau) at each point
+  (WC 40, future connection 76, connection 100 cm below the ground), slope ≥ 3 % (art. 50), gravity
+  throughout, an inspection box or tee at the future connection with its invert, the backflow valve
+  (art. 45 / 9.1); ask for a longitudinal profile ("profil en long") with these levels, and check the inverts
+  with a level before backfilling (photos), as the service may inspect before connection (art. 51).
+- **The laundry sink against the pump limit (owner, 2026-10-24: IKEA HAVSEN "évier intégré" 1 bowl, 53 × 47 cm,
+  s39253713, with the LILLVIKEN trap/waste 103.115.39).** Proven (ikea.com/fr product page): bowl 19 cm deep,
+  sink 20 cm high, it sits on a base cabinet (cutout 44.7 × 51.5 cm). Not in the plan: its place in the laundry
+  r66 is unknown. The assembly instructions give no trap height. Hypothesis (typical, not measured): rim ≈ 0.90 m
+  on a METOD/ENHET base (worktop height), bowl outlet ≈ 0.70 m, trap outlet ≈ 0.48–0.56 m above the floor.
+  Its drain must reach the line with a fall: from the laundry's south-west corner to the future connection
+  ≈ 2.2 m (to the wall 0.3, through the basement wall ≈ 0.55, to the line ≈ 0.6, west ≈ 0.7; Hypothesis on the
+  route), 6.6 cm at 3 %, so its trap outlet must be ≥ ≈ 0.53 m above the basement floor: borderline.
+  Margins: a flat trap ("siphon extra-plat") under the bowl, the sink raised (legs or a plinth), the sink near
+  the laundry's west end, and **the future connection set deeper**: the liaison at 100 cm allows up to 82 cm at
+  6 m while keeping 3 % downstream ((100 − 82) / 6 = 3.0 %; the WC stretch then falls 42 cm over 9 m, 4.7 %),
+  6 cm more than the 76 cm drawn. Measure the trap outlet once the sink is chosen and placed.
+- **Correction (owner, 2026-10-24): the depths are to the top of the pipe, not its invert.** The invert is
+  then deeper by the pipe's outside diameter less one wall: ≈ 15.5 cm for PVC Ø160 (SN8 wall ≈ 4.7 mm),
+  ≈ 12 cm for Ø125, ≈ 10.4 cm for Ø110 (Hypothesis: the diameter is not known; the regulation asks ≥ Ø160 for
+  the public part, art. 9.1). The slopes stay 4.0 % if the diameter is the same throughout; the cover is now
+  exactly the owner's figure (40 cm at the WC). With Ø160, the inverts are ≈ 1.16 (connection), 0.92 (future
+  connection) and 0.56 m (WC) below the ground, i.e. 0.07, 0.31 and 0.67 m above the basement floor, so the
+  gravity limit at the future connection drops from 0.46 to ≈ 0.31 m (≈ 0.34 for Ø125, 0.36 for Ø110). The
+  laundry sink then needs its trap outlet ≥ ≈ 0.37–0.43 m (the limit plus ≈ 6.6 cm of fall), below the
+  typical 0.48–0.56 m: it drains by gravity with ≈ 5–19 cm to spare (Hypothesis until the trap is measured).
+  The earlier "invert" figures in this section read with this correction.
+- **The sink's drain run, corrected (owner, 2026-10-24: the sink goes in the corner, and the drain may not need
+  3 %).** The 2.2 m above added the legs (to the wall, through it, out to the line, west to the point). In the
+  laundry's south-west corner (inside faces x −4.63, y −4.90; Proven, plan) the trap is ≈ 0.25 m from each wall
+  and the future connection is ≈ 0.4 m west of that corner, just outside the south face: a direct run is
+  ≈ 1.0–1.3 m (Hypothesis: the line's distance from the house is not known). Slope: above the floor, inside, a
+  branch needs ≥ 1 % (DTU 60.11, secondary sources); art. 50 asks ≥ 3 % of buried pipes, which covers the stub
+  outside the wall. At 1.2 m that is 1.2–3.6 cm of fall, so the trap outlet needs ≥ ≈ 0.31–0.34 m above the
+  floor against the ≈ 0.30 m invert (Ø160): ≈ 14–25 cm below the typical 0.48–0.56 m.
+- **Drawn (owner's "W", 2026-10-24; written to the headset, read back identical, 308 126):** waste Ø160 on the
+  basement, nodes pn452 liaison (x −11.03, axis 0.14 m above the basement floor), pn453 future connection
+  (x −5.03, 0.38), pn454 a tee (x 0.62, 0.606), pn455 the existing WC (x 3.97, 0.74), all at y −5.8089; pipes
+  p424–p426 (Ø160) and p427 (Ø100) from the drafted collector tee pn80 down into pn454. The line's y continues
+  the drafted façade-vent pipe pn81 → pn80 straight down to the line's height, so pn80 needs no fitting (its
+  place in the strip is not known, Hypothesis); pn454 derives a standard 87°30' Ø160/100 tee. Checked in Node
+  before the write: no conflict or deleted dimension, nothing else moved, no beam clash, the fitting flags
+  unchanged (pn81's 8.5° kink predates it). Hypotheses carried: Ø160, the west limit at the garden wall's outer
+  face, the ground level along the line. The laundry sink is not drawn (not in the plan).
+
+- **Frost depth at Saint-Maur (94) (Hypothesis, secondary sources):** Île-de-France is in the temperate zone,
+  H0 = 0.50 m (AFNOR FD P 18-326, the per-department table, written for foundations and used for pipes too),
+  plus (A − 150 m) / 1000 above 150 m altitude; Saint-Maur is well below 150 m, so 0.50 m.
+- **The straight 4 % line meets the 3 % minimum,** with no drop. At 4 % it passes the 0.50 m frost depth
+  2.5 m west of the existing WC (the first 2.5 m to insulate if the contractor asks).
+- **If it had to be exactly 3 % with the WC fixed at 40 cm (owner question, 2026-10-24; arithmetic):** 3 % over the 15 m
+  falls 45 cm, so a straight 3 % line ends at 85 cm, 15 cm above the 100 cm connection; the extra 15 cm must
+  be a drop (an inspection chamber with a drop, "regard de chute", or a short steep section of two 45°
+  bends). Where it goes matters:
+  - drop at the connection end: the line passes 6 m at 67 cm, 9 cm above the future connection's 76 cm, so a
+    branch arriving there at 76 cm could not join by gravity;
+  - **drop at the WC end (proposed):** 40 → 55 cm in a chamber right after the WC, then 3 %: 82 cm at 6 m (a
+    branch at 76 cm joins 6 cm above the line) and 100 cm at the connection. The pipe is then below the
+    0.50 m frost depth from the chamber on, leaving only the existing 40 cm stretch to insulate;
+  - or two drops (9 cm at the WC end, 6 cm at the connection) to pass exactly 76 cm at 6 m.
+
+
 **Kitchen sink into the façade vent (owner, 2026-10-23; written to the headset the same day, read back identical, 307 484):**
 the sink unit r159 stands on the kitchen's west wall, 1.3 m north of the south wall r135. Its Ø40 drain joins the
 façade vent's riser from the side, through a Ø100 × 40 tee below the vent's top, so the riser is the sink's vent above

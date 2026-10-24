@@ -419,6 +419,8 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
 - [ ] PROJECT · PERF with the 3D view on, Realistic off then on: note the fps both ways
 - [ ] A Beaulieu charme or Monastère floor: with Realistic on it turns to the photo planks or tiles (a few seconds the first time, then offline), back to the procedural look when off
 - [ ] TELEPORT and a LEFT stick yaw step with it on: the shadows stay on the model (the map is redrawn)
+- [ ] Basic shadow filter (2026-10-24, owner's "solution A"): shadow edges are hard with ~1 cm steps; acceptable at arm's length, no acne or flicker; Realistic near 68 fps from the living room's NW corner (was 49)
+- [ ] The furniture merged across items (2026-10-23): radiators, bin, AC units and painted kitchen panels keep their colours; the kitchen looks as before
 
 ## HEAT LOSS · WHAT IF  ⬜ NEW (2026-10-05) — Node-verified only
 - [ ] The panel shows HOUSE W · kWh/yr under the title, and "All insulation and windows counted"

@@ -43,7 +43,7 @@ const SAFE_PAGE = 'https://krosk.github.io/house-cad/version.json';
 const HOOK_KEY = 'house-cad:test-hook:v1';
 // `hide`: parts hidden for the whole sample (mr.js testPart: ceiling, walls, furniture,
 // catcher, outlines, struct, finish, doorwin, device); `shadow`: Realistic's map size and
-// filter. Unset = 2048 PCF, everything shown.
+// filter. Unset = 2048 basic (the app's default since 2026-10-24), everything shown.
 const SCENARIOS = {
   plan: { view3d: false, realistic: false },
   '3d': { view3d: true, realistic: false },
@@ -54,7 +54,7 @@ const SCENARIOS = {
   '3d-nofurn': { view3d: true, realistic: false, hide: ['furniture'] },
   '3d-bare': { view3d: true, realistic: false, hide: ['ceiling', 'walls', 'furniture'] },
   'real-nocatch': { view3d: true, realistic: true, hour: 12, hide: ['catcher'] },
-  'real-basic': { view3d: true, realistic: true, hour: 12, shadow: { type: 'basic' } },
+  'real-pcf': { view3d: true, realistic: true, hour: 12, shadow: { type: 'pcf' } },
   'real-1024': { view3d: true, realistic: true, hour: 12, shadow: { size: 1024 } },
   'real-nofurn': { view3d: true, realistic: true, hour: 12, hide: ['furniture'] },
   // `furnBatch`: the furniture merged across items (mr.js buildFurnitureBatch): 'off', 'all', or a cell
@@ -223,7 +223,7 @@ try {
   for (const name of names) {
     const s = SCENARIOS[name];
     await app.evaluate(`(() => { const h = window.houseCadTest; h.set3d(${s.view3d}); h.setRealistic(${s.realistic});
-      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setRealParts?.(${JSON.stringify(s.real || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'pcf', ...s.shadow })});
+      h.hide(${JSON.stringify(s.hide || [])}); h.setFurnitureBatch?.(${JSON.stringify(s.furnBatch ?? 3)}, ${JSON.stringify({ colours: s.colours ?? true })}); h.hideFurniture?.(${JSON.stringify(s.hideFurn || {})}); h.setRealParts?.(${JSON.stringify(s.real || {})}); h.setShadow(${JSON.stringify({ size: 2048, type: 'basic', ...s.shadow })});
       ${s.hour != null ? `h.setSunHour(${s.hour});` : ''} return true; })()`);
     const st0 = await app.evaluate('window.houseCadTest.state()'), moves0 = st0.shadowMoves;
     log(name, 'settling');

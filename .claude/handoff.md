@@ -43,8 +43,10 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 - Proven (git; `version.json` "05540e2 1022-1859Z"; Actions run success with its `npm test` step; `update-app`
   installed it): the head is `05540e2`, pushed, served and on the headset. Session 44 commits: `3bebe48` tests + CI +
   CLAUDE.md/README refresh + the `solve-house.mjs` validation fix, `05540e2` docs. Uncommitted since: see above.
-- **The base for the next write is 307 484 chars** (the sink drain on 306 688; scratch `readback-1023a.json`,
-  written 2026-10-23, read back byte-identical; backup `backup-1023a` holds the 306 688 state; earlier
+- **The base for the next write is 308 126 chars** (2026-10-24: the outside waste collector to the city sewer on
+  307 484, docs/plumbing-workflow.md "The connection to the city sewer"; scratch `sewer/readback.json`, read back
+  byte-identical; backup `backup-1024-sewer` holds the 307 484 state). Before it: 307 484 (the sink drain on
+  306 688; scratch `readback-1023a.json`, written 2026-10-23, read back byte-identical; backup `backup-1023a` holds the 306 688 state; earlier
   `backup-1022` … `backup-1022d`; scratch is session-local). It was written in solved
   form (`solve-house.mjs`), so the app's next save should change nothing (Hypothesis until a fresh read shows it).
 - Earlier writes, compressed: 286 266 (10-20, item 98: four door frames, r93 on the Meli, r92 7 cm west), 286 557
