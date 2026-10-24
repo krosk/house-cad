@@ -70,6 +70,8 @@ const SCENARIOS = {
   'real-noshadow': { view3d: true, realistic: true, hour: 12, real: { shadows: false } },
   'real-nosun': { view3d: true, realistic: true, hour: 12, real: { sun: false } },
   'real-noreceive': { view3d: true, realistic: true, hour: 12, real: { receive: false } },
+  'real-floorshadow': { view3d: true, realistic: true, hour: 12, real: { receive: 'floor' } },
+  'real-basic-floor': { view3d: true, realistic: true, hour: 12, shadow: { type: 'basic' }, real: { receive: 'floor' } },
   'real-freeze': { view3d: true, realistic: true, hour: 12, real: { freeze: true } },
   'real-bare': { view3d: true, realistic: true, hour: 12, real: { photo: false, shadows: false, sun: false } },
   // `hideFurn`: furniture items hidden (mr.js hideFurniture): { ids }, { minTris }, { maxTris } (one pass).

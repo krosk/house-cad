@@ -1353,8 +1353,26 @@ teleport reticle; no last-active routing remains.
   - The map's size (1024 / 2048) and filter (basic / PCF) changed nothing (2026-10-23). **Hypothesis:**
     the map is redrawn far more often than `shadowMoves` (2–5 a second) says; a redraw draws the whole
     model again from the sun (~190 calls, 440k triangles), and its cost does not depend on the map's
-    size. Next run: `shadowRenders` (the passes three actually draws), `real-freeze` (never redrawn
-    after the first) and `real-noreceive` (drawn, but no surface reads it).
+    size. **Refuted** by the next run.
+  - **Reading the map is the cost, not drawing it (Proven, `b550f2a`, same view and command):**
+
+    | scenario | fps | p50 frame | shadow passes drawn |
+    |---|---|---|---|
+    | Realistic | 49.5 | 19.9 ms | 47 |
+    | never redrawn after the first (`real-freeze`) | 50.3 | 19.8 ms | 0 |
+    | drawn, no surface reads it (`real-noreceive`) | 70.2 | 14.2 ms | 78 |
+    | no shadow | 73.8 | 13.6 ms | 0 |
+
+    Reading costs ~5.7 ms. three 0.170's PCF filter reads the map 17 times per pixel
+    (`shadowmap_pars_fragment`, Proven from its source), on every receiving surface of both eyes.
+  - **The 2026-10-23 "basic filter changed nothing" is void (Hypothesis, to be confirmed by the next
+    run):** three recompiles a built material when its version or its lights change, not when only
+    `shadowMap.type` does, so the materials kept the PCF shader. `setShadow` now forces the recompile.
+    Next run: `real-basic` (1 read per pixel), `real-floorshadow` (only the floors' catchers read the map),
+    `real-basic-floor`.
+  - **A run whose `app loaded` build is not the one just deployed is void:** `update-app` failed once
+    (the DevTools port was not forwarded), the tool launched the old build and the new switches did
+    nothing (2026-10-24). Check the build line before reading a table.
 - **AR furniture is drawn with Lambert copies of its materials** (`arLambert` in `mr.js`), like the
   rest of the AR 3D view: colour, map, emissive, opacity kept; roughness, metalness, bump and normal
   maps dropped, a metal's colour darkened by `0.6 × metalness` to stay close to its unlit PBR look.

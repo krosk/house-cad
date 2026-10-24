@@ -5502,7 +5502,7 @@ export function setupMR(view, project, getFootprint) {
       if (shadows && a.floorGeometry) {
         const catcher = new THREE.Mesh(a.floorGeometry, arShadowCatcher);
         catcher.position.y = (floor.elevation || 0) - displayElevation();
-        catcher.receiveShadow = testReal.receive;
+        catcher.receiveShadow = !!testReal.receive;
         catcher.userData.arch3dLayer = 'struct';
         arch3dGroup.add(catcher);
       } else a.floorGeometry?.dispose();
@@ -5538,7 +5538,7 @@ export function setupMR(view, project, getFootprint) {
           mesh.userData.arch3dLayer = layer;
           // Glass lets the sun through (it is opaque in AR, showing an exterior).
           mesh.castShadow = shadows && material !== arch3dMats.windows && !material.transparent;
-          mesh.receiveShadow = shadows && testReal.receive && !material.isMeshBasicMaterial;
+          mesh.receiveShadow = shadows && testReal.receive === true && !material.isMeshBasicMaterial;
           arch3dGroup.add(mesh);
         }
       }
@@ -5625,7 +5625,7 @@ export function setupMR(view, project, getFootprint) {
     root.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow = on && !(Array.isArray(o.material) ? o.material : [o.material]).some((m) => m?.transparent);
-      o.receiveShadow = on && testReal.receive;
+      o.receiveShadow = on && testReal.receive === true;
     });
   }
   // The sun's direction, colour and strength for today at `arSunHour`; the scene's own sun
@@ -10598,14 +10598,17 @@ export function setupMR(view, project, getFootprint) {
       // Hide these parts (testPart names) until the next call; [] shows everything.
       hide(parts = []) { testHide.clear(); for (const p of parts) testHide.add(p); return [...testHide]; },
       // AR Realistic's parts: { photo, shadows, sun } (false turns one off; unset = on).
-      // receive: false = no surface reads the shadow map; freeze: true = it is not redrawn when
+      // receive: false = no surface reads the shadow map, 'floor' = only the floor catchers do;
+      // freeze: true = it is not redrawn when
       // the plan moves (anchor jitter), so it is drawn once.
       setRealParts({ photo = true, shadows = true, sun = true, receive = true, freeze = false } = {}) {
-        Object.assign(testReal, { photo: !!photo, shadows: !!shadows, sun: !!sun, receive: !!receive, freeze: !!freeze });
+        Object.assign(testReal, { photo: !!photo, shadows: !!shadows, sun: !!sun, receive: receive === 'floor' ? 'floor' : !!receive, freeze: !!freeze });
         arShadowFlags(furnitureGroup);
         const on = arRealisticOn();
         arch3dGroup.traverse((o) => {
-          if (o.isMesh) o.receiveShadow = on && testReal.receive && !o.material?.isMeshBasicMaterial;
+          if (!o.isMesh) return;
+          o.receiveShadow = o.material === arShadowCatcher ? on && !!testReal.receive
+            : on && testReal.receive === true && !o.material?.isMeshBasicMaterial;
         });
         applyArSun();
         for (const material of arch3dFinishMats.values()) applyArPhoto(material);
@@ -10618,7 +10621,13 @@ export function setupMR(view, project, getFootprint) {
           arSun.shadow.map?.dispose(); arSun.shadow.map = null;
         }
         if (type) saved.testShadowType = { pcf: THREE.PCFShadowMap, basic: THREE.BasicShadowMap, soft: THREE.PCFSoftShadowMap }[type];
+        const before = renderer.shadowMap.type;
         applyArSun();
+        // three does not recompile a built material when only the filter type changes
+        // (its program check skips shadowMap.type): force it, or the old filter stays.
+        if (renderer.shadowMap.type !== before) {
+          scene.traverse((o) => { for (const m of [o.material].flat()) if (m) m.needsUpdate = true; });
+        }
         return { size: arSun.shadow.mapSize.x, type: renderer.shadowMap.type };
       },
       perfCycle: () => ({ phase: perf.phase, layers: (perf.layers || perfLayers()).length, ready: !!perf.reportText }),
