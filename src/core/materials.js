@@ -70,9 +70,15 @@ export const BUILTIN_MATERIALS = [
     // lame-de-cloture-aluminium-ajouree-klos-up-gris-zinc-l-176-x-ht-9-cm-x-ep-25mm-98659652.html):
     // spec table 176 × 9 cm, 25 mm, textured RAL 7016; the same 90 × 25 slat as the Trez gates. The
     // owner's fence styling (2026-10-17). Gap 9 mm: estimate from the laid photo (media 5365139: a
-    // 25.6 px pitch for 23.5 px slats ≈ 98 mm). No posts drawn (the page names none; 'boards' has
-    // none); the colour is the Trez gates' (#5a636c).
-    id: 'fence_klosup_ajouree_anthracite', surface: 'fence', pattern: 'fence', design: 'boards', w: 0.09, h: 0, joint: 0.009,
+    // 25.6 px pitch for 23.5 px slats ≈ 98 mm); the colour is the Trez gates' (#5a636c).
+    // Owner, 2026-10-25 (the street fence, Leroy Merlin quote 780480): the Klos'up guides (2019
+    // "entretoises", 2021 kit) fix the gap at 10 mm (the PVC spacers: a 100 mm pitch) and give the
+    // uprights: post 74 × 42 mm (42 along the fence), glissière 40 × 21.5 mm (21.5 along it, screwed
+    // to a pillar), both ending 25 mm over the top slat (a 25 mm top closer). With 'boards' the zone's
+    // top is the top slat + one gap, so the uprights stand `above` = 15 mm over it. Posts ≤ 1772 mm
+    // apart for 1760 mm slats: draw one FENCE zone per bay (fencePostBoxes puts a post at each joint).
+    id: 'fence_klosup_ajouree_anthracite', surface: 'fence', pattern: 'fence', design: 'boards', w: 0.09, h: 0, joint: 0.01,
+    posts: { post: [0.042, 0.074], channel: [0.0215, 0.04], above: 0.015 },
     color: 0x5a636c,
     name: { en: "Klos'up open-work aluminium slats 9 cm, anthracite", fr: "Lames aluminium ajourées Klos'up 9 cm, anthracite", zh: "Klos'up 铝制镂空横板 9 cm（炭灰）" },
   },
@@ -314,6 +320,27 @@ export const BUILTIN_MATERIALS = [
     w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
     color: 0x5a636c, accent: 0x5a636c, pack: null,
     name: { en: 'Trez aluminium driveway gate, 2 leaves, axes 2.70 m, anthracite', fr: 'Portail battant aluminium Trez 2 vantaux, axes à 2,70 m, anthracite', zh: 'Trez 铝制双开车道大门（轴距 2.70 m，炭灰）' },
+  },
+  {
+    // Leroy Merlin Trez swing gate, standard l.99 × H.154, anthracite (70193214; the older listing
+    // 69573224 is the same gate at H.153), "104 cm between pillars": the owner's street gate
+    // (2026-10-25). The zone is the opening between the pillars; the leaf is 99 cm, 25 mm in from
+    // each (`sidePlay`). Its height is the zone's [sill, head]. Profiles and slat layout: the Trez
+    // (src/ui/doorProducts.js buildGate).
+    id: 'gate_trez_anthracite_std99', surface: 'door', pattern: 'door', design: 'trez', mount: 'gate', sidePlay: 0.025,
+    w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: 'Trez aluminium gate 99 cm, between pillars 104, anthracite', fr: 'Portillon aluminium Trez 99 cm, entre piliers 104, anthracite', zh: 'Trez 铝制花园小门 99 cm（柱间 104，炭灰）' },
+  },
+  {
+    // Leroy Merlin Trez swing driveway gate, 2 leaves, made to measure to the opening between the
+    // pillars (the owner's quote 780480: "2860 between pillars", 2026-10-25; the maker fits the
+    // leaves, play and hinges inside it). The standard 80092306 is 299 cm in 306 between pillars, so
+    // the leaves stand 35 mm in from each pillar (`sidePlay`); height = the zone's [sill, head].
+    id: 'gate_trez2_anthracite_opening', surface: 'door', pattern: 'door', design: 'trez', mount: 'gate', leaves: 2, sidePlay: 0.035,
+    w: 0, h: 0, joint: 0, leafDepth: 0.06, roughness: 0.55, metalness: 0.2,
+    color: 0x5a636c, accent: 0x5a636c, pack: null,
+    name: { en: 'Trez aluminium driveway gate, 2 leaves, to the opening, anthracite', fr: 'Portail battant aluminium Trez 2 vantaux, à la mesure entre piliers, anthracite', zh: 'Trez 铝制双开车道大门（按柱间尺寸，炭灰）' },
   },
   {
     // Leroy Merlin Bono swing driveway gate 299 × 168.5, RAL 7016T (80118263, Klos'up): two

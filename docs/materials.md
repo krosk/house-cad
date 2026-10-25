@@ -889,6 +889,20 @@ estimates are embedded in that code** (`docs/product-modelling.md` step 6). In s
   3.01 m zones): the hinge pins at x = ±1.35 m, 2.70 m apart, in both. Hypothesis: that "axis" means the
   hinge pins, and the 65 mm reading of the manual's figure; Leroy Merlin's made-to-measure form may take the
   width or the opening instead, so quote 2.76 m gate / 2.83 m between pillars when ordering.
+- **Fitted between pillars, hung from a sill (owner, 2026-10-25, the street gates of quote 780480).**
+  `sidePlay`: the GATE zone is the opening between the pillars and the leaves stand that much in from each.
+  A GATE zone's `sill` (now editable, like a door's) is where the leaf starts above the ground (a leaf hung
+  over a platform, or to line its slats up with a fence); 0 keeps the product's own 35 mm. The whole gate
+  is lifted by it except the ground stop.
+  - `gate_trez_anthracite_std99`: the standard Trez l.99 × H.154 (Leroy Merlin 70193214; 69573224 is the
+    same gate at H.153), "104 cm between pillars", so `sidePlay` 25 mm.
+  - `gate_trez2_anthracite_opening`: the 2-leaf Trez made to the opening ("2860 between pillars" on the
+    quote; the maker fits leaves, play and hinges inside it), `sidePlay` 35 mm (the standard 80092306: 299
+    in 306).
+  - Proven (Node, test/streetWall.test.js): a 1.04 zone with sill 0.23 and head 1.77 gives a 0.99 leaf
+    from 0.23 to 1.77; a 2.86 zone, 2.79 of leaves with the stop on the ground. Hypothesis: the heights
+    are the owner's plan values, not the maker's (H 1770 on the quote may include the gap under the
+    leaf; to ask), and the slat pitch is the 2026-10-17 photo fit (101 mm), not measured on the gate.
 - Estimates (all): slats and rails centred in the stile depth, the gate centred in the zone's
   depth, hinge shapes simplified, the colour #5a636c (lit studio greys read lighter; the JAX photo
   ≈ #6e7882).
@@ -1005,10 +1019,20 @@ as a `{rect}` finish, like a door product, in AR **MATERIAL · FENCE**. `design`
 looks with typical sizes (Hypothesis, not a product); a real product would be a new entry. No takeoff.
 Product (owner, 2026-10-17: "the clôture can use 98659652 styling"): `fence_klosup_ajouree_anthracite`,
 the Klos'up open-work aluminium slat, Leroy Merlin 98659652 (176 × 9 cm, 25 mm, textured RAL 7016; the
-same slat as the Trez gates): `boards` 9 cm high, 9 mm apart, #5a636c. Hypothesis: the 9 mm gap, read
-off the laid photo (media 5365139, pitch ≈ 98 mm); the page gives no gap and names no post, and `boards`
-draws no posts (the photo shows one every 1.76 m slat). Proven (the 287 012-character read): the plan has
-no FENCE zone yet, so nothing wears it.
+same slat as the Trez gates): `boards` 9 cm high, #5a636c.
+- **Gap and uprights (owner, 2026-10-25, the street fence of quote 780480).** Proven (the Klos'up guides:
+  2019 "entretoises", 2021 kit): 10 mm PVC spacers between slats (a 100 mm pitch; the 2026-10-17 entry had
+  9 mm, read off a photo), post 74 × 42 mm (42 along the fence), glissière 40 × 21.5 mm (21.5 along it,
+  screwed to a pillar), posts ≤ 1772 mm apart for 1760 mm slats, a 25 mm top closer over the top slat.
+- The material's `posts: { post, channel, above }` (`fencePostBoxes`, architectural3d.js) stands the uprights
+  at each FENCE zone's ends, from the wall top under them to `above` (15 mm) over the zone's top: a glissière
+  inside the zone where the end meets a garden wall at least as tall as the fence (a pillar), else a post
+  centred on the end, shared with the next zone. **Draw one FENCE zone per bay**, ending at the post centres.
+- With `boards`, the zone's top is the top slat + one gap (`boards` spreads `n` slats of pitch
+  (top − foot) / n, each `pitch − joint` tall): foot 0.755, top 1.755 → 10 slats 0.755–1.745, posts to 1.770.
+- Proven (Node, test/streetWall.test.js): two zones between two pillars give two glissières and one
+  shared post at the joint, from the wall top to 15 mm over the zone. Hypothesis: the slats are drawn the
+  full zone length (in the real fence they stop 15 mm into each upright).
 `materialsFor(project, 'fence')` lists only fence materials: a `both` material is a floor or wall
 finish only (2026-10-12; before, door and window lists also offered it).
 

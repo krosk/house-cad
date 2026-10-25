@@ -455,9 +455,10 @@ function apertureInsertGeometries(floor, skip = null, { openDoors = false, doorL
       const head = clipped(rect.head ?? 2.1, 0, height);
       if (head - sill > EPS) doors.push(apertureInsertBox(rect, sill + 0.015, Math.max(sill + 0.015, head - 0.015)));
     } else if (kind === 'gate') {
-      // Free-standing and outdoors: the leaf, closed, up to its own head (no ceiling clip).
-      const head = Math.max(0, rect.head ?? 1.2);
-      if (head > 0.03) doors.push(apertureInsertBox(rect, 0.02, head, 0.04));
+      // Free-standing and outdoors: the leaf, closed, up to its own head (no ceiling clip), from
+      // its sill when it has one (a leaf hung high, over a platform), else just off the ground.
+      const head = Math.max(0, rect.head ?? 1.2), foot = rect.sill > 0 ? rect.sill : 0.02;
+      if (head - foot > 0.01) doors.push(apertureInsertBox(rect, foot, head, 0.04));
     } else if (kind === 'window') {
       const sill = clipped(rect.sill ?? 0.9, 0, height);
       const head = clipped(rect.head ?? 2.1, 0, height);
@@ -760,14 +761,52 @@ export function fenceBoxes(floor, rect, def = null) {
   }
   return out;
 }
+// A fence material with `posts` (owner, 2026-10-25: Klos'up) also stands its uprights at the zone's
+// two ends, from the wall top under them to `posts.above` over the zone's top: a glissière (`channel`,
+// [along, across]) inside the zone where the end meets a garden wall at least as tall as the fence
+// (a pillar), else a post (`post`) centred on the end. Fences meeting end to end share that post, so
+// a run split into one zone per bay puts a post at each bay joint. [{ key, box }]: equal keys are
+// the same upright (fenceParts draws it once).
+export function fencePostBoxes(floor, rect, def) {
+  const P = def?.surface === 'fence' ? def.posts : null;
+  if (!P) return [];
+  const b = rect.bounds, alongX = (b.x1 - b.x0) >= (b.y1 - b.y0);
+  const lo = alongX ? b.x0 : b.y0, hi = alongX ? b.x1 : b.y1;
+  const c = alongX ? (b.y0 + b.y1) / 2 : (b.x0 + b.x1) / 2;
+  const z0 = fenceFoot(floor, { ...rect, bounds: b, foot: undefined }), z1 = (rect.top ?? 1.8) + (P.above ?? 0);
+  if (!(z1 - z0 > EPS)) return [];
+  const box = (s0, s1, across) => (alongX
+    ? { x0: s0, x1: s1, y0: c - across / 2, y1: c + across / 2, z0, z1 }
+    : { x0: c - across / 2, x1: c + across / 2, y0: s0, y1: s1, z0, z1 });
+  // A garden wall at least as tall as the fence, beyond `e` on side `dir` (−1 below lo, +1 above hi).
+  const pillarAt = (e, dir) => (floor?.rectangles || []).some((r) => {
+    if (zoneKind(r) !== 'gardenwall' || !validBounds(r.bounds) || !((r.top ?? 0) >= (rect.top ?? 1.8) - EPS)) return false;
+    const w = r.bounds, rlo = alongX ? w.x0 : w.y0, rhi = alongX ? w.x1 : w.y1;
+    const clo = alongX ? w.y0 : w.x0, chi = alongX ? w.y1 : w.x1;
+    return c > clo - EPS && c < chi + EPS && (dir < 0 ? Math.abs(rhi - e) < 0.002 : Math.abs(rlo - e) < 0.002);
+  });
+  const out = [];
+  for (const [e, dir] of [[lo, -1], [hi, 1]]) {
+    const key = `${alongX ? 'x' : 'y'}${e.toFixed(3)}@${c.toFixed(3)}`;
+    if (pillarAt(e, dir)) {
+      const [w, d] = P.channel;
+      out.push({ key: `${key}${dir}`, box: dir < 0 ? box(e, e + w, d) : box(e - w, e, d) });
+    } else {
+      const [w, d] = P.post;
+      out.push({ key, box: box(e - w / 2, e + w / 2, d) });
+    }
+  }
+  return out;
+}
 // Every fence of the floor, grouped by colour: [{ color, geometry }].
 function fenceParts(floor, materialOf) {
-  const byColor = new Map();
+  const byColor = new Map(), posts = new Set();
   for (const rect of floor?.rectangles || []) {
     if (zoneKind(rect) !== 'fence' || !validBounds(rect.bounds)) continue;
     const def = materialOf?.(rect) || null;
     const color = def?.surface === 'fence' ? def.color : FENCE_DEFAULT.color;
     const boxes = fenceBoxes(floor, rect, def);
+    for (const { key, box } of fencePostBoxes(floor, rect, def)) if (!posts.has(key)) { posts.add(key); boxes.push(box); }
     if (boxes.length) (byColor.get(color) ?? byColor.set(color, []).get(color)).push(...boxes);
   }
   return [...byColor].map(([color, boxes]) => ({ color, geometry: boxesGeometry(boxes) }));
@@ -928,7 +967,9 @@ export function doorProductPlacements(floor, materialOf) {
       depth: alongX ? b.y1 - b.y0 : b.x1 - b.x0, // the wall thickness at the zone
       // A gate is outdoors: its own head, no ceiling clip (as apertureInsertGeometries). A door's
       // product stands on its sill (`sill`, buildDoorProduct lifts it); `head` is its height above it.
-      sill: kind === 'gate' ? 0 : Math.max(0, rect.sill ?? 0),
+      // A gate's sill (owner, 2026-10-25) is where its leaf starts above the ground (0 = the
+      // product's own gap); buildGate draws it from there.
+      sill: Math.max(0, rect.sill ?? 0),
       head: kind === 'gate' ? Math.max(0, rect.head ?? 1.2) : clipped(rect.head ?? 2.1, 0, height) - Math.max(0, rect.sill ?? 0),
       hingeEnd: hingeEnd === 'hi' ? 'hi' : 'lo',
       swingZ: alongX ? -perp : perp,

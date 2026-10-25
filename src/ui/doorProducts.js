@@ -381,11 +381,16 @@ function buildGate(p, { lambert }) {
     g.translate(x, y, z);
     parts.push([g, material]);
   };
-  // From 35 mm above the ground up to the zone's head.
-  const y0 = G.under, H = Math.max(0.4, p.head - y0);
+  // From 35 mm above the ground up to the zone's head; a zone with a sill (owner, 2026-10-25: a leaf
+  // hung high over a platform) has the leaf from its sill (buildDoorProduct lifts the whole gate by
+  // it, so here the leaf starts at 0 and the ground stop goes back down to the ground).
+  const lift = p.sill > 0 ? p.sill : 0, y0 = lift ? 0 : G.under, H = Math.max(0.4, p.head - lift - y0);
   // A gate ordered to a hinge-axis spacing (`def.axisSpan`, each axis `def.axisIn` inside the
-  // gate's outer edge) has its own width, centred on the zone; otherwise the zone is the gate.
-  const W = p.def.axisSpan ? p.def.axisSpan + 2 * (p.def.axisIn ?? G.stile / 2) : Math.max(0.3, p.width);
+  // gate's outer edge) has its own width, centred on the zone; a gate fitted between pillars
+  // (`def.sidePlay`: the zone is the opening, the leaves that much in from each pillar) is the
+  // zone less the play; otherwise the zone is the gate.
+  const W = p.def.axisSpan ? p.def.axisSpan + 2 * (p.def.axisIn ?? G.stile / 2)
+    : Math.max(0.3, p.width - 2 * (p.def.sidePlay ?? 0));
   const two = (p.def.leaves ?? 1) === 2;
   // One leaf from `left` to `right`; `hx` = its hinge side (+1 = right), `lock` = it carries the lock.
   const leaf = (left, right, hx, lock) => {
@@ -456,7 +461,7 @@ function buildGate(p, { lambert }) {
     leaf(W / 2 - half, W / 2, 1, true);
     // The cover strip over the meeting stiles, full height; the stop under the gap.
     box(G.battue[0], H, G.battue[1], 0, y0 + H / 2, 0);
-    box(G.sabot[0], G.sabot[1], G.sabot[2], 0, G.sabot[1] / 2, 0, m.black);
+    box(G.sabot[0], G.sabot[1], G.sabot[2], 0, G.sabot[1] / 2 - lift, 0, m.black);
   } else {
     leaf(-W / 2, W / 2, p.hingeEnd === 'hi' ? 1 : -1, true);
   }

@@ -2024,12 +2024,73 @@ function flavioVanity(entry) {
   return g;
 }
 
+// Letter box RENZ Animation, 2 doors (normalised, La Poste lock): a steel box, the covering
+// front door with its raised flap over the mail slot, the curved line ("ligne courbe") sweeping
+// down from the flap, the lock left, the name plate right; a plain rear door with its own lock.
+// Front toward +Z. Owner, 2026-10-25: the street wall's letter box (Leroy Merlin quote 780480,
+// "BAL NORMALISEE ANIMATION 2P ANTHRAC", EAN 3412722308246), standing on the low wall.
+//
+// Sources:
+//   - Leroy Merlin 82276229 (the same box in rouge basque; the anthracite listing is gone):
+//     https://www.leroymerlin.fr/produits/boite-aux-lettres-normalisee-2portes-exterieur-renz-animation-acier-rouge-basque-82276229.html
+//     spec table: series Animation, ref. 230880, 2 doors, surface mounted ("en saillie"), steel,
+//     mail "par le devant avec volet", slot 23.5 × 3 cm, H 28.5 × W 28.5 × D 40 cm, body sheet
+//     0.7 mm; colours include gris anthracite 7016. Photo media 3210572: L 285 × P 400 × H 285.
+//     Retailers listing the anthracite (EAN 3412722308246, E.Leclerc, Bricomarché, ADS): 285 ×
+//     285 × 400, "anthracite RAL 7016 mat".
+//   - Photo media 3210448 (the anthracite, near-straight front; 803 px for the 285 mm width,
+//     940 px for the height, each axis scaled on its own): the flap 20 mm in from the left, 28 mm
+//     from the right, 25 mm under the top, 69 mm tall at the left and 61 mm at the right (its
+//     lower edge curved); the lock Ø 14 mm, centre 30 mm from the left and 101 mm under the top;
+//     the name plate 103 × 23 mm, 154 mm from the left and 124 mm under the top; the curved line
+//     from the flap's lower left corner out to 68 mm from the left at mid height and back to
+//     47 mm, 29 mm above the bottom.
+//   - Estimates: the flap and door 6 mm proud, the line a 3 mm bead, the rear lock where the
+//     front one is (mirrored); the slot (under the flap) not drawn.
+function letterBoxRenz(entry) {
+  const [W, H, D] = (entry.sizeMm || [285, 285, 400]).map((v) => v / 1000);
+  const p = entry.params || {};
+  const coat = new THREE.MeshStandardMaterial({ color: p.color ?? 0x383e42, roughness: 0.75 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xc9cdd1, roughness: 0.3, metalness: 0.4 });
+  const plate = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.4 });
+  const g = new THREE.Group();
+  g.name = entry.name || 'letter-box';
+  const door = 0.006, mm = (v) => v / 1000;
+  // From the photo's front: x from the left edge, y down from the top (mm) → the box frame.
+  const fx = (x) => -W / 2 + mm(x), fy = (y) => H - mm(y);
+  g.add(box([-W / 2, 0, -D / 2 + door], [W / 2, H, D / 2 - door], coat));
+  for (const z of [D / 2 - door, -D / 2]) g.add(box([-W / 2 + 0.0015, 0.0015, z], [W / 2 - 0.0015, H - 0.0015, z + door], coat));
+  // The flap: straight top, its lower edge curving up to the right, a rounded lower left corner.
+  const s = new THREE.Shape();
+  s.moveTo(fx(20), fy(25)); s.lineTo(fx(257), fy(25)); s.lineTo(fx(257), fy(86));
+  s.quadraticCurveTo(fx(150), fy(97), fx(34), fy(94));
+  s.quadraticCurveTo(fx(20), fy(93), fx(20), fy(80)); s.closePath();
+  const flap = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.006, bevelEnabled: false }), coat);
+  flap.position.z = D / 2;
+  g.add(flap);
+  // The curved line: a bead from the flap's corner, out and back down toward the bottom left.
+  const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(fx(24), fy(92), 0), new THREE.Vector3(fx(100), fy(156), 0), new THREE.Vector3(fx(47), fy(256), 0));
+  const bead = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.0015, 6, false), coat);
+  bead.position.z = D / 2;
+  g.add(bead);
+  // Locks (front, and the rear door's mirrored), the name plate on the front.
+  for (const [x, z, dir] of [[fx(30), D / 2, 1], [-fx(30), -D / 2, -1]]) {
+    const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 16).rotateX(Math.PI / 2), chrome);
+    lock.position.set(x, fy(101), z + dir * 0.004);
+    g.add(lock);
+  }
+  g.add(box([fx(154), fy(147), D / 2], [fx(257), fy(124), D / 2 + 0.002], chrome));
+  g.add(box([fx(157), fy(144), D / 2 + 0.002], [fx(254), fy(127), D / 2 + 0.0025], plate));
+  return g;
+}
+
 const BUILDERS = {
   'stockholm-bed': stockholmBed, 'daikin-wall-unit': daikinWallUnit, 'shower-tray': showerTray,
   'upright-piano': uprightPiano, 'towel-radiator': towelRadiator, 'panel-radiator': panelRadiator,
   'pedal-bin': pedalBin, 'moder-table': moderTable, 'wall-hung-wc': wallHungWc, 'vmc-agalina': vmcAgalina,
   'vmc-easyhome': vmcEasyhome, 'vmc-vent-bahia': vmcVentBahia, 'vmc-vent-bdh': vmcVentBdh,'geberit-duofix': geberitDuofix,
   'falmec-lumina': falmecLumina, 'induction-hob': inductionHob, 'flavio-vanity': flavioVanity,
+  'letter-box-renz': letterBoxRenz,
 };
 
 export function isProcedural(entry) {

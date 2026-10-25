@@ -898,5 +898,20 @@
     },
     "source": "procedural: Lapeyre FLAVIO under-basin unit 60 cm, 2 drawers, natural oak veneer, sold without its top (Lapeyre Réf 1248229, 417.20 €, https://www.lapeyre.fr/produits/meuble-salle-bains-sous-vasque-chene-naturel-flavio-FPC3079684); 60 x 55 x 46.8 cm and 16 mm case and fronts from its spec table; the 80 cm unit's fronts, frame and grip (its studio photo 202131928 shows the same build, the grip ≈ 205 of 578 px ≈ 200 mm) (sources in the builder flavioVanity)",
     "registeredAt": "2026-10-17T00:00:00.000Z"
+  },
+  "renz-animation-2p-anthracite": {
+    "name": "renz-animation-2p-anthracite",
+    "article": "3412722308246",
+    "sizeMm": [
+      285,
+      285,
+      400
+    ],
+    "procedural": "letter-box-renz",
+    "params": {
+      "color": 3685954
+    },
+    "source": "procedural: RENZ Animation letter box, 2 doors, anthracite RAL 7016 matte (Leroy Merlin quote 780480, EAN 3412722308246; spec table of the same box in red, Leroy Merlin 82276229: 28.5 x 28.5 x 40 cm, slot 23.5 x 3 cm); front details from photo media 3210448; sources in the letter-box-renz builder",
+    "registeredAt": "2026-10-25T00:00:00.000Z"
   }
 }

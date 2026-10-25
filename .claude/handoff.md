@@ -19,7 +19,7 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-24 (session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written); the headset plan is **308 126**. Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
+**Date:** 2026-10-24 (session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written); the headset plan is **312 148** (2026-10-25: the street wall, option B, fence, letter box; 00j). Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
 
 **Status:**
 - Proven (session 46, one write 2026-10-24, `write --base` on a fresh read byte-identical to 307 484, read back
@@ -45,7 +45,11 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 - Proven (git; `version.json` "05540e2 1022-1859Z"; Actions run success with its `npm test` step; `update-app`
   installed it): the head is `05540e2`, pushed, served and on the headset. Session 44 commits: `3bebe48` tests + CI +
   CLAUDE.md/README refresh + the `solve-house.mjs` validation fix, `05540e2` docs. Uncommitted since: see above.
-- **The base for the next write is 308 126 chars** (2026-10-24: the outside waste collector to the city sewer on
+- **The base for the next write is 312 148 chars** (2026-10-25, owner's "W": the street wall, Next step 00j; scratch
+  `pillars/readback-1025.json`, read back byte-identical; backup `backup-1025-street` holds the 310 761 state).
+  Before it: **310 761** (2026-10-24: four gate pillars r280–r283, 20 × 20 × 1.90, gates refitted to 2.86 / 1.215
+  (the owner's Leroy Merlin quote 780480); backup `backup-1024-pillars` holds the 308 126 state).
+  Before it: **308 126** (the outside waste collector to the city sewer on
   307 484, docs/plumbing-workflow.md "The connection to the city sewer"; scratch `sewer/readback.json`, read back
   byte-identical; backup `backup-1024-sewer` holds the 307 484 state). Before it: 307 484 (the sink drain on
   306 688; scratch `readback-1023a.json`, written 2026-10-23, read back byte-identical; backup `backup-1023a` holds the 306 688 state; earlier
@@ -736,6 +740,79 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    ~1.2 ms (39 distinct textures: an atlas would merge them), Realistic's ~1.3 ms (photo floors ~0.7). Not reachable:
    multiview (three has it only in WebGPURenderer). No further optimisation asked; the owner moved to another topic.
    The headset is left awake with `prox_close`; `automation_disable` restores the sensor.
+00j. **The street wall: pillars, gates, fence, platform (owner, 2026-10-24/25). Written 2026-10-25; open decisions.**
+    Scratch (session-local): `pillars/`. Proven: each copy solves with no conflicts; diffs show only these changes.
+    - **Written 2026-10-25 (owner "W"; `pillars/solved-fence.json` = `edit-fence.mjs` on `optB10c.json`, solved, 0 moves,
+      no conflicts; read back identical):** pillars r280–r283 24 × 20 × 1.90 (flush with the 24 cm wall); window r146 head
+      1.98 → 1.94 (the Lapeyre quote's 620 mm); r244 west face flush with r236, top 1.98 (owner: "at least 1.98");
+      platform r284, a 13 cm gardenwall block (the PLATFORM kind can't rise above its floor) from r236's east face to
+      x −5.12 and from r236's south end to r237's north end; **option B:** r283 at y −1.925…−1.725, r236 to −1.725 (its
+      length dim c1524 −4.86 → −5.035), pedestrian gate r243 1.04 wide, sill 0.23 head 1.77; car gate r242 sill 0.115 head
+      1.785 (the 1670 leaf, 14 slats). **New zones:** FENCE r285 (r237 run), r286 (r236 run south of the box), r287 (over
+      the box, foot 1.055), all `fence_klosup_ajouree_anthracite`, 25 mm thick on the wall's centre line, foot 0.755
+      top 1.755 ('boards' spreads 10 slats at a 100 mm pitch; posts and glissières are not drawn); the letter box r288, a
+      plain furniture box 400 × 285 × 285 on the wall (foot 0.73, top 1.015). The gates render as plain leaves (the
+      'gate' kind has no slats) and the box has no product model: see "models" below.
+      Trap: option B copies (`optB*.json`) were drawing copies with positions moved by hand; their dims still said
+      option A, so a first solve moved five walls 11.7 cm. Always fix the dims, then check `solve-house` reports 0 moves.
+    - **Leroy Merlin quote 780480 (street wall):** car gate Trez made to measure, 2860 = the width **between pillars**
+      (owner: the maker fits leaves, play and hinges inside it); pedestrian Trez 1210 × 1770; Nice Leggio 300 motor + Wi-Fi;
+      Klos'up openwork fence 36 slats (9 per bay × 4 bays), 3 posts (2 for the r236 fence + 1 for the letter box, place
+      not given yet), plates, closers; mailbox 2 doors. The second pedestrian gate line (1 m × 1.73) was a price check: ignore.
+    - **Owner leans to option B** (standard Trez pedestrian 70193214 anthracite l.99 × H.154, 104 between pillars, 841.50 €;
+      the older listing 69573224 is the same gate at 730.15 €, still buyable online, not in the catalogue): move r283
+      17.5 cm north, r236 longer by as much (fence run 4.835 = 3 bays of 1.61), opening 1.04.
+    - **Fence (Proven, Klos'up guides 2019 + 2021):** 90 mm slats, 10 mm clips = 100 mm pitch; on plates a 17 mm bottom
+      closer + 25 mm top closer, post = panel + 42 (9 slats: 890 panel, 932 post, 943 above the wall, i.e. ~28 mm from the
+      wall to the first slat; the 17 + ~11 mm plate split is a Hypothesis); sealed / iron-bar fixing: 25 mm closer; posts
+      ≤ 1772 mm apart for 1760 slats. **Owner's latest (2026-10-25): 10 slats per bay** (not the quote's 9), 25 mm over the
+      0.73 wall: slats 0.755–1.745, posts to 1.770. Owner rule: the gate slats must *look* aligned with the fence; nothing
+      else (rail vs slat) matters. The quote may change (that is the point of the exercise). Not in the plan (no FENCE zones).
+    - **Letter box (owner, 2026-10-25):** the quote's BAL normalisée Animation 2P anthracite (EAN 3412722308246, RENZ:
+      285 × 285 × 400 mm per retailer listings), standing on the r236 wall (0.73 → 1.015) right of the pedestrian gate seen
+      from the street, between the glissière on r283 and an alu post; then south: full bay, post, full bay, post, the
+      remainder, the glissière on r244 (= the quote's 3 posts, 4 glissières; posts and glissières are 120 cm). Hypothesis
+      (option B run 4.835, 22 mm glissières, 42 mm posts, post centres 1772): remainder opening ≈ 920 mm; 7 short slats
+      (~315 mm) above the box (slats 4–10; a 40 mm gap over the box). Slat count: 20 (2 full bays) + 10 (r237 run, one
+      bay) + 10 cut to ~950 for the remainder, whose 810 offcuts give the 7 short ones = **40 slats of 1760** (quote: 36).
+      Drawing `pillars/face-bal.png` (`face3.mjs`).
+    - **Gates (Trez), what is known:** Proven (fitting guide `trez/1392479.pdf` p.19, the maker's standard-heights table):
+      Trez made heights 1230 / 1530 / 1735, "height at the pillar" 1265 / 1565 / **1770** (a 35 mm gap under the leaf);
+      the Trez motor reinforcement sits "dans la traverse intermédiaire", **so the Trez has a middle rail**. Profiles
+      (sheet 3581468): uprights 93 × 60, rails 92 × 36, slats 90 × 25. The maker's render (photo 3828988) shows uprights
+      the full height with the top/bottom rails about flush with their ends. Hypotheses from those: the quote's 1770 is
+      the standard 1735 gate + 35 mm (so the owner was right: H includes the foot gap); with flush rails + a middle rail
+      and 12 slats (the owner's count on 80092341), a 1530 leaf has ~13.4 mm gaps, **pitch ~103 mm**, matching the photo
+      measurement (104–108), so the gate slats would drift ~35–40 mm against the fence's 100 mm over the height and
+      **cannot all line up**. The drawings' 13-slat / 100 mm gates (`face-final.png`: car gate 1670 with 14 slats,
+      0.115 → 1.785; pedestrian 0.230 → 1.770) rest on the superseded 100 mm assumption: redraw once measured.
+    - **Questions to clarify (owner, in store / with the seller):**
+      1. Pedestrian 153 gate: count the slats; measure slat-bottom to slat-bottom (100 vs ~103 mm); the rail heights;
+         whether there is a middle rail and its size; whether rails are flush with the upright ends.
+      2. Quote's 1770: confirm it is the 1735 standard + 35 mm (and the pedestrian line 1210 × 1770 likewise).
+      3. If the pitch is ~103 mm: a made-to-measure car gate on a 100 mm pitch, or accept the drift (align the top slat).
+      4. Fence: 10 slats per bay instead of 9; the fixing (plates ≈ 28 mm under the first slat vs sealed / iron bar 25 mm).
+      5. Letter box: how the RENZ box fixes between glissière and post, and the gap over it; the slat-end allowance in a
+         glissière / post (sets the cut lengths); the entretoises count for 10 slats.
+    - **Models (owner, 2026-10-25: "produce the models"), built, uncommitted (tests 32/32, build OK):** gate `sill`
+      (editable, the leaf from it) and `sidePlay`; `gate_trez_anthracite_std99` (25 mm play) and
+      `gate_trez2_anthracite_opening` (35 mm); the Klos'up fence: 10 mm gap (guide, was 9) and `posts` (glissière at a
+      pillar, a shared post at each zone joint: one FENCE zone per bay); the RENZ letter box
+      `renz-animation-2p-anthracite` (builder `letter-box-renz`). Docs: materials.md, furniture.md, QA items.
+      **Pending write (needs "c p" first so the headset app has the code, then "W"):** `pillars/solved-models.json`
+      (`edit-models.mjs` on `solved-fence.json`, base 312 148): the two gate products, r286 split into bays r286/r289/r290
+      ending at post centres −2.2525 / −4.0245 / −5.7965, r287 over the box, r288 with the RENZ product facing 270.
+      Slat pitch: the existing Trez model (2026-10-17) fits ~101 mm on the maker's straight render 3247470 (no middle
+      rail on the single leaf), which contradicts the ~103 mm Hypothesis above from the Cadiou guide's table; the
+      in-store measurement still decides.
+    - Drawings: `pillars/face2.mjs <house.json> <out.svg> [title] [foot | foot line 2]` (env FENCE_TOP, FENCE_N; fence
+      in the gate colour), latest `face-final.png` (`optB10c.json`); `trez/gate.py` (the 12-slat reading).
+00k. **Window trims (habillages, owner 2026-10-24):** Lapeyre interior trims for frames without a lip (X7628, X7621, X7622,
+    X7612, X6601, X6609, X7663; sticks of 2.60 m). A throwaway three.js page (not the app, owner's wish):
+    `habillages/habillages-lapeyre.html` (offline, a window corner per trim, icons to switch); X7628/X7621/X7622 re-measured
+    on the catalogue photo, the other four still rough. Sticks (owner: only the quote's openings, no trim at the foot of
+    door-height ones, the Néva bay and the Ange-Line door excluded): 3 French doors + 5 windows = 29 pieces, **21 sticks**
+    (16 mm trim) to **23** (≥ 27.5 mm), minimum by exhaustive search (`habillages/sticks.py`), plus a spare.
 00i. **The connection to the city sewer: written 2026-10-24 (308 126).** Owner's figures (0 / 6 / 15 m from the west
    limit; 100 / 76 / 40 cm to the top of the pipe; ground ≈ 10 cm under the laundry window), the local regulation
    (Paris Est Marne&Bois: ≥ 3 %, anti-backflow, a pump only for what cannot fall), frost ≈ 0.50 m, the laundry sink

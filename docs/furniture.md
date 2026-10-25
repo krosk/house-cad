@@ -442,6 +442,20 @@ not in the Workbox precache and would ride the furniture Cache API; not built ye
   preview: front and side renders, orthographic at the drawing's scale, sit on its outline; bounding
   box 155.0 × 155.0 × 43.3 mm. Not yet seen in AR, View 3D or on device.
 
+### Letter box RENZ Animation 2 doors (`renz-animation-2p-anthracite`, owner 2026-10-25)
+
+The street wall's letter box (Leroy Merlin quote 780480, "BAL NORMALISEE ANIMATION 2P ANTHRAC", EAN
+3412722308246), standing on the low wall between a glissière and a fence post, its front to the street.
+Builder `letter-box-renz` (proceduralFurniture.js), sources in its comment block.
+- Proven (Leroy Merlin 82276229, the same box in red; the anthracite listing is gone): 28.5 × 28.5 × 40 cm
+  (W × H × D), slot 23.5 × 3 cm "par le devant avec volet", 2 doors, surface mounted, steel 0.7 mm;
+  photo media 3210572 (L 285 × P 400 × H 285); other retailers list the anthracite as RAL 7016 matte.
+- Measured on photo media 3210448 (the anthracite front, each axis scaled on its own): the flap, the lock
+  (Ø 14, 30 mm in, 101 mm down), the name plate (103 × 23 at 154 mm in, 124 mm down), the curved line.
+- Estimates: the flap and doors 6 mm proud, the line a 3 mm bead, the rear door's lock mirrored, the slot
+  not drawn. Proven (Node): 285 × 285 wide and tall, 0.416 deep with the locks. A Node projection from the
+  street put the lock, the plate and the line where the photo has them.
+
 ## IKEA kitchen units assembled from part models (2026-10-04)
 
 The owner's IKEA Kitchen Planner design "Maison 2" (METOD carcasses, SINARP oak fronts, ASPUDDEN
