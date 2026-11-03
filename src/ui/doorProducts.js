@@ -554,6 +554,79 @@ function buildMeliRail(p, { lambert, open }) {
   }
   return place(parts, p);
 }
+// Sources (2026-10-27), Confort (`rail: 'confort'`, owner: a lockable sliding door for r93):
+//   Lapeyre "Système en applique Confort" = Scrigno XTERNA (hardware + pelmet kit) and its
+//     "poteau de terminaison pour système en applique Confort" (Lapeyre notice AST5689890 =
+//     Scrigno IS-0088, https://statics.lapeyre.fr/img/catalogue/APC0001/689/890/AST5689890.pdf;
+//     batiproduits p493949702). Lapeyre 2025 interior-doors catalogue p. 4: "Poteau d'arrivée en
+//     option" for the surface-mounted systems; the Scrigno kit listing: the receiving post is what
+//     allows a key or privacy lock.
+//   Notice p. 1 (contents): rail 1 = 2000 mm; pelmet A ("bandeau") 2250 mm; post kit sold
+//     separately: post B 2150, edgings C1 C2 2150, seals D 2200, core E 2000; floor guide 5,
+//     door brackets 6 (80 mm from the leaf's edges), soft-close SOFT 30.
+//   Notice p. 2, section: H = the clear opening height (2100 max); the rail screwed to the wall,
+//     52 mm tall, its bottom 50 mm above the opening's head (H + 50); the pelmet A 15 mm thick,
+//     its inside 65 mm off the wall (outside 80), 100 mm tall down from the rail's top; the leaf's
+//     centre line 35 mm off the wall, its top H + 10, 29–32 mm under the rail, floor gap 8–11.
+//   Notice p. 2, plan: opening 1000 max, rail 2000 max; the leaf 40 mm thick, 15 mm off the wall;
+//     closed, it overlaps the park-side jamb by at least 85 mm (the floor guide stays under it)
+//     and stops on the post B, which stands on the wall 10 mm past the other jamb, 30 mm wide and
+//     65 mm out, seals D on its face; the edging C2 on its front (E clips it), the assembly about
+//     57.5 mm along the wall and about 80 mm out; the edging C1 on the wall at the park-side jamb.
+//   Estimates (Hypothesis; the drawing is not to scale): C2 15 mm thick in the pelmet's plane,
+//     covering the post's front from the jamb (so it hides the leaf's edge); C1 45 × 15 mm; the
+//     post and edgings up to the pelmet's underside; the rail and pelmet from the post's outer
+//     edge to the parked leaf's tail; no pelmet end returns; a 10 mm floor gap; open, the leaf's
+//     leading edge on the park-side jamb; the round flush pull (catalogue p. 21 "Cuvette ronde")
+//     Ø 60 mm, 6 cm from the leading edge, at the handle height, on both faces.
+const CONFORT = {
+  railH: 0.052, railAbove: 0.05, railDepth: 0.065, pelmetT: 0.015, pelmetH: 0.1, axis: 0.035,
+  floorGap: 0.01, postSet: 0.01, postW: 0.03, postOut: 0.065, assembly: 0.0575, c1W: 0.045, c1T: 0.015,
+  pullR: 0.03, pullIn: 0.06,
+};
+function buildConfortRail(p, { lambert, open }) {
+  const m = materialsFor(p.def, lambert);
+  const L = p.def.leafWidth ?? p.width, H = p.def.leafHeight ?? p.head, T = Math.min(p.def.leafDepth ?? 0.04, 0.08);
+  const w = p.width, sd = p.hingeEnd === 'hi' ? 1 : -1; // slide (open) direction along local X
+  const wallZ = p.swingZ * (p.depth ?? 0.2) / 2;         // the wall face carrying the rail
+  const out = (d) => wallZ + p.swingZ * d;               // d metres off that face
+  const C = CONFORT, white = railBodyMaterial(p.def, lambert);
+  const parts = [];
+  const box = (sx, sy, sz, x, y, z, material) => {
+    const g = new THREE.BoxGeometry(sx, sy, Math.abs(sz));
+    g.translate(x, y, z);
+    parts.push([g, material]);
+  };
+  const span = (a, b) => [Math.abs(b - a), (a + b) / 2]; // [length, centre] along X
+  // H is the opening's clear height = the leaf's (its top H + 10 with a 10 mm floor gap).
+  const pelmetBottom = H + 0.002; // the pelmet's underside, 2 mm above the opening's head
+  const postJamb = -sd * w / 2;                           // the jamb on the side away from the park
+  // Leaf: closed = its leading edge on the post's face (10 mm past the jamb); open = parked,
+  // its leading edge on the park-side jamb. Grooves (the LINE face) by the leading edge.
+  const lead = open ? sd * w / 2 : postJamb - sd * C.postSet;
+  const leafX = lead + sd * L / 2;
+  const fwd = sd > 0 ? m.face : m.faceMirrored, back = sd > 0 ? m.faceMirrored : m.face;
+  box(L, H, T, leafX, C.floorGap + H / 2, out(C.axis), [m.body, m.body, m.body, m.body, fwd, back]);
+  for (const s of [-1, 1]) {
+    const pull = new THREE.CylinderGeometry(C.pullR, C.pullR, 0.002, 20).rotateX(Math.PI / 2);
+    pull.translate(lead + sd * C.pullIn, HANDLE_Z, out(C.axis + s * (T / 2 + 0.001)));
+    parts.push([pull, m.steel]);
+  }
+  // The post B (30 wide, 65 out) and its front edging C2 (15, in the pelmet's plane).
+  const pb = postJamb - sd * C.postSet, pe = postJamb - sd * C.assembly;
+  const [postL, postX] = span(pb, pe);
+  box(postL, pelmetBottom, C.postOut, postX, pelmetBottom / 2, out(C.postOut / 2), white);
+  const [c2L, c2X] = span(postJamb, pe);
+  box(c2L, pelmetBottom, C.pelmetT, c2X, pelmetBottom / 2, out(C.postOut + C.pelmetT / 2), white);
+  // The edging C1 on the wall at the park-side jamb, behind the leaf.
+  box(C.c1W, pelmetBottom, C.c1T, sd * (w / 2 + C.c1W / 2), pelmetBottom / 2, out(C.c1T / 2), white);
+  // Rail and pelmet: from the post's outer edge to the parked leaf's tail.
+  const [headL, headX] = span(pe, sd * (w / 2 + L));
+  const railTop = H + C.railAbove + C.railH;
+  box(headL, C.railH, C.railDepth, headX, railTop - C.railH / 2, out(C.railDepth / 2), white);
+  box(headL, railTop - pelmetBottom, C.pelmetT, headX, (railTop + pelmetBottom) / 2, out(C.railDepth + C.pelmetT / 2), white);
+  return place(parts, p);
+}
 const railBodyCache = new Map();
 function railBodyMaterial(def, lambert) {
   const color = def.railColor ?? 0xf2f2f0;
@@ -567,6 +640,7 @@ function railBodyMaterial(def, lambert) {
 
 function buildRailDoor(p, { lambert, open }) {
   if (p.def.rail === 'meli') return buildMeliRail(p, { lambert, open });
+  if (p.def.rail === 'confort') return buildConfortRail(p, { lambert, open });
   const m = materialsFor(p.def, lambert);
   const black = railMaterial(lambert);
   const L = p.def.leafWidth ?? p.width, H = p.def.leafHeight ?? p.head, T = Math.min(p.def.leafDepth ?? 0.04, 0.08);

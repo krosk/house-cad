@@ -426,6 +426,11 @@ changes: ~140 ms per pass on a laptop for the owner's plan (Hypothesis: a few hu
 `project.heat`): all counted 21 607 W / 43 878 kWh/yr; without wall insulation +1 996 W; without the
 windows +1 806 W; without attic insulation +0 (no attic R typed in that file). With attic R 8 typed on
 the top floor: 17 636 W, and without it +3 971 W (+22 %, +8 064 kWh/yr).
+**Proven** (Node, `houseHeatLoss` on the headset plan read 2026-10-30, 312 743 chars; the owner's settings
+22 °C in, −7 °C out, 2200 degree-days): **6 710 W at −7 °C, ≈ 12 200 kWh/yr** (ground floor 4 947 W, upper
+1 763 W, basement and garden unheated). Switches one at a time: no wall insulation 16 472 W / 29 990 kWh/yr;
+no attic insulation 14 649 W / 26 671; single glazing 9 685 W / 17 634; reveals no change (the setting is
+already 0.25). These supersede the 2026-10-05 figures above for the current plan.
 
 ## Where the heat goes: the heat map (owner, 2026-10-04)
 

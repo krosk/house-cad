@@ -194,6 +194,102 @@ These are settled; don't reopen them without the owner.
   excluded from plan sheets and change maps; in DXF they are an opt-in `wiring` layer (default
   off). Markers and control links are unaffected.
 
+## Home automation: the owner's own system (owner, 2026-10-25)
+
+The owner wants a **custom home-automation suite, not tied to vendor apps or clouds** (and resists closed
+ecosystems such as Somfy's io-homecontrol). Each automated device is driven by the owner's own controller
+(an ESP32 running ESPHome or the owner's firmware, talking MQTT / HTTP / Home Assistant's API to the owner's
+hub), through **documented wired inputs** where possible. A brand is judged on: wired dry-contact inputs, a
+status output, standard spare parts, local-only operation, a manual release.
+
+**The street gate's motor** (Leroy Merlin quote 780480: Nice Home Leggio 300 kit, LM 98747035; manual
+IS0965A00FR). Proven (manual): control unit CLB212, IP54, 310 × 232 × 122 mm, mounted ≥ 40 cm above the ground,
+cables only through the bottom outdoors, motor cables ≤ 10 m; inputs **Sbs** (step by step) and **Open**
+(normally-open contacts), **Stop** (NO / NC / 8.2 kΩ), output **OGI** (24 V gate-open light, 5 W, or a 12 V
+lock); **ECSbus** (photocells) switches off in standby (5 min after a movement by default), while the
+**IBT4N** connector "stays powered". Operators: 1800 N, 120 W, 700 × 100 × 177 mm, leaves ≤ 300 kg or ≤ 3 m;
+rear bracket A/B from the hinge axis 95/270 or 195/200 mm (90°), 150/150 (110°); durability 125 000 cycles at a
+0 % load index down to ~40 000 at 100 % (Table 1; the owner's light open-work leaves: 0–35 %, ~125 000–65 000,
+read off the curve: Hypothesis). Two remotes in the kit work without any network.
+- **Room for the Leggio on the 24 × 20 pillars (2026-10-25, scratch `nice/leggio_top.py`, top views to scale on the
+  headset plan).** Proven (arithmetic on the manual's Figure 4: 1100 mm between pivots closed, front pivot 107 mm off
+  the leaf; Table 3 A/B): the three settings give a stroke of 377–393 mm at 90° for the two 90° rows, consistent with
+  one operator. With the leaves hung on the pillars' centre line (Hypothesis: the installer's choice), the rear pivot
+  falls **35 / 85 / 155 mm** beyond the pillar's garden face (A/B 150/150, 195/200, 95/270); open, the operator lies
+  beside its leaf within 200 / 245 / 157 mm of the hinge axis: the north one clears wall r241 (281 mm away) by 36–124
+  mm and ends before wall r240; the south one passes over the 13 cm platform r284. So the room is there; what is
+  left is the stand-off of the rear bracket (Figure 8, size not given), a spacer plate where it falls short, or a
+  leaf hung nearer the street face (more pillar depth behind the axis).
+- **The alternative, Nice Walky (articulated arm; manual ISTWLR02.4865, scratch `walky/`), checked 2026-10-25.**
+  Proven (manual): 100 Nm, leaves ≤ 1.8 m (full arm) / 1.6 m (shortened) and ≤ 100 kg (Graph 1; ≤ 180 kg at
+  0.8 m), ≤ 2 m tall, ≤ 110° (≤ 90° with a shortened arm), 100 cycles a day, IP44, 90 × 125 × 385 mm, the arm
+  in the leaf's upper part, a column at least 80 mm wide; inputs PP (step by step) and STOP only (no Open, no OGI;
+  the flash / lock outputs are reprogrammable with Nice's Oview), Bluebus photocells, and a **BusT4 connector**.
+  Mounting: B = the hinge axis to the column face (~115 mm with the leaves on the pillars' centre line), A from
+  Graph 2A; E = the motor's centre line to an obstacle: 80–299 mm → shortened arm, ≥ 300 → full arm.
+  Hypothesis (arithmetic, plan geometry, Graph 2A read by eye): on the 200 mm garden face of r280 the 125 mm
+  body needs A 144–219 mm, and E = 281 − A ≥ 80 caps A at 201: a **shortened arm, 90°**, fine for 1.385 m leaves;
+  on r281 nothing stands beside it (the platform is 13 cm) → full arm. No stand-off plate needed.
+- **Decision (owner, 2026-10-25): keep the quoted Leggio 300.** Compared: the Walky 2024 kit (fits the pillar face
+  directly, BusT4, IP44; ~500–840 € online, not on Leroy Merlin France as a 2-leaf kit) and the Wingo (a ram like
+  the Leggio, same stand-off question; 2024 kit ~255 € at Leroy Merlin Italy, 5024 595 € in France); prices from
+  search listings (Hypothesis). With the Leggio, ask the installer for A/B 150/150 (the least stand-off, 35 mm)
+  and the rear bracket's own stand-off.
+- **Options for the owner's controller, in order** (Hypothesis until tried on the unit): (1) an ESP32 on the
+  IBT4N connector (likely Nice's BusT4 port: power and the protocol; community `esphome-BusT4`), pinout and
+  current to check; (2) relays on Sbs / Open plus an optocoupler on OGI, with its own 5 V supply from the
+  unit's 230 V feed (the Flash, OGI and ECSbus outputs are not steady supplies); (3) the quoted Wi-Fi interface
+  (LM 98747037, model unconfirmed; not IT4WIFI's 83701302) with the owner's own app on Nice's undocumented local
+  protocol (community: `homeassistant_nice`). The Wi-Fi interface is **optional** (owner, 2026-10-25: the remotes
+  suffice); dropping it from the quote is the owner's call.
+- Link to the hub: Wi-Fi, or (suggested) a network cable in the gate's trench to an ESP32 PoE board. Outdoors:
+  inside the Nice box if it fits, else an IP65/66 box ≥ 40 cm up, bottom glands, drip loops, a breather vent,
+  shade, surge protection on a long cable, a 30 mA RCD on the 230 V feed.
+
+### The pedestrian gate's electric strike (owner decision, 2026-10-25)
+
+- **Decision: a custom upright, not the quoted Klos'up kit** (quote line 88975782, 399 − 59.85 = 339.15 €).
+- **The kit** (Proven, klosup.fr page and notice, kit images):
+  - its parts: a "demi-montant" upright with an end cap screwed to the latch pillar, a "battement" carrying the
+    strike, a key lock, a 12/24 V AC/DC strike "en émission", and screws;
+  - it needs "1070 mm entre piliers, finitions type enduit comprises" (the standard 1040 + 30);
+  - no IP rating and no memory function are stated, and the strike's make is not named;
+  - Klos'up sells no electric strike on its own (searched: only the plain keeper 206093KIT and a sliding-gate
+    strike).
+- **The custom version** (the kit's layout, own parts; layout drawn in the scratch plot `door-tube.mjs`):
+  - an aluminium tube screwed full height to the latch pillar r282's side face, packed out so the strike's face
+    sits ~4 mm from the leaf;
+  - a narrow strike that releases when powered (fail-secure), set in a slot in the tube;
+  - a flat strike plate on the tube until the electric strike goes in.
+- **The Leroy Merlin set considered** (sold by Leroy Merlin, Proven 2026-10-25):
+  - EXTEL strike 54843684, 19.90 €: 250 × 25 × 31.5, 90 mm body, 12 V AC/DC, a mechanical memory, a manual
+    release lever;
+  - STANDERS tube 45 × 25 × 1.5, 87825777, 14.90 € per metre;
+  - LUXENS non-ferrous primer 84235833, 13.90 €;
+  - V33 Décolab RAL 7016 "poudré" spray 80153504, 14.90 €, matching the gate's "texturé" finish.
+- **Fallbacks:**
+  - a tube 50 × 30 × 2 (marketplace 88311485), or 50 × 30 × 3 if the strike is ≤ 20 mm wide;
+  - narrow strikes 15–16 mm wide, all published sizes: effeff 118 W (IP54; Leroy Merlin's marketplace has only
+    the 118 E), IZYX 25XMU10 (memory), Dorcas 41.
+- **Open, all Hypothesis until measured:**
+  - whether the EXTEL body is ≤ 20 mm wide, so it fits the STANDERS tube (22 mm inside);
+  - the leaf width, 990 (LM listing) vs 995 (Klos'up notice);
+  - the hinge-side gap, 20–25 mm;
+  - the latch's throw and height on the delivered gate.
+- **Opening:** ~1075 mm between pillars, render included, to absorb masonry tolerance, the tube packed to fit
+  (Hypothesis); not yet in the plan, where r243 is still 1.04.
+- **The pillars are not built** (owner, 2026-10-25), so build in:
+  - in r282: a Ø20 sleeve out behind the tube at ~1.00 m (the Trez guide's height), and a spare sleeve on the
+    street face (~1.40) for a bell or keypad;
+  - sleeves for the Leggio on the car-gate pillars;
+  - separate buried 230 V and data conduits.
+- **Wiring:**
+  - the strike on a 12 V supply switched by the ESP32's relay;
+  - if the lock is key-locked so the handle is dead, an inside exit button wired in parallel with that relay;
+  - deburred holes with a grommet in the tube, about a 1 A fuse, stainless screws in the aluminium;
+  - with no power the key still opens the gate (Proven, the notice: the multifunction lock always opens with the
+    key).
+
 ## The panel (owner, 2026-10-22)
 
 The owner's panel is a **Legrand Drivia ready-wired T4 panel**, 3 rows × 13 modules (Leroy Merlin

@@ -835,6 +835,40 @@ the right face.
     which the Indus rail overlapped by 1.6 cm.
   - Not yet seen in View 3D or AR. The plan glyph and the AR readout are unchanged (they draw the opening and the leaf).
 
+- **A lockable sliding door for r93: Lapeyre "système en applique Confort" (owner research, 2026-10-27; not chosen,
+  not in the catalog).** The owner wants a lock on r93. Findings:
+  - **A lock on a surface-mounted sliding door needs an end post** (Proven: Lapeyre 2025 interior-doors catalogue p. 4,
+    "Poteau d'arrivée en option" for the 4 surface systems Prima, Confort, Harlem, Manhattan; the Scrigno kit listing:
+    the receiving post "permet l'installation d'un mécanisme de serrure à clé ou condamnation"). The leaf slides in
+    front of the wall, so its edge never meets a frame; the lock's hook needs a strike in a post.
+  - The post is **not structural** (owner): a 30 × 65 mm wooden post screwed to the wall past the jamb, a stop for the
+    leaf and a seat for the strike. The rail carries the door.
+  - **Confort = Scrigno XTERNA** (Proven: Lapeyre notice AST5689890 = Scrigno IS-0088,
+    `https://statics.lapeyre.fr/img/catalogue/APC0001/689/890/AST5689890.pdf`). Kit: aluminium rail 2000, carriages,
+    stops, floor guide, soft-close SOFT 30, a wooden pelmet ("bandeau") 2250 × 100 × 15. The post kit is sold
+    separately: post B 2150, two edgings ("couvre-joints") C1 C2 2150, brush seals D, clip core E.
+  - Section and plan (notice p. 2; the drawing is not to scale, so only its figures count): opening ≤ 1000 × 2100 (H);
+    rail 52 mm tall with its bottom 50 mm above the opening's head; pelmet 15 thick, 65–80 mm off the wall, from the
+    rail's top (H + 102) down to about H + 2; leaf 40 mm, 15 mm off the wall (centre line 35), top H + 10, floor gap
+    8–11; closed, the leaf overlaps the park-side jamb by ≥ 85 mm and stops on post B, 10 mm past the other jamb; the
+    post assembly about 57.5 mm along the wall and about 80 mm out; C2 covers the post's front (hides the leaf edge),
+    C1 sits on the wall at the park-side jamb behind the leaf.
+  - In Chinese: the post is 收口立柱 (门挡柱; 锁扣立柱 when stressing the strike); 护边 / 收边条 are the trims C1, C2,
+    not the post (general terminology, not from the documents).
+  - The lock side: the Line sliding door "avec serrure" (204 × 63–93, 40 mm, Lapeyre catalogue) and the pull set
+    "poignée chromée à condamnation pour porte coulissante intégrée" (Lapeyre 0688610, 38.90 €, Ø 5.7 cm cups, 8 cm
+    deep; Proven only from the search snippet: Lapeyre's pages return 403 to scripts). Hypothesis: flush cups that
+    drive the door's built-in hook lock, a thumb turn inside and an emergency release outside; whether the strike comes
+    with the pull, the door or the post is unknown.
+  - **Fit at r93 (Hypothesis, arithmetic on the 2026-10-20 numbers above):** the post takes ~57.5 mm past the north jamb
+    where ~8.1 cm is free before r91's frame (~2.4 cm left); r91's handle bar ends ~1.5 cm beyond the post; an 83 leaf
+    meets the ≥ 825 mm the 73 opening needs; the head reaches about 2.13 m (Meli 2.09). Tape check on site before buying.
+  - Alternative (Hypothesis, offered to the owner): keep the Meli and screw on a home-made post with a strike and a
+    brush seal.
+  - Code: `buildConfortRail` (`rail: 'confort'`) in `src/ui/doorProducts.js` draws the rail, pelmet, post B, C1, C2,
+    the leaf with the LINE face by its leading edge and a flush pull; **uncommitted, no catalog entry, no test, never
+    rendered**: finish it (entry, Node test, preview) only if the owner picks Confort.
+
 ### Garden gates (`mount: 'gate'`)
 
 Owner requests 2026-10-12: the garden gate and the driveway gate as products. Set on a **GATE** zone
@@ -889,6 +923,26 @@ estimates are embedded in that code** (`docs/product-modelling.md` step 6). In s
   3.01 m zones): the hinge pins at x = ±1.35 m, 2.70 m apart, in both. Hypothesis: that "axis" means the
   hinge pins, and the 65 mm reading of the manual's figure; Leroy Merlin's made-to-measure form may take the
   width or the opening instead, so quote 2.76 m gate / 2.83 m between pillars when ordering.
+- **The Trez slat rule (the maker, via the owner, 2026-10-25).**
+  - The parts: top and bottom rails 92 mm high (the sheet's "Traverse 92 x 36" is height × depth), slats 90 mm,
+    15 mm between every rail and slat.
+  - So the frame is fixed by the slat count n: 184 + 90 n + 15 (n + 1). For example 14 slats = 1669, 12 = 1459.
+  - The uprights ("montants") take the rest, sticking out past both rails by an amount that varies.
+  - A gate's stated height is its uprights' length, not its rails' (owner, from the maker's documentation).
+  - Owner's measure: a 1740 gate has 14 slats and no cut slat, uprights 2–3 cm past each rail.
+  - How the quote states the height (the seller at ordering, via the owner, 2026-10-30): the quoted height is
+    the uprights' top above the ground, with a standard 35 mm gap under the leaf counted in. It is not the leaf's
+    own size. So a gate quoted 1770 is a 1735 leaf, hung with its uprights at 0.035–1.770. This matches the maker's
+    table (`trez/1392479.pdf` p.19: made 1735, "height at the pillar" 1770).
+  - Consequence: the quoted height fixes the uprights' top, and the slat count n fixes the frame inside them. The
+    top rail is the quoted height minus the top overhang.
+  - Hypothesis: the overhang is split equally top and bottom, about 33 mm on a 1735 leaf. Then a 1770 quote puts the
+    top rail at about 1.737. To prove it, measure a gate in store: the top of an upright down to the top of the top
+    rail.
+  - No fillers and no cut or custom-sized slats or rails (owner, 2026-10-25): only whole 90 mm slats and 92 mm
+    rails.
+  - The 2026-10-17 model (`src/ui/doorProducts.js` Trez: 11.1 mm gaps, cut slats taking the rest) predates this
+    rule. To redo: 15 mm gaps, whole slats, the uprights' overhang taking the rest.
 - **Fitted between pillars, hung from a sill (owner, 2026-10-25, the street gates of quote 780480).**
   `sidePlay`: the GATE zone is the opening between the pillars and the leaves stand that much in from each.
   A GATE zone's `sill` (now editable, like a door's) is where the leaf starts above the ground (a leaf hung
@@ -896,6 +950,9 @@ estimates are embedded in that code** (`docs/product-modelling.md` step 6). In s
   is lifted by it except the ground stop.
   - `gate_trez_anthracite_std99`: the standard Trez l.99 × H.154 (Leroy Merlin 70193214; 69573224 is the
     same gate at H.153), "104 cm between pillars", so `sidePlay` 25 mm.
+    The height is conflicting: Leroy Merlin's page says 154 (title and "Hauteur (en cm) 154", re-read
+    2026-10-25), the catalog says 153 (owner), the maker's standard-heights table 1530. By the slat rule either
+    gives 12 slats; only the uprights' overhang differs (81 vs 71 mm).
   - `gate_trez2_anthracite_opening`: the 2-leaf Trez made to the opening ("2860 between pillars" on the
     quote; the maker fits leaves, play and hinges inside it), `sidePlay` 35 mm (the standard 80092306: 299
     in 306).
@@ -1023,13 +1080,22 @@ same slat as the Trez gates): `boards` 9 cm high, #5a636c.
 - **Gap and uprights (owner, 2026-10-25, the street fence of quote 780480).** Proven (the Klos'up guides:
   2019 "entretoises", 2021 kit): 10 mm PVC spacers between slats (a 100 mm pitch; the 2026-10-17 entry had
   9 mm, read off a photo), post 74 × 42 mm (42 along the fence), glissière 40 × 21.5 mm (21.5 along it,
-  screwed to a pillar), posts ≤ 1772 mm apart for 1760 mm slats, a 25 mm top closer over the top slat.
+  screwed to a pillar), posts ≤ 1772 mm apart for 1760 mm slats, the posts ending 25 mm over the top slat. The
+  "closoirs" (haut / bas) are short 25 × 20 mm fillers pushed into a post's open groove above the top slat and under the
+  first, not a cap along the fence: the fence's top edge is its top slat (2021 kit p.9, p.19).
 - The material's `posts: { post, channel, above }` (`fencePostBoxes`, architectural3d.js) stands the uprights
   at each FENCE zone's ends, from the wall top under them to `above` (15 mm) over the zone's top: a glissière
   inside the zone where the end meets a garden wall at least as tall as the fence (a pillar), else a post
   centred on the end, shared with the next zone. **Draw one FENCE zone per bay**, ending at the post centres.
 - With `boards`, the zone's top is the top slat + one gap (`boards` spreads `n` slats of pitch
   (top − foot) / n, each `pitch − joint` tall): foot 0.755, top 1.755 → 10 slats 0.755–1.745, posts to 1.770.
+- **The street fence's layout (owner, 2026-10-31, "standard"):** 9 slats of 90 mm with 15 mm gaps (the Trez
+  gates' rhythm, on spacers the owner cuts), **0.805–1.735**, 75 mm over the 0.73 wall. The level follows the
+  standard portail (quote 1770 = uprights 0.035–1.770, 14 slats; top rail ~1.737 if its slats are centred,
+  Hypothesis): every fence gap lines up with a gate gap, the gate rails 2 mm above the fence slats; the standard
+  portillon is hung to the same rail. In the app: foot 0.805, top 1.750, a 15 mm joint (not yet applied:
+  `.claude/handoff.md` 00j). Rejected: 25 mm over the wall needs a gate rail at 1.687, which no 14-slat leaf on a
+  35 mm gap reaches; a 13-slat or near-flush custom portail, or a coping on the wall, were the ways round it.
 - Proven (Node, test/streetWall.test.js): two zones between two pillars give two glissières and one
   shared post at the joint, from the wall top to 15 mm over the zone. Hypothesis: the slats are drawn the
   full zone length (in the real fence they stop 15 mm into each upright).

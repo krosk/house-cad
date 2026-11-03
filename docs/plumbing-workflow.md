@@ -159,6 +159,12 @@ headset plan (Proven: written and read back identical, 2026-10-07); the owner pl
   Daikin's mounting-plate drawing. A buried route (under door r81 and window r108) was costed and not
   chosen (a 6.4 m trench; about the same length).
 
+**A cover over the outdoor unit (owner, 2026-10-27, for the street-façade drawing):** the unit stands on the porch
+at ground-floor level behind the porch railing, at the façade's north end (Proven: the owner's façade drawing is to
+scale and r217's plan position lands there). A louvred cover ("cache climatiseur") must keep Daikin's **> 350 mm free
+in front of the outlet**, so its front about 0.86 m from the wall, or louvres made for it; the porch's depth is not in
+the plan (Hypothesis that it fits). The lines' outside runs would show as painted trunking on the street façade.
+
 **Daikin rules used** (Proven: read in the manuals, 2026-10-07):
 - Indoor (CTXM-A/FTXM-A installer reference guide 4P518023-17P): bottom ≥ 1.8 m above the floor,
   ≥ 30 mm to the ceiling, ≥ 50 mm to a side wall; factory piping exits right (right / right-back /

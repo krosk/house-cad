@@ -19,15 +19,23 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-24 (session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written); the headset plan is **312 148** (2026-10-25: the street wall, option B, fence, letter box; 00j). Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
+**Date:** 2026-10-30 (session 48: the owner's street-façade drawings (00l), a lockable sliding door for r93 (00m), the AC line lengths re-quoted; no headset write, no commit. Session 47, 2026-10-25: the street wall (00j: pillars, option B, fence, letter box, their 3D products `c584045`, the Nice motor and the owner's own home automation), window trims (00k); the headset plan is **312 743**. Session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written). Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
 
 **Status:**
+- **Session 48 (2026-10-27/30):** uncommitted: `docs/materials.md` (the Trez slat rule, the closoir correction, the
+  Confort research), `docs/electrical-workflow.md` (the electric strike decision), `docs/plumbing-workflow.md` (the AC
+  cover), this file, and `src/ui/doorProducts.js` (`buildConfortRail`, unfinished, see 00m). **The Quest was unreachable
+  on 2026-10-27** (192.168.1.36: no route to host; ping fails), so nothing was read or written; the base is still
+  312 743. Scratch was wiped between days: the session-47 `pillars/` plots and copies are gone.
+- **Session 47 (Proven):** `c584045` (street wall models: gate sill + `sidePlay`, Klos'up posts and 10 mm gap, the
+  RENZ letter box) committed, pushed, CI green, `version.json` c584045, `update-app` installed it. Two writes on
+  2026-10-25, each on a fresh read byte-identical to its base and read back identical: 312 148 (street wall) and
+  312 743 (its products). Uncommitted: this file only. Not yet seen by the owner in AR (QA items 2026-10-25).
 - Proven (session 46, one write 2026-10-24, `write --base` on a fresh read byte-identical to 307 484, read back
   byte-identical, 308 126): the outside waste collector to the city sewer, Ø160, 4 nodes pn452–pn455 + a Ø100 drop
   from pn80 (item 00i; `docs/plumbing-workflow.md` "The connection to the city sewer").
 - **Committed and pushed (session 46, Proven: CI green, `version.json`, `update-app` installed each):** `e3a434c`
-  … `85f9f6c` (see Commits). Head `85f9f6c` is on the headset. Uncommitted: the last results line in
-  `docs/ar-survey.md` and this file.
+  … `85f9f6c` (see Commits). Head then `85f9f6c` (superseded by `c584045`).
 - Proven (session 45, one write 2026-10-23, `write --base` on a fresh read byte-identical to 306 688, read back
   byte-identical, 307 484): the kitchen sink's Ø40 drain into a Ø100 × 40 tee on the façade vent riser (item 00g;
   `docs/plumbing-workflow.md` "Kitchen sink into the façade vent").
@@ -45,16 +53,14 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 - Proven (git; `version.json` "05540e2 1022-1859Z"; Actions run success with its `npm test` step; `update-app`
   installed it): the head is `05540e2`, pushed, served and on the headset. Session 44 commits: `3bebe48` tests + CI +
   CLAUDE.md/README refresh + the `solve-house.mjs` validation fix, `05540e2` docs. Uncommitted since: see above.
-- **The base for the next write is 312 148 chars** (2026-10-25, owner's "W": the street wall, Next step 00j; scratch
-  `pillars/readback-1025.json`, read back byte-identical; backup `backup-1025-street` holds the 310 761 state).
+- **The base for the next write is 312 743 chars** (2026-10-25, owner's "c p w": the street wall's products on its
+  zones, Next step 00j; scratch `pillars/readback-models.json`, read back byte-identical; backup `backup-1025-models`
+  holds the 312 148 state). Before it: **312 148** (2026-10-25: the street wall; backup `backup-1025-street` holds
+  the 310 761 state).
   Before it: **310 761** (2026-10-24: four gate pillars r280–r283, 20 × 20 × 1.90, gates refitted to 2.86 / 1.215
   (the owner's Leroy Merlin quote 780480); backup `backup-1024-pillars` holds the 308 126 state).
-  Before it: **308 126** (the outside waste collector to the city sewer on
-  307 484, docs/plumbing-workflow.md "The connection to the city sewer"; scratch `sewer/readback.json`, read back
-  byte-identical; backup `backup-1024-sewer` holds the 307 484 state). Before it: 307 484 (the sink drain on
-  306 688; scratch `readback-1023a.json`, written 2026-10-23, read back byte-identical; backup `backup-1023a` holds the 306 688 state; earlier
-  `backup-1022` … `backup-1022d`; scratch is session-local). It was written in solved
-  form (`solve-house.mjs`), so the app's next save should change nothing (Hypothesis until a fresh read shows it).
+  Earlier: 308 126 (10-24, the city sewer; `backup-1024-sewer` = 307 484), 307 484 (10-23, the sink drain;
+  `backup-1023a` = 306 688). Each written in solved form (`solve-house.mjs`). Scratch is session-local.
 - Earlier writes, compressed: 286 266 (10-20, item 98: four door frames, r93 on the Meli, r92 7 cm west), 286 557
   (10-19: FLAVIO vanities, basement ARTENS tile), 287 012 (10-17: VMC option 4i + bed r264), and the 10-15/16 VMC
   steps (`docs/plumbing-workflow.md`). No save slot holds a pre-edit copy: undo = reverse the edit.
@@ -647,8 +653,10 @@ Sessions 31–39 (items 1–45): see `git log` and the docs. Item numbers are st
   `apply --unidiff-zero` or `stash --keep-index`.
 - **`rlog` works only on the dev server;** never stage `quest-debug.log`.
 
-## Commits (sessions 40–46; all pushed, doc-only omitted; earlier sessions: `git log`)
+## Commits (sessions 40–47; all pushed, doc-only omitted; earlier sessions: `git log`)
 
+Session 47: `c584045` street wall models (gate `sill` editable + `sidePlay`, `gate_trez_anthracite_std99`,
+`gate_trez2_anthracite_opening`, Klos'up `posts` + 10 mm gap, `fencePostBoxes`, the RENZ letter box; test/streetWall.test.js).
 Session 46: `e3a434c` furniture merged across items (hook switch) + the profiling doc · `1a3fbb3` hideFurniture /
 furnitureStats · `0d2e7a1` furniture loads once per article (`onceByKey`) · `5feb7fd` the merge by default + colours
 per vertex · `9f3fcca` / `b550f2a` / `aa34d0a` Realistic's parts behind switches, shadow-pass count, forced filter
@@ -721,6 +729,24 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
 ## Next step
 
 **Active:**
+00m. **A lockable sliding door for r93 (owner, 2026-10-27): research done, decision pending.** Findings, sizes and
+    the fit at r93: `docs/materials.md` "A lockable sliding door for r93". In short: a lock needs an end post (a plain
+    wooden stop, not structural); Lapeyre's Confort = Scrigno Xterna with its post kit, or (Hypothesis) the Meli plus a
+    home-made post. **Owner to choose A (finish the Confort model) or B (Meli + own post)**, and to tape-check the jamb
+    to r91's frame (~8.1 cm, the post needs ~5.75) and r91's handle. `buildConfortRail` is written, uncommitted, no
+    catalog entry, no test, never rendered: finish or revert per the choice. Illustration sent to the owner (plan of the
+    post kit, 护边 = the trims): scratch `hubian/` (gone with the scratch).
+00l. **The owner's street-façade drawing (Drive file `facade-rue-projet6.svg`, an elevation for an application, no
+    dimensions).** Proven: it is to scale, 68.84 px/m (the house's west façade y −5.40…4.87 = 707 px; r244 lands exactly
+    on callout 13; the car gate falls in front of the garage door, the pedestrian gate in front of the front door), x px
+    = 200 + (4.87 − y) · 68.84, terrain line at 820 px (taken as the street level, Hypothesis), ground floor at 750. The
+    street façade is the **west** façade. Two variants sent to the owner (SVG + PNG, scratch `drive/make.mjs`, gone):
+    (1) the AC unit on the porch behind a louvred cover plus the four lines as trunking (routes from the 2026-10-07
+    plan); (2) the street wall in front: 0.73 walls, pillars 1.90 + a guessed cap, fence 9 slats on 15 mm, the 2-leaf
+    portail (14 slats, rail at 1.747), the standard portillon (12), the letter box, the r236 run's posts (Hypothesis).
+    Open: the AC cover's front clearance (`docs/plumbing-workflow.md` "A cover over the outdoor unit"); the drawing's
+    own issues the owner may fix (unlabelled post by the front stair, the lantern, unequal boundary walls 12/13, no
+    garage access drawn). Never put the drawing in the repo.
 00f. **AR Realistic: step 1 (sun + shadows) built 2026-10-23 on the owner's go (`84e3a90`, pushed).** LEFT Y in the AR 3D
    view toggles it, held LEFT Y + stick-x moves the hour; design and limits in `docs/realism.md` "In AR". Proven:
    `npm test` (19, incl. `test/realism.test.js`: noon sun from plan south, morning from plan east) and the build.
@@ -750,24 +776,22 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
       length dim c1524 −4.86 → −5.035), pedestrian gate r243 1.04 wide, sill 0.23 head 1.77; car gate r242 sill 0.115 head
       1.785 (the 1670 leaf, 14 slats). **New zones:** FENCE r285 (r237 run), r286 (r236 run south of the box), r287 (over
       the box, foot 1.055), all `fence_klosup_ajouree_anthracite`, 25 mm thick on the wall's centre line, foot 0.755
-      top 1.755 ('boards' spreads 10 slats at a 100 mm pitch; posts and glissières are not drawn); the letter box r288, a
-      plain furniture box 400 × 285 × 285 on the wall (foot 0.73, top 1.015). The gates render as plain leaves (the
-      'gate' kind has no slats) and the box has no product model: see "models" below.
+      top 1.755 ('boards' spreads 10 slats at a 100 mm pitch); the letter box r288 on the wall (foot 0.73, top 1.015).
+      The products on these zones (gates, posts, the RENZ box) came with the second write: see "Models" below.
       Trap: option B copies (`optB*.json`) were drawing copies with positions moved by hand; their dims still said
       option A, so a first solve moved five walls 11.7 cm. Always fix the dims, then check `solve-house` reports 0 moves.
     - **Leroy Merlin quote 780480 (street wall):** car gate Trez made to measure, 2860 = the width **between pillars**
       (owner: the maker fits leaves, play and hinges inside it); pedestrian Trez 1210 × 1770; Nice Leggio 300 motor + Wi-Fi;
       Klos'up openwork fence 36 slats (9 per bay × 4 bays), 3 posts (2 for the r236 fence + 1 for the letter box, place
       not given yet), plates, closers; mailbox 2 doors. The second pedestrian gate line (1 m × 1.73) was a price check: ignore.
-    - **Owner leans to option B** (standard Trez pedestrian 70193214 anthracite l.99 × H.154, 104 between pillars, 841.50 €;
-      the older listing 69573224 is the same gate at 730.15 €, still buyable online, not in the catalogue): move r283
-      17.5 cm north, r236 longer by as much (fence run 4.835 = 3 bays of 1.61), opening 1.04.
+    - **Option B chosen and written:** the standard Trez pedestrian 70193214 (l.99 × H.154, 104 between pillars, 841.50 €;
+      69573224 is the same gate at H.153, 730.15 €, online only).
     - **Fence (Proven, Klos'up guides 2019 + 2021):** 90 mm slats, 10 mm clips = 100 mm pitch; on plates a 17 mm bottom
       closer + 25 mm top closer, post = panel + 42 (9 slats: 890 panel, 932 post, 943 above the wall, i.e. ~28 mm from the
       wall to the first slat; the 17 + ~11 mm plate split is a Hypothesis); sealed / iron-bar fixing: 25 mm closer; posts
       ≤ 1772 mm apart for 1760 slats. **Owner's latest (2026-10-25): 10 slats per bay** (not the quote's 9), 25 mm over the
       0.73 wall: slats 0.755–1.745, posts to 1.770. Owner rule: the gate slats must *look* aligned with the fence; nothing
-      else (rail vs slat) matters. The quote may change (that is the point of the exercise). Not in the plan (no FENCE zones).
+      else (rail vs slat) matters. The quote may change (that is the point of the exercise).
     - **Letter box (owner, 2026-10-25):** the quote's BAL normalisée Animation 2P anthracite (EAN 3412722308246, RENZ:
       285 × 285 × 400 mm per retailer listings), standing on the r236 wall (0.73 → 1.015) right of the pedestrian gate seen
       from the street, between the glissière on r283 and an alu post; then south: full bay, post, full bay, post, the
@@ -778,33 +802,216 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
       Drawing `pillars/face-bal.png` (`face3.mjs`).
     - **Gates (Trez), what is known:** Proven (fitting guide `trez/1392479.pdf` p.19, the maker's standard-heights table):
       Trez made heights 1230 / 1530 / 1735, "height at the pillar" 1265 / 1565 / **1770** (a 35 mm gap under the leaf);
-      the Trez motor reinforcement sits "dans la traverse intermédiaire", **so the Trez has a middle rail**. Profiles
+      the Trez motor reinforcement sits "dans la traverse intermédiaire" (a middle rail; **contested** by the maker's
+      render of the single leaf, see "Models"). Profiles
       (sheet 3581468): uprights 93 × 60, rails 92 × 36, slats 90 × 25. The maker's render (photo 3828988) shows uprights
       the full height with the top/bottom rails about flush with their ends. Hypotheses from those: the quote's 1770 is
       the standard 1735 gate + 35 mm (so the owner was right: H includes the foot gap); with flush rails + a middle rail
-      and 12 slats (the owner's count on 80092341), a 1530 leaf has ~13.4 mm gaps, **pitch ~103 mm**, matching the photo
+      and 12 slats (the owner's count on 80092341), a 1530 leaf has ~13.4 mm gaps, pitch ~103 mm, matching the photo
       measurement (104–108), so the gate slats would drift ~35–40 mm against the fence's 100 mm over the height and
-      **cannot all line up**. The drawings' 13-slat / 100 mm gates (`face-final.png`: car gate 1670 with 14 slats,
+      could not all line up. The drawings' 13-slat / 100 mm gates (`face-final.png`: car gate 1670 with 14 slats,
       0.115 → 1.785; pedestrian 0.230 → 1.770) rest on the superseded 100 mm assumption: redraw once measured.
     - **Questions to clarify (owner, in store / with the seller):**
       1. Pedestrian 153 gate: count the slats; measure slat-bottom to slat-bottom (100 vs ~103 mm); the rail heights;
          whether there is a middle rail and its size; whether rails are flush with the upright ends.
-      2. Quote's 1770: confirm it is the 1735 standard + 35 mm (and the pedestrian line 1210 × 1770 likewise).
+      2. ~~Quote's 1770~~ **Settled (owner, 2026-10-25, the order details as given by the seller):** "hauteur du portail
+         souhaitée à partir du sol 1770", "hauteur de fabrication (hauteur du portail) 1735", "hauteur sous chapeau de
+         piliers existants 1950" (a figure the owner gave). So 1770 is the leaf's top above the ground: the 1735 leaf
+         plus 35 mm under it, matching the maker's table (`trez/1392479.pdf` p.19). Not the top slat (the owner's
+         earlier reading). Open: the plan's pillars r280–r283 are 1.90 tall, the order says 1950 under the cap; and
+         the plan's gates (car 0.115–1.785, pedestrian 0.23–1.77) come from the slat-alignment exercise, not from
+         this order (car 1735 made from 0.035 if the ground is 0).
+         Owner's intent (2026-10-25): 1770 was meant as the gate's **lowest top edge, not counting the uprights** (the
+         top of the infill / top rail). Holds with the order if the Trez's top rail is flush with the upright ends
+         (Hypothesis from the render 3828988; in-store check, question 1); if the uprights stand proud by x, the top
+         edge is 1770 − x. It matches the fence posts' tops (1.770), not the fence's top slat (1.745): see the
+         correction below.
+         Owner (2026-10-25, "supposedly", from the maker's photos): the standard pedestrian gate's 153 / 154 is likewise
+         the rail-to-rail height, the lowest top edge; the uprights may go past the rails. So both gates are sized by
+         their rails: car rails 0.035–1.770 (1735), pedestrian rails 0.230–1.770 (1540), uprights past them by x
+         (23 mm, an earlier photo estimate: Hypothesis). Plot `pillars/face-rails.png` (`face4.mjs order-rails.json`,
+         car 15 slats = 102.6 mm pitch, pedestrian 13 = 103.3 mm, no middle rail: Hypothesis). Note: the maker's render
+         3828988 looked flush (contested); question 1 settles x, the count and the pitch.
+         **Owner decision (2026-10-25): one top line for the fence, the portillon and the portail** (the lowest point
+         of visibility, posts and uprights excluded). Correction: the Klos'up "closoir haut" is **not** a cap along the
+         fence; it is a short 25 × 20 mm filler pushed into each post's / glissière's open groove above the top slat
+         (Proven, `klosup/kit2021.pdf` p.9 profile, p.19 "Montage du remplissage"). So the fence's top edge is its
+         **top slat, 1.745**; the posts end 25 mm higher (1.770). For one line at 1.745 the gates' top rails go to
+         1.745 (order "1745 du sol au haut de la traverse haute", not 1770), or the fence is raised 25 mm. Owner to
+         **Chosen (owner, 2026-10-25): "1745 du sol (niveau rue) au haut de la traverse haute"** for both gates, one top
+         line with the fence's top slat. With the maker's 35 mm under the leaf (Hypothesis: heights on the rails, the
+         owner's reading): the portail made **1710** (rails 0.035–1.745, 15 slats ≈ 101.0 mm pitch), the standard
+         portillon 1540 hung with rails 0.205–1.745 (13 slats ≈ 103.3 mm). Plots `pillars/face-1745.png` (`face6.mjs
+         order1745.json`) and `topdetail1745.png`; the 1.770 plots are superseded. To do: tell the seller (the order now
+         says 1770 / 1735); then set r242 / r243 in the plan (a write on "W").
+         Maker (via the owner, 2026-10-25): "the slats are always the same size". Owner's reading: laid from the top.
+         Hypothesis (fits the render 3247470's cut slat at the bottom): fixed slats and gaps from the top rail down, the
+         remainder at the bottom. Then, if the gate's gap is 10 mm like the fence's, every gate slat sits 2 mm under its
+         fence slat (the 92 mm rail against the 90 mm top slat): portail 1710 = 15 full slats + 16 mm extra at the
+         bottom; portillon 1540 (rails 0.205–1.745) = 13 full + a 56 mm remainder (a cut slat). The gate's gap (10 vs
+         ~12.6 mm) is still question 1; with ~12.6 the gate drifts ~2.6 mm per slat from the top down.
+         **Correction (owner, 2026-10-25, from the maker's documentation): a gate's height is its uprights' height**
+         (overall), not the rails. So the rail-height reading above is withdrawn: the top rail sits x below the stated
+         height (x = the uprights past the rail, ~23 mm, a photo estimate: Hypothesis). For the top rail at 1.745 the
+         uprights end at 1.745 + x: "souhaitée à partir du sol" 1745 + x, fabrication 1710 + x. With x ≈ 23–25 that is
+         ~1768–1770 / ~1733–1735, i.e. **the original order (1770 / 1735, the standard height) already puts the top
+         rail at ~1.745–1.747**. The standard portillon 1540 likewise: uprights 1540, rails ~1494, hung uprights
+         ~0.228–1.768 for rails to 1.745. x is the one number to measure (question 1).
+         Plots: `pillars/face-uprights.png` (`face7.mjs order-uprights.json`: slats 90 + 11.1 mm laid from the top, the
+         rest a cut slat; portail 14 full + 67 mm, portillon 12 full + 75 mm) and `topdetail-uprights.png`; the owner
+         adjusts the order from them. The `face-1745` / `topdetail1745` (rail reading) plots are superseded.
+         **Maker (via the owner, 2026-10-25): the slats are fixed, every 100 mm, laid from the top; a taller gate grows
+         at the bottom.** So the gates' slat rhythm is the fence's: below the top rail every gate slat is level with a
+         fence slat (car: 0 mm with its rail at 1.747; portillon: 2 mm under). Portail as ordered (uprights
+         0.035–1.770): 14 full slats + an 85 mm cut slat at the bottom; standard portillon 1540: 13 full slats exactly
+         (rails 1494 = 2 × 92 + 13 × 100 + 10). Question 1 shrinks to x (uprights past the rail, ~23 mm). Plots
+         `face-uprights100.png`, `topdetail-uprights100.png` (supersede the 11.1 mm-gap ones).
+         **Owner (2026-10-25): the top rail at exactly 1.745 for both gates** (the fence's top slat). So the portail is
+         ordered "souhaitée à partir du sol" = 1745 + x (1768 / fabrication 1733 if x = 23), not 1770 (which gives
+         1770 − x). Plots `face-1745all.png`, `topdetail-1745all.png` (x = 23).
+         Owner (2026-10-25, "supposedly"): the gates' slat gap is **13 mm** (pitch 103), the fence's 10 mm (pitch 100,
+         Proven: the quote's spacers "l.2.5 × H.1 cm"). Conflicts with the earlier "every 100 mm" (source to settle).
+         If 13: with both tops at 1.745 the gate slats fall 5 mm under the fence's first slat, then 3 mm more per slat:
+         ~29 mm by the fence's bottom slat (≈ the 2026-10-17 photo reading of ~103). Options: accept; 13 mm custom
+         spacers on the fence (Hypothesis: printed; 10 slats no longer fit over 0.73 + 25, 9 do with a ~100 mm bottom
+         gap); or line up mid-height instead of at the top.
+         ~~13 mm~~ **Owner-confirmed (2026-10-25): gate slats 90 mm, gate gaps 15 mm** (pitch 105), **top and bottom
+         rails 92 mm high** (the sheet's 92 × 36 is height × depth); fence slats 90.
+         Owner count (2026-10-25): 14 slats + 2 rails in a gate whose **uprights are 1740 long**. Parts: 184 + 1260 +
+         15 × 15 = 1669, so **71 mm** to place: either a ~56 mm cut slat at the bottom (rails flush, x = 0) or uprights
+         ~35 mm past each rail (no cut slat), or a mix. Still open: is there a narrow band at the bottom / do the
+         uprights stand past the top rail? (Sets the portail's order: 1745 + x from the ground.)
+         **Answered (owner, 2026-10-25): no narrow band; the uprights stand ~2–3 cm past the rails at the top and the
+         bottom.** So x ≈ 25 ± 5 and **the order as it stands (1770 from the ground, made 1735) puts the portail's top
+         rail at ~1.745 ± 5 mm**: keep it. The portillon (standard 1540) is hung with its uprights to ~1.770. The 71 mm
+         spare minus 2 × 20–30 leaves 11–31 mm unexplained: a larger bottom gap, or gaps a little over 15 (16.4 would
+         take it all, a 106.4 pitch, ~11 mm drift over the fence's 8 gaps). Measure over 10 slats (top of the 1st to
+         the top of the 11th, ÷ 10) before cutting the fence spacers. Plot `pillars/face-15x25.png`.
+         **The maker's rule (owner, 2026-10-25), now in `docs/materials.md` "The Trez slat rule":** rails 92, slats 90,
+         gaps 15, uprights overhang by a non-fixed amount. So the frame is 184 + 105 n + 15 and the top rail is placed by
+         the installer's hanging height, not by the made height: **portail made 1735 → 14 slats** (frame 1669, ~33 mm
+         overhang each end, hung uprights 0.043–1.778); **standard portillon 1540 → 12 slats** (frame 1459, ~40 mm,
+         hung 0.246–1.786; the owner's earlier count of 12 on 80092341 fits). Order the portail as is (1735 gives 14
+         slats; 15 needs ≥ 1774 + overhang); tell the installer "haut de la traverse haute à 1745 du sol (niveau rue)".
+         Every gate slat sits 2 mm under its fence slat. The 1745 + x ordering idea above is superseded. Plot
+         `pillars/face-rule.png`.
+         **Seller at ordering (via the owner, 2026-10-30): the quoted 1770 is the uprights' top above the ground,
+         a standard 35 mm gap under the leaf counted in; the leaf is 1735, hung at 0.035–1.770** (`docs/materials.md`
+         "The Trez slat rule"). This replaces "the installer hangs it where we want" below. With an equal overhang
+         split (Hypothesis, ~33 mm), the portail's top rail is at ~1.737, 8 mm under the fence's top slat (the
+         target was 1.747), so the gaps are 10 mm off. Options given to the owner on 2026-10-30, none chosen:
+         lower the fence 10 mm (top slat 1.735); quote the portail 1790 (leaf 1755, still 14 slats, rail ~1.747);
+         or ask for a 45 mm gap under the leaf. The in-store overhang measurement decides.
+         Lowering further (owner finds the fence too high, 2026-10-30): with the 35 mm gap and an equal split, the
+         portail's rail cannot sit between ~1.67 and ~1.72 (a 14-slat leaf can't be shorter than ~1709; below it the
+         maker makes 13 slats). The portillon (standard 1530 leaf, swinging in over the 0.13 platform) puts the floor at
+         rail ~1.635. 9 fence slats need a top ≥ 1.685 (25 mm over the wall). So the two levels plotted:
+         **A** fence 9 slats 0.805–1.735, portail quote 1770 (14), rails ~1.737; **B** fence **8 slats** 0.812–1.637,
+         portail quote **1680** (leaf 1645, 13 slats, ~40 mm overhang), rails ~1.639, portillon uprights ~0.145 (15 mm
+         over the platform), 32 fence slats instead of 36. Scratch `fence/face2.py` (env FTOP FN CQ CN PR CB COP). Not chosen.
+         Also plotted: A + a 50 mm coping on the half walls (25 mm gap, gates unchanged); 10 slats 0.755–1.790 with the
+         gates hung 55 mm higher (90 mm under the portail, 168 over the platform under the portillon).
+         **Owner's working layout (2026-10-30, "keep portail where it is for now"):** fence 9 slats at its lowest,
+         **0.755–1.685** (25 mm over the 0.73 wall); the standard portillon aligned, rail 1.687, uprights ~0.193–1.723
+         (63 mm over the platform); the portail as ordered (1770, uprights 0.035–1.770, rail ~1.737), **not aligned**:
+         ~52 mm above the fence line, its slats ~half a pitch off. Open: what to do with the portail. Plot
+         `fence/fence-9-lowest-portillon.png`. Then plotted (owner's ask): the portail quoted **1723 (leaf 1688)**
+         with **13 slats** (62 mm overhang, equal split: Hypothesis), hung 61 mm off the street, uprights 0.061–1.749,
+         rail 1.687: all three aligned (`fence/fence-portail13.png`). At the standard 35 mm gap the same leaf's rail
+         is 1.661 (26 low); with 14 slats (9.5 mm overhang, likely below the maker's minimum) 1.7135 (26.5 high).
+         The deciding question for the seller: the distance from the uprights' top to the top rail's top, 13 and 14 slats.
+         **Owner's latest (2026-10-30): the portail at uprights 0.035–1.723, slats not aligned** (quote 1723, leaf 1688,
+         13 slats; rail ~1.661 if centred, Hypothesis; its uprights' top level with the portillon's). Plot
+         `fence/fence-portail13-1723.png`. Owner: a made-to-measure gate can have its slats placed to spec
+         ("supposedly", unconfirmed). Then, same uprights, the rails set for alignment: top rail **1.687**, overhang
+         **36 mm at the top** (≈ the portillon's 35.5) and **88 mm at the bottom** (bottom rail 0.123–0.215). All three
+         aligned and both gates' uprights end at 1.723. Plot `fence/fence-portail13-aligned.png` (env CR in face2.py).
+         To specify: "montants 1688, 13 lames, haut de la traverse haute à 36 mm sous le haut des montants".
+         A 14th slat (owner asked, 2026-10-30): with the rail at 1.687 the 1669 frame ends 18 mm off the street, so
+         the uprights must reach 0.018 (leaf 1705, quote ~1740, flush at the bottom, 36 mm at the top), 18 mm under the
+         leaf instead of 35. Plot `fence/fence-portail14-low.png`. Not chosen.
+         **+20 mm (owner asked, 2026-10-30): fence 0.775–1.705 (45 mm over the wall), portillon rail 1.707
+         (uprights ~0.213–1.743, 83 mm over the platform), portail made to measure: 14 slats, uprights 0.035–1.743
+         (leaf 1708, quote 1743), rail 1.707, overhang 36 top / 3 bottom; all aligned, 35 mm under the portail, both
+         gates' uprights end at 1.743.** Hypothesis: the maker accepts a 3 mm bottom overhang and placing the slats.
+         Plot `fence/fence-plus20.png`. **Owner (2026-10-31): back to the 25 mm gap** (the +20 version dropped):
+         fence 0.755–1.685, portillon rail 1.687 (uprights ~0.193–1.723). Portail still open between 13 slats
+         (`fence-portail13-aligned.png`, 88 mm bottom overhang, 35 mm gap) and 14 slats (`fence-portail14-low.png`,
+         18 mm gap). **Then (owner, 2026-10-31): the portail back to the standard order, 1770 from the ground =
+         uprights 1735, 0.035–1.770, 14 slats** (1669 frame, 66 mm of overhang to share). Its rail can sit 1.704
+         (bottom flush) to 1.770 (top flush) if the slats can be placed, 1.737 if centred; neither 1.687 (the 25 mm
+         fence) nor the next step 1.792 is reachable, so the fence must follow the portail: top slat 1.702–1.768,
+         gap over the wall 42–108 (75 if centred = A). Owner to choose the fence level.
+         **DECIDED (owner, 2026-10-31, "I go standard"): the standard layout, slats centred.** Portail as ordered
+         (quote 1770: uprights 0.035–1.770, leaf 1735, 14 slats, top rail ~1.737 if centred: Hypothesis); fence
+         9 slats, 90 / 15 mm, **0.805–1.735** (75 mm over the 0.73 wall); the standard portillon hung
+         with its top rail at 1.737 (uprights ~0.242–1.772, ~112 mm over the 0.13 platform); every gap aligned. Over the
+         letter box: 6 short slats, the lowest 1.120–1.210, 105 mm above the box (the next row would sit on it).
+         Supersedes the 0.815–1.745 / rail 1.747 layout and every 2026-10-30 variant above. Plot
+         `fence/fence-standard-1770-42-vs-75.png` (bottom half). To check in store: the uprights' overhang (33 mm
+         each end if centred), which sets the rail and so the fence. **Plan + app still to do** (then a write on "W"):
+         FENCE zones r285/r286/r289/r290 foot 0.805 top 1.750 (`boards`: 9 slats at a 105 mm pitch, 15 mm joint;
+         r287 over the box foot ~1.105); gate r242 sill 0.035 head
+         1.770; r243 sill ~0.242 head ~1.772; the Trez model to the maker's rule (whole slats, 15 mm gaps, overhang).
+         **Considered (owner, 2026-10-31): a made-to-measure portillon with 13 slats** (frame 1564), rail 1.737:
+         uprights 0.165–1.770 (leaf 1605; order it as "montants 1605", since the 1770-from-the-ground convention
+         assumes 35 mm over the street, not the 0.13 platform), overhang 33 top (= the portail's) / 8 bottom; 35 mm over the platform to the uprights,
+         43 to the rail (was 112 / 148). Equal overhangs would leave 7.5 mm over the platform: too tight. Hypothesis:
+         the maker places the slats and accepts 8 mm. Plot `fence/street-wall-portillon13.png`. Not decided.
+         Variant with the standard bottom overhang (owner asked): 33 / 33, uprights 0.140–1.770 (leaf 1630), only
+         **10 mm over the platform** (rail 43). Plot `fence/street-wall-portillon13-std.png`.
+         ~~13-slat portillon~~ **Dropped (owner, 2026-10-31: "can't work"): back to the standard portillon** (12 slats,
+         leaf ~1530, rail 1.737, uprights ~0.242–1.772, 112 / 148 mm over the platform), i.e. the decided layout above.
+         **Owner (2026-10-25): align the gaps, not the tops.** So the gates' top rails sit **2 mm above** the fence's
+         top slat: rail 1.655–1.747 against slat 1.655–1.745, and every gap and slat below lines up exactly. Tell the
+         installer "haut de la traverse haute à 1747 du sol (niveau rue)"; hung uprights then ~0.045–1.780 (portail)
+         and ~0.248–1.788 (portillon), Hypothesis: the overhang split equally. **Current plots:**
+         `pillars/face-gaps.png` (`face9.mjs order-gaps.json`, env FENCE_N=9 FENCE_PITCH=0.105) and `topdetail-gaps.png`;
+         all earlier street-wall plots are superseded.
+         **Open option (owner asked, not chosen, 2026-10-25): everything 50 mm lower** (fence 0.765–1.695, a 35 mm gap
+         over the wall instead of 85; gate rails at 1.697): the portail drops to **13 slats, made ~1630** (1564–1668 all
+         give 13; 14 would put its uprights below the street), uprights ~0.100–1.730; the standard portillon keeps 12
+         (~0.198–1.738). Plot `pillars/face-minus50.png` (`face10.mjs order-minus50.json`, FENCE_TOP=1.695). Standard
+         portillon height: LM page 154, the owner's catalog 153, maker's table 1530: 12 slats either way.
+         No fillers, no cut / custom slats or rails (owner). The app's Trez model still draws 11.1 mm gaps and cut
+         slats: a code change to make (whole slats, 15 mm, the uprights' overhang), then the plan's gate heights.
+         **Decision: the fence's gaps go to 15 mm too, on spacers the owner cuts.** Plot `pillars/face-15.png`
+         (`face8.mjs order-15.json`, env FENCE_N=9 FENCE_PITCH=0.105): **9 slats per bay, 0.815–1.745** (10 would start
+         at 0.710, under the wall top), an 85 mm gap over the 0.73 wall; every gate slat 2 mm under its fence slat (the
+         92 mm rail). Gates (x = 23, Hypothesis): portail 14 full slats + 5 mm left; portillon 12 full + 20 mm. Slats:
+         9 + 18 + 9 cut (offcuts → 6 short over the letter box) = **36, the quote's count** (Hypothesis: the
+         arithmetic). Spacers: 15 mm lengths, e.g. cut from the quote's "closoir pour poteau" 25 × 20 profile
+         (Hypothesis; likely a second 2.30 m bar). Not yet in the app: FENCE zones foot 0.815 / top 1.760 and a 15 mm
+         `joint` (code + plan change, then a write on "W").
       3. If the pitch is ~103 mm: a made-to-measure car gate on a 100 mm pitch, or accept the drift (align the top slat).
       4. Fence: 10 slats per bay instead of 9; the fixing (plates ≈ 28 mm under the first slat vs sealed / iron bar 25 mm).
       5. Letter box: how the RENZ box fixes between glissière and post, and the gap over it; the slat-end allowance in a
          glissière / post (sets the cut lengths); the entretoises count for 10 slats.
-    - **Models (owner, 2026-10-25: "produce the models"), built, uncommitted (tests 32/32, build OK):** gate `sill`
+      6. ~~Electric strike: the Klos'up kit~~ **Decided (owner, 2026-10-25): a custom upright** (an alu tube on r282
+         with a narrow fail-secure strike, the kit's layout with own parts; ~79 € all Leroy Merlin vs 339.15 €).
+         Details, sources and open checks: `docs/electrical-workflow.md` "The pedestrian gate's electric strike".
+         Still to do: measure the delivered gate (the leaf 990/995, the hinge gap, the latch throw and height), check
+         the EXTEL body ≤ 20 mm wide, then fix the opening (~1075 render included, Hypothesis) and widen r243 from
+         1.04 in the plan (a write only on "W"). Plots: scratch `pillars/door.mjs` (pocket variant, superseded:
+         water and repair) and `door-tube.mjs` (the chosen upright, 1070 drawn).
+    - **Models (owner, 2026-10-25: "produce the models"), committed `c584045`, pushed, served, on the headset (tests 32/32, build OK):** gate `sill`
       (editable, the leaf from it) and `sidePlay`; `gate_trez_anthracite_std99` (25 mm play) and
       `gate_trez2_anthracite_opening` (35 mm); the Klos'up fence: 10 mm gap (guide, was 9) and `posts` (glissière at a
       pillar, a shared post at each zone joint: one FENCE zone per bay); the RENZ letter box
       `renz-animation-2p-anthracite` (builder `letter-box-renz`). Docs: materials.md, furniture.md, QA items.
-      **Pending write (needs "c p" first so the headset app has the code, then "W"):** `pillars/solved-models.json`
+      **Written 2026-10-25 ("c p w", read back identical):** `pillars/solved-models.json`
       (`edit-models.mjs` on `solved-fence.json`, base 312 148): the two gate products, r286 split into bays r286/r289/r290
       ending at post centres −2.2525 / −4.0245 / −5.7965, r287 over the box, r288 with the RENZ product facing 270.
       Slat pitch: the existing Trez model (2026-10-17) fits ~101 mm on the maker's straight render 3247470 (no middle
       rail on the single leaf), which contradicts the ~103 mm Hypothesis above from the Cadiou guide's table; the
       in-store measurement still decides.
+    - **Motor and home automation:** **the Leggio 300 kit, kept (owner, 2026-10-25)** after comparing the Walky and the
+      Wingo; the owner's own ESP32-based system, no vendor apps. Room on the 24 × 20 pillars: Proven by the top views
+      (`nice/leggio_top.py`), the rear pivot 35–155 mm off the pillar face, A/B 150/150 advised. Specs, terminals,
+      controller options and the open checks (IBT4N pinout, the rear bracket's stand-off, which Wi-Fi interface
+      98747037 is and whether to drop it from the quote):
+      `docs/electrical-workflow.md` "Home automation". Not drawn in the plan yet (the control unit, the owner's box,
+      the 230 V and data runs to the house: the owner was asked where the hub / network cabinet sits).
     - Drawings: `pillars/face2.mjs <house.json> <out.svg> [title] [foot | foot line 2]` (env FENCE_TOP, FENCE_N; fence
       in the gate colour), latest `face-final.png` (`optB10c.json`); `trez/gate.py` (the 12-slat reading).
 00k. **Window trims (habillages, owner 2026-10-24):** Lapeyre interior trims for frames without a lip (X7628, X7621, X7622,
@@ -870,9 +1077,9 @@ exist (`packaging/quest-apk.md`); don't re-init. Scratchpad scripts and backups 
    (top 0.88, a Hypothesis), and the basement ARTENS tile. Connect with skill `quest-connect`. Before any route work:
    `house-query anchors` and `house-query beams` on a fresh read. The attic lintels at y −1.96 (open check below) are a
    natural first use of BEAM · FLOOR / CEILING, drawn by the owner.
-0a. **Optional W (owner's go needed):** the Trez on r243 (item 92), the 2-leaf Trez on r242 resized to 2.76 m
-   (item 93), and FENCE zones once the owner gives their lines (item 94). ~~The vanities (95) and the basement tile
-   (91)~~: written 10-19.
+0a. ~~**Optional W:** the Trez on r243 (item 92), the 2-leaf Trez on r242 resized to 2.76 m (item 93), FENCE zones
+   (item 94)~~: superseded 2026-10-25 by 00j (the standard Trez 99 on r243, the 2-leaf Trez to the 2.86 opening on
+   r242, Klos'up FENCE zones per bay; written). ~~The vanities (95) and the basement tile (91)~~: written 10-19.
 0. **Item 86 after the 4i write:** ~~the owner's unit choice~~ decided 2026-10-18: the **Aldes Compact Premium MW** (not the HP+); kitchen Ø125 flexible or semi-rigid (docs/plumbing-workflow.md, after "4i with the kitchen and shower ducts in flexible"). Still open: the checks (wall top at slab height
    where the shower duct slants, attic lintels at y −1.96, the outlet terminal); on the headset, the laundry stub ends
    12.9 cm from unit B (inside airflow.js's 15 cm PORT_REACH: the app's air model ignores the laundry vent). ~~Finish item 86 on option 4d~~
