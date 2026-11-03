@@ -560,8 +560,9 @@ the animation loop. `setMode` resets in-progress gestures and activates/deactiva
   8 fps during continuous dimension/edge drags. The preview/export floor is always the active
   real floor; change it only through SETUP · LEVEL. In EXPORT, RIGHT **thumbstick up/down** switches
   `SVG` / `PNG` / `DXF` / `COOHOM DXF` / `JSON`. PNG is a 4096-pixel-long-edge raster of the same complete paper sheet
-  as SVG. A ray-picked panel has **7 output-layer toggles** (`TOGGLES` = `planDims`, `markerDims`,
-  `markerIcons`, `wiring`, `furniture`, `furnitureDims`, `area`): `wiring` (default **off**) surfaces
+  as SVG. A ray-picked panel has **8 output-layer toggles** (`TOGGLES` = `planDims`, `markerDims`,
+  `markerIcons`, `wiring`, `furniture`, `furnitureDims`, `area`, `pipes`; `pipes`, default off, adds the waste
+  and VMC pipes to the preview, SVG and PNG, owner 2026-11-03): `wiring` (default **off**) surfaces
   the whole-house conduit/wire layer, and `furnitureDims` (default off) surfaces dimensions anchored to
   a furniture edge — each gated under its parent (`wiring` under `markerIcons`, `furnitureDims` under
   `furniture`) so a dim/route to an undrawn element can't dangle. With plan dims off and furniture +
@@ -1512,6 +1513,6 @@ teleport reticle; no last-active routing remains.
 | `src/io/planSheet.js` | To-scale plan-sheet renderer: canvas + SVG backends, footprint/dims/markers/electrical links/legend/scale bar. `floorToSvg` (print + download), `floorToCanvas` (AR live preview) |
 | `src/io/dxf.js` | Layered AutoCAD 2000 DXF exporter in 1:1 millimeter model space, including true-3D electrical routes; shared by desktop and AR |
 | `src/core/planDiff.js` | Change-map diff: id-matched, solved-geometry diff of zones/markers/dimensions between a saved-slot baseline and the live project (`diffAgainstSnapshot`); rendered as revision clouds by `planSheet.js`, sheet-only |
-| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format + 7-toggle output profile (`planDims`/`markerDims`/`markerIcons`/`wiring`/`furniture`/`furnitureDims`/`area`) |
+| `src/io/outputOptions.js` | Device-local SVG/PNG/DXF/COOHOM DXF/JSON format + 8-toggle output profile (`planDims`/`markerDims`/`markerIcons`/`wiring`/`furniture`/`furnitureDims`/`area`/`pipes`) |
 | `src/core/dimline.js` | Shared `edgeLineWorld(ref, rects)` — guarded edge lookup (marker/origin → null) used by both `Sketch2D` and the sheet renderer |
 | `packaging/quest-apk.md` | reproduce-from-scratch Quest APK runbook |

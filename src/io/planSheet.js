@@ -1302,8 +1302,9 @@ function drawElectricalLinks(be, L, floor) {
 // One conventional floor-area chip per semantic ROOM component. Use the center
 // of its largest source rectangle as a stable point inside the union; this avoids
 // polygon-centroid labels falling outside an L-shaped room.
-// Pipes (owner, 2026-10-14: waste and VMC on the PNG sheet, nothing else for now). Opt-in
-// through opts.pipeServices (service names), so no other output changes. Drawn to scale at
+// Pipes (owner, 2026-10-14: waste and VMC; 2026-11-03: a `pipes` output layer, off by default, for
+// every sheet output, where it was the PNG's only content). opts.pipeServices (service names)
+// overrides the layer. Drawn to scale at
 // each pipe's diameter in plan projection, monochrome like the rest of the sheet: waste a
 // solid grey band, VMC an outlined (hollow) duct. A run shows when either end is on this
 // floor; a run through the slab marks its plan point with a crossed circle (a riser).
@@ -1311,17 +1312,12 @@ const PIPE_SHEET_STYLE = {
   waste: { fill: '#8a8a8a', outline: null },
   vmc: { fill: '#ffffff', outline: '#111' },
 };
-// The services the PNG sheet shows (desktop and AR), for now.
-export const SHEET_PNG_PIPES = ['waste', 'vmc'];
-// The PNG sheet's options, for now (owner, 2026-10-14): the plan and those pipes only, so
-// dimensions and fixtures are off. Applied over shared-scale options, so the page, scale and
-// origin still match every other sheet of the set.
-export function pipeSheetOptions(opts = {}) {
-  return {
-    ...opts,
-    pipeServices: SHEET_PNG_PIPES,
-    layers: { ...resolveOutputLayers(opts), planDims: false, markerDims: false, markerIcons: false, furnitureDims: false },
-  };
+// The services the `pipes` layer shows (desktop and AR).
+export const SHEET_PIPE_SERVICES = ['waste', 'vmc'];
+// The pipe services a sheet draws: opts.pipeServices when given, else the `pipes` layer's.
+export function sheetPipeServices(opts = {}) {
+  if (opts.pipeServices) return opts.pipeServices;
+  return resolveOutputLayers(opts).pipes ? SHEET_PIPE_SERVICES : [];
 }
 const PIPE_SHEET_LABELS = { waste: 'Waste', vmc: 'VMC' };
 const PIPE_OUTLINE_MM = 0.25;
@@ -1471,8 +1467,9 @@ function drawStrip(be, L, floor, opts) {
       label: `${markerName(t)}${MARKER_RECOMMENDED_AMPS[t] ? ` · ${MARKER_RECOMMENDED_AMPS[t]} A` : markerNote(t) ? ` · ${markerNote(t)}` : ''}`,
     })), (entry) => 4.4 + be.measure(entry.label, 2.4) + 3);
 
-  const pipeRuns = sheetPipeRuns(opts.project, floor, opts.pipeServices);
-  const pipeRows = wrapRows((opts.pipeServices || []).filter((sv) => pipeRuns.some((r) => r.service === sv)).map((sv) => {
+  const pipeServices = sheetPipeServices(opts);
+  const pipeRuns = sheetPipeRuns(opts.project, floor, pipeServices);
+  const pipeRows = wrapRows(pipeServices.filter((sv) => pipeRuns.some((r) => r.service === sv)).map((sv) => {
     const sizes = [...new Set(pipeRuns.filter((r) => r.service === sv).map((r) => Math.round(r.diameter * 1000)))]
       .sort((a, b) => b - a);
     return { sv, label: `${(opts.pipeLabel || ((t) => PIPE_SHEET_LABELS[t] || t))(sv)} Ø${sizes.join('/')} mm` };
@@ -1737,7 +1734,7 @@ function renderFloor(be, floor, opts = {}) {
   if (layers.markerIcons) {
     drawElectricalLinks(be, L, floor); // logical switch→light control legs; conduit topology is never printed
   }
-  drawPipes(be, L, sheetPipeRuns(opts.project, floor, opts.pipeServices)); // opt-in, over the zones
+  drawPipes(be, L, sheetPipeRuns(opts.project, floor, sheetPipeServices(opts))); // opt-in, over the zones
   if (layers.planDims || furnitureDimsOnly(layers)) drawDimensions(be, L, floor, layers);
   if (layers.markerDims) drawMarkerPins(be, L, floor, layers); // fixture-placement dimensions, under the glyphs
   if (layers.area) drawRoomAreas(be, L, floor);

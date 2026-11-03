@@ -142,6 +142,7 @@ const STRINGS = {
   'export.furniture': { en: 'FURNITURE', fr: 'MOBILIER', zh: '家具' },
   'export.furnitureDims': { en: 'FURNITURE DIMS', fr: 'COTES MOBILIER', zh: '家具尺寸' },
   'export.area': { en: 'AREA', fr: 'SURFACE', zh: '面积' },
+  'export.pipes': { en: 'PIPES (WASTE, VMC)', fr: 'TUYAUX (EU, VMC)', zh: '管道（排水、新风）' },
   'export.action': { en: 'EXPORT', fr: 'EXPORTER', zh: '导出' },
   'export.compare': { en: 'COMPARE', fr: 'COMPARER', zh: '对比' },
   'export.language': { en: 'LANGUAGE', fr: 'LANGUE', zh: '语言' },

@@ -216,10 +216,13 @@ generation time across Print, SVG, and AR previews so pages can be superposed. S
 footprint, structural and marker-pin dimensions, dotted switch→light control links, fixture stacks,
 semantic door/window/stairs/cabinet symbols and legends, timestamp, and scale bar. Whole-house
 conduit nodes, conduit runs, routed wires, their pin dimensions, and risers are authoring data and
-are always excluded from sheets and sheet revision maps. The **PNG** download (desktop Print and AR EXPORT) is,
-for now (owner, 2026-10-14), a pipe sheet: `pipeSheetOptions()` turns dimensions and fixtures off and draws the
-waste and VMC pipes to scale (waste a grey band, VMC a hollow duct, a crossed circle where a run passes the slab,
-including a storey it crosses without a node on it); Print/PDF, SVG, DXF and the AR preview are unchanged. FURNITURE defaults to
+are always excluded from sheets and sheet revision maps. **Pipes** are an output layer
+(`pipes`, default off; owner, 2026-11-03: a toggle, desktop Print menu "Pipes" and AR EXPORT · PIPES, one shared
+setting): on, every sheet (Print/PDF, SVG, PNG, the AR preview) adds the waste and VMC pipes to scale (waste a grey
+band, VMC a hollow duct, a crossed circle where a run passes the slab, including a storey it crosses without a node
+on it) and their legend; `sheetPipeServices()`. DXF never carries them. From 2026-10-14 to 2026-11-03 the PNG was a
+pipes-only sheet with dimensions and fixtures off, which surprised the owner against the preview: the PNG is now
+the same sheet as the SVG. FURNITURE defaults to
 hidden; AR's device-local output profile can show it in SVG/DXF. Constraints involving furniture
 remain stored and solved (one-way, after the structure: a furniture dimension never moves a wall, and one that no longer fits is deleted; `docs/furniture.md`) but are always excluded from output. Furniture also does not reduce connected-room area; other subtract kinds
 still do. Vertical marker stacks require strictly identical plan `x` and `y`; horizontal fixtures

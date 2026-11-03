@@ -21,7 +21,8 @@ import {
 import { buildShareUrl, decodeViewFromHash, loadView } from './io/shareView.js';
 import { onTextureProgress } from './ui/textureWorker.js';
 import { exportSTL, exportOBJ, exportGLTF } from './io/exportMesh.js';
-import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions, pipeSheetOptions } from './io/planSheet.js';
+import { floorToSvg, floorToPngBlob, floorsToSharedScaleSvgs, sharedScaleSheetOptions } from './io/planSheet.js';
+import { getOutputSettings, toggleOutputLayer } from './io/outputOptions.js';
 import { floorToDxf, floorToCoohomDxf } from './io/dxf.js';
 import { diffAgainstSnapshot } from './core/planDiff.js';
 import { getUnit, setUnit, onUnitChange, toMeters, fmt, unitLabel, unitInfo } from './core/units.js';
@@ -1286,6 +1287,11 @@ function printSheets(svgs) {
   const btn = document.getElementById('print-btn');
   const pop = document.getElementById('print-pop');
   const baselineSel = document.getElementById('print-baseline');
+  // Pipes on the sheets (owner, 2026-11-03): the shared output layer, so AR's EXPORT · PIPES agrees.
+  const pipesBox = document.getElementById('print-pipes');
+  pipesBox.checked = getOutputSettings().pipes;
+  pipesBox.addEventListener('change', () => { if (getOutputSettings().pipes !== pipesBox.checked) toggleOutputLayer('pipes'); });
+  const sheetLayers = () => ({ pipes: pipesBox.checked });
   const langSel = document.getElementById('print-lang');
   const close = () => { pop.hidden = true; };
 
@@ -1366,14 +1372,14 @@ function printSheets(svgs) {
           const f = project.activeFloor;
           // A single-floor export uses the exact project-wide print transform so
           // it can be superposed with a page from Print All without rescaling.
-          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap };
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, { ...localizedSheetOptions(sheetLang()), layers: sheetLayers() }), changeMap };
           const name = sheetDownloadName(f, 'svg');
           download(name, floorToSvg(f, sheetOpts), 'image/svg+xml');
           sketch.onStatus?.(`Downloaded ${name}${changeMap ? ' — with change map' : ''}`);
         } else if (b.dataset.print === 'png') {
           const f = project.activeFloor;
-          // PNG only, for now (owner, 2026-10-14): the plan with the waste and VMC pipes.
-          const sheetOpts = pipeSheetOptions({ ...sharedScaleSheetOptions(project.floors, localizedSheetOptions(sheetLang())), changeMap });
+          // The same sheet as the SVG (owner, 2026-11-03; it was a pipes-only sheet from 2026-10-14).
+          const sheetOpts = { ...sharedScaleSheetOptions(project.floors, { ...localizedSheetOptions(sheetLang()), layers: sheetLayers() }), changeMap };
           const blob = await floorToPngBlob(f, sheetOpts);
           const name = sheetDownloadName(f, 'png');
           download(name, blob, 'image/png');
@@ -1389,7 +1395,7 @@ function printSheets(svgs) {
           download(name, floorToCoohomDxf(f), 'application/dxf');
           sketch.onStatus?.(`Downloaded ${name} — simplified Coohom recognition geometry.`);
         } else {
-          printSheets(floorsToSharedScaleSvgs(project.floors, { ...localizedSheetOptions(sheetLang()), changeMap }));
+          printSheets(floorsToSharedScaleSvgs(project.floors, { ...localizedSheetOptions(sheetLang()), layers: sheetLayers(), changeMap }));
           sketch.onStatus?.(`Opening print dialog — choose Save as PDF, print at 100%.${changeMap ? ' Change map included.' : ''}`);
         }
       } catch (err) {

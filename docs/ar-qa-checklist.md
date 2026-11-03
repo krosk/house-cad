@@ -353,6 +353,7 @@ outline, one-way pin), cross-cutting HUD/input, and accuracy. Tick a box when co
       another floor or format instead of being blocked by Chromium's multi-download gate
 - [ ] If Web Share is advertised but rejected from immersive mode, the same export falls back to a uniquely named direct download instead of being lost
 - [ ] PNG is a sharp 4096-pixel-long-edge raster matching the SVG sheet content and output filters
+- [ ] EXPORT · PIPES (2026-11-03): off by default; on, the preview, SVG and PNG show the waste and VMC pipes and their legend while keeping dims and markers; the desktop Print menu's "Pipes" checkbox shows the same state on that device
 - [ ] The downloaded file lands in the headset's Download folder (retrieve by cable) — TWA + Quest Browser
 - [ ] Options survive mode changes/APK relaunches but do not alter JSON saves or copied floors
 - [ ] Grip is inert here (no delete/undo); leaving EXPORT keeps the active-floor companion visible

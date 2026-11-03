@@ -5,7 +5,7 @@
 // 'link' and 'qr' are whole-house view-only exports rather than per-floor sheet/CAD
 // exports. LINK copies the URL; QR delivers a PNG. They are intentionally separate.
 export const OUTPUT_FORMATS = ['svg', 'png', 'dxf', 'coohom', 'json', 'link', 'qr'];
-export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
+export const OUTPUT_LAYER_KEYS = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area', 'pipes'];
 export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   planDims: true,
   markerDims: true,
@@ -20,6 +20,9 @@ export const OUTPUT_LAYER_DEFAULTS = Object.freeze({
   // to an undrawn furniture edge would dangle), like wiring is gated under markerIcons.
   furnitureDims: false,
   area: true,
+  // The waste and VMC pipes drawn to scale (owner, 2026-11-03: a toggle, so the PNG shows the
+  // same sheet as the preview and the SVG). Default OFF.
+  pipes: false,
 });
 
 const STORE_KEY = 'house-cad:output:v1';
@@ -36,6 +39,7 @@ export function resolveOutputLayers(options = {}) {
     furniture: bool(source.furniture, OUTPUT_LAYER_DEFAULTS.furniture),
     furnitureDims: bool(source.furnitureDims, OUTPUT_LAYER_DEFAULTS.furnitureDims),
     area: bool(source.area, OUTPUT_LAYER_DEFAULTS.area),
+    pipes: bool(source.pipes, OUTPUT_LAYER_DEFAULTS.pipes),
   };
 }
 

@@ -44,7 +44,7 @@ import {
   AUTOSAVE_KEY, FLOOR_CLIPBOARD_KEY, createFloorClipboard, pasteFloorClipboard,
   serializeProject, deserializeInto,
 } from '../io/serialize.js';
-import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions, pipeSheetOptions } from '../io/planSheet.js';
+import { floorToSvg, floorToCanvas, floorToPngBlob, sharedScaleSheetOptions } from '../io/planSheet.js';
 import { floorToDxf, floorToCoohomDxf } from '../io/dxf.js';
 import { buildShareUrl } from '../io/shareView.js';
 import { qrToPngBlob } from '../io/qr.js';
@@ -732,7 +732,7 @@ export function setupMR(view, project, getFootprint) {
     // Tall enough that the format + "Compare" (change-map baseline) + "Language" rows,
     // the seven layer toggles, and the download button all fit without the button
     // clipping off the bottom. The plane keeps the canvas aspect.
-    const W = 512, H = 948;
+    const W = 512, H = 1016;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -749,11 +749,11 @@ export function setupMR(view, project, getFootprint) {
     group.add(mesh);
     group.visible = false;
 
-    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area'];
+    const TOGGLES = ['planDims', 'markerDims', 'markerIcons', 'wiring', 'furniture', 'furnitureDims', 'area', 'pipes'];
     const BASELINE_Y = 186, BASELINE_H = 58;   // change-map "Compare" row → 186..244
     const LANG_Y = 250, LANG_H = 58;           // sheet-language row → 250..308
-    const TOGGLE_Y = 322, ROW_H = 68;          // 7 layer toggles → 322..798
-    const BUTTON_Y = 812, BUTTON_H = 112;      // download button → 812..924 (fits H=948)
+    const TOGGLE_Y = 322, ROW_H = 68;          // 8 layer toggles → 322..866
+    const BUTTON_Y = 880, BUTTON_H = 112;      // download button → 880..992 (fits H=1016)
     function actionAt(u, v) {
       const cy = (1 - v) * H;
       if (cy >= BASELINE_Y && cy < BASELINE_Y + BASELINE_H) return 'baseline';
@@ -7484,7 +7484,7 @@ export function setupMR(view, project, getFootprint) {
         changeMap: exportChangeMap(), // revision clouds when a baseline slot is chosen
       });
       if (extension === 'png') {
-        data = await floorToPngBlob(f, pipeSheetOptions(sheetOpts));
+        data = await floorToPngBlob(f, sheetOpts);
         mime = 'image/png';
       } else {
         data = floorToSvg(f, sheetOpts);
