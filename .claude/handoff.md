@@ -19,10 +19,38 @@ repo docs (project knowledge is repo-only; rule in `CLAUDE.md`, "Where project k
 | `docs/realism.md` / `docs/share-view.md` / `docs/markers-plan.md` | Realistic + photo finishes / share links (+ the parked Quest-to-TV mirror) / marker roadmap |
 | `packaging/quest-apk.md` | Quest APK runbook (read before any packaging work) |
 
-**Date:** 2026-10-30 (session 48: the owner's street-façade drawings (00l), a lockable sliding door for r93 (00m), the AC line lengths re-quoted; no headset write, no commit. Session 47, 2026-10-25: the street wall (00j: pillars, option B, fence, letter box, their 3D products `c584045`, the Nice motor and the owner's own home automation), window trims (00k); the headset plan is **312 743**. Session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written). Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
+**Date:** 2026-11-05 (session 49: the street fence decided as "standard" (00j), the PNG/pipes toggle `085c50e`, heating cost answers, the upper floor's levelling (research only, `docs/materials.md`); no headset write. VMC: the upper bathroom duct's basement part researched 2026-11-05/07 (Status bullet below). Session 48, 2026-10-30: the owner's street-façade drawings (00l), a lockable sliding door for r93 (00m), the AC line lengths re-quoted; no headset write, no commit. Session 47, 2026-10-25: the street wall (00j: pillars, option B, fence, letter box, their 3D products `c584045`, the Nice motor and the owner's own home automation), window trims (00k); the headset plan is **312 743**. Session 46: AR performance (00h: furniture merged across items, the loader race, the basic shadow filter; 3D 70 → 76 fps, Realistic 49 → 66.5 from the owner's viewpoint), the city sewer connection (00i, written). Session 45: AR Realistic (00f), the panel step 1 (00e), the sink drain (00g), the AR double-render fix)
 
 **Status:**
-- **Session 48 (2026-10-27/30):** uncommitted: `docs/materials.md` (the Trez slat rule, the closoir correction, the
+- **Session 49 (2026-10-30 → 11-04, Proven):** `085c50e` (sheets: a `pipes` output layer, default off, desktop Print
+  checkbox + AR EXPORT · PIPES row; the PNG is now the same sheet as the SVG) and `e85250d` (docs: fence decision,
+  heat-loss figures, Confort research, the session-48 files) committed, pushed, CI green, `version.json` e85250d,
+  `update-app` installed it. Not yet seen on the headset: the taller AR EXPORT panel (QA item). The Quest was
+  reachable over mDNS (`adb devices` lists `adb-2G0YC5ZG5202JF-…`; the old 192.168.1.36:42795 refused); a read on
+  2026-10-30 was **312 743**, byte-identical to the base, `solve-house` 0 moves. No write. Next: 00j "Plan + app
+  still to do" (the Trez model to the maker's rule, the fence pitch 105, the zones and gate heights, then a write on
+  "W"). Scratch `fence/` (plots, `face2.py`) is session-local.
+- **Session 49, 2026-11-05/07, the upper bathroom's VMC duct (owner, research only, no plan change):** the longest VMC
+  duct is the upper bathroom's, 13.20 m to unit r219 (Proven, Node, the 312 743 read). The owner corrected the plan:
+  the basement west-wall run p287 is **Ø80 and already built**; the east run p288 (3.74 m) is not built, and they want
+  it flat if possible, the corner kept in Ø80. Everything is in `docs/plumbing-workflow.md` after "The upper bathroom
+  duct stays Ø80": the loss comparison (round Ø125 best, ≈ 81–87 Pa at the vent's weakest point; best flat 60×200 /
+  55×220, ≈ 79–86 with an Ø80 corner, Hypothesis), shopping lists (Castorama sells the rigid Aldes Minigaine 200×60
+  range itself; Leroy Merlin's Aldes fittings are marketplace only; the S&P TPL is folded and rejected by the owner),
+  the BDH vents' "Pression" tap and a water-tube (inclined) manometer to measure. **Pending on "W":** p287 → Ø80,
+  p288 to the chosen size (owner has not chosen). Drawings in scratch only (`vmc-basement.png`, `manometer.png`).
+- **Session 49, 2026-11-04/05, the upper floor's levelling (owner question, research only, uncommitted):** the owner
+  wants the old wood boards of Upper (outside the bathroom, which gets a screed) levelled under a floating composite
+  parquet; first 3 cm of the Leroy Merlin PRB leveller 69836270, now about 5 mm; the contractor insists a leveller
+  will level and stop the creaks. Everything is in `docs/materials.md` "Upper floor: levelling the old wood floor":
+  the product (no wood substrate listed, no technical sheet), the weights, the one-joist check (EN 1995, the design
+  limit and its k_sys/k_h correction), the supports read from Ground/Basement (the north room r88 has no support
+  found under its south end: ≈ 4.8 m to the owner's sighted beam over passage r56, which 7 × 10 joists cannot do;
+  Hypothesis: deeper joists or a hidden beam), r123 = solid 7 cm plaster blocks (owner), and the advice (screw the
+  boards down first; a wood-rated fibred leveller with primer and mesh, or 18 mm OSB3 dalles, the products listed
+  in that section). Questions for the contractor were drafted in French. Not in the
+  plan: the beam over r56, the north room's joists. Open: the north room's joist depth and supports.
+- **Session 48 (2026-10-27/30):** committed in `e85250d`; was uncommitted: `docs/materials.md` (the Trez slat rule, the closoir correction, the
   Confort research), `docs/electrical-workflow.md` (the electric strike decision), `docs/plumbing-workflow.md` (the AC
   cover), this file, and `src/ui/doorProducts.js` (`buildConfortRail`, unfinished, see 00m). **The Quest was unreachable
   on 2026-10-27** (192.168.1.36: no route to host; ping fails), so nothing was read or written; the base is still

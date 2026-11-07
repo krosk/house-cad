@@ -718,6 +718,74 @@ pale specks, a sandy grain and a slightly darker eased edge; the bump map has on
   read with the swap): 25.1 m², 162 tiles, 24 boxes (576 €), about 4.9 kg of grout (12 kg with the 20 × 20).
   `tile_200_dark_red` stays in the catalog.
 
+## Upper floor: levelling the old wood floor (owner question, 2026-11-04)
+
+Owner: the bathroom (r86) gets a screed; the rest of Upper keeps its old wood flooring, to be levelled with
+3 cm of the Leroy Merlin PRB "Ragréage fibré hautes performances" (ref 69836270) under a floating composite
+parquet. Owner: the joists "probably" run north–south (Hypothesis until seen), and the whole floor follows the
+bathroom's pattern (7 × 10 cm at 29 cm), only drawn in the bathroom (r266–r271).
+- **The product** (Proven: the retailer's spec table read in Chrome, its safety sheet media 3217502): Leroy
+  Merlin's own-label PRB product, code LMB3RREHPF, 30 mm maximum per layer, indoor/outdoor, 30 kg, 5 m² a bag.
+  No wood substrate is listed and no technical sheet is attached. PRB's own wood rules (Proven, its technical sheets): Planisol
+  Fibré 3–15 mm on rigid wood ventilated underneath, with primer (DTU 51.3); Planifibre SR 5–30 mm with a
+  stapled 10 × 10 glass mesh and a 3 mm edge joint.
+- **Weight** (Hypothesis, PRB's 1.5–1.7 kg/m²/mm): 3 cm ≈ 50 kg/m², about doubling the floor's own ≈ 50 kg/m²
+  (boards, joists, ceiling, composite).
+- **Joist check** (Hypothesis: the bathroom's measured joists 7 × 10 cm at 29 cm assumed in every room, C24,
+  span = the room's north–south length, 150 kg/m² use, design stress 14.8 MPa = k_mod 0.8 × f_m,k 24 / γ_M 1.3, EN 1995-1-1, without k_sys 1.1 (joists sharing)
+  or k_h 1.08 (a 10 cm-deep section), which raise it to ≈ 17.6 MPa; loads 1.35 G + 1.5 Q, M = wL²/8, σ = M / (b h²/6),
+  sag 5wL⁴/384EI with E 11 000 MPa, no creep, the boards' help ignored; a one-joist Node calculation):
+
+  | room | span | composite only: stress / sag | + 3 cm leveller: stress / sag |
+  |---|---|---|---|
+  | bathroom r86 | 2.39 m | 5.2 MPa / 3.8 mm | 6.4 MPa / 4.8 mm |
+  | south room r85 | 3.13 m | 8.9 MPa / 11.3 mm | 11.0 MPa / 14.1 mm |
+  | north room r88 | 3.83 m | 13.3 MPa / 25.3 mm | 16.4 MPa (over 14.8, under 17.6) / 31.7 mm |
+
+  East–west joists would span ≈ 4.7 m, much worse.
+- **Supports from the floor below** (Proven: the plan read 2026-10-30, 312 743; that they bear is Hypothesis):
+  the south room's joists have a line under both ends: the south façade, and at y ≈ −1.86 the Ground partition
+  r51/r57 (−1.88…−1.81) with beam r265 at its ceiling (x −4.66…−3.465, 2.58–2.70) over a ≈ 47 cm gap in the
+  Basement (r66 ends −2.15, r67 starts −1.68): span ≈ 3.1 m, as assumed. The north room's south end (the Upper
+  partition at y 0.53–0.62) sits over the living room r55 (Ground y 0.09…4.49), with no wall under it; the nearest
+  Ground walls are y 0…0.09 (x −3.055…−0.195 only, 9 cm) and passage partition r56 at y −0.37…−0.30 beside column
+  r122 (west part). Spans 4.4–4.8 m, which 7 × 10 joists fail today (17.6–21.1 MPa, 44–64 mm sag): the north room
+  has bigger joists or a beam in the living-room ceiling that the plan does not have. Depth needed (7 cm wide,
+  29 cm pitch; L/300 + strength / L/500): 3.1 m 10.3 / 12.1 cm today, 11.0 / 13.1 with 3 cm; 3.8 m 12.6 / 14.9, 13.6 /
+  16.1; 4.4 m 14.5 / 17.2, 15.6 / 18.5; 4.8 m 15.9 / 18.8, 17.1 / 20.2. The Upper floor is drawn 25 cm thick (5 screed +
+  10 joist leaves 10 cm unexplained): the measured 10 cm may be the visible depth only (Hypothesis).
+- **Owner (2026-11-04):** the bathroom's joists "seem to rest over a beam" running east–west over passage r56 (Ground,
+  y −0.37…−0.30): a lintel in the partition line at y ≈ −0.33 (column r122 → x ≈ −3.05), so a bearing line
+  (Hypothesis). Bathroom spans become ≈ 1.5 m and ≈ 0.9 m (fine for its screed). The north room's nearest southern
+  support is then that beam: ≈ 4.8 m to the north façade, unless its joists are deeper or another support exists.
+  Not in the plan yet (a BEAM · CEILING on Ground; size unmeasured; a headset write only on "W").
+  Also Hypothesis: the Upper east wall r189 (x 0…0.4) stands over the Ground's open junction of r55 and r59 (they
+  touch at x −0.195), so a beam there too.
+- **Owner (2026-11-04):** wall r123 (Ground, the back of cabinet r125, y −2.49…−2.42) is not plasterboard on studs
+  but 7 cm of solid white material, "石膏板" per whoever told them (Chinese for plaster board). Most likely solid
+  plaster blocks (carreaux de plâtre, sold 5/7/10 cm), a non-bearing partition (Hypothesis; proof: blocks about
+  66 × 50 cm with tongue-and-groove joints at a cut or a socket hole). It lies south of the y ≈ −1.86 line, so it
+  changes no span above.
+- Advice given: a cement layer on old boards cracks as they move
+  and wets them, and a floating floor needs only flatness (≈ 2–3 mm under 1 m, Hypothesis), so screwed OSB/CTB-H
+  sheets on shims or battens (≈ 10–12 kg/m²) or a dry screed suit better; any pour thin, local and wood-rated.
+- **Owner (2026-11-05): about 5 mm, not 3 cm.** ≈ 8 kg/m² (Hypothesis, 1.5–1.7 kg/m²/mm): structurally negligible
+  (≈ +4 % on the joists' stress). What still decides it is the substrate: PRB allows a fibred leveller on wood only on
+  a rigid, stable floor ventilated underneath, with primer (Planisol Fibré 3–15 mm), so the creaking boards are screwed
+  down first; and 5 mm levels only dips ≤ ≈ 5 mm. The Leroy Merlin product's wood suitability is still unproven (no
+  technical sheet on its page).
+- **Products shown (Leroy Merlin, read 2026-11-04/05 in Chrome; prices in the Black Friday sale):** SWISS KRONO OSB3
+  dalles 250 × 67.5 cm: 18 mm 68398456 (17.77 €, 17.94 kg, Proven OSB3 for damp rooms, 640 kg/m³), 16 mm 70394576
+  (19.44 €; its page's 10 kg contradicts its density, ≈ 17 kg), 22 mm 70257453 (22.82 €, 22.42 kg); particle board
+  22 mm 67392493 (205 × 61, 21.28 €, P class unread); battens 38 × 63 treated fir 67014801 (4 m, 6.39 €) / 67014731
+  (3 m, 4.79 €); shims RAIMONDI 8 mm 95457196, wedges 79970373. Tongue and groove: not stated on any page (Hypothesis:
+  usual for the 67.5 cm dalle format; check the edges in store). 18 mm on every joist (29 cm), 22 mm on battens ≤ 60 cm.
+- **The contractor** (owner, 2026-11-05) insists a leveller will both level and stop the creaks. Answer given: plausible
+  only with a wood-rated product, the boards screwed into the joists first, primer, a stapled glass mesh and an edge
+  joint; questions to ask them (product sheet, screwing, primer/mesh, thickness, guarantee) were drafted in French.
+- Open: the joists' size, spacing, direction and supports in the north and south rooms (the north room first);
+  the worst dip and whether it is local or a slope.
+
 ## Doors (door products)
 
 Owner decisions (2026-09-26): a door product is a **material of a DOOR zone** (not a free-placed furniture item),

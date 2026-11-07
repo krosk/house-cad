@@ -943,6 +943,74 @@ bathroom's minimum-demand point (78–83 Pa); 4h with the basement part in Ø100
 lowest 84–89; the unit where it is (4f, OUT 0.35 m west) passes in Ø80, lowest 83–89 (upper) and 86–91 (shower room).
 The Classic fails in every layout.
 
+**The basement west-wall run is Ø80 (owner, 2026-11-05: "Along the west wall, the duct is actually a 80").** This corrects
+the Hypothesis above: the existing duct goes past pn58 and runs south along the basement west wall (p287, 2.80 m) in
+Ø80. The plan still draws p287 Ø100 (Proven: the read of 2026-10-30, 312 743); change it only on the owner's "W".
+Not known: whether the east run p288 (3.74 m to unit B) exists and its size. Hypothesis: with Ø100 on p288 alone the
+gain is about half the 4i figure less a reducer, ≈ 1.5–2.5 Pa, so the upper vent's minimum-demand point lands at
+≈ 80–86 Pa, near the 80 Pa limit; a CPT re-run with the corrected diameters would prove it. As drawn, p287's axis
+(x −4.615) is 1.5 cm from the r66/r67 wall face (−4.63): a Ø80 would sit 2.5 cm in the wall, so the real position is
+to be measured.
+Owner (2026-11-05): p288 is **not built**; they are measuring what to buy and asked whether it can be a **flat duct**.
+Keep p287 drawn where it is (x −4.615, clipping the wall). Hypothesis (Colebrook, smooth wall, p288 3.74 m, nominal
+inside sizes, two Ø80 transitions at K 0.15–0.4 for anything not Ø80; scratch `flat.mjs`), loss on p288 at 35 m³/h:
+Ø80 3.9 Pa; Ø100 2.1–3.4; flat 40×100 (Minigaine "Ø80") 8.1–9.4; 55×110 3.4–4.7; 50×150 2.5–3.8; 60×204 1.4–2.7.
+So a flat duct the Ø80's equal is no gain, the 40×100 is ≈ 5 Pa worse (fails the vent floor further), and only
+60×204 saves ≈ 1–2.5 Pa, about what the 78–83 Pa all-Ø80 point needs to clear 80. Shortening p288 (unit B further
+west, as in 4f) saves ≈ 1 Pa per metre of Ø80 removed.
+Recommendation (2026-11-05, owner: "p287 must be round and 80 ... replace p288 with the piece that keeps pressure
+closest to what it needs"): **p288 in round Ø125**, an Ø80→Ø125 increaser at p287's south end, the corner at pn319
+as a Ø125 elbow, a Ø125→Ø80 reducer just before the unit, the Ø80 stub p333 into the port. Hypothesis (scratch
+`p288.mjs`: Colebrook, corner K 0.6–0.8, sudden expansion (1−A80/A)², reducer K 0.1–0.25 on the Ø80 dynamic
+pressure), the corner and p288 at 35 m³/h: Ø80 5.4–5.9 Pa (two 45° 4.9–5.4); Ø100 2.5–3.2; **Ø125 1.5–2.4**; Ø160
+1.4–2.4 (no better: the fittings dominate); flat 60×204 with a Ø80 corner 2.9–4.8. Ø125 gains ≈ 3.5 Pa on Ø80, so
+the upper vent's minimum-demand point moves from 78–83 to ≈ 81–87 Pa, just over the 80 Pa floor. Fit: axis 1.97,
+top ≈ 2.03 under the 2.07 ceiling (Basement joists not in the plan). The plan still draws p288 Ø100 (only on "W").
+Among flat ducts (owner asked, 2026-11-05; scratch `flat2.mjs`, same model, round→flat adapter as a widening
+(1−A80/A)² × 0.5–1 + 0.1, flat→Ø80 K 0.1–0.4, a flat horizontal bend K 0.4–1.0 on the flat duct's dynamic pressure),
+corner + p288 at 35 m³/h, corner done flat after the adapter / in Ø80 before it: 40×100 9.0–12.2 / 9.2–10.8;
+55×110 3.6–5.6 / 4.5–6.1; 50×150 2.6–4.4 / 3.8–5.5; **60×204 1.5–3.3** / 2.9–5.0; 55×220 1.5–3.3 / 3.0–5.0.
+Best flat: 60×204 (or 55×220), adapter at p287's end, the corner as a flat bend; vent ≈ 80–87 Pa against round
+Ø125's ≈ 81–87 (Hypothesis). Turning in Ø80 before the adapter wastes ≈ 1.5 Pa.
+If the corner must stay Ø80 (owner asked, 2026-11-05): the best flat is still 60×204 (or 55×220), 2.9–5.0 Pa with an
+87°30′, ≈ 2.4–4.5 with the corner as two Ø80 45° (K 0.4–0.6); vent ≈ 78–86 / 79–86 Pa, so the low end may stay under
+80 (Hypothesis). The round→flat widening is ≈ 0.5–1.3 Pa of it: a long tapered adapter keeps the low side.
+Shopping list for that layout (owner asked, 2026-11-05; read on leroymerlin.fr search in Chrome, castorama.fr, and the
+Aldes Minigaine sheet fts_minigaine.pdf). Aldes Minigaine 60×200 is 200×60 outside, "équivalent Ø125"; its mixed
+fittings are Ø125, so each end goes Ø80 ↔ Ø125 reducer ↔ raccord mixte droit Ø125/60×200 (11023995). Bars join with
+a raccord (entre 2 barres) 11023970. LM: bar 1 m 90974982 16.90 € (sold by LM), 3 m 82864656 (no price shown),
+raccord mixte droit 83620101 10.80 € (marketplace; that it is 11023995 is Hypothesis, the page shows no spec),
+réduction conique galva Ø125/80 Aldes 88285495 10.39 € or Atlantic 82861678 11.03 €, coude 45° galva Ø80 76136742
+7.99 €, bride de fixation 11028081 83943125 5.01 €, coude horizontal 60×200 11023973 82864618 14.20 €; the coupler
+11023970 not found on LM (123elec, domomat list it). Castorama: bar 200×60 1 m 17.50 € (3542280351474, sold by
+Castorama), réduction galva Ø125/80 5.90 € and coude 45° Ø80 7.99 € (marketplace); no 60×200 fittings found.
+Aldes's sheet asks for ≥ 1.5 m of insulated flexible duct between the network and the unit (noise), not modelled.
+In-store alternative (owner asked for products not sold only online, 2026-11-05): on leroymerlin.fr every Aldes 60×200
+fitting is a marketplace offer (web only; only the 1 m bar 90974982 is sold by Leroy Merlin). Leroy Merlin itself sells
+the **S&P Unelvent extra-flat 55×220 ("TPL 125", Ø125 equivalent, joined with adhesive tape)** range: bar 1 m
+70608125 16.90 €, MCM 125 mixed coupler Ø125 ↔ 55×220 70606970 9.99 €, MCR 125 flat-to-flat coupler 70606956 7.69 €,
+3 wall fixings FXL 125 70608013 9.59 €, flat horizontal bend CHR 125 70606984 13.90 €; PVC reducers Equation RC125/100
+67706576 2.49 € and RC100/80 67706583 2.19 €; plumbing PVC 45° Ø80 Nicoll M/F 86576171 4.69 € or Girpi 61575913
+5.89 €. MCM = mixed and MCR = flat joint per domomat's S&P listings (833639, 833658). 55×220 performs as 60×204 in
+`flat2.mjs` (Hypothesis). Which fitting fits the existing Ø80 duct depends on its type (drain PVC or VMC), unchecked.
+Owner (2026-11-05): the S&P TPL is sold folded ("pliant") and poorly rated, so not it. **Castorama sells the rigid Aldes
+Minigaine 200×60 range itself** (castorama.fr search, EAN 354228035xxxx): bar 1 m 351474 17.50 €, raccord droit
+200×60 for Ø125 (the mixed adapter) 351535 10.50 €, raccord droit 200×60 bar joint 351498 7.89 €, coude horizontal
+351511 11.90 €, collier de fixation 351481 5.29 €, Aldes reducers Ø125/100 351412 4.59 € and Ø100/80 351405 3.59 €.
+No Ø80 45° elbow sold by Castorama itself (only marketplace gutter fittings): the Nicoll 45° Ø80 from Leroy Merlin.
+**Vent pressure taps (owner, 2026-11-05, photos of their BDH C51 opened):** the BDH vents have a moulded tap marked
+"Pression" for a manometer, so the vent pressures modelled above can be measured once the unit runs. Proven (photo): a
+2 × AA holder inside, so the owner's C51 is the PUSH battery version (11015168, Hypothesis on the reference). Method
+(Hypothesis, the usual commissioning check): a differential manometer between the tap and the room, unit running,
+doors shut; read at minimum and at boost; target ≥ 80 Pa (C51 boost ≥ 70) and ≤ 160 Pa.
+Owner's instrument (2026-11-05): a clear plastic tube with water (a U-tube manometer). Proven (physics): 1 mm of water
+= 9.81 Pa, so 80 Pa = 8.2 mm and 160 Pa = 16.3 mm between the two menisci; a ±1 mm reading is ±10 Pa, too coarse to tell
+79 from 86. Lay the reading leg on a slope instead (an inclined manometer): at a rise of 1 in 10 the water moves ≈ 10×
+further along the tube, ≈ 82 mm for 80 Pa (Pa ≈ 9.81 × distance along the tube in mm × rise/length). This needs a
+wide open reservoir (a bottle) as the other leg: with a second tube of the same bore, its level falls as far as the
+water moves and the true head is distance × (rise/length + 1), which loses the gain. The water moves toward the tap
+(the vent is in suction): the sloped leg goes on the tap side, long enough that water cannot reach the vent.
+
 **Option 4h: 4g with unit B 26.5 cm further east (owner, 2026-10-17: "Sure"; drafted in Node, not written).** Unit B at
 (−0.675…−0.315, −3.18…−2.82), 16.5 cm from the laundry's east wall (Aldes: 10 cm at the lug). Its kitchen port sits
 right under the slab exit (x −0.395), so the kitchen Ø125 turns from its 45° slab slant straight south with one elbow (a
